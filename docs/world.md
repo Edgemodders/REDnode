@@ -184,3 +184,23 @@ Before the game: REDnode 0.25.0 deployed, and `"bridgeTest": "clean"` in the hos
 5. Quit the game.
 
 The host log should have `REDbridge: the newest release is 0.10.0`, `matches GitHub's SHA-256`, `installing the .NET 10 runtime`, `ready, 0.10.0 from REDnode`, `REDbridge 0.10.0 starting from REDnode`, and `Tooltips: off`, `Tooltips: on`.
+
+**First run, 2026-10-17: steps 1 and 2 passed; 3 and 4 not proven.** REDnode 0.25.0, with the timer, marks matching the steps. The Mod Manager showed the missing REDbridge and the button; pressed, the host logged the release, the SHA-256 match, the .NET 10 install into `%LOCALAPPDATA%Microsoftdotnet` and `ready, 0.10.0 from REDnode` within 7 s, and the Packaging test then read `OK REDbridge >=0.10 0.10.0`. But:
+
+| Step | What the logs showed |
+|---|---|
+| 3. The archives | REDbridge never started: the sample only starts it on its **Archives** button, which the step did not say to press |
+| 4. Tooltips | `Tooltips: off` was logged, `Tooltips: on` was not, and the setting stayed off. Off and on again both worked in the mock game |
+| The sample's window | One missing requirement painted every line red, the OK ones too. Packaging test 0.2.1 shows the OK lines in the normal colour |
+
+### W3: retest
+
+REDnode 0.25.0 with Packaging test 0.2.1, still with `"bridgeTest": "clean"`. Tooltips are off from the first run.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. Load a save, press F10, and start the timer. The Packaging test window: the OK lines in the normal colour, only `MISSING not-a-real-mod` in red. Mark.
+2. Press **Archives** in the Packaging test window. Within a few seconds it reads "REDbridge 0.10.0 from REDnode" and lists the archives. Mark.
+3. Hover a title-bar icon: no tooltip (they are off). In the launcher, switch **Tooltips** on, then hover the icon again: the tooltip shows. Mark.
+4. Quit the game.
+
+The host log should have `REDbridge 0.10.0 starting from REDnode` and `Tooltips: on`.

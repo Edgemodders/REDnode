@@ -1,5 +1,5 @@
-// Packaging test: a sample of W2. Its rednode-app.json requires Codeware, ArchiveXL
-// and a mod that does not exist, so the Mod Manager and this window show one missing.
+// Packaging test: a sample of W2 and W3. Its rednode-app.json requires Codeware, ArchiveXL,
+// REDbridge and a mod that does not exist, so the Mod Manager and this window show one missing.
 // kernel.bridge() reaches REDbridge (WolvenKit's engine) to list and search the game's
 // archives. Needs "permissions": ["bridge"] and the player's OK in the Mod Manager.
 
@@ -7,7 +7,9 @@ import { kernel, ui } from 'rednode';
 
 let query = 'player_ma_tpp';
 
+// Met requirements in the normal colour, missing ones in red: one red line used to turn them all red.
 const requires = ui.text('Checking requirements...', { tone: 'dim' });
+const missing = ui.text('', { tone: 'danger' });
 const bridgeLine = ui.text('Press Archives to start REDbridge.', { tone: 'dim' });
 const results = ui.text('', { tone: 'dim' });
 
@@ -20,6 +22,7 @@ ui.window({
   height: 460,
   children: [
     requires,
+    missing,
     ui.row(ui.button('Archives', listArchives), ui.button('Search', search, { variant: 'ghost' })),
     ui.input({
       placeholder: 'Search the archives (Enter)',
@@ -37,10 +40,9 @@ ui.window({
 
 // What rednode-app.json requires, checked against the game folder.
 const checked = await kernel.requirements();
-requires.set({
-  text: checked.map((r) => `${r.ok ? 'OK' : 'MISSING'}  ${r.name} ${r.wants}  ${r.found ?? r.note}`).join('\n'),
-  tone: checked.every((r) => r.ok) ? 'normal' : 'danger',
-});
+const line = (r) => `${r.ok ? 'OK' : 'MISSING'}  ${r.name} ${r.wants}  ${r.found ?? r.note}`;
+requires.set({ text: checked.filter((r) => r.ok).map(line).join('\n'), tone: 'normal' });
+missing.set({ text: checked.filter((r) => !r.ok).map(line).join('\n') });
 console.log(`Requirements: ${checked.map((r) => `${r.name} ${r.ok ? 'ok' : r.note}`).join(', ')}`);
 
 async function bridge() {

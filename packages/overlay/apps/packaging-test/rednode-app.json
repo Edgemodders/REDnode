@@ -1,7 +1,7 @@
 {
   "id": "packaging-test",
   "name": "Packaging test",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": "Edgemodders",
   "description": "A sample of W2 and W3: \"requires\" in rednode-app.json (Codeware, ArchiveXL, REDbridge, and one mod that does not exist, so the Mod Manager shows it missing) and kernel.bridge(), which lists and searches the game's archives through REDbridge. Asks for the bridge permission.",
   "main": "mod.mjs",
