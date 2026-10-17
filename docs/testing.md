@@ -33,8 +33,8 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [S1 research spike](#s1-research-spike) | In the game | Sound S1 | 2026-10-16 | 0.23.1 | Partial |
 | [S1 Play](#s1-play) | In the game | Sound S1 | 2026-10-16 | 0.24.0 | Pass but pan, fixed in 0.24.1 |
 | [S1 check, 0.24.1](#s1-check-0241) | In the game | Sound S1 | 2026-10-16 | 0.24.1 | Pass |
-| [Polish 0.24.2](#polish-0242) | In the game | Polish | 2026-10-17 | 0.24.4 | **Partly**: tooltips failed, HUD widgets on the boot loading screen |
-| [Polish 0.24.5](#polish-0245) | In the game | Polish | 2026-10-17 | 0.24.6 | **Partly**: main menu and the switch's tooltip passed; no title-bar tooltips (0.24.7 to test) |
+| [Polish 0.24.2](#polish-0242) | In the game | Polish | 2026-10-17 | 0.24.4 | **Partly**: tooltips failed, HUD widgets on the boot loading screen; both fixed and passed in Polish 0.24.5 |
+| [Polish 0.24.5](#polish-0245) | In the game | Polish | 2026-10-17 | 0.24.7 | Pass |
 
 ## Before any in-game test
 
@@ -299,7 +299,7 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 
 ### Polish 0.24.5
 
-[Source](overlay.md#polish-0245-test). First run 2026-10-17 with 0.24.5: **the game crashed** at the title screen, from a weak handle taken as a strong one in the IsPreGame check. Fixed in 0.24.6. With 0.24.6: no crash; the main menu stayed on through the boot-time player and went off with the save (log); the **Open at start** tooltip showed; the title-bar icons still had none, because Chromium sent `pointerover` for the title bar but not for the icons inside it. 0.24.7 also checks `pointermove`, **not run yet**. Retests 0.24.2's failed parts: tooltips through shadow roots checked in an offscreen repro only; the main menu by `IsPreGame()` unverified.
+[Source](overlay.md#polish-0245-test). First run 2026-10-17 with 0.24.5: **the game crashed** at the title screen, from a weak handle taken as a strong one in the IsPreGame check. Fixed in 0.24.6. With 0.24.6: no crash; the main menu stayed on through the boot-time player and went off with the save (log); the **Open at start** tooltip showed; the title-bar icons still had none, because Chromium sent `pointerover` for the title bar but not for the icons inside it. 0.24.7 also checks `pointermove`: **passed** in game the same day, all steps. Retests 0.24.2's failed parts: tooltips through shadow roots checked in an offscreen repro only; the main menu by `IsPreGame()` unverified.
 
 1. Start the game. Boot loading screen and main menu: no Vitals, no Coords. Load a save: both show.
 2. **F10**, Test timer on, **Start**, **Mark**.

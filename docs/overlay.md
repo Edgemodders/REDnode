@@ -771,6 +771,8 @@ Run with REDnode 0.24.7.
 
 The plugin log should have `Overlay: main menu on` at the start, `main menu off (player yes, IsPreGame false)` once the save runs, and no `could not read IsPreGame`.
 
+**Result, 2026-10-17: passed** with REDnode 0.24.7, all steps, with the timer. Vitals and Coords stayed hidden on the boot screens and at the main menu and showed in the save. The plugin log: `main menu on (player no, IsPreGame true)` on the first frame, still on through the boot-time player 0.6 s later, `main menu off (player yes, IsPreGame false)` when the save loaded. Tooltips showed on **Open at start** and on the title-bar icons, and a clicked icon's tooltip stayed away until the cursor left. The marks read one step low (marks 1 to 4 for steps 1, 3, 4 and 5), because step 2's Mark was for step 1: test lists now give each step exactly one Mark with its own number. This closes the Polish phase (0.24.2 to 0.24.7).
+
 ### UI kit
 
 UI is written as markup, not built by hand in code. Two layers keep it optional:
