@@ -79,6 +79,49 @@ function statusOf(i) {
   return i.open ? 'open' : 'off';
 }
 const statusLabel = (i) => (i.mod ? STATUS[i.mod.status] ?? i.mod.status.toUpperCase() : i.open ? 'OPEN' : 'OFF');
+// REDbridge (W3): where it is, or a button that gets it, with the download's progress.
+// Shown under the package's "requires" when it names REDbridge, else under its bridge permission.
+const isBridgeName = (name) => String(name).toLowerCase().replace(/[^a-z0-9]/g, '') === 'redbridge';
+const mb = (bytes) => Math.round(bytes / 1048576);
+function bridgeBlock(i) {
+  const b = i.bridge;
+  const parts = [];
+  const getButton = (label) => button(label, () => act('REDbridge', () => window.rednode.apps.getBridge()), null);
+  if (b.job && !b.job.error) {
+    parts.push(el('div', 'perm', b.job.step));
+    if (b.job.total) {
+      const bar = document.createElement('rn-progress');
+      bar.setAttribute('max', String(b.job.total));
+      bar.setAttribute('value', String(b.job.received ?? 0));
+      bar.setAttribute('label', `${mb(b.job.received ?? 0)} of ${mb(b.job.total)} MB`);
+      parts.push(bar);
+    }
+    return parts;
+  }
+  if (b.job?.error) parts.push(el('div', 'perm err', `Could not get REDbridge: ${b.job.error}`));
+  if (!b.found) {
+    const what = b.latest ? `REDbridge ${b.latest.version} (${mb(b.latest.size)} MB)` : 'the newest REDbridge (about 60 MB)';
+    parts.push(el('div', 'perm err', 'REDbridge is not installed.'));
+    parts.push(el('div', 'perm dim', `Get REDbridge downloads ${what} from GitHub, and the .NET 10 runtime if it is missing. For this Windows user only; no admin rights.`));
+    parts.push(el('div', 'row', undefined));
+    parts.at(-1).append(getButton(b.job?.error ? 'Try again' : 'Get REDbridge'));
+    return parts;
+  }
+  parts.push(el('div', 'perm dim', `REDbridge ${b.version ?? ''} from ${b.source}${b.running ? ', running' : ''}`));
+  if (!b.dotnet) {
+    parts.push(el('div', 'perm err', 'It needs the .NET 10 runtime, which this PC does not have.'));
+    parts.push(el('div', 'perm dim', 'Get REDbridge installs it for this Windows user, with the installer from Microsoft; no admin rights.'));
+    parts.push(el('div', 'row', undefined));
+    parts.at(-1).append(getButton(b.job?.error ? 'Try again' : 'Get REDbridge'));
+  } else if (b.update) {
+    const row = el('div', 'row');
+    row.append(el('span', 'dim', `REDbridge ${b.update} is out.`));
+    row.append(getButton(`Update REDbridge to ${b.update}`));
+    parts.push(row);
+  }
+  return parts;
+}
+
 // What a package's "requires" asks for and the game does not have.
 const missingOf = (i) => (i.requires ?? []).filter((r) => !r.ok);
 const wantsText = (r) => `${r.name}${r.wants && r.wants !== '*' ? ` ${r.wants}` : ''}`;
@@ -398,20 +441,16 @@ function renderDetails() {
       const detail = r.ok ? (r.found ? `${r.found} installed` : r.note || 'installed') : r.note;
       line.append(el('span', 'dim', ` · ${detail}`));
       parts.push(line);
+      if (isBridgeName(r.name) && i.bridge) parts.push(...bridgeBlock(i));
     }
   }
+  const bridgeInRequires = (i.requires ?? []).some((r) => isBridgeName(r.name));
   if (i.permissions?.length) {
     parts.push(el('div', 'section', 'Permissions'));
     for (const p of i.permissions) {
       parts.push(el('div', 'perm', `Asks for ${p.what}`));
-      if (p.name === 'bridge' && i.bridge) {
-        // REDbridge is not part of REDnode: say where it was found, or how to get it.
-        parts.push(
-          i.bridge.found
-            ? el('div', 'perm dim', `REDbridge ${i.bridge.version ?? ''} from ${i.bridge.source}${i.bridge.running ? ', running' : ''}`)
-            : el('div', 'perm err', 'REDbridge is not installed. Get it with EDGEdeck ("Get REDbridge") or REDcode in VS Code.'),
-        );
-      }
+      // REDbridge is not part of REDnode: where it was found, or a button that gets it.
+      if (p.name === 'bridge' && i.bridge && !bridgeInRequires) parts.push(...bridgeBlock(i));
       parts.push(toggle('Allowed', p.granted, (on) => act(i.name, () => window.rednode.apps.grant(i.id, p.name, on))));
     }
   }

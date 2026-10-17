@@ -1,8 +1,9 @@
 // REDbridge for packages (W2, kernel.bridge()): WolvenKit's engine behind JSON-RPC,
 // a separate GPL-3.0 program (https://github.com/Edgemodders/REDbridge). REDnode
-// does not ship it: it finds the copy EDGEdeck or REDcode fetched, starts it on the
-// first call with the game folder, and shares it between the packages the player
-// allowed. It stops after IDLE_MS without calls; the next call starts it again.
+// does not ship it: it finds the copy it fetched itself (the Mod Manager's Get
+// REDbridge, W3, bridge-install.js) or the one EDGEdeck or REDcode fetched, starts it
+// on the first call with the game folder, and shares it between the packages the
+// player allowed. It stops after IDLE_MS without calls; the next call starts it again.
 //
 // The protocol is JSON-RPC 2.0 on the bridge's stdio, Content-Length framed as
 // language servers do; stderr is its log.
@@ -14,6 +15,7 @@ const os = require('node:os');
 const path = require('node:path');
 const readline = require('node:readline');
 const { spawn } = require('node:child_process');
+const { bridgeRoot, dotnet10 } = require('./bridge-install');
 
 const IDLE_MS = 10 * 60 * 1000;
 // Editors whose storage folders may hold a fetched REDbridge, and the extensions that fetch it.
@@ -40,11 +42,29 @@ const isFile = (p) => {
   }
 };
 
+// Copies of REDbridge.exe in <dir>/<tag>/, as { exe, version, source }.
+function copiesIn(dir, source) {
+  let tags = [];
+  try {
+    tags = fs.readdirSync(dir);
+  } catch {
+    return [];
+  }
+  return tags
+    .filter((tag) => !tag.startsWith('.') && isFile(path.join(dir, tag, 'REDbridge.exe')))
+    .map((tag) => ({ exe: path.join(dir, tag, 'REDbridge.exe'), version: tag.replace(/^v/, ''), source }));
+}
+
 /**
  * REDbridge.exe: a configured path (a file or its folder), REDBRIDGE_EXE, or the newest
- * copy EDGEdeck or REDcode fetched into an editor's storage. { exe, version, source } or null.
+ * copy REDnode, EDGEdeck or REDcode fetched. { exe, version, source } or null.
+ * aClean (the W3 test's "bridgeTest": "clean" setting) sees only REDnode's own copies.
  */
-function findRedbridge(configured) {
+function findRedbridge(configured, aClean) {
+  if (aClean) {
+    const own = copiesIn(bridgeRoot(), 'REDnode').sort((a, b) => compareVersions(b.version, a.version));
+    return own[0] ?? null;
+  }
   for (const [p, source] of [
     [configured, 'the REDnode setting'],
     [process.env.REDBRIDGE_EXE, 'REDBRIDGE_EXE'],
@@ -54,47 +74,29 @@ function findRedbridge(configured) {
     if (isFile(exe)) return { exe, version: null, source };
   }
   const appData = process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming');
-  const copies = [];
+  // REDnode's own copies first, so a tie in version goes to them (the sort is stable).
+  const copies = copiesIn(bridgeRoot(), 'REDnode');
   for (const editor of EDITORS) {
     for (const ext of EXTENSIONS) {
       const dir = path.join(appData, editor, 'User', 'globalStorage', ext, 'bridge');
-      let tags = [];
-      try {
-        tags = fs.readdirSync(dir);
-      } catch {
-        continue;
-      }
-      for (const tag of tags) {
-        const exe = path.join(dir, tag, 'REDbridge.exe');
-        if (isFile(exe)) copies.push({ exe, version: tag.replace(/^v/, ''), source: `${ext === EXTENSIONS[0] ? 'EDGEdeck' : 'REDcode'} (${editor})` });
-      }
+      copies.push(...copiesIn(dir, `${ext === EXTENSIONS[0] ? 'EDGEdeck' : 'REDcode'} (${editor})`));
     }
   }
   copies.sort((a, b) => compareVersions(b.version, a.version));
   return copies[0] ?? null;
 }
 
-// REDbridge needs .NET 10. A machine-wide install wins; otherwise a per-user one, set
-// for the bridge process only (a user-level DOTNET_ROOT once broke other programs).
-function dotnetRoot() {
-  const has10 = (root) => {
-    try {
-      return fs.readdirSync(path.join(root, 'shared', 'Microsoft.NETCore.App')).some((v) => v.startsWith('10.'));
-    } catch {
-      return false;
-    }
-  };
-  const machine = path.join(process.env.ProgramFiles ?? 'C:\\Program Files', 'dotnet');
-  if (has10(machine)) return null;
-  const user = path.join(process.env.LOCALAPPDATA ?? path.join(os.homedir(), 'AppData', 'Local'), 'Microsoft', 'dotnet');
-  return has10(user) ? user : null;
-}
+/** The message for a package that needs REDbridge when none is found. */
+const NOT_INSTALLED =
+  'REDbridge is not installed. Press Get REDbridge on this package in the Mod Manager, ' +
+  'or get it with EDGEdeck or REDcode in VS Code.';
 
 /**
  * @param {object} host
  * @param {(...args: string[]) => void} host.log
  * @param {() => string | null} host.gameDir      the game folder, for --game
  * @param {() => string | undefined} host.configured  a REDbridge path from the settings
+ * @param {() => boolean} host.clean  the W3 test: only REDnode's own copy, only a per-user .NET
  */
 function createRedbridge(host) {
   let child = null;
@@ -105,22 +107,22 @@ function createRedbridge(host) {
   let buffer = Buffer.alloc(0);
 
   function locate() {
-    found = findRedbridge(host.configured());
+    found = findRedbridge(host.configured(), host.clean());
     return found;
   }
 
   function start() {
     if (child) return;
-    if (!locate()) {
-      throw new Error(
-        'REDbridge is not installed. Get it with EDGEdeck ("Get REDbridge") or REDcode in VS Code, ' +
-          'or set its path in REDnode (REDBRIDGE_EXE).',
-      );
+    if (!locate()) throw new Error(NOT_INSTALLED);
+    // REDbridge needs .NET 10. A machine-wide one it finds by itself; a per-user one is
+    // given to the bridge process only (a user-level DOTNET_ROOT once broke other programs).
+    const runtime = dotnet10(host.clean());
+    if (!runtime) {
+      throw new Error('REDbridge needs the .NET 10 runtime. Press Get REDbridge on this package in the Mod Manager to install it for this Windows user.');
     }
     const args = host.gameDir() ? ['--game', host.gameDir()] : [];
     const env = { ...process.env };
-    const root = dotnetRoot();
-    if (root) env.DOTNET_ROOT = root;
+    if (!runtime.machine) env.DOTNET_ROOT = runtime.root;
     host.log(`REDbridge ${found.version ?? ''} starting from ${found.source}: ${found.exe}`.replace('  ', ' '));
     const proc = spawn(found.exe, args, { env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     child = proc;
@@ -207,13 +209,24 @@ function createRedbridge(host) {
     }
   }
 
-  /** Whether REDbridge is found and running, for the Mod Manager and kernel.bridge(). */
+  /**
+   * Whether REDbridge is found and running, and where its .NET 10 is ('machine', 'user'
+   * or null), for the Mod Manager and kernel.bridge().
+   */
   function status() {
     const f = child ? found : locate();
-    return { found: !!f, exe: f?.exe ?? null, version: f?.version ?? null, source: f?.source ?? null, running: !!child };
+    const runtime = dotnet10(host.clean());
+    return {
+      found: !!f,
+      exe: f?.exe ?? null,
+      version: f?.version ?? null,
+      source: f?.source ?? null,
+      running: !!child,
+      dotnet: runtime ? (runtime.machine ? 'machine' : 'user') : null,
+    };
   }
 
   return { call, stop, status };
 }
 
-module.exports = { createRedbridge, findRedbridge };
+module.exports = { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED };

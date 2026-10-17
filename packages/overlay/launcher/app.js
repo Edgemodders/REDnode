@@ -186,6 +186,13 @@ $('start').addEventListener('change', async (e) => {
   RednodeUI.notify(on ? 'REDnode opens with the game' : 'Next start: only HUD widgets until you press F10', { title: 'Open at start' });
 });
 
+// Tooltips: the UI kit's, in every window. Off for players who know REDnode.
+$('tips').addEventListener('change', async (e) => {
+  const on = await window.rednode.apps.tooltips(e.detail.checked);
+  $('tips').checked = on;
+  RednodeUI.notify(on ? 'Tooltips show after a short hover' : 'No tooltips in any window', { title: 'Tooltips' });
+});
+
 // Theme: every window that uses the UI kit follows it, unless the app chose its own.
 const themeButtons = [...document.querySelectorAll('[data-theme]')];
 function showTheme(name) {
@@ -209,6 +216,7 @@ async function refresh() {
     $('mcp').checked = await window.rednode.apps.mcp();
     $('dev').checked = await window.rednode.apps.developer();
     $('start').checked = await window.rednode.apps.openAtStart();
+    $('tips').checked = await window.rednode.apps.tooltips();
     const state = await window.rednode.state();
     $('version').textContent = `REDNODE ${state.version}`;
     // Solo mode: which package has the screen, and a way out.

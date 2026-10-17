@@ -27,7 +27,8 @@ const path = require('node:path');
 const { createMods } = require('./mods');
 const { createMcp } = require('./mcp');
 const { scanGame, checkRequires, validRange } = require('./gamefiles');
-const { createRedbridge } = require('./redbridge');
+const { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED } = require('./redbridge');
+const bridgeInstall = require('./bridge-install');
 const { createLookup } = require('./gameapi-lookup');
 const crypto = require('node:crypto');
 
@@ -314,7 +315,114 @@ const GAME_DIR = (() => {
 })();
 
 // REDbridge, shared by the packages with the "bridge" permission (kernel.bridge()).
-const redbridge = createRedbridge({ log, gameDir: () => GAME_DIR, configured: () => settings.redbridge });
+// "bridgeTest": "clean" in settings.json (set by hand, for the W3 test) sees only the copy
+// REDnode fetched and only a per-user .NET, as on a PC without VS Code.
+const redbridge = createRedbridge({
+  log,
+  gameDir: () => GAME_DIR,
+  configured: () => settings.redbridge,
+  clean: () => settings.bridgeTest === 'clean',
+});
+
+// ---------- getting REDbridge from the Mod Manager (W3) ----------
+
+// An update made while REDbridge ran from the old copy left that copy behind; it goes
+// now, before REDbridge starts. Only REDnode's own copies, never EDGEdeck's or REDcode's.
+{
+  const own = findRedbridge(undefined, true);
+  if (own) bridgeInstall.removeOlder(path.basename(path.dirname(own.exe)), log);
+}
+
+let bridgeJob = null; // { step, version, received, total, error } while getting it, or its failure
+let bridgeLatest = null; // the newest release on GitHub, once asked this session
+let bridgeAsking = null;
+let bridgeNotified = 0;
+let bridgePeeked = false; // asked GitHub for the newest release's size, for the button's text
+
+/** The newest REDbridge release, asked of GitHub once a session. */
+function latestBridge() {
+  bridgeAsking ??= bridgeInstall.latestRelease().then(
+    (rel) => {
+      bridgeLatest = rel;
+      log(`REDbridge: the newest release is ${rel.version} (${rel.asset})`);
+      notifyLauncher();
+      return rel;
+    },
+    (err) => {
+      bridgeAsking = null; // ask again next time
+      throw err;
+    },
+  );
+  return bridgeAsking;
+}
+
+/** REDbridge's state for the Mod Manager: where it is, its .NET, the newest release, a job. */
+function bridgeInfo() {
+  const s = redbridge.status();
+  // The Mod Manager's text names the version and size before the player presses Get.
+  if (!s.found && !bridgeLatest && !bridgePeeked) {
+    bridgePeeked = true;
+    latestBridge().catch((err) => log(`REDbridge: could not ask GitHub for the newest release: ${err.message}`));
+  }
+  const newer = bridgeLatest && s.found && s.version && compareVersions(bridgeLatest.version, s.version) > 0;
+  return {
+    ...s,
+    latest: bridgeLatest ? { version: bridgeLatest.version, size: bridgeLatest.size } : null,
+    update: newer ? bridgeLatest.version : null,
+    job: bridgeJob,
+  };
+}
+
+function bridgeProgress(patch) {
+  bridgeJob = { ...bridgeJob, ...patch };
+  // At most four refreshes a second while downloading.
+  if (Date.now() - bridgeNotified > 250 || patch.step) {
+    bridgeNotified = Date.now();
+    notifyLauncher();
+  }
+}
+
+/**
+ * Gets REDbridge for the player (the Mod Manager's button): the newest release when none
+ * is found or a newer one is out, and the .NET 10 runtime for this Windows user when the
+ * machine has none. One job at a time; the Mod Manager shows its steps.
+ */
+async function getRedbridge() {
+  if (bridgeJob && !bridgeJob.error) return bridgeInfo();
+  bridgeJob = { step: 'Asking GitHub for the newest REDbridge', received: 0, total: 0 };
+  notifyLauncher();
+  try {
+    const rel = await latestBridge();
+    const before = redbridge.status();
+    if (!before.found || (before.version && compareVersions(rel.version, before.version) > 0)) {
+      bridgeProgress({ step: `Downloading REDbridge ${rel.version}`, version: rel.version, total: rel.size });
+      await bridgeInstall.installRelease(rel, {
+        log,
+        progress: (received, total) => bridgeProgress({ received, total: total || rel.size }),
+      });
+    }
+    if (!redbridge.status().dotnet) {
+      bridgeProgress({ step: 'Installing the .NET 10 runtime for this Windows user', received: 0, total: 0 });
+      await bridgeInstall.installDotnet({ log });
+    }
+    // Older copies of REDnode's own go, unless REDbridge runs from one; then at the next start.
+    if (!redbridge.status().running) bridgeInstall.removeOlder(rel.tag, log);
+    bridgeJob = null;
+    installed = null; // "requires": { "redbridge": ... } is checked again
+    const now = redbridge.status();
+    log(`REDbridge: ready, ${now.version} from ${now.source}, .NET 10 ${now.dotnet === 'machine' ? 'for the machine' : 'for this Windows user'}`);
+  } catch (err) {
+    bridgeJob = { error: err.message };
+    log(`REDbridge: could not get it: ${err.message}`);
+  }
+  notifyLauncher();
+  return bridgeInfo();
+}
+
+ipcMain.handle('rednode:apps:get-bridge', (event) => {
+  fromLauncher(event);
+  return getRedbridge();
+});
 
 let installed = null;
 let installedAt = 0;
@@ -323,6 +431,9 @@ function installedNow() {
   if (!installed || Date.now() - installedAt > 30000) {
     installed = scanGame(GAME_DIR);
     installedAt = Date.now();
+    // REDbridge is not in the game folder, but packages may require it (W3).
+    const b = redbridge.status();
+    if (b.found) installed.set('redbridge', { name: 'REDbridge', kind: 'tool', version: b.version, path: b.exe });
   }
   return installed;
 }
@@ -333,6 +444,9 @@ function requirementsOf(id) {
   if (!entry || !Object.keys(entry.manifest.requires ?? {}).length) return [];
   return checkRequires(entry.manifest.requires, installedNow());
 }
+
+/** Whether a manifest's "requires" names REDbridge. */
+const needsBridge = (m) => Object.keys(m.requires ?? {}).some((name) => name.toLowerCase().replace(/[^a-z0-9]/g, '') === 'redbridge');
 
 /** What a package is missing, in words, or null. */
 function missingOf(id) {
@@ -1269,6 +1383,7 @@ function hostState() {
   const s = spaces();
   return {
     connected, mode, windowed, version: VERSION, game: gameState(), theme: theme(), developer: !!settings.developer, solo,
+    tooltips: settings.tooltips !== false,
     spaces: { names: [...s.names], current: s.current },
   };
 }
@@ -1552,7 +1667,7 @@ function appList() {
           return of.length === 1 ? of[0] : of.length > 1 ? 'mixed' : null;
         })(),
         requires: requirementsOf(m.id),
-        bridge: m.permissions.includes('bridge') ? redbridge.status() : null,
+        bridge: m.permissions.includes('bridge') || needsBridge(m) ? bridgeInfo() : null,
         permissions: m.permissions.map((name) => ({ name, what: PERMISSIONS[name], granted: isGranted(m.id, name) })),
       };
     });
@@ -2006,11 +2121,12 @@ async function bridgeFor(id, op, method, params) {
   }
   if (op === 'status') {
     const s = redbridge.status();
-    if (!s.found) {
-      throw new Error('REDbridge is not installed. Get it with EDGEdeck ("Get REDbridge") or REDcode in VS Code.');
-    }
+    if (!s.found) throw new Error(NOT_INSTALLED);
     return { version: s.version, source: s.source, running: s.running };
   }
+  // The first call of a session also asks GitHub whether a newer REDbridge is out; the
+  // Mod Manager then offers Update REDbridge. Never automatic.
+  if (!bridgeLatest) latestBridge().catch((err) => log(`REDbridge: could not ask GitHub for a newer release: ${err.message}`));
   return redbridge.call(String(method), params ?? {});
 }
 
@@ -2301,6 +2417,19 @@ ipcMain.handle('rednode:host:hot-reload', (event, on) => {
     setHotReload(on);
   }
   return hotReload;
+});
+
+// Tooltips (the UI kit's, for title attributes): on by default; the launcher's switch
+// turns them off in every window, for players who know REDnode.
+ipcMain.handle('rednode:host:tooltips', (event, on) => {
+  fromLauncher(event);
+  if (typeof on === 'boolean' && on !== (settings.tooltips !== false)) {
+    settings.tooltips = on;
+    writeJson('settings.json', settings);
+    log(`Tooltips: ${on ? 'on' : 'off'}`);
+    toAllPages({ event: 'tooltips', on });
+  }
+  return settings.tooltips !== false;
 });
 
 ipcMain.handle('rednode:host:open-at-start', (event, on) => {

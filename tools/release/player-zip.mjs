@@ -14,7 +14,8 @@
 //   red4ext/plugins/REDnode/LICENSE.txt, THIRD-PARTY-NOTICES.txt, README.txt
 //
 // REDbridge is not in it: REDnode runs without it, and packages that use kernel.bridge()
-// find the copy EDGEdeck or REDcode fetched (packages/overlay/redbridge.js).
+// get it with the Mod Manager's Get REDbridge, or find the copy EDGEdeck or REDcode
+// fetched (packages/overlay/redbridge.js, bridge-install.js).
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -105,9 +106,9 @@ writeFileSync(
     'Needs: RED4ext and redscript. Some packages also need Codeware, TweakXL or ArchiveXL;',
     'the Mod Manager says which.',
     '',
-    'Packages that read the game\'s archives also need REDbridge. Install EDGEdeck or REDcode',
-    '(VS Code extensions) and let it download REDbridge once; REDnode finds that copy.',
-    'Or set REDBRIDGE_EXE to a REDbridge.exe from github.com/Edgemodders/REDbridge (needs .NET 10).',
+    'Packages that read the game\'s archives also need REDbridge. The Mod Manager shows a',
+    'Get REDbridge button on such a package: it downloads REDbridge from GitHub, and .NET 10',
+    'for your Windows user if missing, with no admin rights. A copy EDGEdeck or REDcode fetched works too.',
     '',
     'Press F10 in the game to open the overlay. Samples are in the launcher, switched off.',
     'Install REDnode packages into red4ext/plugins/REDnode/apps/<package>/.',

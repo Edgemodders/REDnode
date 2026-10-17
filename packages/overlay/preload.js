@@ -49,7 +49,7 @@ contextBridge.exposeInMainWorld('rednode', {
     listeners.add(fn);
     return () => listeners.delete(fn);
   },
-  /** Connection and game state: { connected, mode, windowed, version, game, theme, developer, solo }. */
+  /** Connection and game state: { connected, mode, windowed, version, game, theme, developer, solo, tooltips }. */
   state: () => ipcRenderer.invoke('rednode:state'),
   /** Closes this app, as switching it off in the launcher does. The UI kit's window close button uses it. */
   close: () => ipcRenderer.send('rednode:app:close'),
@@ -95,6 +95,10 @@ contextBridge.exposeInMainWorld('rednode', {
     hotReload: (on) => ipcRenderer.invoke('rednode:host:hot-reload', on),
     /** Gets Open at start, or turns it on or off. Off: the game starts with only HUD widgets showing, until F10. */
     openAtStart: (on) => ipcRenderer.invoke('rednode:host:open-at-start', on),
+    /** Gets the Tooltips switch, or turns it on or off for every window. */
+    tooltips: (on) => ipcRenderer.invoke('rednode:host:tooltips', on),
+    /** Gets REDbridge, and .NET 10 for this Windows user if missing (W3). Progress arrives with the apps list. */
+    getBridge: () => ipcRenderer.invoke('rednode:apps:get-bridge'),
     /** Gets the theme every window follows, or sets it: 'rednode', 'hud' (HUD red) or 'edge' (EDGE). */
     theme: (name) => ipcRenderer.invoke('rednode:host:theme', name),
     /** Grants or withdraws a permission a package asks for, such as 'mcp'. */

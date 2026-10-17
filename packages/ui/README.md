@@ -53,7 +53,7 @@ Themes are CSS custom properties, so an app can adjust one: `--rn-bg`, `--rn-pan
 
 Properties: `rn-toggle.checked`, `rn-slider.value`, `rn-input.value`, `rn-list.value`.
 
-Tooltips: any element with a `title` gets a tooltip drawn by the kit after half a second's hover, also inside the components (the title-bar icons). Overlay windows are drawn off screen, where the browser's own tooltips never show. On `rn-window`, `rn-panel`, `rn-menu` and `rn-notification` the `title` is the heading, so it gets none. Use `rn-tooltip` for a tooltip that shows on focus too.
+Tooltips: any element with a `title` gets a tooltip drawn by the kit after half a second's hover, also inside the components (the title-bar icons). Overlay windows are drawn off screen, where the browser's own tooltips never show. On `rn-window`, `rn-panel`, `rn-menu` and `rn-notification` the `title` is the heading, so it gets none. Use `rn-tooltip` for a tooltip that shows on focus too. The launcher's **Tooltips** switch turns the `title` tooltips off in every window, for players who know REDnode; `rn-tooltip` elements are part of the page and stay.
 
 ## Script API
 

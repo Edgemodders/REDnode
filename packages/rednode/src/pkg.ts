@@ -208,10 +208,13 @@ export const kernel = {
   /**
    * REDbridge, WolvenKit's engine, shared by every package that may use it: the
    * game's archives (list, search, extract), CR2W files as JSON and back, textures
-   * as PNG, hashes. REDnode does not ship REDbridge (GPL-3.0); it uses the copy
-   * EDGEdeck or REDcode fetched. The package must ask for the `bridge` permission
-   * in its rednode-app.json and the player must allow it in the Mod Manager; this
-   * rejects and says why until then, or when REDbridge is not installed.
+   * as PNG, hashes. REDnode does not ship REDbridge (GPL-3.0): the player gets it
+   * with **Get REDbridge** in the Mod Manager, or REDnode uses the copy EDGEdeck or
+   * REDcode fetched. The package must ask for the `bridge` permission in its
+   * rednode-app.json and the player must allow it in the Mod Manager; this rejects
+   * and says why until then, or when REDbridge is not installed. Add
+   * `"requires": { "redbridge": ">=0.10" }` so the Mod Manager shows the need, and
+   * its button, before the package runs.
    *
    * @example
    * ```ts

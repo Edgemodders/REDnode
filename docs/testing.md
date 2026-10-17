@@ -35,6 +35,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [S1 check, 0.24.1](#s1-check-0241) | In the game | Sound S1 | 2026-10-16 | 0.24.1 | Pass |
 | [Polish 0.24.2](#polish-0242) | In the game | Polish | 2026-10-17 | 0.24.4 | **Partly**: tooltips failed, HUD widgets on the boot loading screen; both fixed and passed in Polish 0.24.5 |
 | [Polish 0.24.5](#polish-0245) | In the game | Polish | 2026-10-17 | 0.24.7 | Pass |
+| [W3 REDbridge for players](#w3-redbridge-for-players) | In the game | W3 | Not run | 0.25.0 | |
 
 ## Before any in-game test
 
@@ -306,6 +307,16 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 3. Hover **Open at start** and keep still: a tooltip.
 4. Hover a title-bar icon (Roll up on the Mod Manager) and keep still: a tooltip. If not, leave the game running for an MCP `window_console` read of the `[rn-tip]` trace.
 5. Quit. The plugin log has `Overlay: main menu on`, then `main menu off (player yes, IsPreGame false)` in the save, and no `could not read IsPreGame`.
+
+### W3 REDbridge for players
+
+[Source](world.md#w3-test). Built, **not run yet**. Checked before the game: the install end to end into an empty `LOCALAPPDATA`, and the Mod Manager's button in the mock game. Needs `"bridgeTest": "clean"` in the host's settings, and really installs REDbridge and, if missing for this user, .NET 10.
+
+1. Load a save, **F10**, timer. Mod Manager, **Packaging test**: ✕ `redbridge >=0.10`, the text naming 0.10.0 (58 MB), **Get REDbridge**.
+2. **Get REDbridge**: steps and a bar, then ✓ `0.10.0 installed`, "REDbridge 0.10.0 from REDnode".
+3. Packaging test off and on: its window lists the archives.
+4. Launcher **Tooltips** off: no tooltip on a title-bar icon; on: tooltip again.
+5. Quit. The host log has the newest release, the SHA-256 match, .NET, `ready, 0.10.0 from REDnode`, and the Tooltips lines.
 
 ## MCP server
 

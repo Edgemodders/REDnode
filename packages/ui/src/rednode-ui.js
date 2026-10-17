@@ -174,13 +174,20 @@
   function applyDeveloper(on) {
     document.documentElement.toggleAttribute('rn-developer', !!on && !!window.rednode?.debug);
   }
+  // Tooltips (the launcher's switch): off, the kit draws none for title attributes.
+  function applyTooltips(on) {
+    document.documentElement.toggleAttribute('rn-no-tips', on === false);
+    if (on === false) hideTip();
+  }
   window.rednode?.state?.().then((s) => {
     applyPlayerTheme(s?.theme);
     applyDeveloper(s?.developer);
+    applyTooltips(s?.tooltips);
   }, () => {});
   window.rednode?.on?.((m) => {
     if (m.event === 'theme') applyPlayerTheme(m.theme);
     if (m.event === 'developer') applyDeveloper(m.on);
+    if (m.event === 'tooltips') applyTooltips(m.on);
   });
 
   // ---------- shared helpers ----------
@@ -984,7 +991,8 @@ nav button:focus-visible { outline: 2px solid var(--rn-accent-2); outline-offset
   // desktop does not show both. Kit elements whose title is their heading are skipped.
   // The walk goes through shadow roots, so a kit control with a title (rn-toggle) gets
   // one when its inner parts are hovered. Each tooltip's fate goes to the console as
-  // "[rn-tip] ..." (debug level), for the MCP server's window_console.
+  // "[rn-tip] ..." (debug level), for the MCP server's window_console. The launcher's
+  // Tooltips switch turns them off in every window (rn-no-tips on <html>).
   const HEADING_TITLE = new Set(['rn-window', 'rn-panel', 'rn-menu', 'rn-notification']);
   let tipBox = null;
   let tipTarget = null;
@@ -1047,6 +1055,7 @@ nav button:focus-visible { outline: 2px solid var(--rn-accent-2); outline-offset
   // when the cursor entered a title bar but not when it went on into an icon, while the
   // moves themselves named the icon (found with the debugger on 2026-10-17).
   function onPointer(e) {
+    if (document.documentElement.hasAttribute('rn-no-tips')) return; // the player turned them off
     const target = titledIn(e.composedPath());
     if (target === tipTarget) return;
     if (target === tipDismissed) return;

@@ -145,3 +145,42 @@ Agreed with the user on 2026-10-17, as REDnode 0.25.0, right after the Polish an
 Not in W3: REDbridge in the REDnode zip (58 MB more, plus .NET, for players who never use it), and REDbridge as its own Nexus mod (it would still need .NET from elsewhere; maybe later, for Vortex users).
 
 **The test proves:** on a Windows user with no REDbridge and no .NET 10, a package that needs REDbridge shows the button; one click fetches both, and the package lists the game's archives. The test needs a second Windows user, or the dev PC's EDGEdeck and REDcode copies moved aside and .NET 10 hidden, to start from nothing.
+
+### W3: built
+
+REDnode 0.25.0, built on 2026-10-17. Also in it: the launcher's **Tooltips** switch (on by default; off, the UI kit draws no `title` tooltips in any window), asked for by the user after the Polish test.
+
+| Part | Where |
+|---|---|
+| Download, SHA-256 check, unpacking (Windows' `tar.exe`, else `Expand-Archive`), .NET 10 per user with `dotnet-install.ps1`, removing REDnode's older copies | `packages/overlay/bridge-install.js` |
+| Lookup: REDnode's own copies with the others, newest wins, a tie goes to REDnode's; .NET checked before REDbridge starts; `dotnet` in the status | `packages/overlay/redbridge.js` |
+| The job (one at a time, its steps and bytes sent to the Mod Manager four times a second at most), the update offer, `redbridge` as an installed `requires` entry, the messages | `packages/overlay/main.js` |
+| **Get REDbridge**, the progress bar, **Try again**, **Update REDbridge to ...**, under the package's REQUIRES when it names REDbridge, else under its bridge permission | `packages/overlay/manager/app.js` |
+| The Packaging test sample asks for `"redbridge": ">=0.10"` (sample 0.2.0) | `packages/overlay/apps/packaging-test` |
+
+GitHub is asked for the newest release only: when a package needs REDbridge and none is found (once a session, so the button names the version and size), when the player presses the button, and once a session after the first REDbridge call (for **Update**).
+
+**The clean test switch:** `"bridgeTest": "clean"` in the host's `settings.json` (`%APPDATA%@rednodeoverlay`), set by hand. The lookup then sees only REDnode's own copy and the .NET check only a per-user runtime, as on a PC without VS Code or .NET. Remove it after the test.
+
+Checked before the game:
+
+| Check | Result |
+|---|---|
+| The install, with `LOCALAPPDATA` pointed at an empty folder | GitHub's v0.10.0 (58 MB) downloaded, matched its SHA-256 and unpacked; a wrong SHA-256 was refused and the file deleted; .NET 10 installed per user with no admin rights; REDbridge started from REDnode's copy on that runtime and listed the game's 583,798 files |
+| The Mod Manager in the mock game, clean, from nothing | REQUIRES showed `redbridge >=0.10` missing, the text "REDbridge 0.10.0 (58 MB)" and **Get REDbridge**; pressed, it showed each step and a progress bar, and 8 s later `✓ REDbridge >=0.10 · 0.10.0 installed` and "REDbridge 0.10.0 from REDnode" |
+| The launcher in the mock game | The **Tooltips** switch, on |
+| The packaged host (the build the game starts), in the mock game with the game's arguments | The same Get REDbridge run, 8 s; this check found `bridge-install.js` missing from the packager's file list (`tools/overlay/package-host.mjs`), fixed before the commit |
+| **Update REDbridge** | **Unverified**: it needs an older copy and a newer release |
+
+### W3: test
+
+Before the game: REDnode 0.25.0 deployed, and `"bridgeTest": "clean"` in the host's settings. On a PC without .NET 10 for this user, step 2 really installs it into `%LOCALAPPDATA%Microsoftdotnet` (about 70 MB) and REDbridge into `%LOCALAPPDATA%REDnoderidge`.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. Load a save, press F10, and start the timer. In the Mod Manager, select **Packaging test**. Under REQUIRES: ✕ `redbridge >=0.10` not installed, "REDbridge is not installed", a line naming REDbridge 0.10.0 (58 MB), and **Get REDbridge**. Mark.
+2. Press **Get REDbridge**. The steps show: downloading with a bar, then .NET 10. Within a minute: ✓ `redbridge >=0.10 · 0.10.0 installed` and "REDbridge 0.10.0 from REDnode". Mark.
+3. Switch the Packaging test off and on again in the Mod Manager. Its window lists the game's archives. Mark.
+4. In the launcher, switch **Tooltips** off and hover a title-bar icon: no tooltip. Switch it on again and hover: the tooltip shows. Mark.
+5. Quit the game.
+
+The host log should have `REDbridge: the newest release is 0.10.0`, `matches GitHub's SHA-256`, `installing the .NET 10 runtime`, `ready, 0.10.0 from REDnode`, `REDbridge 0.10.0 starting from REDnode`, and `Tooltips: off`, `Tooltips: on`.

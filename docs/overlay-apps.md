@@ -422,6 +422,7 @@ A package that needs other mods says so in its manifest. REDnode checks the game
 | A redscript module: a folder or `.reds` file in `r6/scripts` | None: installed or not |
 | A Cyber Engine Tweaks mod: a folder in `bin/x64/plugins/cyber_engine_tweaks/mods` | None |
 | `red4ext`, `cet` (or `cyber engine tweaks`), `redscript` | RED4ext's and CET's file versions; redscript has none |
+| `redbridge`: not in the game folder, but a package may need it (see [The game's files through REDbridge](#the-games-files-through-redbridge)) | The version of the copy REDnode uses. When it is missing, the Mod Manager shows **Get REDbridge** |
 
 Names match without regard to case, spaces, dashes or underscores. Ranges: `>=1.16`, `>1`, `<2`, `<=1.2`, `1.20` (any 1.20.x), `=1.20.3`, `^1.16` (1.16 or later, before 2), `~1.16` (1.16.x), `*` (any version); several separated by spaces must all hold, and `||` gives alternatives.
 
@@ -434,9 +435,9 @@ const missing = (await kernel.requirements()).filter((r) => !r.ok);
 
 ## The game's files through REDbridge
 
-[REDbridge](https://github.com/Edgemodders/REDbridge) runs WolvenKit's engine and answers JSON-RPC: the game's archives (list, search, extract), CR2W files as JSON and back, textures as PNG, hashes. REDnode does not ship it (it is GPL-3.0, its own program): it uses the copy [EDGEdeck](https://github.com/Edgemodders/EDGEdeck) ("Get REDbridge") or REDcode fetched, or one set with the `REDBRIDGE_EXE` environment variable. One REDbridge serves every package: it starts on the first call, loads the game's archive index in about three seconds, and stops after 10 minutes without calls.
+[REDbridge](https://github.com/Edgemodders/REDbridge) runs WolvenKit's engine and answers JSON-RPC: the game's archives (list, search, extract), CR2W files as JSON and back, textures as PNG, hashes. REDnode does not ship it (it is GPL-3.0, its own program). Where a package needs it and none is found, the Mod Manager shows a **Get REDbridge** button: it downloads the newest release from GitHub into `%LOCALAPPDATA%REDnoderidge`, checked against GitHub's SHA-256, and the .NET 10 runtime for that Windows user if the PC has none, with no admin rights. REDnode also uses a copy [EDGEdeck](https://github.com/Edgemodders/EDGEdeck) or REDcode fetched, or one set with the `REDBRIDGE_EXE` environment variable; the newest wins. Once a session, after the first call, REDnode asks GitHub for a newer REDbridge and the Mod Manager offers **Update REDbridge**; it never updates by itself. One REDbridge serves every package: it starts on the first call, loads the game's archive index in about three seconds, and stops after 10 minutes without calls.
 
-Add `"permissions": ["bridge"]` to the manifest; the player allows it in the Mod Manager, which also says where REDbridge was found.
+Add `"permissions": ["bridge"]` to the manifest; the player allows it in the Mod Manager, which also says where REDbridge was found. Add `"requires": { "redbridge": ">=0.10" }` too, so the Mod Manager marks the package and shows the button before it runs.
 
 ```js
 import { kernel } from 'rednode';
