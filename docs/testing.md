@@ -36,6 +36,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [Polish 0.24.2](#polish-0242) | In the game | Polish | 2026-10-17 | 0.24.4 | **Partly**: tooltips failed, HUD widgets on the boot loading screen; both fixed and passed in Polish 0.24.5 |
 | [Polish 0.24.5](#polish-0245) | In the game | Polish | 2026-10-17 | 0.24.7 | Pass |
 | [W3 REDbridge for players](#w3-redbridge-for-players) | In the game | W3 | 2026-10-17 | 0.25.0 | Pass (with the retest) |
+| [H0 and Welcome](#h0-and-welcome) | In the game | #12, Welcome | Not run | 0.25.1 | |
 
 ## Before any in-game test
 
@@ -317,6 +318,15 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 3. Packaging test off and on: its window lists the archives.
 4. Launcher **Tooltips** off: no tooltip on a title-bar icon; on: tooltip again.
 5. Quit. The host log has the newest release, the SHA-256 match, .NET, `ready, 0.10.0 from REDnode`, and the Tooltips lines.
+
+### H0 and Welcome
+
+[Source](world.md#h0-and-welcome-test). Built, **not run yet**. The Welcome window checked in the mock game; RED Hot Tools never run here.
+
+1. Start: the Welcome window at the main menu, Showing lit. F10: Using lit. **Got it** closes it. Load a save, start the timer.
+2. Launcher: switch **Welcome** on, it opens; close it with ✕.
+3. In the game, `EDGEmat_M0_probe.archive` copied into `archive/pc/hot`: RED Hot Tools swaps it; play on half a minute.
+4. Quit. RED Hot Tools loaded, `Archives reload completed`, `Welcome: closed`, no crash.
 
 ## MCP server
 

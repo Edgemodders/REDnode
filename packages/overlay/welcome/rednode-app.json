@@ -1,0 +1,15 @@
+{
+  "id": "welcome",
+  "name": "Welcome",
+  "version": "0.25.1",
+  "author": "Edgemodders",
+  "description": "Shown once, at the first start: what REDnode is and what F10 does. Switch it on to read it again.",
+  "entry": "index.html",
+  "kind": "window",
+  "width": 600,
+  "height": 500,
+  "anchor": "center",
+  "x": 0,
+  "y": 0,
+  "open": false
+}

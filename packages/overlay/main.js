@@ -59,6 +59,8 @@ const APP_ROOTS = [
   { dir: path.join(__dirname, 'launcher'), single: true, builtin: true, pinned: true },
   { dir: path.join(__dirname, 'modlog'), single: true, builtin: true },
   { dir: path.join(__dirname, 'manager'), single: true, builtin: true, manager: true },
+  // The Welcome window: opened at the first start, until the player closes it once.
+  { dir: path.join(__dirname, 'welcome'), single: true, builtin: true },
   // --apps-dir may list several folders, separated by ";", for example REDnode's
   // examples and another repo's packages during development.
   ...(arg('apps-dir') ?? path.join(__dirname, 'apps'))
@@ -519,7 +521,8 @@ function windowOnHud(w) {
 // closed. Until the player first opens the overlay (F10), only HUD widgets show in passive
 // mode; windows pinned to the HUD, the launcher tab among them, wait for that F10.
 let startHold = false;
-const shownInPassive = (w) => (startHold ? w.app.manifest.kind === 'hud' : windowOnHud(w));
+// The Welcome window shows too: it is how a new player learns about F10.
+const shownInPassive = (w) => (startHold ? w.app.manifest.kind === 'hud' || w.app.manifest.id === 'welcome' : windowOnHud(w));
 function endStartHold() {
   if (!startHold) return;
   startHold = false;
@@ -860,6 +863,7 @@ function watchAppRoots() {
 
 function shouldOpen(entry) {
   if (entry.pinned) return true;
+  if (entry.builtin && entry.manifest.id === 'welcome' && !settings.welcomed) return true; // the first start
   if (chosenApps) return chosenApps.includes(entry.manifest.id);
   return settings.apps[entry.manifest.id]?.open ?? entry.manifest.open;
 }
@@ -1684,6 +1688,11 @@ function setPackageOpen(id, open) {
   if (!entry || entry.pinned) throw new Error(`No app or mod "${id}"`);
   const wasOn = isEnabled(entry);
   settings.apps[id] = { ...settings.apps[id], open: !!open };
+  // Closed once, the Welcome window no longer opens by itself.
+  if (id === 'welcome' && entry.builtin && !open && !settings.welcomed) {
+    settings.welcomed = true;
+    log('Welcome: closed; it opens again only from the launcher');
+  }
   // Switching a mod on (from off) shows the windows the player had closed.
   if (open && !wasOn) settings.closedWindows = (settings.closedWindows ?? []).filter((k) => !k.startsWith(`${id}~`));
   writeJson('settings.json', settings);

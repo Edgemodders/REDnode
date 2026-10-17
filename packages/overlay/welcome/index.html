@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Welcome</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<style>
+  html, body { margin: 0; width: 600px; height: 500px; overflow: hidden; background: transparent; }
+  rn-window { position: absolute; inset: 0; }
+  /* The social banner, cropped to its top: the framework line and the REDNODE wordmark. */
+  .banner { height: 100px; margin: -2px -2px 4px; background: #08090d url(social.png) no-repeat 0 -34px / 600px auto;
+    border-bottom: 1px solid var(--rn-line); }
+  p { margin: 0 0 10px; font-size: 15px; line-height: 1.45; }
+  .modes { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 4px 0 12px; font-size: 14px; }
+  .modes .key { font: 700 12px var(--rn-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--rn-dim); padding-top: 2px; }
+  .modes .key.now { color: var(--rn-accent); }
+  kbd { font: 700 12px var(--rn-mono); padding: 1px 6px; border: 1px solid var(--rn-line); color: var(--rn-fg); }
+  .foot { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+  #now { flex: 1; font: 600 13px var(--rn-mono); letter-spacing: .04em; color: var(--rn-accent-2); }
+</style>
+</head>
+<body>
+  <rn-window title="Welcome to REDnode" draggable closable no-space>
+    <div class="banner" role="img" aria-label="REDnode"></div>
+    <p>REDnode runs mods written in JavaScript beside the game, and draws windows like this one over it. The tab at the bottom left opens the launcher; its <b>Mod Manager</b> switches mods on and off.</p>
+    <p><kbd>F10</kbd> moves REDnode through three modes:</p>
+    <div class="modes">
+      <span class="key" id="k-passive">Showing</span><span>REDnode's windows are drawn; the game keeps the mouse and keys.</span>
+      <span class="key" id="k-interactive">Using</span><span>The mouse and keys work in REDnode's windows. <kbd>Esc</kbd>, or a click on empty screen, gives them back to the game.</span>
+      <span class="key" id="k-hidden">Hidden</span><span>Nothing of REDnode is drawn.</span>
+    </div>
+    <div class="foot">
+      <span id="now">Press F10 to use the mouse here.</span>
+      <rn-button id="ok">Got it</rn-button>
+    </div>
+  </rn-window>
+  <script src="app.js"></script>
+</body>
+</html>

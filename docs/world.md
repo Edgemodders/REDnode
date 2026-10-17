@@ -206,3 +206,30 @@ REDnode 0.25.0 with Packaging test 0.2.1, still with `"bridgeTest": "clean"`. To
 The host log should have `REDbridge 0.10.0 starting from REDnode` and `Tooltips: on`.
 
 **Result, 2026-10-17: passed.** All steps, marks matching. The host started `REDbridge 0.10.0 starting from REDnode` from `%LOCALAPPDATA%REDnoderidge0.10.0` on the per-user .NET 10; it loaded 57 archives and 583,798 files in 3.6 s, and the sample logged `REDbridge: 57 archives, 583798 files`. `Tooltips: on` was logged and saved. With the first run, **W3 passed**. The test switch was then removed from the settings; the normal lookup picks REDnode's copy (a tie in version with EDGEdeck's 0.10.0 goes to REDnode's). Still **unverified**: **Update REDbridge**, which needs a newer release than the copy in use.
+
+## Hot-loading archives (#12)
+
+Asked for by EDGEmat and EDGEfab ([#12](https://github.com/Edgemodders/REDnode/issues/12)): seeing a changed asset in the running game without a restart. Agreed with the user on 2026-10-17: try RED Hot Tools first; if it gives trouble, REDnode's own.
+
+**RED Hot Tools** (psiberx, MIT; 1.3.0-rc.2 of 2026-07-12, last commit 2026-07-29; its README still names game 2.21) watches `archive/pc/hot`. When an `.archive` or `.xl` file changes there, it unloads the mod archives, moves the new files into `archive/pc/mod`, loads them again, drops the cached resources they hold, and reloads ArchiveXL's extensions. Its script class `RedHotTools` also has `ReloadArchives()`, `ReloadResources(paths)` and `HotInstall(path)` (a copy into the hot folder); its own CET menu leaves `ReloadArchives()` unused and relies on the folder, as WolvenKit's Hot Reload does.
+
+| Phase | What |
+|---|---|
+| H0 Try it | RED Hot Tools 1.3.0-rc.2 in the dev game: it loads on 2.31, and an archive copied into `archive/pc/hot` reloads without trouble |
+| H1 `archives.reload` | In the `rednode` package and as an MCP tool: copy the named archives into the hot folder, wait for RED Hot Tools' "reload completed", return `{ reloaded, failed, via }`. `requires` can name RED Hot Tools |
+| H2 `world.refresh` | Respawn or re-apply the appearance of objects using a reloaded mesh or material, V's clothing included |
+| Fallback | The same swap in REDnode's plugin, if H0 fails or RED Hot Tools stops being kept up |
+
+Installed on the dev PC on 2026-10-17 from its GitHub release (`RedHotTools-1.3.0.zip`, SHA-256 checked): `red4ext/plugins/RedHotTools` and `bin/x64/plugins/cyber_engine_tweaks/mods/RedHotTools`. Deleting both removes it; it makes `archive/pc/hot`.
+
+### H0 and Welcome: test
+
+REDnode 0.25.1 deployed, with RED Hot Tools. Nothing to set by hand; the dev PC has never closed the Welcome window, so it opens.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Step 1 comes before it can be reached.
+1. Start the game. At the main menu the Welcome window shows in the centre, with **Showing** lit and "Press F10 to use the mouse here". Press F10: **Using** lights up. Press **Got it**: it closes. Then load a save, switch on the Test timer, press **Start**, and **Mark**.
+2. In the launcher's list, switch **Welcome** on: it opens again. Close it with its ✕. **Mark**.
+3. Alt+Tab and tell me you are in the game. I copy `EDGEmat_M0_probe.archive` (EDGEmat's probe, 24 KB) unchanged from `archive/pc/mod` into `archive/pc/hot`; RED Hot Tools should swap it within a second. Go back to the game, play for half a minute, and **Mark**.
+4. Quit the game.
+
+Then: RED4ext's log should list RedHotTools as loaded, RED Hot Tools' log should have `Archives reload completed`, the host log `Welcome: closed`, and nothing should have crashed.

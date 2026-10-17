@@ -773,6 +773,22 @@ The plugin log should have `Overlay: main menu on` at the start, `main menu off 
 
 **Result, 2026-10-17: passed** with REDnode 0.24.7, all steps, with the timer. Vitals and Coords stayed hidden on the boot screens and at the main menu and showed in the save. The plugin log: `main menu on (player no, IsPreGame true)` on the first frame, still on through the boot-time player 0.6 s later, `main menu off (player yes, IsPreGame false)` when the save loaded. Tooltips showed on **Open at start** and on the title-bar icons, and a clicked icon's tooltip stayed away until the cursor left. The marks read one step low (marks 1 to 4 for steps 1, 3, 4 and 5), because step 2's Mark was for step 1: test lists now give each step exactly one Mark with its own number. This closes the Polish phase (0.24.2 to 0.24.7).
 
+### Welcome 0.25.1: built
+
+Asked for by the user on 2026-10-17: a new player who does not know F10 sees only the small launcher tab, which takes no click in passive mode, and could get stuck.
+
+| Part | What it does |
+|---|---|
+| The Welcome window | A built-in app (`packages/overlay/welcome`), centred, in the tool layer: the social banner cropped to the framework line and the REDNODE wordmark, a short note on what REDnode is, the launcher tab and the Mod Manager, and what F10 does (Showing, Using, Hidden; Esc or a click on empty screen gives input back) |
+| It follows the mode | The current mode is lit, and the line beside **Got it** says what to do: "Press F10 to use the mouse here", then "Click Got it". Closing it needs F10, so the player learns it by doing it |
+| Once | The host opens it while `settings.welcomed` is unset, also at the main menu and while Open at start holds other windows back. Closed once (**Got it**, its ✕ or the launcher), it sets `welcomed` and opens again only from the launcher's list |
+
+Checked in the mock game: it opened on a fresh start with Showing lit, lit Using in interactive mode, and **Got it** closed it and saved `welcomed`; the next start did not open it.
+
+### Welcome 0.25.1: test
+
+See [the session's test](world.md#h0-and-welcome-test) in the World API page: it runs with #12's H0.
+
 ### UI kit
 
 UI is written as markup, not built by hand in code. Two layers keep it optional:
