@@ -35,7 +35,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [S1 check, 0.24.1](#s1-check-0241) | In the game | Sound S1 | 2026-10-16 | 0.24.1 | Pass |
 | [Polish 0.24.2](#polish-0242) | In the game | Polish | 2026-10-17 | 0.24.4 | **Partly**: tooltips failed, HUD widgets on the boot loading screen; both fixed and passed in Polish 0.24.5 |
 | [Polish 0.24.5](#polish-0245) | In the game | Polish | 2026-10-17 | 0.24.7 | Pass |
-| [W3 REDbridge for players](#w3-redbridge-for-players) | In the game | W3 | 2026-10-17 | 0.25.0 | **Partly**: Get REDbridge passed; REDbridge's start and Tooltips on not proven, retest |
+| [W3 REDbridge for players](#w3-redbridge-for-players) | In the game | W3 | 2026-10-17 | 0.25.0 | Pass (with the retest) |
 
 ## Before any in-game test
 
@@ -310,7 +310,7 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 
 ### W3 REDbridge for players
 
-[Source](world.md#w3-test). First run 2026-10-17: steps 1 and 2 passed; step 3 did not start REDbridge (the sample needs its **Archives** button) and step 4's "on" was never logged. Retest: [W3: retest](world.md#w3-retest). Checked before the game: the install end to end into an empty `LOCALAPPDATA`, and the Mod Manager's button in the mock game. Needs `"bridgeTest": "clean"` in the host's settings, and really installs REDbridge and, if missing for this user, .NET 10.
+[Source](world.md#w3-test). First run 2026-10-17: steps 1 and 2 passed; step 3 did not start REDbridge (the sample needs its **Archives** button) and step 4's "on" was never logged. Retest the same day with Packaging test 0.2.1: **passed**. REDbridge started from REDnode's copy on the per-user .NET and listed 57 archives; Tooltips on was logged and saved. **Update REDbridge** is unverified. Checked before the game: the install end to end into an empty `LOCALAPPDATA`, and the Mod Manager's button in the mock game. Needs `"bridgeTest": "clean"` in the host's settings, and really installs REDbridge and, if missing for this user, .NET 10.
 
 1. Load a save, **F10**, timer. Mod Manager, **Packaging test**: ✕ `redbridge >=0.10`, the text naming 0.10.0 (58 MB), **Get REDbridge**.
 2. **Get REDbridge**: steps and a bar, then ✓ `0.10.0 installed`, "REDbridge 0.10.0 from REDnode".

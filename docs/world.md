@@ -204,3 +204,5 @@ REDnode 0.25.0 with Packaging test 0.2.1, still with `"bridgeTest": "clean"`. To
 4. Quit the game.
 
 The host log should have `REDbridge 0.10.0 starting from REDnode` and `Tooltips: on`.
+
+**Result, 2026-10-17: passed.** All steps, marks matching. The host started `REDbridge 0.10.0 starting from REDnode` from `%LOCALAPPDATA%REDnoderidge0.10.0` on the per-user .NET 10; it loaded 57 archives and 583,798 files in 3.6 s, and the sample logged `REDbridge: 57 archives, 583798 files`. `Tooltips: on` was logged and saved. With the first run, **W3 passed**. The test switch was then removed from the settings; the normal lookup picks REDnode's copy (a tie in version with EDGEdeck's 0.10.0 goes to REDnode's). Still **unverified**: **Update REDbridge**, which needs a newer release than the copy in use.
