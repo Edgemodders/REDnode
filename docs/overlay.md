@@ -748,9 +748,19 @@ Agreed with the user on 2026-10-17, after the 0.24.4 test.
 
 **0.24.5 crashed the game, fixed in 0.24.6.** On 2026-10-17 the game closed less than a second after the title screen showed, with no crash report. The plugin log ended right after `Overlay: main menu on (player no, IsPreGame true)` and `Overlay: interactive`. The cause: `GetSystemRequestsHandler` returns a weak handle (`whandle`), and 0.24.5 took it into a strong `Handle`. Each poll then dropped a strong reference that was never added, so the game soon freed its own handler while still using it. 0.24.6 takes a `WeakHandle` and locks it. The check itself worked: IsPreGame read true at the title screen.
 
+**0.24.6 in game, 2026-10-17 (partly run).** No crash. Step 1 by the log: `main menu on (player no, IsPreGame true)` on the first frame, still on when the boot-time player appeared 0.6 s later, and `main menu off (player yes, IsPreGame false)` when the save loaded. Step 3 passed: the **Open at start** tooltip showed. Step 4 failed: no tooltip on the title-bar icons. Found live, with the MCP server's `window_console` and `window_image` and the window debugger:
+
+| Check | Result |
+|---|---|
+| Is the cursor where the page thinks? | Yes. Roll up's box was 913 to 935 by 10 to 32, and the page's moves at rest read 922,18 on its `svg` |
+| Do events reach the title bar? | `pointermove` named the icon (`svg`, `path`, `button.act`). `pointerover` came for the `header` but not for the icon inside it |
+| Did the page see the hover? | Yes: the icon was drawn in its hover colours, and clicks worked |
+
+So the kit's tooltip, started only on `pointerover`, never started for the icons. Chromium's offscreen repro always sent both events, which is why it passed there. **0.24.7** checks every `pointermove` too, and a tooltip closed by a press, key or wheel stays away until the cursor leaves that element (checked in the repro).
+
 ### Polish 0.24.5: test
 
-Run with REDnode 0.24.6.
+Run with REDnode 0.24.7.
 
 0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. The timer is out of reach until step 2, so step 1 is done before it.
 1. Start the game. On the boot loading screen and at the main menu, Vitals and Coords do **not** show. Load a save: they show once you are in the game.

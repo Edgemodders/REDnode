@@ -989,6 +989,7 @@ nav button:focus-visible { outline: 2px solid var(--rn-accent-2); outline-offset
   let tipBox = null;
   let tipTarget = null;
   let tipTimer = 0;
+  let tipDismissed = null; // closed by a press, key or wheel: no tooltip again until the cursor leaves it
 
   function titledIn(path) {
     for (const node of path) {
@@ -1001,6 +1002,7 @@ nav button:focus-visible { outline: 2px solid var(--rn-accent-2); outline-offset
   const tipName = (el) => el.getAttribute('title') || el.getAttribute('data-rn-title');
   function hideTip(e) {
     clearTimeout(tipTimer);
+    if (tipTarget && e && e.type !== 'pointerleave' && e.type !== 'blur') tipDismissed = tipTarget;
     if (tipTarget) {
       const shown = tipBox && !tipBox.hidden;
       console.debug(`[rn-tip] ${shown ? 'hid' : 'dropped before showing'} "${tipName(tipTarget)}" (${e?.type || 'moved on'})`);
@@ -1041,19 +1043,21 @@ nav button:focus-visible { outline: 2px solid var(--rn-accent-2); outline-offset
     tipBox.style.top = `${y}px`;
     console.debug(`[rn-tip] showed "${text}" at ${Math.round(x)},${Math.round(y)} (page ${innerWidth}x${innerHeight})`);
   }
-  document.addEventListener(
-    'pointerover',
-    (e) => {
-      const target = titledIn(e.composedPath());
-      if (target === tipTarget) return;
-      hideTip();
-      if (!target) return;
-      tipTarget = target;
-      console.debug(`[rn-tip] hover "${tipName(target)}"`);
-      tipTimer = setTimeout(() => showTip(target), 500);
-    },
-    true,
-  );
+  // Every move is checked, not only pointerover: in the game, Chromium sent pointerover
+  // when the cursor entered a title bar but not when it went on into an icon, while the
+  // moves themselves named the icon (found with the debugger on 2026-10-17).
+  function onPointer(e) {
+    const target = titledIn(e.composedPath());
+    if (target === tipTarget) return;
+    if (target === tipDismissed) return;
+    tipDismissed = null;
+    hideTip();
+    if (!target) return;
+    tipTarget = target;
+    console.debug(`[rn-tip] hover "${tipName(target)}" (${e.type})`);
+    tipTimer = setTimeout(() => showTip(target), 500);
+  }
+  for (const type of ['pointerover', 'pointermove']) document.addEventListener(type, onPointer, true);
   for (const type of ['pointerdown', 'wheel', 'keydown']) document.addEventListener(type, hideTip, true);
   document.documentElement.addEventListener('pointerleave', hideTip);
   window.addEventListener('blur', hideTip);
