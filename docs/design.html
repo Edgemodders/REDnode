@@ -373,7 +373,7 @@ interceptor(<span class="s">"damage-scale"</span>).<span class="t">set</span>(<s
   </table></div>
 
   <h3>Which tier</h3>
-  <p>Neither Tier 1 nor a new engine in the game is needed. The work splits between the native plugin and Tier 2:</p>
+  <p>The first phases need neither Tier 1 nor a new engine in the game; frame drawing adds Tier 1 later (below). The work splits between the native plugin and Tier 2:</p>
   <div class="grid g2">
     <div class="panel"><div class="label">Plugin &middot; the ink driver (native, in process)</div>
       <ul>
@@ -403,7 +403,15 @@ interceptor(<span class="s">"damage-scale"</span>).<span class="t">set</span>(<s
       <tr><td>Keep the game from also acting on a click</td><td>A <code>consume</code> flag on the node, applied by the plugin when the event fires</td></tr>
     </tbody>
   </table></div>
-  <p style="margin-top:14px">Tier 1 stays optional for later. It is only needed for logic that must run inside the frame, such as custom drawing that depends on frame data. Nothing in the first set of tags needs it.</p>
+  <p style="margin-top:14px">Phases I1 to I5 need no Tier 1. <b>Frame drawing</b> does, and comes in a later phase (I6, agreed with the user on 2026-10-18): richer animations and cosmetic effects on screens and widgets, computed every frame. A Tier 1 <code>draw</code> function runs on the game thread each frame, inside the same sandbox and time budget as an interceptor. It changes its package's own widgets directly, with no round trip: opacity, translation, rotation, scale, tint, shape points and effect parameters. Tier 2 pushes it parameters, as it does for interceptors.</p>
+  <div class="cap">Tier 1 &middot; frame drawing (later, I6; sketch)</div>
+<pre><span class="k">export default</span> <span class="t">defineFrame</span>({
+  target: <span class="s">"bounties"</span>,                           <span class="c">// a screen or mounted tree of this package</span>
+  draw(f) {
+    f.widget(<span class="s">"glow"</span>).opacity = 0.5 + 0.5 * Math.<span class="t">sin</span>(f.time * f.params.speed);
+    f.widget(<span class="s">"scan"</span>).translation.y = (f.time * 120) % f.height;
+  }
+});</pre>
 
   <h3>Tags</h3>
   <div class="tw"><table>
@@ -478,6 +486,7 @@ bounties.<span class="t">on</span>(<span class="s">"back"</span>, () =&gt; bount
       <tr><td>I3 Input</td><td>Buttons, sliders, lists and text input on the <code>menu</code> layer. Events, <code>consume</code>, and an answer to the cursor question</td></tr>
       <tr><td>I4 Game look</td><td>The game's library items, styles, states and animations. JSX typings and the docs page</td></tr>
       <tr><td>I5 Screens</td><td>Open and switch the game's screens, and report the open one. The <code>rednode_screen</code> entry and REDnode's scenario. <code>ink.screen</code> for new screens, with pause, cursor and Back. Hub tabs</td></tr>
+      <tr><td>I6 Frame drawing</td><td>Tier 1 <code>defineFrame</code>: a <code>draw</code> function each frame for animations and cosmetic effects on a package's own widgets, with Tier 1's time budget and fault handling. Comes with or after P4, which builds the Tier 1 runner</td></tr>
     </tbody>
   </table></div>
 
@@ -537,7 +546,7 @@ bounties.<span class="t">on</span>(<span class="s">"back"</span>, () =&gt; bount
       <p>Native fast-path rules applied inside hooks with no IPC. Gives synchronous behavior with no engine.</p></div></div>
     <div class="phase"><div class="n">P4<small>TIER 1</small></div><div>
       <h3>QuickJS interceptors</h3>
-      <p>Add the sandboxed runner, time limits, ordering and fault handling. Only after P2 and P3 show which hooks need it.</p></div></div>
+      <p>Add the sandboxed runner, time limits, ordering and fault handling. Only after P2 and P3 show which hooks need it. Ink frame drawing (I6, section 06) is a second use of the same runner.</p></div></div>
   </div>
 </section>
 
