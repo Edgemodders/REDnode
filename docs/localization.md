@@ -51,7 +51,7 @@ my-mod/
 | A string | `t("track")` |
 | Parameters | `t("reward", { amount: fmt.money(500) })`: `{name}` placeholders |
 | Plurals | `t("found", { count: 3 })`: the forms are the language's plural categories (`one`, `few`, `many`, `other`), picked by `Intl.PluralRules` |
-| V's gender | `m` and `f` forms, picked by V's body gender |
+| V's gender | `m` and `f` forms, picked by V's gender as the game's own text does (body or voice tone: unverified) |
 | The game's strings | `"LocKey#12345"` anywhere a text goes, or `t("UI-…")` for a secondary key the package does not define. A record's name from TweakDB works as it is |
 | Formats | `fmt.number`, `fmt.money` (the game's €$), `fmt.date`, `fmt.distance`, using the locale rules above |
 | Language | `game.language()`, and a `language` event when the player changes it |

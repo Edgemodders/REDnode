@@ -495,7 +495,7 @@ board.<span class="t">update</span>(...);                            <span class
 &lt;text text={t(<span class="s">"bounty.reward"</span>, { amount: 500 })} /&gt;</pre>
   <ul>
     <li><b>Parameters.</b> <code>{name}</code> placeholders take values from the call. For game keys they become the engine's text parameters (<code>textTextParameterSet</code>), which can hold localized names too.</li>
-    <li><b>V's gender.</b> A string can have <code>m</code> and <code>f</code> forms, picked by V's body gender, as the game's own <code>GetLocalizedTextGanderDepened</code> does for its keys.</li>
+    <li><b>V's gender.</b> A string can have <code>m</code> and <code>f</code> forms, picked by V's gender the way the game's own <code>GetLocalizedTextGanderDepened</code> does for its keys (body or voice tone: unverified).</li>
     <li><b>Language.</b> <code>game.language()</code> gives the interface language, using the game's names such as <code>en-us</code> and <code>fr-fr</code>, and an event fires when it changes. How the plugin reads it is unverified: the settings path, or the engine's language-changed event.</li>
     <li><b>No requirements.</b> REDnode resolves package strings itself, so packages need neither ArchiveXL's localization files nor Codeware's <code>ModLocalizationPackage</code>.</li>
     <li><b>Everywhere.</b> The same <code>t()</code> and <code>LocKey#</code> strings work in overlay windows (the <code>ui</code> builder and HTML apps), notifications and the Mod Manager's package names. There, REDnode looks game keys up with <code>GetLocalizedText</code>.</li>
