@@ -436,14 +436,48 @@ board.<span class="t">update</span>(...);                            <span class
 <pre>ink.<span class="t">mount</span>(<span class="s">"hud"</span>, { anchor: <span class="s">"top-right"</span> },
   ink.<span class="t">vbox</span>({ gap: 6 }, ink.<span class="t">text</span>(<span class="s">"Bounty board"</span>, { style: <span class="s">"title"</span> })));</pre>
 
+  <h3>Screens</h3>
+  <p>Besides single widgets, mods need whole screens: open and switch the game's own full-screen menus (inventory, character, cyberware and the rest), and build new ones that behave the same way. A new screen should pause the game, take the game's cursor and Back key, and sit in the hub's row of tabs where that fits. The game does this with two pieces, both in the dump:</p>
+  <div class="tw"><table>
+    <thead><tr><th>Piece</th><th>What it is</th></tr></thead>
+    <tbody>
+      <tr><td>Menu resource</td><td><code>inkMenuResource</code>: a list of <code>inkMenuEntry</code> (a menu name, its widget library resource, depth, spawn mode and input context) and the scenario names. Codeware declares both for scripts</td></tr>
+      <tr><td>Scenarios</td><td>Scripted state machines that open, switch and close menus: <code>MenuScenario_HubMenu</code> (<code>OpenMenu</code>, <code>SwitchMenu</code>, <code>OpenSubMenu</code>, <code>OnBack</code>), plus <code>PauseMenu</code>, <code>Vendor</code>, <code>Storage</code>, <code>Wardrobe</code>, <code>FastTravel</code> and others. <code>inkMenuScenario.SwitchToScenario(name, userData)</code> moves between them</td></tr>
+      <tr><td>Opening one</td><td>A <code>StartHubMenuEvent</code> carrying <code>HubMenuInitData</code> (<code>menuName</code>, <code>submenuName</code>, <code>userData</code>), queued with <code>GetUISystem().QueueEvent</code>. Inside the hub, an <code>OpenMenuRequest</code>. The hub's tabs are the <code>HubMenuItems</code> enum: Crafting, Character, Inventory, Map, Journal, Phone, Database, Stats, Backpack, Codex, Shards, Gallery, Tarot, Gear, Cyberware, VisualSets</td></tr>
+    </tbody>
+  </table></div>
+  <p style="margin-top:14px"><b>Opening and switching the game's screens</b> needs no new engine work. The API wraps these events, so a mod writes <code>ink.screens.open("inventory")</code>. The names map to the game's menu names, kept in one table. Screens that need context, such as a vendor or a stash, take it as an argument or are left out. The plugin also reports the open screen as an event, so mods can follow the player through the menus.</p>
+  <p><b>New screens</b> need an entry in the menu resource, because a scenario can only open the menus listed there. The proposal is one generic entry: REDnode adds a single menu, <code>rednode_screen</code>, whose widget is an empty canvas with a REDnode controller. Every package screen opens that one entry, with <code>userData</code> naming the package and screen, and the ink driver builds the package's tree into the canvas. One entry serves every mod, so adding a screen never touches game files. How the entry gets in is unverified and is part of the spike:</p>
+  <div class="tw"><table>
+    <thead><tr><th>Way in</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr class="rec"><td>The plugin adds the entry to the loaded menu resource</td><td>No game files changed. Needs the resource in memory before the menu layer reads it</td></tr>
+      <tr><td>A small REDnode <code>.archive</code> with the canvas widget and a patched menu list</td><td>The usual modding route. The widget file can be built with REDbridge (WolvenKit's engine). Patching the menu list may need ArchiveXL</td></tr>
+      <tr><td>Draw on the menu layer while REDnode holds the game in a menu state</td><td>A fallback with no menu entry. Pause, input and Back must then be handled by hand</td></tr>
+    </tbody>
+  </table></div>
+  <p style="margin-top:14px">REDnode's scripts add their own scenario class, extending <code>MenuScenario_BaseMenu</code>, for screens outside the hub. Screens that belong in the hub open as hub menus, and a hub tab can be added by wrapping the hub's controller (<code>MenuHubGameController</code>), as redscript mods do.</p>
+  <div class="cap">Tier 2 &middot; screens (sketch)</div>
+<pre>ink.screens.<span class="t">open</span>(<span class="s">"inventory"</span>);                     <span class="c">// a game screen</span>
+ink.screens.<span class="t">on</span>(<span class="s">"change"</span>, (s) =&gt; log(s.name));          <span class="c">// which screen is open</span>
+
+<span class="k">const</span> bounties = ink.<span class="t">screen</span>({
+  id: <span class="s">"bounties"</span>, title: <span class="s">"Bounties"</span>,
+  hub: { tab: <span class="k">true</span>, after: <span class="s">"Journal"</span> },             <span class="c">// a tab in the hub's row</span>
+}, &lt;BountyBoard /&gt;);
+
+bounties.<span class="t">open</span>();                                <span class="c">// pauses, takes the cursor and Back</span>
+bounties.<span class="t">on</span>(<span class="s">"back"</span>, () =&gt; bounties.<span class="t">close</span>());</pre>
+
   <h3>Phases (proposal)</h3>
   <div class="tw"><table>
     <thead><tr><th>Phase</th><th>What</th></tr></thead>
     <tbody>
-      <tr><td>I1 Spike</td><td>Reach a root on the HUD and in a menu, with and without Codeware. Add a text and a rectangle through <code>rtti.call</code>. Have a listener class in REDnode's scripts receive <code>OnRelease</code>. Measure how many calls fit in a frame. Check the script changes with redscript-cli first</td></tr>
+      <tr><td>I1 Spike</td><td>Reach a root on the HUD and in a menu, with and without Codeware. Add a text and a rectangle through <code>rtti.call</code>. Have a listener class in REDnode's scripts receive <code>OnRelease</code>. Measure how many calls fit in a frame. Open the inventory with a <code>StartHubMenuEvent</code>, and try adding a menu entry to the loaded menu resource. Check the script changes with redscript-cli first</td></tr>
       <tr><td>I2 Display</td><td>The driver: kept trees, batched changes, cleanup per package, rebuild on load. <code>ink.mount</code> on <code>hud</code> with the containers, text, images, shapes and bindings. Sample: an ink version of Coords HUD</td></tr>
       <tr><td>I3 Input</td><td>Buttons, sliders, lists and text input on the <code>menu</code> layer. Events, <code>consume</code>, and an answer to the cursor question</td></tr>
       <tr><td>I4 Game look</td><td>The game's library items, styles, states and animations. JSX typings and the docs page</td></tr>
+      <tr><td>I5 Screens</td><td>Open and switch the game's screens, and report the open one. The <code>rednode_screen</code> entry and REDnode's scenario. <code>ink.screen</code> for new screens, with pause, cursor and Back. Hub tabs</td></tr>
     </tbody>
   </table></div>
 
@@ -453,6 +487,7 @@ board.<span class="t">update</span>(...);                            <span class
     <li>Cursor in gameplay: the HUD layer has no cursor. Options: interactive ink only in menus; the game's cursor shown during <b>Using</b> mode; or REDnode hit-testing its own ink widgets with its cursor.</li>
     <li>Game library paths can change with a patch. Keep them in one table behind the tags, and check them against the game's files with REDbridge.</li>
     <li>Should redscript mods be able to find REDnode's ink widgets by name, to place themselves beside them?</li>
+    <li>Screens: which way in for the <code>rednode_screen</code> entry (above)? Can a new hub tab coexist with other mods that wrap the hub? Which game screens can open without context?</li>
   </ul>
 </section>
 
