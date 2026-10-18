@@ -444,6 +444,40 @@ board.<span class="t">update</span>(...);                            <span class
 <pre>ink.<span class="t">mount</span>(<span class="s">"hud"</span>, { anchor: <span class="s">"top-right"</span> },
   ink.<span class="t">vbox</span>({ gap: 6 }, ink.<span class="t">text</span>(<span class="s">"Bounty board"</span>, { style: <span class="s">"title"</span> })));</pre>
 
+  <h3>What the API adds over ink</h3>
+  <p>Modders are not engine developers. A modder should write what they want, not how ink builds it. If the engine takes ten lines to place a button, the modder writes one tag with a few properties. Ink is a low-level kit. REDnode adds the layer a UI toolkit has and ink lacks.</p>
+  <div class="grid g2">
+    <div class="panel"><div class="label">A game-style button in redscript</div>
+      <ul>
+        <li>Spawn the button item from its library resource path into a parent.</li>
+        <li>Name it, then set its anchor, margin and size.</li>
+        <li>Find its label child and set the text.</li>
+        <li>Write a listener class with a handler function.</li>
+        <li>Register press, release and hover on it.</li>
+        <li>Play the click sound.</li>
+        <li>Unregister and remove it all when done.</li>
+      </ul></div>
+    <div class="panel ok"><div class="label">The same with REDnode</div>
+<pre style="margin:0">&lt;button label=<span class="s">"Track"</span> onClick={track} /&gt;</pre>
+      <p style="margin-top:10px">The look, sounds, hover state, controller navigation and cleanup come with it.</p></div>
+  </div>
+  <div class="tw" style="margin-top:14px"><table>
+    <thead><tr><th>Area</th><th>What ink has</th><th>What REDnode gives the modder</th></tr></thead>
+    <tbody>
+      <tr><td>Layout</td><td>Anchors, margins, paddings, size rules and alignments, set one by one on each widget and panel</td><td><code>row</code>, <code>column</code>, <code>stack</code> and <code>grid</code> with <code>gap</code>, <code>pad</code>, <code>align</code> and sizes such as <code>fill</code>, <code>auto</code> or <code>40%</code>. Placement relative to the screen's safe area</td></tr>
+      <tr><td>Look</td><td>Style resource paths, font family paths, colors as numbers</td><td>Theme words: <code>style="title"</code>, <code>tone="danger"</code>, and the game's palette by name (<code>red</code>, <code>cyan</code>, <code>yellow</code>). Defaults that already look like the game</td></tr>
+      <tr><td>Composite widgets</td><td>Primitives and a few controllers</td><td>Ready pieces: <code>panel</code> (the game's frame with a title), <code>tabs</code>, <code>dialog</code> and <code>confirm</code> (modal; Back closes), <code>tooltip</code> on any node, <code>table</code> and <code>list</code> from an array (long lists only draw what shows), <code>toggle</code>, <code>progress</code>, <code>icon</code>, <code>keyhint</code> (the right key or pad glyph for the player's input), <code>menu</code>, <code>slots</code> (an inventory-style grid), <code>notify</code></td></tr>
+      <tr><td>Handlers</td><td>A script object and a function name per event, registered and unregistered by hand; raw ink events</td><td>Plain functions with plain values: <code>onClick</code> (mouse, pad button or Enter), <code>onHover</code>, <code>onChange(value)</code>, <code>onHold</code>. Removed with the node</td></tr>
+      <tr><td>Data and state</td><td>Widgets changed one by one through references</td><td>Trees made from data. Change the data, and the API sends only what changed. Nodes are named with <code>id</code>, not held as references. <code>bind</code> to game values</td></tr>
+      <tr><td>Controller and keyboard</td><td>Navigation set up per screen</td><td>Focus order worked out from the layout, so pad and arrow keys work by default</td></tr>
+      <tr><td>Sounds</td><td>Played by name, per event</td><td>The game's hover and click sounds by default; a property to change or mute them</td></tr>
+      <tr><td>Lifecycle</td><td>Widgets live until removed; they vanish on a save load</td><td>Mount and unmount; removed when the package stops; rebuilt after a load; screens handle pause and Back</td></tr>
+      <tr><td>Your own pieces</td><td>Library resources made in an editor</td><td>Components as plain functions: a modder's <code>&lt;BountyCard&gt;</code> is a function that returns tags. REDnode's own composites are written the same way, so modders can read them and copy the pattern</td></tr>
+      <tr><td>Escape hatch</td><td>Everything</td><td>The <code>widget</code> tag and <code>ink.raw(id)</code>, which give the real ink widget to the <code>api</code> for what the tags do not cover</td></tr>
+    </tbody>
+  </table></div>
+  <p style="margin-top:14px">Most of this layer lives in Tier 2. Composites expand into primitives inside the package before anything is sent, so they hot reload and modders can read their source. Only what needs the engine sits in the plugin's driver: focus navigation, sounds, input glyphs, measuring text, and pause and Back. The names and properties match the <code>ui</code> builder where the two overlap, so <code>button</code>, <code>toggle</code> and <code>slider</code> mean the same thing in an overlay window and in ink. A modder learns one vocabulary.</p>
+
   <h3>Screens</h3>
   <p>Besides single widgets, mods need whole screens: open and switch the game's own full-screen menus (inventory, character, cyberware and the rest), and build new ones that behave the same way. A new screen should pause the game, take the game's cursor and Back key, and sit in the hub's row of tabs where that fits. The game does this with two pieces, both in the dump:</p>
   <div class="tw"><table>
@@ -482,9 +516,9 @@ bounties.<span class="t">on</span>(<span class="s">"back"</span>, () =&gt; bount
     <thead><tr><th>Phase</th><th>What</th></tr></thead>
     <tbody>
       <tr><td>I1 Spike</td><td>Reach a root on the HUD and in a menu, with and without Codeware. Add a text and a rectangle through <code>rtti.call</code>. Have a listener class in REDnode's scripts receive <code>OnRelease</code>. Measure how many calls fit in a frame. Open the inventory with a <code>StartHubMenuEvent</code>, and try adding a menu entry to the loaded menu resource. Check the script changes with redscript-cli first</td></tr>
-      <tr><td>I2 Display</td><td>The driver: kept trees, batched changes, cleanup per package, rebuild on load. <code>ink.mount</code> on <code>hud</code> with the containers, text, images, shapes and bindings. Sample: an ink version of Coords HUD</td></tr>
-      <tr><td>I3 Input</td><td>Buttons, sliders, lists and text input on the <code>menu</code> layer. Events, <code>consume</code>, and an answer to the cursor question</td></tr>
-      <tr><td>I4 Game look</td><td>The game's library items, styles, states and animations. JSX typings and the docs page</td></tr>
+      <tr><td>I2 Display</td><td>The driver: kept trees, batched changes, cleanup per package, rebuild on load. <code>ink.mount</code> on <code>hud</code> with the containers, text, images, shapes and bindings. The layout words (<code>row</code>, <code>column</code>, <code>gap</code>, <code>pad</code>, <code>align</code>), theme words, data-driven trees and <code>id</code>. Sample: an ink version of Coords HUD</td></tr>
+      <tr><td>I3 Input</td><td>Buttons, sliders, lists, toggles and text input on the <code>menu</code> layer. Plain handlers, <code>consume</code>, focus order for pad and keys, default sounds, and an answer to the cursor question</td></tr>
+      <tr><td>I4 Game look</td><td>The game's library items, styles, states and animations. The composites: <code>panel</code>, <code>tabs</code>, <code>dialog</code>, <code>tooltip</code>, <code>table</code>, <code>keyhint</code>, <code>slots</code>. JSX typings and the docs page, with a gallery of every tag</td></tr>
       <tr><td>I5 Screens</td><td>Open and switch the game's screens, and report the open one. The <code>rednode_screen</code> entry and REDnode's scenario. <code>ink.screen</code> for new screens, with pause, cursor and Back. Hub tabs</td></tr>
       <tr><td>I6 Frame drawing</td><td>Tier 1 <code>defineFrame</code>: a <code>draw</code> function each frame for animations and cosmetic effects on a package's own widgets, with Tier 1's time budget and fault handling. Comes with or after P4, which builds the Tier 1 runner</td></tr>
     </tbody>
