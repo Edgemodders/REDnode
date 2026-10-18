@@ -172,7 +172,7 @@ footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line);
   <a class="home" href="./"><span class="dot"></span><b>REDNODE</b> / DESIGN DOC / DRAFT 0.1</a>
   <span>TARGET: CYBERPUNK 2077 PC</span>
   <nav>
-    <a href="#goal">Goal</a><a href="#landscape">Landscape</a><a href="#options">Options</a><a href="#hybrid">Hybrid</a><a href="#api">API</a><a href="#safety">Safety</a><a href="#roadmap">Roadmap</a>
+    <a href="#goal">Goal</a><a href="#landscape">Landscape</a><a href="#options">Options</a><a href="#hybrid">Hybrid</a><a href="#api">API</a><a href="#ink">Ink UI</a><a href="#safety">Safety</a><a href="#roadmap">Roadmap</a>
   </nav>
 </div></div>
 
@@ -338,8 +338,126 @@ interceptor(<span class="s">"damage-scale"</span>).<span class="t">set</span>(<s
   </ul>
 </section>
 
+<section id="ink">
+  <h2><span class="id">06</span>Native game UI (ink)</h2><div class="rule"></div>
+  <p>Proposed on 2026-10-18, not scheduled. The game draws its own UI with <b>ink</b>: a tree of widgets (<code>inkCanvasWidget</code>, <code>inkTextWidget</code>, <code>inkImageWidget</code> and so on) with logic controllers for behavior (<code>inkButtonController</code>, <code>inkSliderController</code> and so on). redscript mods build their menus and HUD parts into that tree. REDnode should let JavaScript and TypeScript mods do the same, with a set of tags and an <code>ink</code> API in the <code>rednode</code> package.</p>
+
+  <h3>What REDnode has today</h3>
+  <p>Neither of REDnode's two UI paths is ink. Overlay apps write HTML, and the <code>ui</code> builder lets Node mods describe a window as a tree of nodes. Both are drawn by Chromium in the overlay host, and the plugin composites the picture over the game's frame. The game's UI never sees them. The "Native button" sample is an HTML window styled like the game, not ink.</p>
+  <div class="tw"><table>
+    <thead><tr><th></th><th>Overlay (HTML apps, <code>ui</code>)</th><th>Ink (proposed <code>ink</code>)</th></tr></thead>
+    <tbody>
+      <tr><td>Drawn by</td><td>Chromium offscreen; the plugin composites it over the frame</td><td>The game's renderer, inside its own UI</td></tr>
+      <tr><td>Look</td><td>The REDnode UI kit, or any web content</td><td>The game's fonts, styles and library widgets</td></tr>
+      <tr><td>HUD hiding, photo mode, UI scale, HDR</td><td>REDnode follows them by hand (the HUD widget rules)</td><td>Follows them as the game's own UI does, by layer (unverified)</td></tr>
+      <tr><td>Input</td><td>F10 <b>Using</b> mode with REDnode's cursor</td><td>The game's cursor in menus; none on the HUD in gameplay (open question)</td></tr>
+      <tr><td>Cost</td><td>A Chromium process and its textures</td><td>Widgets in the game's tree, no extra process</td></tr>
+      <tr><td>Reach</td><td>Anything a web page can do</td><td>Ink widgets and the game's library items only</td></tr>
+    </tbody>
+  </table></div>
+  <p style="margin-top:14px">The generic game API (<code>rtti.call</code>, <code>api</code> in the package) can already call ink functions one at a time. <code>inkCompoundWidget.AddChild</code> returns a reference, and <code>SetText</code> works on it. With Codeware, a Node mod could reach the HUD layer and add raw widgets. That is unverified: nobody has tried it. Five things are missing: a root to attach to without Codeware, events, ownership and cleanup, a rebuild after a save load, and speed. Each call is one round trip, and a styled panel of 40 widgets takes hundreds of calls.</p>
+
+  <h3>What the engine offers</h3>
+  <p>Checked in REDnode's base-game RTTI dump for game 2.31 (<code>gameapi/2.31/rtti.json</code>) and in the installed Codeware's scripts.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Part</th><th>Classes and functions</th></tr></thead>
+    <tbody>
+      <tr><td>Containers</td><td><code>inkCanvasWidget</code>, <code>inkVerticalPanelWidget</code>, <code>inkHorizontalPanelWidget</code>, <code>inkFlexWidget</code>, <code>inkGridWidget</code>, <code>inkUniformGridWidget</code>, <code>inkScrollAreaWidget</code></td></tr>
+      <tr><td>Leaves</td><td><code>inkTextWidget</code>, <code>inkRichTextBoxWidget</code>, <code>inkTextInputWidget</code>, <code>inkImageWidget</code>, <code>inkRectangleWidget</code>, <code>inkCircleWidget</code>, <code>inkShapeWidget</code>, <code>inkBorderWidget</code>, <code>inkMaskWidget</code>, <code>inkVectorGraphicWidget</code>, <code>inkVideoWidget</code></td></tr>
+      <tr><td>Controls</td><td>No button widget exists. A game button is a compound widget, from a library resource, with a controller attached: <code>inkButtonController</code>, <code>inkSliderController</code>, <code>inkListController</code>, <code>inkScrollController</code>, <code>inkSelectorController</code>, <code>inkStepperController</code>, <code>inkRadioGroupController</code>, <code>inkComboBoxController</code></td></tr>
+      <tr><td>Building</td><td><code>inkCompoundWidget.AddChild(type)</code>, <code>RemoveChild</code>, <code>ReorderChild</code>. From a logic controller, <code>SpawnFromExternal(parent, resource, libraryID)</code> spawns the game's own library items, with their controllers and styles</td></tr>
+      <tr><td>Events</td><td><code>inkWidget.RegisterToCallback(event, object, function)</code> calls a function on a script object: <code>OnPress</code>, <code>OnRelease</code>, <code>OnHoverOver</code>, <code>OnHoverOut</code>, and the controllers' own callbacks, such as a slider's value change</td></tr>
+      <tr><td>Roots</td><td>Base-game scripts reach a root only from inside a controller (<code>GetRootCompoundWidget</code>); <code>gameuiRootHudGameController</code> owns the HUD. Codeware adds <code>GameInstance.GetInkSystem().GetLayer(n"inkHUDLayer").GetVirtualWindow()</code> and <code>AttachController</code></td></tr>
+      <tr><td>Names</td><td>The dump uses native names, and redscript renames some of them: <code>gameuiWidgetGameController</code> is <code>inkGameController</code> in redscript, and <code>inkWidgetLogicController</code> is <code>inkLogicController</code>. Mods using the tags see neither</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Which tier</h3>
+  <p>Neither Tier 1 nor a new engine in the game is needed. The work splits between the native plugin and Tier 2:</p>
+  <div class="grid g2">
+    <div class="panel"><div class="label">Plugin &middot; the ink driver (native, in process)</div>
+      <ul>
+        <li>Keeps each package's tree, so it can rebuild it after a save load or a HUD rebuild with no help from Node.</li>
+        <li>Applies changes in batches on the game thread, between frames, with a budget per frame.</li>
+        <li>Owns the widgets, and removes a package's widgets when the package stops.</li>
+        <li>Registers callbacks through a small listener class in REDnode's scripts and sends the events out.</li>
+        <li>Reads bindings each frame, so a value that changes every frame needs no round trip.</li>
+      </ul></div>
+    <div class="panel"><div class="label">Tier 2 &middot; the <code>ink</code> API (Node, TypeScript)</div>
+      <ul>
+        <li>Tags and functions that describe a tree, typed.</li>
+        <li>Diffs each new tree against the last one and sends only the changes.</li>
+        <li>Runs the mod's handlers for clicks, hovers and value changes.</li>
+        <li>Hot reload, like the rest of Tier 2.</li>
+      </ul></div>
+  </div>
+  <p style="margin-top:14px">UI needs very few synchronous answers. Wherever the game would wait, the answer can be declared in the tree ahead of time, the same way Tier 2 pushes parameters to an interceptor:</p>
+  <div class="tw"><table>
+    <thead><tr><th>Need</th><th>How it works without a synchronous call</th></tr></thead>
+    <tbody>
+      <tr><td>Build or change the UI</td><td>Commands, batched and applied on the next frame</td></tr>
+      <tr><td>Click, hover, value change</td><td>An event goes out and the handler runs in Node. Its changes apply one or two frames later</td></tr>
+      <tr><td>Hover and pressed looks</td><td>Ink states and styles declared on the node; the engine switches them with no round trip</td></tr>
+      <tr><td>Animation</td><td>An ink animation (<code>inkanimDefinition</code>) declared on the node and played by the engine</td></tr>
+      <tr><td>A value every frame, such as a health bar</td><td>A binding the plugin reads each frame, like a declarative rule; or the mod sets the value at its own rate</td></tr>
+      <tr><td>Keep the game from also acting on a click</td><td>A <code>consume</code> flag on the node, applied by the plugin when the event fires</td></tr>
+    </tbody>
+  </table></div>
+  <p style="margin-top:14px">Tier 1 stays optional for later. It is only needed for logic that must run inside the frame, such as custom drawing that depends on frame data. Nothing in the first set of tags needs it.</p>
+
+  <h3>Tags</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Tag</th><th>Ink</th></tr></thead>
+    <tbody>
+      <tr><td><code>canvas</code>, <code>vbox</code>, <code>hbox</code>, <code>flex</code>, <code>grid</code>, <code>scroll</code></td><td>The containers above; <code>scroll</code> adds <code>inkScrollController</code></td></tr>
+      <tr><td><code>text</code>, <code>richtext</code>, <code>input</code></td><td><code>inkTextWidget</code>, <code>inkRichTextBoxWidget</code>, <code>inkTextInputWidget</code></td></tr>
+      <tr><td><code>image</code>, <code>rect</code>, <code>circle</code>, <code>border</code>, <code>mask</code>, <code>vector</code>, <code>video</code></td><td>The leaves above. <code>image</code> takes an atlas and a part, or a TweakDB icon</td></tr>
+      <tr><td><code>button</code>, <code>slider</code>, <code>list</code>, <code>selector</code>, <code>stepper</code>, <code>radio</code>, <code>combo</code></td><td>The game's library items with their controllers, so they look and sound like the game's own</td></tr>
+      <tr><td><code>library</code></td><td>Any item of a game <code>.inkwidget</code> library, by resource path and item name</td></tr>
+      <tr><td><code>widget</code></td><td>The escape hatch: any ink class by name, with raw properties</td></tr>
+    </tbody>
+  </table></div>
+  <p style="margin-top:14px">One tree format, written three ways. In <code>.tsx</code> files the tags are JSX, which TypeScript compiles with REDnode's factory and checks against generated types. Plain JavaScript can write the same tags in a tagged template, or call the functions, which mirror the <code>ui</code> builder. A tree mounts on a layer: <code>hud</code> (display only; hides with the HUD), <code>menu</code> (inside the game's menus, with the game's cursor), and later <code>world</code> (in-world screens through <code>IWorldWidgetComponent</code>). The layers are unverified.</p>
+  <div class="cap">Tier 2 &middot; ink from TypeScript (sketch)</div>
+<pre><span class="k">import</span> { ink } <span class="k">from</span> <span class="s">"rednode"</span>;
+
+<span class="k">const</span> board = ink.<span class="t">mount</span>(<span class="s">"hud"</span>, { anchor: <span class="s">"top-right"</span>, x: -40, y: 120 },
+  &lt;vbox gap={6}&gt;
+    &lt;text style=<span class="s">"title"</span>&gt;Bounty board&lt;/text&gt;
+    &lt;text bind=<span class="s">"player.health"</span> /&gt;          <span class="c">// read by the plugin every frame</span>
+    &lt;list items={contracts} item={(c) =&gt; &lt;text&gt;{c.name}&lt;/text&gt;} /&gt;
+  &lt;/vbox&gt;);
+
+ink.<span class="t">mount</span>(<span class="s">"menu"</span>, { menu: <span class="s">"pause"</span> },
+  &lt;button label=<span class="s">"Track contract"</span> consume onClick={() =&gt; <span class="t">track</span>()} /&gt;);  <span class="c">// event, async</span>
+
+board.<span class="t">update</span>(...);                            <span class="c">// diffed, only changes are sent</span></pre>
+  <div class="cap">Tier 2 &middot; the same from plain JavaScript</div>
+<pre>ink.<span class="t">mount</span>(<span class="s">"hud"</span>, { anchor: <span class="s">"top-right"</span> },
+  ink.<span class="t">vbox</span>({ gap: 6 }, ink.<span class="t">text</span>(<span class="s">"Bounty board"</span>, { style: <span class="s">"title"</span> })));</pre>
+
+  <h3>Phases (proposal)</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Phase</th><th>What</th></tr></thead>
+    <tbody>
+      <tr><td>I1 Spike</td><td>Reach a root on the HUD and in a menu, with and without Codeware. Add a text and a rectangle through <code>rtti.call</code>. Have a listener class in REDnode's scripts receive <code>OnRelease</code>. Measure how many calls fit in a frame. Check the script changes with redscript-cli first</td></tr>
+      <tr><td>I2 Display</td><td>The driver: kept trees, batched changes, cleanup per package, rebuild on load. <code>ink.mount</code> on <code>hud</code> with the containers, text, images, shapes and bindings. Sample: an ink version of Coords HUD</td></tr>
+      <tr><td>I3 Input</td><td>Buttons, sliders, lists and text input on the <code>menu</code> layer. Events, <code>consume</code>, and an answer to the cursor question</td></tr>
+      <tr><td>I4 Game look</td><td>The game's library items, styles, states and animations. JSX typings and the docs page</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Open questions</h3>
+  <ul>
+    <li>Root: REDnode's own script hook on a HUD or menu controller (base game only), or Codeware's ink system (a <code>requires</code> for <code>ink</code>)? I1 decides.</li>
+    <li>Cursor in gameplay: the HUD layer has no cursor. Options: interactive ink only in menus; the game's cursor shown during <b>Using</b> mode; or REDnode hit-testing its own ink widgets with its cursor.</li>
+    <li>Game library paths can change with a patch. Keep them in one table behind the tags, and check them against the game's files with REDbridge.</li>
+    <li>Should redscript mods be able to find REDnode's ink widgets by name, to place themselves beside them?</li>
+  </ul>
+</section>
+
 <section id="safety">
-  <h2><span class="id">06</span>Safety rails for Tier 1</h2><div class="rule"></div>
+  <h2><span class="id">07</span>Safety rails for Tier 1</h2><div class="rule"></div>
   <div class="panel warn"><div class="label">Hard requirement</div>
     <p>A buggy interceptor must never crash or freeze the game.</p></div>
   <div class="grid g3" style="margin-top:14px">
@@ -353,7 +471,7 @@ interceptor(<span class="s">"damage-scale"</span>).<span class="t">set</span>(<s
 </section>
 
 <section id="risks">
-  <h2><span class="id">07</span>Risks</h2><div class="rule"></div>
+  <h2><span class="id">08</span>Risks</h2><div class="rule"></div>
   <div class="tw"><table>
     <thead><tr><th>Risk</th><th>Impact</th><th>Mitigation</th></tr></thead>
     <tbody>
@@ -368,7 +486,7 @@ interceptor(<span class="s">"damage-scale"</span>).<span class="t">set</span>(<s
 </section>
 
 <section id="roadmap">
-  <h2><span class="id">08</span>Roadmap</h2><div class="rule"></div>
+  <h2><span class="id">09</span>Roadmap</h2><div class="rule"></div>
   <div class="panel">
     <div class="phase"><div class="n">P0<small>RESEARCH</small></div><div>
       <h3>Map the ABI</h3>
@@ -389,7 +507,7 @@ interceptor(<span class="s">"damage-scale"</span>).<span class="t">set</span>(<s
 </section>
 
 <section id="questions">
-  <h2><span class="id">09</span>Open questions</h2><div class="rule"></div>
+  <h2><span class="id">10</span>Open questions</h2><div class="rule"></div>
   <ul>
     <li>Full CET-style reflection access, or a smaller curated API for v1?</li>
     <li>Which hooks must support Tier 1 interception on day one?</li>
