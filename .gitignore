@@ -19,6 +19,7 @@ rtti-dump*
 # generated API references (built by CI)
 docs/api/
 docs/game/
+docs/examples/
 
 # game API types, generated from gameapi/<version>/rtti.json by the rednode build
 packages/rednode/src/generated/

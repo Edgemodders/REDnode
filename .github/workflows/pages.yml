@@ -2,8 +2,10 @@
 #   1. TypeDoc generates the API reference into docs/api (never committed).
 #   2. tools/gameapi/build.mjs generates the game API reference into docs/game
 #      from gameapi/<version>/rtti.json and gameapi/notes (never committed).
-#   3. Jekyll renders docs/ with the HUD layout and copies docs/api and docs/game as-is.
-#   4. The result is deployed to https://edgemodders.github.io/REDnode/
+#   3. tools/examples/build.mjs generates the example apps section into docs/examples
+#      from packages/overlay/apps (never committed).
+#   4. Jekyll renders docs/ with the HUD layout and copies docs/api and docs/game as-is.
+#   5. The result is deployed to https://edgemodders.github.io/REDnode/
 # Requires Settings > Pages > Source: GitHub Actions.
 
 name: Docs site
@@ -43,6 +45,9 @@ jobs:
 
       - name: Generate game API reference
         run: npm run docs:game
+
+      - name: Generate example apps
+        run: npm run docs:examples
 
       - uses: actions/configure-pages@v5
 
