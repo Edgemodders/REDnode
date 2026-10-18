@@ -41,6 +41,8 @@ nav:
     url: /tweakdb.html
   - title: Sound API
     url: /sound.html
+  - title: Localization
+    url: /localization.html
   - title: Tests
     url: /testing.html
   - title: P0 findings

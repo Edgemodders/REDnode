@@ -478,6 +478,30 @@ board.<span class="t">update</span>(...);                            <span class
   </table></div>
   <p style="margin-top:14px">Most of this layer lives in Tier 2. Composites expand into primitives inside the package before anything is sent, so they hot reload and modders can read their source. Only what needs the engine sits in the plugin's driver: focus navigation, sounds, input glyphs, measuring text, and pause and Back. The names and properties match the <code>ui</code> builder where the two overlap, so <code>button</code>, <code>toggle</code> and <code>slider</code> mean the same thing in an overlay window and in ink. A modder learns one vocabulary.</p>
 
+  <h3>Localization</h3>
+  <p>Localization covers all of REDnode, not only ink: its plan is on the <a href="localization.html">Localization</a> page. For ink, any text property, such as a button's <code>label</code>, a <code>text</code> or a <code>tooltip</code>, takes either a plain string or a key:</p>
+  <div class="tw"><table>
+    <thead><tr><th>Write</th><th>What it shows</th><th>Resolved by</th></tr></thead>
+    <tbody>
+      <tr><td><code>label="Track"</code></td><td>The string as it is</td><td>Nobody</td></tr>
+      <tr><td><code>label="LocKey#12345"</code></td><td>The game's own text for that key, in the player's language. This is the form TweakDB records use, so a record's name works as it is</td><td>The engine: <code>SetLocalizedText</code>, so it follows a language change by itself</td></tr>
+      <tr><td><code>label={t("bounty.track")}</code></td><td>The package's own text, from <code>locales/&lt;language&gt;.json</code> in its folder. A key the package lacks falls back to the game's secondary keys (<code>t("UI-…")</code>), then to English, then to the key itself</td><td>REDnode: sends it again when the language changes</td></tr>
+    </tbody>
+  </table></div>
+<pre><span class="c">// locales/en-us.json                     locales/fr-fr.json</span>
+{ <span class="s">"bounty.reward"</span>: <span class="s">"Reward: {amount} €$"</span>,      { <span class="s">"bounty.reward"</span>: <span class="s">"Récompense : {amount} €$"</span>,
+  <span class="s">"bounty.thanks"</span>: { <span class="s">"m"</span>: <span class="s">"…"</span>, <span class="s">"f"</span>: <span class="s">"…"</span> } }       <span class="c">…</span>
+
+&lt;text text={t(<span class="s">"bounty.reward"</span>, { amount: 500 })} /&gt;</pre>
+  <ul>
+    <li><b>Parameters.</b> <code>{name}</code> placeholders take values from the call. For game keys they become the engine's text parameters (<code>textTextParameterSet</code>), which can hold localized names too.</li>
+    <li><b>V's gender.</b> A string can have <code>m</code> and <code>f</code> forms, picked by V's body gender, as the game's own <code>GetLocalizedTextGanderDepened</code> does for its keys.</li>
+    <li><b>Language.</b> <code>game.language()</code> gives the interface language, using the game's names such as <code>en-us</code> and <code>fr-fr</code>, and an event fires when it changes. How the plugin reads it is unverified: the settings path, or the engine's language-changed event.</li>
+    <li><b>No requirements.</b> REDnode resolves package strings itself, so packages need neither ArchiveXL's localization files nor Codeware's <code>ModLocalizationPackage</code>.</li>
+    <li><b>Everywhere.</b> The same <code>t()</code> and <code>LocKey#</code> strings work in overlay windows (the <code>ui</code> builder and HTML apps), notifications and the Mod Manager's package names. There, REDnode looks game keys up with <code>GetLocalizedText</code>.</li>
+    <li><b>Help for authors.</b> A missing key shows in the Mod log, once per key and language.</li>
+  </ul>
+
   <h3>Screens</h3>
   <p>Besides single widgets, mods need whole screens: open and switch the game's own full-screen menus (inventory, character, cyberware and the rest), and build new ones that behave the same way. A new screen should pause the game, take the game's cursor and Back key, and sit in the hub's row of tabs where that fits. The game does this with two pieces, both in the dump:</p>
   <div class="tw"><table>
@@ -516,7 +540,7 @@ bounties.<span class="t">on</span>(<span class="s">"back"</span>, () =&gt; bount
     <thead><tr><th>Phase</th><th>What</th></tr></thead>
     <tbody>
       <tr><td>I1 Spike</td><td>Reach a root on the HUD and in a menu, with and without Codeware. Add a text and a rectangle through <code>rtti.call</code>. Have a listener class in REDnode's scripts receive <code>OnRelease</code>. Measure how many calls fit in a frame. Open the inventory with a <code>StartHubMenuEvent</code>, and try adding a menu entry to the loaded menu resource. Check the script changes with redscript-cli first</td></tr>
-      <tr><td>I2 Display</td><td>The driver: kept trees, batched changes, cleanup per package, rebuild on load. <code>ink.mount</code> on <code>hud</code> with the containers, text, images, shapes and bindings. The layout words (<code>row</code>, <code>column</code>, <code>gap</code>, <code>pad</code>, <code>align</code>), theme words, data-driven trees and <code>id</code>. Sample: an ink version of Coords HUD</td></tr>
+      <tr><td>I2 Display</td><td>The driver: kept trees, batched changes, cleanup per package, rebuild on load. <code>ink.mount</code> on <code>hud</code> with the containers, text, images, shapes and bindings. The layout words (<code>row</code>, <code>column</code>, <code>gap</code>, <code>pad</code>, <code>align</code>), theme words, data-driven trees and <code>id</code>. Localization: <code>LocKey#</code> strings, <code>t()</code> with package locale files, parameters, V's gender forms, the language and its change event. Sample: an ink version of Coords HUD</td></tr>
       <tr><td>I3 Input</td><td>Buttons, sliders, lists, toggles and text input on the <code>menu</code> layer. Plain handlers, <code>consume</code>, focus order for pad and keys, default sounds, and an answer to the cursor question</td></tr>
       <tr><td>I4 Game look</td><td>The game's library items, styles, states and animations. The composites: <code>panel</code>, <code>tabs</code>, <code>dialog</code>, <code>tooltip</code>, <code>table</code>, <code>keyhint</code>, <code>slots</code>. JSX typings and the docs page, with a gallery of every tag</td></tr>
       <tr><td>I5 Screens</td><td>Open and switch the game's screens, and report the open one. The <code>rednode_screen</code> entry and REDnode's scenario. <code>ink.screen</code> for new screens, with pause, cursor and Back. Hub tabs</td></tr>
