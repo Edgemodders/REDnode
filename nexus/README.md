@@ -1,6 +1,6 @@
 # REDnode on Nexus Mods
 
-The source of REDnode's Nexus Mods page lives here, so updates are edits in the repo, not in Nexus's text box. Not on Nexus at the moment: the pages were posted on 2026-10-16 from an Edgemodders account (REDnode 35355, REDdeck 35366, REDcode 35356; REDdeck is now EDGEdeck, a new extension with its own page to come), and Nexus took them down because the owner already has a personal account. They will be posted again from that account, with new mod ids. Then replace the ids in the three descriptions' links, and upload the images again: their `staticdelivery.nexusmods.com` URLs carry the old mod id.
+The source of REDnode's Nexus Mods page lives here, so updates are edits in the repo, not in Nexus's text box. Not on Nexus at the moment: the pages were posted on 2026-10-16 from an Edgemodders account (REDnode 35355, REDdeck 35366, REDcode 35356; REDdeck is now EDGEdeck, a new extension with its own page to come), and Nexus took them down because the owner already has a personal account. They will be posted again from that account, with new mod ids. For the repost (2026-10-18) the description's link to REDcode goes to its GitHub repo instead of its Nexus page; the owner may switch links to the new Nexus pages by hand later. The images still load from the old page's `staticdelivery.nexusmods.com` URLs (checked 2026-10-18); upload them again if those stop working.
 
 | File | What it is |
 |---|---|
