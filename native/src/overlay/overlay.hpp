@@ -198,6 +198,7 @@ struct OpusPlaces
     uint16_t* pakCount = nullptr;   // pak table entries used so far
     uint8_t* pakTable = nullptr;    // open paks, 0x70 bytes each
     uint64_t* infoHash = nullptr;   // the resource path hash the game loads its index from
+    uint8_t* loader = nullptr;      // the index loader: bool (uint64_t path hash)
 };
 struct CodeRange
 {
@@ -207,6 +208,30 @@ struct CodeRange
 bool LocateOpus(const std::vector<CodeRange>& aCode, OpusPlaces& aOut, std::string& aWhy);
 std::string OpusState(const OpusPlaces& aPlaces, const json::Value& aParams, std::string& aError,
                       std::string* aSummary = nullptr); // result JSON; aSummary: one line for logs
+// The audio engine's RegisterGlobalCallback (Wwise), found where the audio start registers
+// the pak tick: int (callback, location bits, cookie, 0, 0, 0), 1 on success; and its
+// UnregisterGlobalCallback, found where the audio shutdown unregisters the tick:
+// int (callback, location bits).
+struct AudioCallbacks
+{
+    void* registerFn = nullptr;
+    void* unregisterFn = nullptr;
+};
+bool LocateAudioCallbacks(const std::vector<CodeRange>& aCode, AudioCallbacks& aOut, std::string& aWhy);
+void StopOpus(); // unregisters REDnode's audio callback, if it registered one
+// A reload of the sound index (H1c-2), run on the audio thread: retires every pak table
+// entry (pak number 0xFFFE, so no lookup matches it), then loads the index again with the
+// game's own loader. On failure or a fault it puts the old index and pak numbers back.
+struct OpusReload
+{
+    bool loaded = false;
+    bool restored = false;
+    uint32_t retired = 0;
+    uint32_t soundsBefore = 0;
+    uint32_t soundsAfter = 0;
+    char why[160] = {};
+};
+void OpusReloadNow(const OpusPlaces& aPlaces, OpusReload& aOut);
 bool IsOpusMethod(const std::string& aMethod);
 std::string Opus(const std::string& aMethod, const json::Value& aParams, std::string& aError);
 } // namespace detail

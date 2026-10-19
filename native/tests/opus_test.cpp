@@ -1,4 +1,4 @@
-// Tests for the opus state (src/overlay/opus.cpp): it finds the game's sound pak tables by
+// Tests for the opus state and reload (src/overlay/opus.cpp): it finds the game's sound pak tables by
 // byte patterns and reads them in the running game, so it must find exactly the places the
 // patterns point at, refuse when a pattern is missing or ambiguous, and answer with an error
 // rather than crash on a wrong guess. Runs without the game: fake code and tables are built
@@ -84,6 +84,12 @@ constexpr size_t Loader = 0x100;
 constexpr size_t Magic = 0x200;
 constexpr size_t Opener = 0x300;
 constexpr size_t Caller = 0x400;
+constexpr size_t Registration = 0x500;
+constexpr size_t TickThunk = 0x580;
+constexpr size_t Tick = 0x5A0;
+constexpr size_t Register = 0x5C0;
+constexpr size_t Unregistration = 0x640;
+constexpr size_t Unregister = 0x6C0;
 
 void BuildCode()
 {
@@ -100,6 +106,16 @@ void BuildCode()
     Put(Caller, {0x48, 0x8B, 0x0D, 0, 0, 0, 0, 0xE8, 0, 0, 0, 0});
     Rip(Caller, 3, 7, InfoHash);
     Rip(Caller + 7, 1, 5, Code + Loader);
+    Put(Registration, {0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0x41, 0x8D, 0x51, 0x40, 0xE8, 0, 0, 0, 0});
+    Rip(Registration, 3, 7, Code + TickThunk);
+    Rip(Registration + 11, 1, 5, Code + Register);
+    Put(TickThunk, {0xE9, 0, 0, 0, 0});
+    Rip(TickThunk, 1, 5, Code + Tick);
+    Put(Register, {0x40, 0x53, 0x55, 0x41, 0x56, 0x41, 0x57});
+    Put(Unregistration, {0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0xE8, 0, 0, 0, 0});
+    Rip(Unregistration, 3, 7, Code + Tick);
+    Rip(Unregistration + 7, 1, 5, Code + Unregister);
+    Put(Unregister, {0x40, 0x55, 0x56, 0x57, 0x48, 0x83, 0xEC, 0x30, 0x48, 0x8B, 0xF9, 0x8B, 0xF2});
 }
 
 // Three sounds (ids 10, 20, 30 in paks 5, 6, 7) and two entries of the second table, laid
@@ -147,6 +163,48 @@ std::vector<CodeRange> CodeRanges()
     return {{Code, Code + CodeSize}};
 }
 
+// The game's loader, as far as the reload sees it: it raises the count first and refuses
+// once an index is loaded; it writes the entry and opens its first paks only on success.
+bool g_loaderAccepts = true;
+uint64_t g_loaderHash = 0;
+alignas(16) uint8_t g_newBlock[0x100];
+
+bool FakeLoader(uint64_t aHash)
+{
+    g_loaderHash = aHash;
+    if (*IndexCount >= 1)
+        return false;
+    (*IndexCount)++;
+    if (!g_loaderAccepts)
+        return false;
+    const uint32_t n = 5, m = 0;
+    uint8_t* at[7] = {g_newBlock, g_newBlock + 20, g_newBlock + 30, g_newBlock + 50, g_newBlock + 60,
+                      g_newBlock + 80, g_newBlock + 100};
+    std::memcpy(IndexTable, at, sizeof(at));
+    std::memcpy(IndexTable + 0x38, &n, 4);
+    std::memcpy(IndexTable + 0x3C, &m, 4);
+    uint8_t* e = PakTable + 0x70 * (*PakCount);
+    const uint16_t slot = *PakCount, pak = 9;
+    std::memcpy(e, &slot, 2);
+    std::memcpy(e + 4, &pak, 2);
+    (*PakCount)++;
+    return true;
+}
+
+bool FaultLoader(uint64_t)
+{
+    (*IndexCount)++;
+    *reinterpret_cast<volatile uint32_t*>(uintptr_t{0x30}) = 1;
+    return true;
+}
+
+uint16_t PakNumber(int aEntry)
+{
+    uint16_t pak;
+    std::memcpy(&pak, PakTable + 0x70 * aEntry + 4, 2);
+    return pak;
+}
+
 json::Value Params(const char* aJson)
 {
     json::Value v;
@@ -168,6 +226,7 @@ int main()
     Check(places.indexCount == IndexCount && places.indexTable == IndexTable && places.pakCount == PakCount &&
               places.pakTable == PakTable && places.infoHash == InfoHash,
           "each place is the one its pattern points at");
+    Check(places.loader == Code + Loader, "the loader is the function the count check is in");
 
     std::string error, summary;
     const std::string state = OpusState(places, Params(R"({"sounds":[20, 99, "0x1e"]})"), error, &summary);
@@ -230,6 +289,66 @@ int main()
     Rip(Caller + 7, 1, 5, Code + Magic);
     Check(!LocateOpus(CodeRanges(), none, why) && Has(why, "no call"), "no call of the loader is refused");
 
+    // The audio engine's callback registration.
+    BuildCode();
+    AudioCallbacks callbacks;
+    Check(LocateAudioCallbacks(CodeRanges(), callbacks, why) && callbacks.registerFn == Code + Register &&
+              callbacks.unregisterFn == Code + Unregister,
+          "finds RegisterGlobalCallback and UnregisterGlobalCallback around the pak tick");
+    Code[TickThunk] = 0xCC;
+    Check(!LocateAudioCallbacks(CodeRanges(), callbacks, why) && Has(why, "pak tick"),
+          "a registration of something else is refused");
+    BuildCode();
+    Code[Register + 1] = 0x90;
+    Check(!LocateAudioCallbacks(CodeRanges(), callbacks, why) && Has(why, "does not start"),
+          "a registration function that starts otherwise is refused");
+    BuildCode();
+    Code[Unregister + 1] = 0x90;
+    Check(!LocateAudioCallbacks(CodeRanges(), callbacks, why) && Has(why, "no unregistration"),
+          "no way to unregister is refused");
+    BuildCode();
+
+    // The reload: pak entries retired, the loader run again with the path hash.
+    BuildTables();
+    places.loader = reinterpret_cast<uint8_t*>(&FakeLoader);
+    OpusReload r;
+    OpusReloadNow(places, r);
+    Check(r.loaded && !r.restored && r.soundsBefore == 3 && r.soundsAfter == 5 && *IndexCount == 1,
+          "a reload loads the new index: 3 sounds before, 5 after");
+    Check(g_loaderHash == *InfoHash, "the loader gets the index's path hash");
+    Check(r.retired == 2 && PakNumber(0) == 0xFFFE && PakNumber(2) == 0xFFFE && PakNumber(1) == 0,
+          "the two open pak entries are retired, the free slot is left alone");
+    Check(*PakCount == 4 && PakNumber(3) == 9, "the paks the new index opens are added after them");
+    error.clear();
+    summary.clear();
+    OpusState(places, Params("{}"), error, &summary);
+    Check(error.empty() && Has(summary, "of 5 sounds") && Has(summary, "65534 (2), 65534 (1), 9 (0)"),
+          "the state after a reload shows the new index and the retired entries");
+
+    // A refused index: everything goes back.
+    BuildTables();
+    uint8_t entryBefore[0x60];
+    std::memcpy(entryBefore, IndexTable, 0x60);
+    g_loaderAccepts = false;
+    OpusReloadNow(places, r);
+    Check(!r.loaded && r.restored && Has(r.why, "refused") && *IndexCount == 1 &&
+              std::memcmp(entryBefore, IndexTable, 0x60) == 0 && PakNumber(0) == 5 && PakNumber(2) == 6,
+          "a refused index puts the old index and pak numbers back");
+    g_loaderAccepts = true;
+
+    // A fault in the loader: caught, and everything goes back.
+    places.loader = reinterpret_cast<uint8_t*>(&FaultLoader);
+    OpusReloadNow(places, r);
+    Check(!r.loaded && r.restored && Has(r.why, "fault") && *IndexCount == 1 && PakNumber(0) == 5,
+          "a fault during the reload is caught and the old index put back");
+
+    // No index loaded: nothing is touched.
+    *IndexCount = 0;
+    places.loader = reinterpret_cast<uint8_t*>(&FakeLoader);
+    OpusReloadNow(places, r);
+    Check(!r.loaded && r.retired == 0 && Has(r.why, "not what REDnode expects") && PakNumber(0) == 5,
+          "with no index loaded the reload touches nothing");
+
     // Optional: the patterns against a real game exe, mapped as an image without running it.
     // Set REDNODE_GAME_EXE to Cyberpunk2077.exe's path. Prints the offsets (they change with
     // each game version); the 2.31 ones are in opus.cpp's header.
@@ -254,6 +373,14 @@ int main()
             OpusPlaces real;
             const bool ok = LocateOpus(code, real, why);
             Check(ok, ok ? "the patterns find the tables in the game exe" : why.c_str());
+            AudioCallbacks realCallbacks;
+            const bool regOk = LocateAudioCallbacks(code, realCallbacks, why);
+            Check(regOk, regOk ? "the patterns find the audio callback functions in the game exe" : why.c_str());
+            if (regOk)
+                std::printf("      callback registration +0x%llx, unregistration +0x%llx, loader +0x%llx\n",
+                            static_cast<unsigned long long>(static_cast<const uint8_t*>(realCallbacks.registerFn) - image),
+                            static_cast<unsigned long long>(static_cast<const uint8_t*>(realCallbacks.unregisterFn) - image),
+                            static_cast<unsigned long long>(real.loader - image));
             const auto rel = [&](const void* p) {
                 return static_cast<unsigned long long>(static_cast<const uint8_t*>(p) - image);
             };
@@ -265,6 +392,6 @@ int main()
         }
     }
 
-    std::printf("%s\n", g_failed ? "Opus state tests FAILED" : "Opus state tests passed");
+    std::printf("%s\n", g_failed ? "Opus tests FAILED" : "Opus tests passed");
     return g_failed ? 1 : 0;
 }

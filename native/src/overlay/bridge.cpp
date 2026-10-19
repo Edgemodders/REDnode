@@ -14,6 +14,8 @@
 //                                                          REDnode's own audio output, in audio.cpp
 //   faults.watch     {"seconds":15,"label":"..."}: logs the first faults for a while, in faults.cpp
 //   opus.state       {"sounds":[id]}: the game's sound pak index and open paks, read only, in opus.cpp
+//   opus.reload      {}: ask the audio thread to load the sound index again (H1c-2 spike), in opus.cpp
+//   opus.reloadStatus {"cancel"?}: waiting, running or done, with the reload's result
 
 #include "json.hpp"
 #include "jvalue.hpp"

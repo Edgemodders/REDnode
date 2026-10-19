@@ -101,6 +101,7 @@ void Stop()
     detail::UninstallInput();
     detail::UninstallCompositor();
     detail::StopAudio();
+    detail::StopOpus();
     detail::StopLink();
     detail::StopHost();
     detail::StopFaults();

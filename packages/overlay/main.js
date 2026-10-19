@@ -1473,12 +1473,15 @@ function checkTweaks() {
 // on either RED Hot Tools route (docs/world.md, "H1 limit: sound paks crash a swap"), so
 // they are refused. For the spike that looks for a fix, settings.json can let them through:
 //   "soundPakSwap": "try"    swap them anyway
+//   "soundPakSwap": "reload" swap them with the game paused, then have the plugin load the
+//                            game's sound index again on the audio thread (H1c-2)
 //   "swapPause": "pause"     pause the game (TimeSystem.SetPausedState) around every swap
 // Each swap also asks the plugin to watch for faults (red4ext/logs/rednode-faults.log).
 // A sound swap let through logs the game's sound pak index and open paks (opus.state, H1c)
-// before the swap, after it and after the unpause, to see what the swap changed.
+// before the swap, after it, after the reload and after the unpause, to see what changed.
 const HOT_TYPES = new Set(['.archive', '.xl', '.yaml', '.yml']);
 const PAUSE_SETTLE_MS = 500;
+const SOUND_RELOAD_TIMEOUT = 3000;
 const HOT_TIMEOUT = 60000;
 const HOT_LOG = 'its log in red4ext/plugins/RedHotTools';
 let hotQueue = Promise.resolve();
@@ -1541,7 +1544,8 @@ async function swapArchives(caller, params) {
     );
   }
 
-  const soundTry = settings.soundPakSwap === 'try';
+  const soundReload = settings.soundPakSwap === 'reload';
+  const soundTry = settings.soundPakSwap === 'try' || soundReload;
   let sound = false;
   for (const f of files) {
     if (path.extname(f.file).toLowerCase() !== '.archive') continue;
@@ -1559,7 +1563,11 @@ async function swapArchives(caller, params) {
           'Install it and restart the game instead.',
       );
     }
-    log(`Archives: ${f.name} changes ${which}; swapping anyway, since "soundPakSwap": "try" is set (it has crashed the game)`);
+    log(
+      soundReload
+        ? `Archives: ${f.name} changes ${which}; swapping it and reloading the sound index, since "soundPakSwap": "reload" is set (experimental)`
+        : `Archives: ${f.name} changes ${which}; swapping anyway, since "soundPakSwap": "try" is set (it has crashed the game)`,
+    );
     sound = true;
   }
 
@@ -1579,7 +1587,8 @@ async function swapArchives(caller, params) {
   } catch (err) {
     log(`Archives: no fault watch (${err.message})`);
   }
-  const pause = settings.swapPause === 'pause';
+  // A sound index reload always runs with the game paused.
+  const pause = settings.swapPause === 'pause' || (sound && soundReload);
   if (sound) await logSoundState('before the swap', caller);
   if (pause) await pauseGame(true);
   const started = Date.now();
@@ -1597,6 +1606,10 @@ async function swapArchives(caller, params) {
   }
   const ms = Date.now() - started;
   if (sound) await logSoundState('after the swap', caller);
+  if (sound && soundReload) {
+    await reloadSoundIndex(caller);
+    await logSoundState('after the reload', caller);
+  }
   if (pause) await pauseGame(false);
   if (sound && pause) await logSoundState('after the unpause', caller);
   const reloaded = [];
@@ -1631,6 +1644,45 @@ async function logSoundState(when, caller) {
     if (caller.id) mods?.log(caller.id, 'info', `Sound ${when}: ${state.summary}`);
   } catch (err) {
     log(`Archives: no sound state ${when} (${err.message})`);
+  }
+}
+
+// "soundPakSwap": "reload": the plugin loads the game's sound index again on the audio
+// thread, at the end of the next audio frame (opus.cpp). The host asks, then polls until
+// it is done, or cancels it if the audio thread never runs it.
+async function reloadSoundIndex(caller) {
+  const report = (level, text) => {
+    log(`Archives: ${text}`);
+    if (caller.id) mods?.log(caller.id, level, `Archives: ${text}`);
+  };
+  try {
+    await bridgeCall('opus.reload', {});
+  } catch (err) {
+    report('error', `no sound index reload (${err.message})`);
+    return;
+  }
+  const until = Date.now() + SOUND_RELOAD_TIMEOUT;
+  for (;;) {
+    let status;
+    try {
+      status = await bridgeCall('opus.reloadStatus', Date.now() > until ? { cancel: true } : {});
+    } catch (err) {
+      report('error', `no sound index reload status (${err.message})`);
+      return;
+    }
+    if (status.state === 'done') {
+      if (status.loaded) {
+        report('info', `sound index reloaded in ${status.ms} ms: ${status.soundsBefore} sounds before, ${status.soundsAfter} after; ${status.retired} pak entries retired`);
+      } else {
+        report('error', `sound index reload failed: ${status.why}; ${status.restored ? 'the old index is back' : 'the old index could NOT be put back'}`);
+      }
+      return;
+    }
+    if (status.state === 'cancelled' || status.state === 'idle') {
+      report('error', `the audio thread did not run the sound index reload in ${SOUND_RELOAD_TIMEOUT} ms; cancelled`);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
   }
 }
 
