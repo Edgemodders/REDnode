@@ -526,6 +526,51 @@ Built on 2026-10-19 from that run:
 
 Checked in the mock game: a swap with the wait and the reload, and an audio thread that never stops (no swap, the hot folder left empty, the game unpaused). Unverified until the game: whether the game's other threads wait on the audio thread during a swap (the cap bounds it), and whether the wait prevents the crash.
 
+### H1c-2 test: second run (0.26.4)
+
+Run on the laptop on 2026-10-19 at 19:37, with `"soundPakSwap": "reload"` set and the swaps done in gameplay. The plugin was still 0.26.4 (the log says "REDnode 0.26.4 loading"), so without H1c-2b's wait. **No crash**, two swaps, 0 faults.
+
+| Step | Result |
+|---|---|
+| Before | Index checksum `0x84b342b65b6327fd` (the base game's); sound 746693166 in pak 881 at 179386 |
+| First swap (19:40:13) | The reload ran on the audio thread in 4.8 ms, 47 ms after asking. The checksum became `0x67add29894c2a988` and the sound moved to offset 313786: **the new index is in**. 31 pak entries retired |
+| Katana after it | **The base game's sound** |
+| Second swap (19:42:26) | Reloaded again in 7.9 ms (the same index, the same checksum); 24 entries retired |
+| Katana after it | **EDGEwave's sound**: the first hot-swapped sound to play in a running game |
+
+Why the base sound the first time, found in the code the same evening: the game keeps a second table, of **loaded sounds** (`0x3B49050`, 16 bytes each: sound id, references, data object; count at `0x3497E38`). The pak tick acquires a sound there (`0x6E3D94`: an entry with the same id just gets one more reference; otherwise a new data object is filled by the lookup) and releases it (`0x113A51C`). Nothing else touches the table: the game has no function that empties it. So a sound still held when the index is reloaded keeps the data it was loaded with until the game lets it go. The katana was drawn just before the first swap, so its entry was held; between the swaps the user drew other weapons, it was let go, and the next draw loaded it fresh from the new index. The other path, Wwise's own file hook (`0x1D80A40`, Open by sound id, 66 for not found), looks a sound up on every open, so streamed sounds follow the reload at once.
+
+Also found: RED Hot Tools moves a swapped archive into `archive/pc/mod`, so it stays installed: the 19:15 session started with EDGEwave's index already loaded. Remove it from there before a fresh session.
+
+### H1c-3: which sounds the game holds (REDnode 0.26.6)
+
+Built on 2026-10-19, diagnostics only:
+
+| Part | What |
+|---|---|
+| `opus.cpp` | Finds the loaded sounds table by the acquire's pattern (optional: without it the state just leaves it out). `opus.state` says how many sounds are held, and for each given id whether it is held and by how many references. After a reload, the held sounds whose pak, offset or size differ between the old index (still in memory) and the new one are listed in the plugin log and the reload's result |
+| `main.js` | After a reload the Mod log says how many held sounds keep their old data, with their ids |
+| `archives.soundState()` | `held`, and `held` per sound |
+
+The real exe gives the table at `+0x3b49050` (count `+0x3497e38`). Next, depending on the test: if letting the sound go (unequipping, loading a save) is enough, the API says so and can tell which sounds wait; if not, a refresh of held entries in the plugin, which needs research first (how Wwise uses the data object).
+
+### H1c-3 test
+
+REDnode 0.26.6 on the laptop (check the plugin log's first line says "REDnode 0.26.6 loading"), with RED Hot Tools and Hot swap test (**Allowed** on), `"soundPakSwap": "reload"` in the settings. **Before each game start, remove `EDGEwaveTest.archive` from `archive\pc\mod`** (a swap moves it there). Swap in gameplay with F10. The katana sound's id is 746693166.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Step 1 comes before it can be reached.
+1. Start the game and load a save where the katana is in V's inventory but **not equipped** in a weapon slot. Switch on the Test timer, **Start**, **Mark**.
+2. Type `746693166` in the sound ids box, press **Sound state**: the line ends "not held". **Mark**.
+3. Swap `EDGEwaveTest.archive`. The Mod log says "sound index reloaded ..." and how many held sounds keep their old data (746693166 should not be among them). **Mark**.
+4. Equip the katana and draw it. Note which sound played (expected: EDGEwave's). **Mark**.
+5. Quit the game. Remove `EDGEwaveTest.archive` from `archive\pc\mod`. Start the game again, load the same save, equip and draw the katana (the base sound), put it away. Press **Sound state**: "held" or "not held"? **Mark**.
+6. Swap `EDGEwaveTest.archive`. Is 746693166 in the Mod log's list of held sounds? Draw the katana: which sound? **Mark**.
+7. Unequip the katana (take it out of its weapon slot), wait 10 seconds, press **Sound state** (held or not), equip it again and draw it: which sound? **Mark**.
+8. If it still played the base sound: load the save again (it keeps the swapped archive and index), draw the katana: which sound? **Mark**.
+9. Quit the game. Send `rednode-mods.log`, both sessions' `rednode-*.log`, `rednode-overlay.log` and `rednode-overlay.prev.log`, and `rednode-faults.log`.
+
+Afterwards remove `soundPakSwap` and `swapPause` from the settings, and `EDGEwaveTest.archive` from `archive\pc\mod` if it should not stay installed.
+
 ### H1 quoted path: retest
 
 Run on 2026-10-19 on the laptop with REDnode 0.26.1 (after its NVIDIA driver update). **Pass.** The path came from File Explorer's **Copy as path**, with its double quotes.

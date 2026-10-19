@@ -40,7 +40,8 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H1 archives.reload](#h1-archivesreload) | In the game | #12 H1 | 2026-10-19 | 0.26.1 | Pass (laptop), with a quoted path |
 | [H1b sound pak check](#h1b-sound-pak-check) | In the game | #12 H1b | 2026-10-19 | 0.26.2 | Refusal **pass** (laptop). Spike: crash with sound let through, no fault caught; no crash with the game paused, but the sound did not change |
 | [H1c-1 sound state](#h1c-1-sound-state) | In the game | #12 H1c-1 | 2026-10-19 | 0.26.3 | Pass (laptop): the reading holds; the index is never re-read, so the swapped sound played silent |
-| [H1c-2 sound index reload](#h1c-2-sound-index-reload) | In the game | #12 H1c-2 | 2026-10-19 | 0.26.4 | **Crash** at step 4 with the setting still "try" (the reload never ran): the crash is in the archive load. 0.26.5 (H1c-2b) holds the audio thread during the swap; awaiting its run. Also the Welcome window's F9 note |
+| [H1c-2 sound index reload](#h1c-2-sound-index-reload) | In the game | #12 H1c-2 | 2026-10-19 | 0.26.4 | **Crash** at step 4 with the setting still "try". Second run with "reload" (still 0.26.4): no crash, the index reloaded; the katana played the base sound after the first swap (held by the game) and **EDGEwave's sound** after the second |
+| [H1c-3 held sounds](#h1c-3-held-sounds) | In the game | #12 H1c-3 | Not run | 0.26.6 | Built; awaiting its first run (laptop). Also checks 0.26.5's wait (H1c-2b) and the Welcome window's F9 note |
 | [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | 2026-10-19 | 0.26.1 | **Fixed** by an NVIDIA driver update: the arrow blinked in the game with DLSS on (laptop) and not with DLSS off; drawn on every frame, no jumps. Not a REDnode bug |
 
 ## Before any in-game test
@@ -376,6 +377,20 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 7. Play a minute; note missing or wrong sounds.
 8. Swap again, draw the katana.
 9. Quit. Plugin log: `Opus: REDnode's callback runs at the end of each audio frame`, `Opus: reloaded the sound index`, and at exit `Opus: REDnode's audio callback unregistered`; send the mods, plugin, host and fault logs.
+
+### H1c-3 held sounds
+
+[Source](world.md#h1c-3-test). Built 2026-10-19 in REDnode 0.26.6: `archives.soundState()` says which sounds the game holds loaded, and a reload lists the held sounds that keep their old data. Same setup as H1c-2; remove `EDGEwaveTest.archive` from `archive\pc\mod` before each game start. Not run yet.
+
+1. Load a save with the katana not equipped; timer.
+2. Sound state: "not held".
+3. Swap: reloaded; the held sounds with old data listed.
+4. Equip and draw the katana: EDGEwave's sound expected.
+5. New session (archive removed): draw the katana, Sound state: held?
+6. Swap: is the katana listed? Draw: which sound?
+7. Unequip, wait, Sound state, equip, draw: which sound?
+8. If still the base sound: load the save, draw.
+9. Quit; send both sessions' logs.
 
 ### Cursor flicker
 
