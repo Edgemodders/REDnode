@@ -36,7 +36,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [Polish 0.24.2](#polish-0242) | In the game | Polish | 2026-10-17 | 0.24.4 | **Partly**: tooltips failed, HUD widgets on the boot loading screen; both fixed and passed in Polish 0.24.5 |
 | [Polish 0.24.5](#polish-0245) | In the game | Polish | 2026-10-17 | 0.24.7 | Pass |
 | [W3 REDbridge for players](#w3-redbridge-for-players) | In the game | W3 | 2026-10-17 | 0.25.0 | Pass (with the retest) |
-| [H0 and Welcome](#h0-and-welcome) | In the game | #12, Welcome | Not run | 0.25.1 | |
+| [H0 and Welcome](#h0-and-welcome) | In the game | #12, Welcome | 2026-10-18 | 0.25.1 | Pass (laptop, with a retest) |
 
 ## Before any in-game test
 
@@ -321,7 +321,7 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 
 ### H0 and Welcome
 
-[Source](world.md#h0-and-welcome-test). Built, **not run yet**. The Welcome window checked in the mock game; RED Hot Tools never run here.
+[Source](world.md#h0-and-welcome-test). Last run 2026-10-18, REDnode 0.25.1, on the user's laptop. **Pass**, with a retest of step 3: the first archive picked, a scene mod missing its other parts and swapped at the main menu, was followed by a crash minutes later; a plain archive in a loaded save passed. Load a save before the swap. [Results](world.md#h0-and-welcome-results). On a PC without EDGEmat's probe, copy any plain `.archive` from `archive/pc/mod` (no `.xl`, no required mods).
 
 1. Start: the Welcome window at the main menu, Showing lit. F10: Using lit. **Got it** closes it. Load a save, start the timer.
 2. Launcher: switch **Welcome** on, it opens; close it with ✕.

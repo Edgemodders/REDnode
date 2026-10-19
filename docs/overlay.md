@@ -787,7 +787,7 @@ Checked in the mock game: it opened on a fresh start with Showing lit, lit Using
 
 ### Welcome 0.25.1: test
 
-See [the session's test](world.md#h0-and-welcome-test) in the World API page: it runs with #12's H0.
+See [the session's test](world.md#h0-and-welcome-test) in the World API page: it runs with #12's H0. Passed on 2026-10-18 on the user's laptop: it showed once, **Got it** closed it, and it stayed closed at the next start ([results](world.md#h0-and-welcome-results)).
 
 ### UI kit
 
