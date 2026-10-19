@@ -281,3 +281,26 @@ REDnode 0.26.0 deployed, with RED Hot Tools. In the launcher, switch on **Hot sw
 5. Quit the game.
 
 Then: the host log has `Archives: hot-test swaps Plain.archive (RED Hot Tools ...)` and `1 reloaded in N ms`, RED Hot Tools' log in its plugin folder has `Archives reload completed.`, `archive/pc/hot` is empty, and nothing crashed.
+
+### H1 test: results
+
+Run on 2026-10-19 on the user's laptop (the 0.26.0 player zip with the Test timer and Hot swap test added, RED Hot Tools 1.3.0). **Pass**, from the plugin log, the host log, the Mod log and RED Hot Tools' log. The archive was `###_nim_material_override.archive`, given as a full path.
+
+| Time | What happened |
+|---|---|
+| 06:48:51 | A save loaded |
+| 06:51:04 | The first **Swap**, before the permission was on: refused with "Allow "Hot swap test" to swap archives in the REDnode launcher first". The check works. The test's "allow it to swap archives" was read as "do a swap"; the steps now name the **Allowed** switch |
+| 06:51:32 | `Granted archives for hot-test` |
+| 06:51:43 | The path pasted with Windows' double quotes around it: refused as the wrong file type, since the extension read as `.archive"`. Fixed after the test (commit 510334d): `archives.reload` drops quotes and spaces around a path, and the type error names the extension it saw |
+| 06:54:09 | The path without quotes: "1 swapped in 71 ms". RED Hot Tools' log shows every step through "Archives reload completed." in 52 ms, on thread 10276, the game thread that runs REDnode's frame pump |
+| 06:54:26 to 06:54:28 | Test timer started, **Mark** 1 |
+| 06:55:06 | The same swap again: "1 swapped in 67 ms" (RED Hot Tools 49 ms). **Mark** 2 at 06:55:14 |
+| 06:55:24 | `Nope.archive`: "Nope.archive was not found in archive/pc/mod". Marks 3 and 4 were not pressed |
+| 06:56:27 | "Game thread pump stopped after 31271 frames": a clean quit |
+
+What it means:
+
+- `RedHotTools.ReloadArchives()` works when REDnode calls it on the game thread, and the answer is definite: no swap reported `failed`, and nothing stayed in `archive/pc/hot`.
+- A swap holds the game's frame for about 50 ms, three frames at the laptop's 45 fps. The host's 5-second performance lines show no dip. Unverified whether the user saw a stutter.
+- About 430 ms after each swap, RED Hot Tools' folder watcher fires on its own thread: it sees REDnode's copy into the hot folder, finds no archives left, and reloads ArchiveXL's extensions a second time, which takes under a millisecond. Harmless; it cannot be avoided while the swap goes through the hot folder.
+- RED Hot Tools' `box_occluder.w2mesh` warnings come before and after swaps alike: the game's, not the swap's.
