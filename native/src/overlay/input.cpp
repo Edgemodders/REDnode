@@ -39,11 +39,42 @@ bool JustActivated()
     return g_activatedAt && NowMs() - g_activatedAt < 300;
 }
 
-void MoveCursorTo(float aX, float aY)
+// Cursor diagnostics. H1 test on the user's laptop (2026-10-19, touchpad): the arrow
+// flickered in the game, not in menus. Counts what moved the cursor and how often it
+// was drawn; CursorFrame logs them every 5 seconds in interactive mode.
+struct CursorDiag
+{
+    std::atomic<uint32_t> raw{0};         // raw relative moves used
+    std::atomic<uint32_t> rawAbsolute{0}; // raw moves with absolute positions (ignored)
+    std::atomic<uint32_t> rawAway{0};     // raw mouse input while another window was in front
+    std::atomic<uint32_t> msgMoves{0};    // WM_MOUSEMOVE in interactive mode
+    std::atomic<uint32_t> msgUsed{0};     // ... that moved the cursor (no raw mouse seen)
+    std::atomic<uint32_t> jumps{0};       // moves of more than 150 reference pixels at once
+    std::atomic<float> jumpFromX{0}, jumpFromY{0}, jumpToX{0}, jumpToY{0};
+    std::atomic<char> jumpVia{0};
+    uint32_t frames = 0; // render thread only
+    uint32_t drawn = 0;
+    uint64_t lastReport = 0;
+};
+CursorDiag g_diag;
+
+// aVia: 'r' raw input, 'w' WM_MOUSEMOVE, 'c' centred on entering interactive mode.
+void MoveCursorTo(float aX, float aY, char aVia)
 {
     const Screen s = GetScreen();
+    const float oldX = g_cursorX, oldY = g_cursorY;
     g_cursorX = std::clamp(aX, 0.0f, std::max(0.0f, s.width - 1));
     g_cursorY = std::clamp(aY, 0.0f, std::max(0.0f, s.height - 1));
+    const float dx = g_cursorX - oldX, dy = g_cursorY - oldY;
+    if (aVia != 'c' && dx * dx + dy * dy > 150.0f * 150.0f)
+    {
+        g_diag.jumps += 1;
+        g_diag.jumpFromX = oldX;
+        g_diag.jumpFromY = oldY;
+        g_diag.jumpToX = g_cursorX.load();
+        g_diag.jumpToY = g_cursorY.load();
+        g_diag.jumpVia = aVia;
+    }
     OnMouseMove(g_cursorX, g_cursorY);
 }
 
@@ -95,7 +126,11 @@ LRESULT HandleRawInput(HWND aWnd, WPARAM aWParam, LPARAM aLParam, bool aInteract
     // is not the player's input to the game: it must not move the overlay's cursor,
     // press its buttons or toggle it.
     if (GET_RAWINPUT_CODE_WPARAM(aWParam) == RIM_INPUTSINK)
+    {
+        if (raw->header.dwType == RIM_TYPEMOUSE && aInteractive)
+            g_diag.rawAway += 1;
         return 0;
+    }
 
     if (raw->header.dwType == RIM_TYPEKEYBOARD)
     {
@@ -135,13 +170,16 @@ LRESULT HandleRawInput(HWND aWnd, WPARAM aWParam, LPARAM aLParam, bool aInteract
     {
         const auto& m = raw->data.mouse;
         g_rawMouse = true;
-        if (!(m.usFlags & MOUSE_MOVE_ABSOLUTE) && (m.lLastX || m.lLastY))
+        if (m.usFlags & MOUSE_MOVE_ABSOLUTE)
+            g_diag.rawAbsolute += 1;
+        else if (m.lLastX || m.lLastY)
         {
+            g_diag.raw += 1;
             // Locked: the cursor stays; the page gets the raw movement.
             if (PointerLocked())
                 OnMouseDelta(float(m.lLastX), float(m.lLastY));
             else
-                MoveCursorTo(g_cursorX + float(m.lLastX), g_cursorY + float(m.lLastY));
+                MoveCursorTo(g_cursorX + float(m.lLastX), g_cursorY + float(m.lLastY), 'r');
         }
         const USHORT f = JustActivated() ? 0 : m.usButtonFlags;
         if (f & RI_MOUSE_LEFT_BUTTON_DOWN)
@@ -225,12 +263,14 @@ LRESULT CALLBACK WndProc(HWND aWnd, UINT aMsg, WPARAM aWParam, LPARAM aLParam)
         {
             static float lastX = 0, lastY = 0;
             float x = lastX, y = lastY;
+            g_diag.msgMoves += 1;
             if (!g_rawMouse && ClientToReference(aLParam, x, y))
             {
+                g_diag.msgUsed += 1;
                 if (PointerLocked())
                     OnMouseDelta(x - lastX, y - lastY);
                 else
-                    MoveCursorTo(x, y);
+                    MoveCursorTo(x, y, 'w');
             }
             lastX = x;
             lastY = y;
@@ -300,7 +340,7 @@ void SetMode(Mode aMode)
     if (aMode == Mode::Interactive)
     {
         const Screen s = GetScreen();
-        MoveCursorTo(s.width * 0.5f, s.height * 0.5f);
+        MoveCursorTo(s.width * 0.5f, s.height * 0.5f, 'c');
     }
     Log("Overlay: %s", ModeName(aMode));
     SendJson(std::string("{\"event\":\"overlay\",\"mode\":") + JsonString(ModeName(aMode)) + "}");
@@ -323,6 +363,47 @@ void GetCursor(float& aX, float& aY)
 {
     aX = g_cursorX.load();
     aY = g_cursorY.load();
+}
+
+void CursorFrame(bool aDrawn)
+{
+    const uint64_t now = NowMs();
+    if (GetMode() != Mode::Interactive)
+    {
+        g_diag.lastReport = 0;
+        return;
+    }
+    if (!g_diag.lastReport)
+    {
+        // Entering interactive mode: start a fresh count.
+        g_diag.lastReport = now;
+        g_diag.frames = g_diag.drawn = 0;
+        g_diag.raw = g_diag.rawAbsolute = g_diag.rawAway = g_diag.msgMoves = g_diag.msgUsed = g_diag.jumps = 0;
+    }
+    g_diag.frames += 1;
+    g_diag.drawn += aDrawn ? 1 : 0;
+    if (now - g_diag.lastReport < 5000)
+        return;
+
+    CURSORINFO info{sizeof(info)};
+    const bool osCursor = GetCursorInfo(&info) && (info.flags & CURSOR_SHOWING);
+    RECT clip{};
+    GetClipCursor(&clip);
+    char jump[160] = "";
+    if (g_diag.jumps)
+        snprintf(jump, sizeof(jump), " (last %.0f,%.0f to %.0f,%.0f by %s)", g_diag.jumpFromX.load(),
+                 g_diag.jumpFromY.load(), g_diag.jumpToX.load(), g_diag.jumpToY.load(),
+                 g_diag.jumpVia == 'r' ? "raw input" : "window message");
+    Log("Overlay: cursor, last %.1f s: %u frames, drawn on %u; raw moves %u (absolute %u, while away %u); window "
+        "moves %u (used %u); jumps over 150 px %u%s; now at %.0f,%.0f; Windows cursor %s at %ld,%ld, clip %ld,%ld "
+        "to %ld,%ld",
+        double(now - g_diag.lastReport) / 1000.0, g_diag.frames, g_diag.drawn, g_diag.raw.load(),
+        g_diag.rawAbsolute.load(), g_diag.rawAway.load(), g_diag.msgMoves.load(), g_diag.msgUsed.load(),
+        g_diag.jumps.load(), jump, g_cursorX.load(), g_cursorY.load(), osCursor ? "shown" : "hidden", info.ptScreenPos.x,
+        info.ptScreenPos.y, clip.left, clip.top, clip.right, clip.bottom);
+    g_diag.lastReport = now;
+    g_diag.frames = g_diag.drawn = 0;
+    g_diag.raw = g_diag.rawAbsolute = g_diag.rawAway = g_diag.msgMoves = g_diag.msgUsed = g_diag.jumps = 0;
 }
 
 bool InstallInput(HWND aWindow)

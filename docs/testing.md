@@ -38,6 +38,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [W3 REDbridge for players](#w3-redbridge-for-players) | In the game | W3 | 2026-10-17 | 0.25.0 | Pass (with the retest) |
 | [H0 and Welcome](#h0-and-welcome) | In the game | #12, Welcome | 2026-10-18 | 0.25.1 | Pass (laptop, with a retest) |
 | [H1 archives.reload](#h1-archivesreload) | In the game | #12 H1 | 2026-10-19 | 0.26.0 | Pass (laptop) |
+| [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | Not run | 0.26.1 | |
 
 ## Before any in-game test
 
@@ -338,6 +339,16 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 3. `Nope.archive`, **Swap**: not found.
 4. Play on half a minute.
 5. Quit. Host log: `Archives: hot-test swaps Plain.archive` and `1 reloaded`; RED Hot Tools' log: `Archives reload completed.`; `archive/pc/hot` empty; no crash.
+
+### Cursor flicker
+
+[Source](overlay.md#cursor-flicker-test). Built, **not run yet**. For the laptop where the overlay's arrow flickered in the game. Notes typed in the Test timer go out with the next **Mark**.
+
+1. Load a save, F10, start the timer; touchpad still 10 s.
+2. Move slowly 10 s.
+3. Pause menu open, F10; still and moving 10 s.
+4. Pause menu closed, F10; fast circles 10 s.
+5. Quit. Plugin log: `Overlay: cursor` lines for each step.
 
 ## MCP server
 

@@ -51,11 +51,12 @@ export const NOTES = {
   timer: {
     group: 'start',
     summary: 'The Test timer: a stopwatch whose marks go to the Mod log with the time, used to match log lines to test steps.',
-    teaches: ['ui.heading', 'ui.row', 'ui.input', 'onSubmit', 'console.log', '"front" permission'],
+    teaches: ['ui.heading', 'ui.row', 'ui.input', 'onSubmit', 'props.value', 'console.log', '"front" permission'],
     how: [
       'Everything a Node mod prints with `console.log` goes to the Mod log and to `red4ext/logs/rednode-mods.log`, tagged with the package id.',
       'State lives in plain variables; `show()` writes it into the nodes. There is no framework to learn: change a node with `set()` whenever your data changes.',
       'The manifest asks for the `front` permission, so the timer stays above other packages\' windows.',
+      'A field keeps what the player typed in `props.value`, so **Mark** can send a note that was typed without pressing Enter.',
     ],
     tryThis: ['Add a Lap button that logs the time since the last mark.'],
   },

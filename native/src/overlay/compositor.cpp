@@ -1095,6 +1095,7 @@ void ToNdc(float aX, float aY, float aW, float aH, float aScale, float aOut[4])
 }
 
 void RenderFrame(IDXGISwapChain* aSwapChain);
+bool g_cursorDrawn = false; // RenderFrame drew the cursor this present
 
 // Times the overlay's CPU work on the present path.
 void Render(IDXGISwapChain* aSwapChain)
@@ -1105,7 +1106,9 @@ void Render(IDXGISwapChain* aSwapChain)
     LARGE_INTEGER start;
     QueryPerformanceCounter(&start);
     const uint32_t before = g_perf.rendered;
+    g_cursorDrawn = false;
     RenderFrame(aSwapChain);
+    CursorFrame(g_cursorDrawn);
     if (g_perf.rendered != before)
     {
         const double ms = SecondsSince(start) * 1000.0;
@@ -1269,6 +1272,7 @@ void RenderFrame(IDXGISwapChain* aSwapChain)
         g.list->SetGraphicsRoot32BitConstants(0, sizeof(Constants) / 4, &c, 0);
         g.list->SetGraphicsRootDescriptorTable(1, SrvGpu(MaxWindows));
         g.list->DrawInstanced(4, 1, 0, 0);
+        g_cursorDrawn = true;
     }
 
     RecordCapture(backBuffer.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, true); // what the player sees, if asked for

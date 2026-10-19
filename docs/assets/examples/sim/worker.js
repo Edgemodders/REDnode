@@ -166,11 +166,22 @@ export const ui = {
   text: (text, o = {}) => node('text', { text, ...o }),
   heading: (text, o = {}) => node('heading', { text, ...o }),
   button: (label, onClick, o = {}) => node('button', { label, ...o }, { click: onClick }),
-  toggle: (label, onChange, o = {}) => node('toggle', { label, ...o }, { change: onChange }),
-  slider: (label, onChange, o = {}) => node('slider', { label, ...o }, { change: onChange }),
+  // Like the package, a toggle, slider or field keeps what the player set in its props.
+  toggle(label, onChange, o = {}) {
+    const self = node('toggle', { label, ...o }, { change: (v) => (Object.assign(self.props, { checked: !!v }), onChange?.(!!v)) });
+    return self;
+  },
+  slider(label, onChange, o = {}) {
+    const self = node('slider', { label, ...o }, { change: (v) => (Object.assign(self.props, { value: Number(v) }), onChange?.(Number(v))) });
+    return self;
+  },
   input(options = {}) {
     const { props, onChange, onSubmit } = split(options);
-    return node('input', props, { change: onChange, submit: onSubmit });
+    const self = node('input', props, {
+      change: (v) => (Object.assign(self.props, { value: String(v) }), onChange?.(String(v))),
+      submit: (v) => onSubmit?.(String(v)),
+    });
+    return self;
   },
   progress: (value, o = {}) => node('progress', { value, ...o }),
   row: (...children) => node('row', {}, {}, children),

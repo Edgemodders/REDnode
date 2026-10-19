@@ -789,6 +789,25 @@ Checked in the mock game: it opened on a fresh start with Showing lit, lit Using
 
 See [the session's test](world.md#h0-and-welcome-test) in the World API page: it runs with #12's H0. Passed on 2026-10-18 on the user's laptop: it showed once, **Got it** closed it, and it stayed closed at the next start ([results](world.md#h0-and-welcome-results)).
 
+### Cursor flicker on the laptop: 0.26.1 diagnostics
+
+Found in the H1 test on 2026-10-19, on the user's laptop (2560 x 1440, touchpad, about 45 fps in the game): the overlay's own arrow flickered while a save was loaded, not in menus. It flickered with the touchpad still and moving, before and after a switch to the desktop, with Frame Generation off. Not seen on the dev PC with a mouse. The arrow is drawn on every present in interactive mode, on the game's own queue, so a missing draw would make the windows flicker too; the likelier cause is something moving the arrow back and forth. Unverified.
+
+REDnode 0.26.1 logs, every 5 seconds in interactive mode, `Overlay: cursor, last 5.0 s: ...` in the plugin log: frames and how many had the arrow drawn; raw relative moves, raw moves with absolute positions (ignored), raw input while another window was in front; window messages (`WM_MOUSEMOVE`) and how many moved the arrow; moves of more than 150 reference pixels at once, with the last one and what made it; where the arrow is; and the Windows cursor (shown or hidden, its position, its clip rectangle). The Test timer 0.2.0 sends a typed note with the next **Mark** when Enter was not pressed (the notes of the first retest were lost that way).
+
+### Cursor flicker: test
+
+REDnode 0.26.1 on the laptop. Type what you see into the Test timer's field; **Mark** sends it with the step.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Step 1 comes before it can be reached.
+1. Load a save, F10 to interactive, switch on the Test timer and **Start**. Hands off the touchpad for 10 seconds. Note whether the arrow flickers, then **Mark**.
+2. Move the arrow slowly for 10 seconds. Note, **Mark**.
+3. Press Esc to open the game's pause menu, F10 to interactive, watch still and moving for 10 seconds. Note, **Mark**.
+4. Close the pause menu, F10 to interactive, then move the arrow quickly in circles for 10 seconds. Note, **Mark**.
+5. Quit the game.
+
+Then: the plugin log's `Overlay: cursor` lines for each step, and the notes in the Mod log.
+
 ### UI kit
 
 UI is written as markup, not built by hand in code. Two layers keep it optional:

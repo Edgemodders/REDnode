@@ -17,6 +17,20 @@ const clock = (ms) => {
 const time = ui.heading('00:00');
 const status = ui.text('Press Start, then Mark after each step.', { tone: 'dim' });
 const last = ui.text('', { tone: 'accent' });
+// A note goes to the log on Enter, or with the next Mark if Enter was not pressed
+// (laptop test, 2026-10-19: notes typed without Enter were lost).
+const writeNote = (text) => {
+  console.log(`Note at ${clock(elapsed())}, during step ${step + 1}: ${text}`);
+  note.set({ value: '' });
+};
+const note = ui.input({
+  placeholder: 'A note for the log (Enter, or the next Mark)',
+  onSubmit: (text) => {
+    if (!text.trim()) return;
+    writeNote(text.trim());
+    last.set({ text: 'Note written to the log' });
+  },
+});
 const start = ui.button('Start', () => {
   if (startedAt) {
     heldMs = elapsed();
@@ -53,10 +67,12 @@ ui.window({
           heldMs = 0;
           console.log('Started');
         }
+        const pending = String(note.props.value ?? '').trim();
+        if (pending) writeNote(pending);
         step += 1;
         const at = clock(elapsed());
         console.log(`Mark: step ${step} done at ${at}`);
-        last.set({ text: `Step ${step} marked at ${at}` });
+        last.set({ text: `Step ${step} marked at ${at}${pending ? ', with the note' : ''}` });
         show();
       }),
       ui.button('Reset', () => {
@@ -68,14 +84,7 @@ ui.window({
         show();
       }, { variant: 'ghost' }),
     ),
-    ui.input({
-      placeholder: 'A note for the log (Enter)',
-      onSubmit: (text) => {
-        if (!text.trim()) return;
-        console.log(`Note at ${clock(elapsed())}, after step ${step}: ${text.trim()}`);
-        last.set({ text: 'Note written to the log' });
-      },
-    }),
+    note,
     last,
   ],
 });
