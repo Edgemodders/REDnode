@@ -368,6 +368,25 @@ Run C, the same with the game paused: add `"swapPause": "pause"` as well.
 
 Afterwards remove both settings.
 
+### H1b test: results
+
+Run on 2026-10-19 on the laptop with the REDnode 0.26.2 test build, RED Hot Tools 1.3.0, the archive in `Documents` (not installed).
+
+| Run | Time | What happened |
+|---|---|---|
+| A, default settings | 11:40 to 11:41 | `EDGEwaveTest.archive` refused: "changes the game's sound (2 sound paks, such as sfx_container.opusinfo) ... Install it and restart the game instead"; the game ran on. The nim archive swapped in 77 ms under a fault watch, with no faults. Marks 1 to 3 present. **Pass** |
+| B, `"soundPakSwap": "try"` | 11:46 | Crash. `rednode-faults.log` has the watch's start at 11:46:17 and nothing after it: no fault of the error kind (`0xC...`) reached REDnode's handler, and no `ExitProcess` line |
+| C, also `"swapPause": "pause"` | 11:49 | **No crash.** "game paused for the swap (IsPausedState true)", "1 reloaded in 29 ms", "unpaused (IsPausedState false)"; the game ran on, no faults. But drawing the katana played the base game sound, not the override |
+| Afterwards | 11:51 | A last start: the base katana sound plays |
+
+What it means:
+
+- H1b's refusal works, and the fault watch is quiet on a normal swap.
+- Run B's ending passed REDnode's handler by: either a handler registered ahead of REDnode's ends the process at the fault, or a C++ exception (skipped by the watch as routine) ends it through `terminate`, or a fail-fast or `TerminateProcess`. Unverified which.
+- Pausing the game with `TimeSystem.SetPausedState` around the swap avoided the crash (one run): what fails is something that runs while the game plays, as the user suspected, plausibly the audio engine's work.
+- A clean swap does not change the sound: the audio engine evidently reads its index (`sfx_container.opusinfo`) at start and keeps it, so newly mounted paks are not used until a restart. Hearing a swapped sound would need the audio engine to reload its index, which the game's script API does not offer; it would mean reverse engineering native audio code. Unverified.
+- Open: whether in the last start the archive was still installed (the swap leaves it in `archive/pc/mod`); if it was, and the base sound played, the swap left the install broken.
+
 ### H1 quoted path: retest
 
 Run on 2026-10-19 on the laptop with REDnode 0.26.1 (after its NVIDIA driver update). **Pass.** The path came from File Explorer's **Copy as path**, with its double quotes.
