@@ -39,7 +39,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H0 and Welcome](#h0-and-welcome) | In the game | #12, Welcome | 2026-10-18 | 0.25.1 | Pass (laptop, with a retest) |
 | [H1 archives.reload](#h1-archivesreload) | In the game | #12 H1 | 2026-10-19 | 0.26.1 | Pass (laptop), with a quoted path |
 | [H1b sound pak check](#h1b-sound-pak-check) | In the game | #12 H1b | 2026-10-19 | 0.26.2 | Refusal **pass** (laptop). Spike: crash with sound let through, no fault caught; no crash with the game paused, but the sound did not change |
-| [H1c-1 sound state](#h1c-1-sound-state) | In the game | #12 H1c-1 | Not run | 0.26.3 | Built; awaiting its first run (laptop) |
+| [H1c-1 sound state](#h1c-1-sound-state) | In the game | #12 H1c-1 | 2026-10-19 | 0.26.3 | Pass (laptop): the reading holds; the index is never re-read, so the swapped sound played silent |
 | [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | 2026-10-19 | 0.26.1 | **Fixed** by an NVIDIA driver update: the arrow blinked in the game with DLSS on (laptop) and not with DLSS off; drawn on every frame, no jumps. Not a REDnode bug |
 
 ## Before any in-game test
@@ -346,14 +346,21 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 
 [Source](world.md#h1b-test). First run 2026-10-19, REDnode 0.26.2, on the laptop: run A passed (refused, no crash; a plain swap watched with no faults); run B crashed with nothing in the fault log; run C, paused, did not crash, but the sound stayed the base game's ([results](world.md#h1b-test-results)). Found first on 2026-10-19: swapping an archive with the game's sound paks crashes the game on any route ([limit](world.md#h1-limit-sound-paks-crash-a-swap)). Needs RED Hot Tools, Hot swap test with **Allowed** on, a sound archive from EDGEwave (not installed) and a plain archive known to swap. Runs B and C use the spike settings `"soundPakSwap": "try"` and `"swapPause": "pause"` in the host's `settings.json`, removed afterwards.
 
-### H1c-1 sound state
-
-[Source](world.md#h1c-1-test). Built 2026-10-19 in REDnode 0.26.3: a read-only look at the game's sound pak index and open paks (`opus.state`, `archives.soundState`), around drawing the katana and a paused sound swap. Needs RED Hot Tools, Hot swap test 0.2.0 with **Allowed** on, `EDGEwaveTest.archive` (not installed), and the spike settings `"soundPakSwap": "try"` and `"swapPause": "pause"`, removed afterwards. Not run yet.
-
 1. Run A: load a save, timer; swap the sound archive: refused, no crash.
 2. Swap the plain archive: "1 swapped"; the plugin log has the fault watch start and end, 0 faults.
 3. Run B, `"soundPakSwap": "try"`: swap the sound archive; expected to crash. Send `rednode-faults.log`, the host log, the plugin log and RED Hot Tools' log.
 4. Run C, with `"swapPause": "pause"` too: the same, with the game paused around the swap.
+
+### H1c-1 sound state
+
+[Source](world.md#h1c-1-test). First run 2026-10-19, REDnode 0.26.3, on the laptop: **pass**. The patterns found the tables, every read worked, and the swap left the index unchanged; the swapped sound then played silent, which the readings explain ([results](world.md#h1c-1-test-results)). A read-only look at the game's sound pak index and open paks (`opus.state`, `archives.soundState`), around drawing the katana and a paused sound swap. Needs RED Hot Tools, Hot swap test 0.2.0 with **Allowed** on, `EDGEwaveTest.archive` (not installed), and the spike settings `"soundPakSwap": "try"` and `"swapPause": "pause"`, removed afterwards.
+
+1. Load a save with the katana not drawn; timer.
+2. Sound state with the overridden sound's id (EDGEwave's hash): index, open paks, where the sound is.
+3. Draw the katana, put it away; Sound state.
+4. Swap the sound archive: three state lines (before, after, after the unpause); no crash.
+5. Draw the katana; note what played; Sound state.
+6. Quit. Plugin log: `Opus: found the sound pak tables`; send the mods, plugin, host and fault logs.
 
 ### Cursor flicker
 

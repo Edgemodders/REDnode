@@ -436,6 +436,27 @@ REDnode 0.26.3 on the laptop, with RED Hot Tools, Hot swap test (**Allowed** on)
 
 Afterwards remove both settings.
 
+### H1c-1 test: results
+
+Run on the laptop on 2026-10-19 (REDnode 0.26.3, game 2.31, RED Hot Tools 1.3.0). The sound id was 746693166, the katana sound EDGEwave overrode. A first try (18:34) was restarted because Alt+Tab, used to read the steps, drew the katana through a game key binding (the user remapped it). The run that counts started at 18:41. No crash; the fault watch saw no faults.
+
+| Step | Result |
+|---|---|
+| Patterns | Found in 235 ms at the same five offsets as on the dev PC (`index count +0x3495df8, index +0x3b28fd0, pak count +0x3495dfc, paks +0x3a38cc0, path hash +0x3493b58`). Every read worked: the layout reading holds |
+| 2. Sound state | 1 index of 73,139 sounds, checksum `0x84b342b65b6327fd`; 24 paks open; sound 746693166 in pak 881 at offset 179386 |
+| 3. Katana drawn | Not read at this step (no Sound state press logged) |
+| 4. Paused swap | State before the swap, after it and after the unpause: the checksum unchanged, the same 24 paks with the same readers (only pak 56's references moved, 4 to 2). Swap 50 ms |
+| 5. Katana drawn | **Silent**: no sound played (H1b's run C played the base game's sound) |
+| Control | The same archive installed normally and the game restarted: the new sound played. The archive is fine |
+
+What it shows:
+
+- **The index is never re-read.** The checksum is the same before and after the swap, as the research said. The sound still points at pak 881, offset 179386, from the base game's index.
+- **Paks open on demand and close again.** Pak 881 was not open in any read, even after the katana was drawn at step 3 and before the swap. The list held 24 paks in every read (in this run and the 18:34 try), with different paks each time, and entries with 0 references stayed in it. That looks like a cache of about 24 readers that drops the oldest, unverified. The research read the first paks as kept for good; they are not, or not these.
+- **Why silence.** At step 5 the game opened `sfx_container_881.opuspak` again, now from the swapped archive, and read it at the base index's offset and size. The mod's rebuilt pak has its sounds at other places, so the decoder got no valid sound there: silence this time, a crash in H1b's run B. In run C pak 881 was plausibly still open from before the swap, so the old reader played the base sound. Both unverified, but both fit.
+
+What it means for H1c-2: the reading is confirmed. Reloading the index is the missing step, and it can be simpler than planned: reload the index, and drop the cached pak entries with no references so the next play opens them from the new archive. Entries still playing (references above 0) wait, or their sounds stop, before the reload.
+
 ### H1 quoted path: retest
 
 Run on 2026-10-19 on the laptop with REDnode 0.26.1 (after its NVIDIA driver update). **Pass.** The path came from File Explorer's **Copy as path**, with its double quotes.
