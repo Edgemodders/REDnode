@@ -331,7 +331,7 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 
 ### H1 archives.reload
 
-[Source](world.md#h1-test). Built, **not run yet**. Checked in the mock game with a stand-in RED Hot Tools. Needs RED Hot Tools, and **Hot swap test** switched on and allowed to swap archives in the launcher. `Plain.archive` is any small archive in `archive/pc/mod` known to work, with no `.xl` and no required mods.
+[Source](world.md#h1-test). Built, **not run yet**. Checked in the mock game with a stand-in RED Hot Tools. Needs RED Hot Tools, and **Hot swap test** switched on in the launcher with **Allowed** on beside its "Asks for swapping archives..." line (the permission, not a swap). `Plain.archive` is any small archive in `archive/pc/mod` known to work, with no `.xl` and no required mods.
 
 1. Load a save, start the timer.
 2. Hot swap test: `Plain.archive`, **Swap**: "1 swapped in N ms"; note any stutter.

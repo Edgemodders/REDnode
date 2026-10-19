@@ -271,7 +271,7 @@ Later, agreed the same day: open the archive with REDbridge before a swap when R
 
 ### H1 test
 
-REDnode 0.26.0 deployed, with RED Hot Tools. In the launcher, switch on **Hot swap test** and allow it to swap archives (the launcher lists its permission). Pick a small archive in `archive/pc/mod` that you know works, with no `.xl` file and no required mods; the steps call it `Plain.archive`.
+REDnode 0.26.0 deployed, with RED Hot Tools. In the launcher, switch on **Hot swap test**. Under it, the line "Asks for swapping archives in the game's mod folder..." has an **Allowed** switch: switch it on too. That is the permission; the swap itself is step 2. Pick a small archive in `archive/pc/mod` that you know works, with no `.xl` file and no required mods; the steps call it `Plain.archive`.
 
 0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Step 1 comes before it can be reached.
 1. Start the game and load a save. Switch on the Test timer, press **Start**, and **Mark**.
