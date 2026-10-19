@@ -819,7 +819,9 @@ Run on 2026-10-19 on the laptop with REDnode 0.26.1. The user's notes: step 1 fl
 | Window messages | About one `WM_MOUSEMOVE` a frame even with the touchpad still, all ignored (raw input is used) | Only while moving |
 | The Windows cursor | Hidden, held at the centre of the screen (1280,720) by a clip rectangle one pixel wide | Hidden, free to move, clip the whole screen |
 
-What it means: the arrow is drawn on every frame at a steady place, so it is not being moved back and forth, and no frame lacks it. In the game, the game puts the Windows cursor back at the centre every frame, which is what the window messages are. Open, unverified: whether what flickers is the overlay's yellow arrow where it was left, or the Windows pointer at the centre of the screen, which the game moves every frame; and whether the overlay windows flicker too.
+What it means: the arrow is drawn on every frame at a steady place, so it is not being moved back and forth, and no frame lacks it. In the game, the game puts the Windows cursor back at the centre every frame, which is what the window messages are.
+
+Found with the user afterwards: it is the overlay's yellow arrow that appears and disappears where it was left; the overlay windows do not flicker. The laptop has an NVIDIA GPU and no other overlays. The game ran DLSS Super Resolution with the transformer model and Frame Generation off; **with DLSS off, the arrow no longer flickers.** Not explained: DLSS upscales the game's picture before the plugin draws, and the windows, drawn in the same pass, are not affected. Unverified whether the arrow is lost on the GPU before Present or after it.
 
 ### UI kit
 
