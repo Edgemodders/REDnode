@@ -11,6 +11,15 @@ How to keep it:
 
 ## Unreleased
 
+**Changed**
+
+- `archives.reload` and the MCP tool `archives_reload` refuse an archive that changes the game's sound paks (`.opuspak`, `.opusinfo`), since swapping sound into a running game crashes it. Install such an archive and restart the game.
+
+**Other**
+
+- The plugin watches for faults around each archive swap and writes what it finds to `red4ext/logs/rednode-faults.log`, for bug reports.
+- The host log of the last game session is kept as `red4ext/logs/rednode-overlay.prev.log`, so a crash's log survives the next start.
+
 ## 0.26.1 (2026-10-19)
 
 **New**

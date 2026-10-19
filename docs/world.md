@@ -160,7 +160,7 @@ REDnode 0.25.0, built on 2026-10-17. Also in it: the launcher's **Tooltips** swi
 
 GitHub is asked for the newest release only: when a package needs REDbridge and none is found (once a session, so the button names the version and size), when the player presses the button, and once a session after the first REDbridge call (for **Update**).
 
-**The clean test switch:** `"bridgeTest": "clean"` in the host's `settings.json` (`%APPDATA%@rednodeoverlay`), set by hand. The lookup then sees only REDnode's own copy and the .NET check only a per-user runtime, as on a PC without VS Code or .NET. Remove it after the test.
+**The clean test switch:** `"bridgeTest": "clean"` in the host's `settings.json` (`%APPDATA%\@rednode\overlay`), set by hand. The lookup then sees only REDnode's own copy and the .NET check only a per-user runtime, as on a PC without VS Code or .NET. Remove it after the test.
 
 Checked before the game:
 
@@ -174,7 +174,7 @@ Checked before the game:
 
 ### W3: test
 
-Before the game: REDnode 0.25.0 deployed, and `"bridgeTest": "clean"` in the host's settings. On a PC without .NET 10 for this user, step 2 really installs it into `%LOCALAPPDATA%Microsoftdotnet` (about 70 MB) and REDbridge into `%LOCALAPPDATA%REDnoderidge`.
+Before the game: REDnode 0.25.0 deployed, and `"bridgeTest": "clean"` in the host's settings. On a PC without .NET 10 for this user, step 2 really installs it into `%LOCALAPPDATA%\Microsoft\dotnet` (about 70 MB) and REDbridge into `%LOCALAPPDATA%\REDnode\bridge`.
 
 0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
 1. Load a save, press F10, and start the timer. In the Mod Manager, select **Packaging test**. Under REQUIRES: ✕ `redbridge >=0.10` not installed, "REDbridge is not installed", a line naming REDbridge 0.10.0 (58 MB), and **Get REDbridge**. Mark.
@@ -185,7 +185,7 @@ Before the game: REDnode 0.25.0 deployed, and `"bridgeTest": "clean"` in the hos
 
 The host log should have `REDbridge: the newest release is 0.10.0`, `matches GitHub's SHA-256`, `installing the .NET 10 runtime`, `ready, 0.10.0 from REDnode`, `REDbridge 0.10.0 starting from REDnode`, and `Tooltips: off`, `Tooltips: on`.
 
-**First run, 2026-10-17: steps 1 and 2 passed; 3 and 4 not proven.** REDnode 0.25.0, with the timer, marks matching the steps. The Mod Manager showed the missing REDbridge and the button; pressed, the host logged the release, the SHA-256 match, the .NET 10 install into `%LOCALAPPDATA%Microsoftdotnet` and `ready, 0.10.0 from REDnode` within 7 s, and the Packaging test then read `OK REDbridge >=0.10 0.10.0`. But:
+**First run, 2026-10-17: steps 1 and 2 passed; 3 and 4 not proven.** REDnode 0.25.0, with the timer, marks matching the steps. The Mod Manager showed the missing REDbridge and the button; pressed, the host logged the release, the SHA-256 match, the .NET 10 install into `%LOCALAPPDATA%\Microsoft\dotnet` and `ready, 0.10.0 from REDnode` within 7 s, and the Packaging test then read `OK REDbridge >=0.10 0.10.0`. But:
 
 | Step | What the logs showed |
 |---|---|
@@ -205,7 +205,7 @@ REDnode 0.25.0 with Packaging test 0.2.1, still with `"bridgeTest": "clean"`. To
 
 The host log should have `REDbridge 0.10.0 starting from REDnode` and `Tooltips: on`.
 
-**Result, 2026-10-17: passed.** All steps, marks matching. The host started `REDbridge 0.10.0 starting from REDnode` from `%LOCALAPPDATA%REDnoderidge0.10.0` on the per-user .NET 10; it loaded 57 archives and 583,798 files in 3.6 s, and the sample logged `REDbridge: 57 archives, 583798 files`. `Tooltips: on` was logged and saved. With the first run, **W3 passed**. The test switch was then removed from the settings; the normal lookup picks REDnode's copy (a tie in version with EDGEdeck's 0.10.0 goes to REDnode's). Still **unverified**: **Update REDbridge**, which needs a newer release than the copy in use.
+**Result, 2026-10-17: passed.** All steps, marks matching. The host started `REDbridge 0.10.0 starting from REDnode` from `%LOCALAPPDATA%\REDnode\bridge\v0.10.0` on the per-user .NET 10; it loaded 57 archives and 583,798 files in 3.6 s, and the sample logged `REDbridge: 57 archives, 583798 files`. `Tooltips: on` was logged and saved. With the first run, **W3 passed**. The test switch was then removed from the settings; the normal lookup picks REDnode's copy (a tie in version with EDGEdeck's 0.10.0 goes to REDnode's). Still **unverified**: **Update REDbridge**, which needs a newer release than the copy in use.
 
 ## Hot-loading archives (#12)
 
@@ -315,9 +315,58 @@ Found on 2026-10-19 on the laptop (REDnode 0.26.1, RED Hot Tools 1.3.0), with `E
 | 10:3x | The same archive in `archive/pc/mod`, game started normally | | | Runs |
 | 10:43:19 | REDnode's Hot swap test, `archives.reload` | 23000, the game thread (REDnode's pump) | "Loading updated archives..." | Crash a second later |
 
-What it means: the route is not the cause; loading an archive with sound paks into a running game is. Why is unverified (likely the game's audio engine keeps its paks open while it runs; the crash report's module would tell). Plain archives swap fine on both routes; H0's other crash was a scene mod swapped at the main menu.
+What it means: the route is not the cause; loading an archive with sound paks into a running game is. Why is unverified. Plain archives swap fine on both routes; H0's other crash was a scene mod swapped at the main menu, and it also stopped at "Loading updated archives...".
 
-Proposed, not yet agreed: REDnode refuses such archives before the swap, with a message that sound paks need a restart, and REDcode's hot deploy does the same. Unverified which file types besides `.opuspak` and `.opusinfo` behave this way.
+More from the user's runs the same day:
+
+- Every hot reload of an archive with opus paks crashed, through REDcode and through REDnode, and whether the game had loaded that archive at the start or not. So it is not about replacing an archive the game has open: adding sound paks to a running game is enough.
+- No crash dialog appeared, and Windows' Application log has no "Application Error" or "Windows Error Reporting" entry for either crash. So the game was not ended by an unhandled fault: something in it caught the failure and ended the process.
+- What RED Hot Tools does at that step (its `ArchiveLoader.cpp`, MIT): it closes and reopens the file handle of an archive of the same name, calls the game's own `ResourceDepot::LoadArchives` (the boot-time mount) for the new files, and writes the result into the depot's archive list, in place or inserted. Afterwards it refreshes only what the resource loader tracks (cached resources, ink widget libraries, ArchiveXL). Nothing tells the audio engine. The game's script API (2.31) has no function to reload or restart audio either; the only match is a test helper, `AudioFunctionalTests::IsSoundbankLoaded`.
+- Hypothesis (the user's, unverified): an audio thread keeps running during the swap and reaches something the swap changed, such as a null reference. The game thread is already held during a swap through REDnode, so pausing the game loop alone does not cover the audio threads.
+
+Agreed with the user on 2026-10-19: refuse such archives by default (H1b, below), and a research spike for a real fix: first find which thread and module fail.
+
+### H1b: sound pak check and fault watch (REDnode 0.26.2)
+
+Built on 2026-10-19:
+
+| Part | What |
+|---|---|
+| `packages/overlay/archive-index.js` | Reads an `.archive`'s file table (RDAR header, then 56-byte entries starting with each path's FNV-1a 64 hash) without REDbridge, and finds the game's sound paks by hashing their paths: `base\sound\soundbanks\sfx_container.opusinfo` and `sfx_container_<n>.opuspak`. Checked against the game's `audio_2_soundbanks.archive`: 1,880 of them (the index and 1,879 packs, as REDcode counts), none in ep1 |
+| `archives.reload` in `main.js` | Refuses an archive with sound paks: "X.archive changes the game's sound (N sound paks, such as sfx_container_42.opuspak), and swapping sound into a running game crashes it. Install it and restart the game instead." Before every swap it asks the plugin to watch for faults for 15 seconds |
+| `native/src/overlay/faults.cpp` | `faults.watch`: while a watch is on, a vectored exception handler writes the first 8 faults to `red4ext/logs/rednode-faults.log` before the game's own handler sees them: the code, what an access violation read or wrote (a null reference reads an address near 0), the module and offset, the thread and its name, the stack. If the game exits through `ExitProcess` during the watch, `DllMain` writes who called it; no exit line means `TerminateProcess`. The plugin log says when a watch starts and ends, with the count. Unit tests in `native/tests/faults_test.cpp` (a real access violation) |
+| `host.cpp` | The last game session's host log is kept as `red4ext/logs/rednode-overlay.prev.log`, so a crash's host log survives the next start |
+| Spike settings, in `%APPDATA%\@rednode\overlay\settings.json` | `"soundPakSwap": "try"` lets sound pak archives through (with a warning in the host log). `"swapPause": "pause"` pauses the game around every swap with `TimeSystem.SetPausedState(true, "REDnode")`, waits half a second, swaps, and unpauses; unverified whether that pauses the game's audio. Remove both after the spike |
+
+Checked in the mock game (default settings: the sound archive refused, a plain one swapped; spike settings: the sound archive swapped, the pause logged as failing, since the mock has no time system). Unverified until the game: the fault watch inside the game, and what it shows.
+
+### H1b test
+
+REDnode 0.26.2 on the laptop, with RED Hot Tools, Hot swap test (**Allowed** on), `EDGEwaveTest.archive` from EDGEwave (not installed in `archive/pc/mod`), and a plain archive known to swap (`###_nim_material_override.archive`). Three game runs: A with default settings, B and C with the spike settings in `%APPDATA%\@rednode\overlay\settings.json`, added while the game is closed.
+
+Run A, default settings:
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Step 1 comes before it can be reached.
+1. Start the game and load a save. Switch on the Test timer, **Start**, **Mark**.
+2. In Hot swap test, paste the path of `EDGEwaveTest.archive` and press **Swap**. It is refused with "changes the game's sound ... Install it and restart the game instead", and the game keeps running. **Mark**.
+3. Swap the plain archive. "1 swapped". **Mark**.
+4. Quit the game. The plugin log has `Faults: watching 15 s (swap of ###_nim_material_override.archive)` and, 15 s later, `Faults: watch ended (...), 0 faults`.
+
+Run B, the sound pak let through, with the fault watch: add `"soundPakSwap": "try"`.
+
+0. Switch on **Test timer**, press **Start**, and press **Mark** after each step. Step 1 comes before it can be reached.
+1. Start the game and load a save. Switch on the Test timer, **Start**, **Mark**.
+2. Swap `EDGEwaveTest.archive`. The game is expected to crash. If it does not, **Mark** and type whether the new sound plays.
+3. After the crash, send `red4ext/logs/rednode-faults.log`, `rednode-overlay.log` (or `rednode-overlay.prev.log` if the game was started again since), the crashed session's plugin log, and RED Hot Tools' log.
+
+Run C, the same with the game paused: add `"swapPause": "pause"` as well.
+
+0. Switch on **Test timer**, press **Start**, and press **Mark** after each step. Step 1 comes before it can be reached.
+1. Start the game and load a save. Switch on the Test timer, **Start**, **Mark**.
+2. Swap `EDGEwaveTest.archive`. The game pauses half a second before the swap. Crash or not; if not, **Mark** and type what the screen and the sound did.
+3. The same logs as run B.
+
+Afterwards remove both settings.
 
 ### H1 quoted path: retest
 

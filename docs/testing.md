@@ -38,6 +38,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [W3 REDbridge for players](#w3-redbridge-for-players) | In the game | W3 | 2026-10-17 | 0.25.0 | Pass (with the retest) |
 | [H0 and Welcome](#h0-and-welcome) | In the game | #12, Welcome | 2026-10-18 | 0.25.1 | Pass (laptop, with a retest) |
 | [H1 archives.reload](#h1-archivesreload) | In the game | #12 H1 | 2026-10-19 | 0.26.1 | Pass (laptop), with a quoted path |
+| [H1b sound pak check](#h1b-sound-pak-check) | In the game | #12 H1b | Not run | 0.26.2 | Built: sound pak archives refused, fault watch around swaps |
 | [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | 2026-10-19 | 0.26.1 | **Fixed** by an NVIDIA driver update: the arrow blinked in the game with DLSS on (laptop) and not with DLSS off; drawn on every frame, no jumps. Not a REDnode bug |
 
 ## Before any in-game test
@@ -339,6 +340,15 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 3. `Nope.archive`, **Swap**: not found.
 4. Play on half a minute.
 5. Quit. Host log: `Archives: hot-test swaps Plain.archive` and `1 reloaded`; RED Hot Tools' log: `Archives reload completed.`; `archive/pc/hot` empty; no crash.
+
+### H1b sound pak check
+
+[Source](world.md#h1b-test). Not run yet; REDnode 0.26.2. Found first on 2026-10-19: swapping an archive with the game's sound paks crashes the game on any route ([limit](world.md#h1-limit-sound-paks-crash-a-swap)). Needs RED Hot Tools, Hot swap test with **Allowed** on, a sound archive from EDGEwave (not installed) and a plain archive known to swap. Runs B and C use the spike settings `"soundPakSwap": "try"` and `"swapPause": "pause"` in the host's `settings.json`, removed afterwards.
+
+1. Run A: load a save, timer; swap the sound archive: refused, no crash.
+2. Swap the plain archive: "1 swapped"; the plugin log has the fault watch start and end, 0 faults.
+3. Run B, `"soundPakSwap": "try"`: swap the sound archive; expected to crash. Send `rednode-faults.log`, the host log, the plugin log and RED Hot Tools' log.
+4. Run C, with `"swapPause": "pause"` too: the same, with the game paused around the swap.
 
 ### Cursor flicker
 
