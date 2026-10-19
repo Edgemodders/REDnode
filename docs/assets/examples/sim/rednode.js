@@ -734,7 +734,7 @@ async function swapArchives(files) {
   if (!(manifest.permissions ?? []).includes('archives')) {
     throw new Error('This package does not ask for the "archives" permission in its rednode-app.json');
   }
-  for (const name of list.map(String)) {
+  for (const name of list.map((f) => String(f).trim().replace(/^"(.*)"$/, '$1').trim())) {
     const bare = !/[\\/]/.test(name);
     if (!/\.(archive|xl|ya?ml)$/i.test(name)) throw new Error(`${name}: RED Hot Tools swaps .archive, .xl and .yaml files`);
     if (bare && !MOD_ARCHIVES.includes(name)) throw new Error(`${name} was not found in archive/pc/mod`);

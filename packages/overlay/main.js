@@ -1487,14 +1487,15 @@ function hotFiles(entry, files) {
   const modDir = path.join(GAME_DIR, 'archive', 'pc', 'mod');
   const seen = new Set();
   return list.map((given) => {
-    const name = String(given);
+    // Windows' "Copy as path" puts the path in double quotes.
+    const name = String(given).trim().replace(/^"(.*)"$/, '$1').trim();
     const bare = !/[\\/]/.test(name);
     let file;
     if (bare) file = path.join(modDir, name);
     else if (path.isAbsolute(name)) file = name;
     else if (entry) file = path.resolve(entry.dir, name);
     else throw new Error(`${name}: give a full path, or the name of an archive in archive/pc/mod`);
-    if (!HOT_TYPES.has(path.extname(file).toLowerCase())) throw new Error(`${name}: RED Hot Tools swaps .archive, .xl and .yaml files`);
+    if (!HOT_TYPES.has(path.extname(file).toLowerCase())) throw new Error(`${name}: RED Hot Tools swaps .archive, .xl and .yaml files, not "${path.extname(file) || 'no extension'}"`);
     if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`${name} was not found${bare ? ' in archive/pc/mod' : ''}`);
     const base = path.basename(file).toLowerCase();
     if (seen.has(base)) throw new Error(`Two files are named ${path.basename(file)}: the game knows an archive by its name`);
