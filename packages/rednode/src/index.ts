@@ -35,7 +35,7 @@ export { tweakdb } from "./tweakdb.js";
 export type { TweakId, Flat, RecordTypeName } from "./tweakdb.js";
 export { audio } from "./audio.js";
 export { archives } from "./archives.js";
-export type { ReloadResult } from "./archives.js";
+export type { ReloadResult, SoundState } from "./archives.js";
 export type { Sound, SoundCategory, SoundEnd, SoundInfo, PlayOptions } from "./audio.js";
 export type { GameRef, ApiExtras } from "./api.js";
 export type {

@@ -1411,6 +1411,7 @@ async function packageCall(id, method, params) {
   if (id && undoing.has(id)) await undoing.get(id);
   if (typeof method === 'string' && method.startsWith('sound.')) return soundCall(id, method, params);
   if (method === 'archives.reload') return reloadArchives({ id }, params);
+  if (method === 'archives.soundState') return bridgeCall('opus.state', { sounds: Array.isArray(params?.sounds) ? params.sounds : [] });
   if (method === 'tweakdb.set' && id && params?.path) {
     const path = String(params.path);
     if (!tweakJournal.has(id)) tweakJournal.set(id, new Map());
@@ -1474,6 +1475,8 @@ function checkTweaks() {
 //   "soundPakSwap": "try"    swap them anyway
 //   "swapPause": "pause"     pause the game (TimeSystem.SetPausedState) around every swap
 // Each swap also asks the plugin to watch for faults (red4ext/logs/rednode-faults.log).
+// A sound swap let through logs the game's sound pak index and open paks (opus.state, H1c)
+// before the swap, after it and after the unpause, to see what the swap changed.
 const HOT_TYPES = new Set(['.archive', '.xl', '.yaml', '.yml']);
 const PAUSE_SETTLE_MS = 500;
 const HOT_TIMEOUT = 60000;
@@ -1539,6 +1542,7 @@ async function swapArchives(caller, params) {
   }
 
   const soundTry = settings.soundPakSwap === 'try';
+  let sound = false;
   for (const f of files) {
     if (path.extname(f.file).toLowerCase() !== '.archive') continue;
     let paks;
@@ -1556,6 +1560,7 @@ async function swapArchives(caller, params) {
       );
     }
     log(`Archives: ${f.name} changes ${which}; swapping anyway, since "soundPakSwap": "try" is set (it has crashed the game)`);
+    sound = true;
   }
 
   const hotDir = path.join(GAME_DIR, 'archive', 'pc', 'hot');
@@ -1575,6 +1580,7 @@ async function swapArchives(caller, params) {
     log(`Archives: no fault watch (${err.message})`);
   }
   const pause = settings.swapPause === 'pause';
+  if (sound) await logSoundState('before the swap', caller);
   if (pause) await pauseGame(true);
   const started = Date.now();
   let error = null;
@@ -1590,7 +1596,9 @@ async function swapArchives(caller, params) {
     }
   }
   const ms = Date.now() - started;
+  if (sound) await logSoundState('after the swap', caller);
   if (pause) await pauseGame(false);
+  if (sound && pause) await logSoundState('after the unpause', caller);
   const reloaded = [];
   const failed = [];
   for (const f of files) {
@@ -1614,6 +1622,16 @@ async function swapArchives(caller, params) {
     mods?.log(caller.id, failed.length ? 'error' : 'info', `Archives: ${names}: ${summary}${why}`);
   }
   return { reloaded, failed, via: 'red-hot-tools', ms };
+}
+
+async function logSoundState(when, caller) {
+  try {
+    const state = await bridgeCall('opus.state', {});
+    log(`Archives: sound ${when}: ${state.summary}`);
+    if (caller.id) mods?.log(caller.id, 'info', `Sound ${when}: ${state.summary}`);
+  } catch (err) {
+    log(`Archives: no sound state ${when} (${err.message})`);
+  }
 }
 
 // The spike's "swapPause": "pause" setting: the game's own pause, then a moment for the

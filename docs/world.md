@@ -407,7 +407,34 @@ What it explains:
 
 What a reload in REDnode would do, all on the game thread with the game paused: stop playing sounds; release every pak entry (`0x6E3740`) so readers on the old archives go; free the index's arrays and hash maps and set its count to 0; call the loader again (`0x279ED4`) with the same hash, which reads the new index and opens the start paks from the new archives. The functions and tables would be found by byte patterns at start, so a new game version turns the feature off (sound archives refused, as now) rather than crashing.
 
-Proposed next step, not yet agreed: H1c-1, a read-only `audio.opusState` in the plugin that reports the index (sounds, paks) and the open pak table, called before and after drawing the katana and around a paused swap. It confirms this reading in the game without changing anything. H1c-2, the reload itself behind a spike setting, only if H1c-1 matches.
+Next steps, agreed with the user on 2026-10-19: H1c-1, a read-only look at the index and the open pak table in the game, called before and after drawing the katana and around a paused swap, to confirm this reading without changing anything. H1c-2, the reload itself behind a spike setting, only if H1c-1 matches.
+
+### H1c-1: sound state (REDnode 0.26.3)
+
+Built on 2026-10-19:
+
+| Part | What |
+|---|---|
+| `native/src/overlay/opus.cpp` | Bridge method `opus.state`. At its first call it finds the tables by four byte patterns in the game's code (the index loader's count check and its `SND ` header check, a sound lookup's pak count read, and the call that passes the index's path hash) and logs where: `Opus: found the sound pak tables in N ms (index count +0x..., ...)`, or what it missed. Then it reads, never writes: the index (sounds, a second table's size, a checksum of its tables) and each open pak (number, references, reader), and where the index puts given sound ids (pak, offset, size). Each call logs a summary line in the plugin log. Reads go through `__try`, so a wrong guess is an error, not a crash. Unit tests in `native/tests/opus_test.cpp` with fake code and tables; with `REDNODE_GAME_EXE` set, the test also maps the real exe and finds 2.31's five places (checked on the dev PC: the offsets above) |
+| `archives.soundState(ids?)` in the `rednode` package | The same for packages; experimental, no permission needed |
+| `archives.reload` in `main.js` | A sound swap let through by `"soundPakSwap": "try"` logs the state before the swap, after it and after the unpause |
+| Hot swap test 0.2.0 | A **Sound state** button, with a box for sound ids; the summary goes to the Mod log |
+
+Checked in the mock game (the three lines around a sound swap). Unverified until the game: the patterns on the laptop's game, and every reading of the layout.
+
+### H1c-1 test
+
+REDnode 0.26.3 on the laptop, with RED Hot Tools, Hot swap test (**Allowed** on), and `EDGEwaveTest.archive` not installed. Add `"soundPakSwap": "try"` and `"swapPause": "pause"` to `%APPDATA%\@rednode\overlay\settings.json` while the game is closed, as in H1b's run C. If EDGEwave shows the id of the sound it overrode (a number like 123456789), have it ready; without it the test still works.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Step 1 comes before it can be reached.
+1. Start the game and load a save, with the katana in V's inventory but not drawn. Switch on the Test timer, **Start**, **Mark**.
+2. In Hot swap test, type the sound id in the sound ids box (or leave it empty) and press **Sound state**. A line like "1 index of ... sounds, checksum 0x...; N paks open: ..." shows. **Mark**.
+3. Draw the katana and put it away. Press **Sound state** again. **Mark**.
+4. Swap `EDGEwaveTest.archive` (paste its path, **Swap**). The game pauses for a moment; it is expected not to crash. **Mark**.
+5. Draw the katana; note in the timer which sound played (expected: the base game's). Press **Sound state**. **Mark**.
+6. Quit the game. Send `rednode-mods.log`, the plugin log (`rednode-*.log` of this session), `rednode-overlay.log` and `rednode-faults.log`.
+
+Afterwards remove both settings.
 
 ### H1 quoted path: retest
 

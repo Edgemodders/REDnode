@@ -1,9 +1,9 @@
 {
   "id": "hot-test",
   "name": "Hot swap test",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Edgemodders",
-  "description": "The test of #12's H1: archives.reload swaps an archive into the running game through RED Hot Tools and says what happened. Asks for the archives permission.",
+  "description": "The test of #12's H1: archives.reload swaps an archive into the running game through RED Hot Tools and says what happened; Sound state reads the game's sound pak index and open paks (H1c). Asks for the archives permission.",
   "main": "mod.mjs",
   "open": false,
   "permissions": ["archives"],

@@ -472,6 +472,8 @@ console.log(`${r.reloaded.length} swapped in ${r.ms} ms`, r.failed);
 | Not sound | An archive that changes the game's sound paks (`.opuspak`, `.opusinfo`) is refused: swapping them into a running game crashes it. Install it and restart the game. To hear a sound in the game without a restart, play it with REDnode's own [`audio`](#your-own-sounds) instead |
 | The answer | `{ reloaded, failed, via: "red-hot-tools", ms }`. A file that could not be swapped is in `failed` with the reason. A missing file, a missing permission, the main menu, sound paks, or RED Hot Tools not loaded throw |
 
+`archives.soundState(soundIds?)` reads the game's sound pak index and the paks it has open, without changing them, and where the index puts the sound ids given. It is an experimental diagnostic for the research into swapping sound ([H1c](world.md#h1c-how-the-game-loads-its-sound-paks-research)); its shape may change.
+
 What the game shows after a swap: objects already in the world keep the old asset until they load it again. Respawn them, or apply their appearance again. A broken archive, or a mod whose other parts are missing, can crash the game at the swap even if it loaded at start.
 
 AI agents have the same as the [MCP tool](mcp.md) `archives_reload`.

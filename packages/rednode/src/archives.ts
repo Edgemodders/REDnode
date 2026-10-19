@@ -35,6 +35,51 @@ export interface ReloadResult {
   ms: number;
 }
 
+/**
+ * What {@link archives.soundState} read: the game's sound pak index and the paks it has
+ * open. Experimental: a diagnostic for the research into swapping sound paks (H1c), so
+ * its shape may change. Field names past `pak` are guesses from the game's code.
+ */
+export interface SoundState {
+  /** One line for logs, as the plugin log has it. */
+  summary: string;
+  /** The resource path hash the game loads its index from, as hex. */
+  infoHash: string;
+  /** Whether that hash is `base\sound\soundbanks\sfx_container.opusinfo`'s. */
+  infoPathOk: boolean;
+  /** The loaded index: one entry once the game has started. */
+  indexes: {
+    /** Sounds in the index. */
+    sounds: number;
+    /** Entries of its second table. */
+    second: number;
+    /** The size of its tables in memory. */
+    bytes: number;
+    /** Where its tables are, as hex. */
+    at: string;
+    /** A checksum of its tables, as hex: it changes when the index is read again from a new file. */
+    checksum: string | null;
+  }[];
+  /** The paks the game has open: `pak` is the n of `sfx_container_<n>.opuspak`. */
+  paks: {
+    slot: number;
+    index: number;
+    pak: number;
+    flag: number;
+    serial: number;
+    row: number;
+    /** How many users hold it open. */
+    refs: number;
+    /** The game's reader for the file, as hex: a new one means the pak was opened again. */
+    reader: string;
+  }[];
+  /** The sound ids asked for, and where the index puts each. */
+  sounds: (
+    | { id: number; found: false }
+    | { id: number; found: true; index: number; row: number; pak: number; offset: number; size: number; headerSize: number; x10: number }
+  )[];
+}
+
 /** Hot-loading archives into the running game. */
 export const archives = {
   /**
@@ -62,6 +107,29 @@ export const archives = {
   async reload(files: string | string[]): Promise<ReloadResult> {
     try {
       return (await transport().call("archives.reload", { files })) as ReloadResult;
+    } catch (err) {
+      throw cleanError(err);
+    }
+  },
+
+  /**
+   * Reads the game's sound pak index and the paks it has open, without changing them.
+   * Experimental: a diagnostic for the research into swapping sound paks (H1c); see
+   * {@link SoundState}. Give sound ids (the 32-bit ids an opusinfo lists) to see where
+   * the index puts them. Needs no permission. Throws when REDnode does not know this
+   * game version's sound tables.
+   *
+   * @example
+   * ```ts
+   * import { archives } from "rednode";
+   *
+   * const s = await archives.soundState([123456789]);
+   * console.log(s.summary); // "1 index of ... sounds, checksum 0x...; 12 paks open: ..."
+   * ```
+   */
+  async soundState(sounds: number[] = []): Promise<SoundState> {
+    try {
+      return (await transport().call("archives.soundState", { sounds })) as SoundState;
     } catch (err) {
       throw cleanError(err);
     }
