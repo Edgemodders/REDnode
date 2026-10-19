@@ -40,7 +40,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H1 archives.reload](#h1-archivesreload) | In the game | #12 H1 | 2026-10-19 | 0.26.1 | Pass (laptop), with a quoted path |
 | [H1b sound pak check](#h1b-sound-pak-check) | In the game | #12 H1b | 2026-10-19 | 0.26.2 | Refusal **pass** (laptop). Spike: crash with sound let through, no fault caught; no crash with the game paused, but the sound did not change |
 | [H1c-1 sound state](#h1c-1-sound-state) | In the game | #12 H1c-1 | 2026-10-19 | 0.26.3 | Pass (laptop): the reading holds; the index is never re-read, so the swapped sound played silent |
-| [H1c-2 sound index reload](#h1c-2-sound-index-reload) | In the game | #12 H1c-2 | Not run | 0.26.4 | Built; awaiting its first run (laptop). Also the Welcome window's F9 note |
+| [H1c-2 sound index reload](#h1c-2-sound-index-reload) | In the game | #12 H1c-2 | 2026-10-19 | 0.26.4 | **Crash** at step 4 with the setting still "try" (the reload never ran): the crash is in the archive load. 0.26.5 (H1c-2b) holds the audio thread during the swap; awaiting its run. Also the Welcome window's F9 note |
 | [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | 2026-10-19 | 0.26.1 | **Fixed** by an NVIDIA driver update: the arrow blinked in the game with DLSS on (laptop) and not with DLSS off; drawn on every frame, no jumps. Not a REDnode bug |
 
 ## Before any in-game test
@@ -365,12 +365,12 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 
 ### H1c-2 sound index reload
 
-[Source](world.md#h1c-2-test). Built 2026-10-19 in REDnode 0.26.4: with `"soundPakSwap": "reload"`, a sound archive is swapped with the game paused and the plugin loads the game's sound index again on the audio thread. Needs RED Hot Tools, Hot swap test with **Allowed** on, `EDGEwaveTest.archive` (not installed) and its sound id (746693166), the setting removed afterwards. Not run yet. The same build has the Welcome window's F9 note: switch Welcome on in the Mod Manager to see it.
+[Source](world.md#h1c-2-test). Built 2026-10-19 in REDnode 0.26.4: with `"soundPakSwap": "reload"`, a sound archive is swapped with the game paused and the plugin loads the game's sound index again on the audio thread; 0.26.5 also holds the audio thread for the whole swap. Needs RED Hot Tools, Hot swap test with **Allowed** on, `EDGEwaveTest.archive` (not installed) and its sound id (746693166), the setting removed afterwards; swap in gameplay with F10. First run 2026-10-19 on 0.26.4: a crash at step 4 with the setting still "try" ([first run](world.md#h1c-2-test-first-run-0264)). The same build has the Welcome window's F9 note: switch Welcome on in the Mod Manager to see it.
 
 1. Load a save with the katana not drawn; timer.
 2. Sound state with the sound id.
 3. Draw the katana: the base sound.
-4. Swap the sound archive: "sound index reloaded ..." in the Mod log; no crash.
+4. Swap the sound archive: "the audio thread waits for the swap" in the host log and "sound index reloaded ..." in the Mod log; no crash.
 5. Draw the katana: EDGEwave's sound is the goal; note what played.
 6. Sound state.
 7. Play a minute; note missing or wrong sounds.

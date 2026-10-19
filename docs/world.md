@@ -485,7 +485,7 @@ Known risks: anything else that reads the index outside the audio thread (none f
 
 ### H1c-2 test
 
-REDnode 0.26.4 on the laptop, with RED Hot Tools and Hot swap test (**Allowed** on), `EDGEwaveTest.archive` **not** installed. In `%APPDATA%\@rednode\overlay\settings.json`, while the game is closed, set `"soundPakSwap": "reload"`; `swapPause` can stay or go (the reload pauses anyway). The katana sound's id is 746693166.
+REDnode 0.26.5 on the laptop (first run on 0.26.4, below), with RED Hot Tools and Hot swap test (**Allowed** on), `EDGEwaveTest.archive` **not** installed. In `%APPDATA%\@rednode\overlay\settings.json`, while the game is closed, set `"soundPakSwap": "reload"` (the host log's swap line must say `"soundPakSwap": "reload" is set`); `swapPause` can stay or go (the reload pauses anyway). The katana sound's id is 746693166. Swap in gameplay with F10, not from the game's pause menu.
 
 0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Step 1 comes before it can be reached.
 1. Start the game and load a save with the katana in V's inventory, not drawn. Switch on the Test timer, **Start**, **Mark**.
@@ -499,6 +499,32 @@ REDnode 0.26.4 on the laptop, with RED Hot Tools and Hot swap test (**Allowed** 
 9. Quit the game. Send `rednode-mods.log`, the plugin log (`rednode-*.log` of this session), `rednode-overlay.log` and `rednode-faults.log`.
 
 Afterwards set `"soundPakSwap"` back (remove it) and remove `swapPause`.
+
+### H1c-2 test: first run (0.26.4)
+
+Run on the laptop on 2026-10-19 at 19:15; stopped at step 4 by a crash. The settings still said `"soundPakSwap": "try"`, so **the reload never ran** (no `Opus: reload` line; the host log says "try"): this was H1b's run B again, with the game paused. What the logs show:
+
+| Finding | Detail |
+|---|---|
+| Who swapped | RED Hot Tools' folder watcher (thread 18616), not REDnode's call on the game thread: the host copied the archive into `archive/pc/hot` before the pause and its 500 ms settle, and the watcher took it during that wait |
+| When it crashed | Within milliseconds of RED Hot Tools' "Loading updated archives...", inside the archive load. The swap was started from the game's pause menu, with its sounds playing |
+| Fault log | Nothing, as in run B. The watch recorded only error-class exceptions; a failed assert in the game (a breakpoint, `0x80000003`) or a fail-fast that skips exception dispatch would leave no line |
+| Cursor | The overlay's arrow vanished in gameplay that session (the log says it was drawn every frame) and was fine in the next session; not followed up now |
+
+So sound swaps crash inside the archive load itself, sometimes (run B, this run), not always (run C, H1c-1). The likely race, unverified: the audio thread reading paks through the resource depot while RED Hot Tools changes its archives. The game's pause does not stop the audio thread.
+
+### H1c-2b: the audio thread waits for the swap (REDnode 0.26.5)
+
+Built on 2026-10-19 from that run:
+
+| Part | What |
+|---|---|
+| `opus.cpp` | `opus.park {"capMs"}`: REDnode's end-of-frame callback holds the audio thread there (after the pak tick: no pak tick, no lookups, no decoding) until the host asks for the reload, which then runs on it, or cancels, or the cap runs out (3 s by default, at most 10 s), so it can never hang the game. `opus.reloadStatus` answers waiting, parked, running, done (with how long it waited) or idle (and whether a wait ran out) |
+| `main.js` | With `"soundPakSwap": "reload"`: pause, wait for the audio thread to stop (at most 1 s, or no swap), then copy the archive into `archive/pc/hot` (so RED Hot Tools' watcher cannot start before), swap, read the state, reload, then the audio thread goes on and the game unpauses. Every mode now copies only after the pause |
+| `faults.cpp` | The fault watch also records breakpoints (`0x80000003`, a failed assert) |
+| Unit tests | A thread stands in for the audio thread: it stops while asked to wait, the reload runs on it, a cancel and the cap end the wait |
+
+Checked in the mock game: a swap with the wait and the reload, and an audio thread that never stops (no swap, the hot folder left empty, the game unpaused). Unverified until the game: whether the game's other threads wait on the audio thread during a swap (the cap bounds it), and whether the wait prevents the crash.
 
 ### H1 quoted path: retest
 
