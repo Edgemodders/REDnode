@@ -13,6 +13,7 @@
 //   sound.play, sound.stop, sound.set, sound.list, sound.mix, audio.tone
 //                                                          REDnode's own audio output, in audio.cpp
 //   faults.watch     {"seconds":15,"label":"..."}: logs the first faults for a while, in faults.cpp
+//   opus.state       {"sounds":[id]}: the game's sound pak index and open paks, read only, in opus.cpp
 
 #include "json.hpp"
 #include "jvalue.hpp"
@@ -164,7 +165,7 @@ std::string Handle(const std::string& aJson, uint64_t aFrame)
         return PlayerPosition(id);
     if (method == "audio.play")
         return AudioPlay(id, aJson);
-    if (IsReflectMethod(method) || IsAudioMethod(method) || IsFaultsMethod(method))
+    if (IsReflectMethod(method) || IsAudioMethod(method) || IsFaultsMethod(method) || IsOpusMethod(method))
     {
         json::Value request;
         std::string error;
@@ -175,6 +176,7 @@ std::string Handle(const std::string& aJson, uint64_t aFrame)
         const json::Value& given = params ? *params : none;
         std::string result = IsAudioMethod(method)    ? Audio(method, given, error)
                              : IsFaultsMethod(method) ? Faults(method, given, error)
+                             : IsOpusMethod(method)   ? Opus(method, given, error)
                                                       : Reflect(method, given, error);
         if (!error.empty())
             return Error(id, error.c_str());

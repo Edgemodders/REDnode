@@ -47,6 +47,7 @@ add_library(REDnode SHARED
   src/overlay/gamestate.cpp
   src/overlay/audio.cpp
   src/overlay/faults.cpp
+  src/overlay/opus.cpp
 )
 target_link_libraries(REDnode PRIVATE RED4ext::SDK d3d12 d3dcompiler)
 target_include_directories(REDnode SYSTEM PRIVATE ${miniaudio_SOURCE_DIR})
@@ -87,6 +88,11 @@ add_executable(REDnode_faults_tests tests/faults_test.cpp src/overlay/faults.cpp
 target_link_libraries(REDnode_faults_tests PRIVATE RED4ext::SDK)
 target_compile_definitions(REDnode_faults_tests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_compile_options(REDnode_faults_tests PRIVATE /W4 /utf-8)
+
+add_executable(REDnode_opus_tests tests/opus_test.cpp src/overlay/opus.cpp)
+target_link_libraries(REDnode_opus_tests PRIVATE RED4ext::SDK)
+target_compile_definitions(REDnode_opus_tests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_compile_options(REDnode_opus_tests PRIVATE /W4 /utf-8)
 
 add_executable(REDnode_capture_tests tests/capture_test.cpp)
 target_compile_definitions(REDnode_capture_tests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)

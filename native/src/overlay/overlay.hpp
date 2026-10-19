@@ -190,5 +190,24 @@ bool IsFaultsMethod(const std::string& aMethod);
 std::string Faults(const std::string& aMethod, const json::Value& aParams, std::string& aError);
 void UpdateFaults();  // game thread, each frame: logs the end of a watch
 void FaultsOnExit();  // DllMain's process detach: who called ExitProcess during a watch
+// opus.cpp: a read-only look at the game's sound pak index and open paks (opus.state, H1c).
+struct OpusPlaces
+{
+    uint16_t* indexCount = nullptr; // loaded indexes (sfx_container.opusinfo), at most one
+    uint8_t* indexTable = nullptr;  // their entries, 0x60 bytes each
+    uint16_t* pakCount = nullptr;   // pak table entries used so far
+    uint8_t* pakTable = nullptr;    // open paks, 0x70 bytes each
+    uint64_t* infoHash = nullptr;   // the resource path hash the game loads its index from
+};
+struct CodeRange
+{
+    const uint8_t* begin;
+    const uint8_t* end;
+};
+bool LocateOpus(const std::vector<CodeRange>& aCode, OpusPlaces& aOut, std::string& aWhy);
+std::string OpusState(const OpusPlaces& aPlaces, const json::Value& aParams, std::string& aError,
+                      std::string* aSummary = nullptr); // result JSON; aSummary: one line for logs
+bool IsOpusMethod(const std::string& aMethod);
+std::string Opus(const std::string& aMethod, const json::Value& aParams, std::string& aError);
 } // namespace detail
 } // namespace rednode::overlay
