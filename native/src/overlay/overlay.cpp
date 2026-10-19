@@ -62,6 +62,7 @@ void Start(RED4ext::v1::PluginHandle aHandle, const RED4ext::v1::Sdk* aSdk, cons
 {
     g_handle = aHandle;
     g_sdk = aSdk;
+    detail::StartFaults(aPluginDir);
     detail::StartLink();
     detail::StartHost(aPluginDir);
 }
@@ -82,6 +83,7 @@ void Update(uint64_t aFrame)
     detail::RunRequests(aFrame);
     detail::PollGameState(aFrame);
     detail::UpdateAudio();
+    detail::UpdateFaults();
 }
 
 uint64_t detail::NowMs()
@@ -101,6 +103,7 @@ void Stop()
     detail::StopAudio();
     detail::StopLink();
     detail::StopHost();
+    detail::StopFaults();
     g_installed = false;
 }
 } // namespace rednode::overlay

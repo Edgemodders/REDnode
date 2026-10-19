@@ -30,6 +30,7 @@ const { scanGame, checkRequires, validRange } = require('./gamefiles');
 const { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED } = require('./redbridge');
 const bridgeInstall = require('./bridge-install');
 const { createLookup } = require('./gameapi-lookup');
+const { soundPaksIn } = require('./archive-index');
 const crypto = require('node:crypto');
 
 // REDNODE_OVERLAY_PIPE lets tests use a private pipe instead of the game's.
@@ -1467,7 +1468,14 @@ function checkTweaks() {
 // answer says what happened. RED Hot Tools' own folder watcher may start the same swap
 // first; the two share a lock, and the call returns once both are done. One swap at a time.
 
+// Archives with the game's sound paks (.opuspak, .opusinfo) crash the game when swapped in,
+// on either RED Hot Tools route (docs/world.md, "H1 limit: sound paks crash a swap"), so
+// they are refused. For the spike that looks for a fix, settings.json can let them through:
+//   "soundPakSwap": "try"    swap them anyway
+//   "swapPause": "pause"     pause the game (TimeSystem.SetPausedState) around every swap
+// Each swap also asks the plugin to watch for faults (red4ext/logs/rednode-faults.log).
 const HOT_TYPES = new Set(['.archive', '.xl', '.yaml', '.yml']);
+const PAUSE_SETTLE_MS = 500;
 const HOT_TIMEOUT = 60000;
 const HOT_LOG = 'its log in red4ext/plugins/RedHotTools';
 let hotQueue = Promise.resolve();
@@ -1530,6 +1538,26 @@ async function swapArchives(caller, params) {
     );
   }
 
+  const soundTry = settings.soundPakSwap === 'try';
+  for (const f of files) {
+    if (path.extname(f.file).toLowerCase() !== '.archive') continue;
+    let paks;
+    try {
+      paks = soundPaksIn(f.file);
+    } catch (err) {
+      throw new Error(`${f.given}: ${err.message}`);
+    }
+    if (!paks.length) continue;
+    const which = `${paks.length} sound pak${paks.length === 1 ? '' : 's'}, such as ${path.win32.basename(paks[0])}`;
+    if (!soundTry) {
+      throw new Error(
+        `${f.name} changes the game's sound (${which}), and swapping sound into a running game crashes it. ` +
+          'Install it and restart the game instead.',
+      );
+    }
+    log(`Archives: ${f.name} changes ${which}; swapping anyway, since "soundPakSwap": "try" is set (it has crashed the game)`);
+  }
+
   const hotDir = path.join(GAME_DIR, 'archive', 'pc', 'hot');
   fs.mkdirSync(hotDir, { recursive: true });
   // Copied under another name first, so RED Hot Tools never sees half a file.
@@ -1541,6 +1569,13 @@ async function swapArchives(caller, params) {
   }
   const names = files.map((f) => f.name).join(', ');
   log(`Archives: ${who} swaps ${names} (RED Hot Tools ${version})`);
+  try {
+    await bridgeCall('faults.watch', { seconds: 15, label: `swap of ${names}` });
+  } catch (err) {
+    log(`Archives: no fault watch (${err.message})`);
+  }
+  const pause = settings.swapPause === 'pause';
+  if (pause) await pauseGame(true);
   const started = Date.now();
   let error = null;
   try {
@@ -1555,6 +1590,7 @@ async function swapArchives(caller, params) {
     }
   }
   const ms = Date.now() - started;
+  if (pause) await pauseGame(false);
   const reloaded = [];
   const failed = [];
   for (const f of files) {
@@ -1578,6 +1614,23 @@ async function swapArchives(caller, params) {
     mods?.log(caller.id, failed.length ? 'error' : 'info', `Archives: ${names}: ${summary}${why}`);
   }
   return { reloaded, failed, via: 'red-hot-tools', ms };
+}
+
+// The spike's "swapPause": "pause" setting: the game's own pause, then a moment for the
+// audio engine to settle before the swap. Unverified whether it pauses the game's audio.
+async function pauseGame(paused) {
+  let time = null;
+  try {
+    time = await bridgeCall('rtti.call', { class: 'GameInstance', fn: 'GetTimeSystem', args: [{}] });
+    await bridgeCall('rtti.call', { self: time, fn: 'SetPausedState', args: [paused, 'REDnode'] });
+    const now = await bridgeCall('rtti.call', { self: time, fn: 'IsPausedState', args: [] });
+    log(`Archives: game ${paused ? 'paused' : 'unpaused'} for the swap (IsPausedState ${now})`);
+    if (paused) await new Promise((resolve) => setTimeout(resolve, PAUSE_SETTLE_MS));
+  } catch (err) {
+    log(`Archives: could not ${paused ? 'pause' : 'unpause'} the game (${err.message})`);
+  } finally {
+    if (time?.$ref) bridgeCall('rtti.release', { refs: [time.$ref] }).catch(() => {});
+  }
 }
 
 // ---------- sound per package (Sound API, S1) ----------

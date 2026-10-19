@@ -12,6 +12,7 @@
 //   tweakdb.get, tweakdb.record, tweakdb.records           TweakDB, read, in reflect.cpp
 //   sound.play, sound.stop, sound.set, sound.list, sound.mix, audio.tone
 //                                                          REDnode's own audio output, in audio.cpp
+//   faults.watch     {"seconds":15,"label":"..."}: logs the first faults for a while, in faults.cpp
 
 #include "json.hpp"
 #include "jvalue.hpp"
@@ -163,7 +164,7 @@ std::string Handle(const std::string& aJson, uint64_t aFrame)
         return PlayerPosition(id);
     if (method == "audio.play")
         return AudioPlay(id, aJson);
-    if (IsReflectMethod(method) || IsAudioMethod(method))
+    if (IsReflectMethod(method) || IsAudioMethod(method) || IsFaultsMethod(method))
     {
         json::Value request;
         std::string error;
@@ -171,8 +172,10 @@ std::string Handle(const std::string& aJson, uint64_t aFrame)
             return Error(id, ("Bad request: " + error).c_str());
         static const json::Value none;
         const json::Value* params = request.Get("params");
-        std::string result =
-            IsAudioMethod(method) ? Audio(method, params ? *params : none, error) : Reflect(method, params ? *params : none, error);
+        const json::Value& given = params ? *params : none;
+        std::string result = IsAudioMethod(method)    ? Audio(method, given, error)
+                             : IsFaultsMethod(method) ? Faults(method, given, error)
+                                                      : Reflect(method, given, error);
         if (!error.empty())
             return Error(id, error.c_str());
         return Reply(id, "\"result\":" + result);

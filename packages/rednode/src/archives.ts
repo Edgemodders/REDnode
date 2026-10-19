@@ -46,8 +46,10 @@ export const archives = {
    * it is. `.archive` files and ArchiveXL's `.xl` and `.yaml` files are accepted.
    *
    * Throws when the package lacks the `archives` permission, at the main menu, when
-   * RED Hot Tools is not loaded, or when a file is missing. A file that could not be
-   * swapped is in `failed`, not thrown.
+   * RED Hot Tools is not loaded, or when a file is missing. Also throws for an archive
+   * that changes the game's sound paks (`.opuspak`, `.opusinfo`): swapping those into a
+   * running game crashes it, so install it and restart instead. A file that could not
+   * be swapped is in `failed`, not thrown.
    *
    * @example
    * ```ts

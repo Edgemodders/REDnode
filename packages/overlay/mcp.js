@@ -24,7 +24,7 @@ REDnode runs overlay apps (web pages drawn on top of the game) and Node mods (No
 - window_text, window_image: what an overlay window shows. window_console: what its page logged.
 - game_image: the game's screen as the player sees it, with or without the overlay.
 - tweakdb: TweakDB flats and records, read from the running game.
-- archives_reload: swaps changed archives into the running game through RED Hot Tools, for seeing an asset change without a restart.
+- archives_reload: swaps changed archives into the running game through RED Hot Tools, for seeing an asset change without a restart. Archives that change the game's sound paks are refused: they need a restart.
 - api_call, api_get: live calls into the game. Game objects come back as {"$ref": n, "$type": "..."}; pass {"$ref": n} back as self. Most functions take the game instance first: pass {}. 64-bit numbers are strings. References die when a save loads.
 api_call can change the player's game, such as their money or health, and archives_reload replaces files in the game's mod folder: ask before changes the user did not request.
 Guide: https://edgemodders.github.io/REDnode/overlay-apps.html`;

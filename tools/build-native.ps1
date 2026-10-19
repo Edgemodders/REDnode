@@ -39,6 +39,8 @@ if ($LASTEXITCODE) { throw 'Build failed.' }
 if ($LASTEXITCODE) { throw 'Unit tests failed.' }
 & (Join-Path $build "$Config\REDnode_json_tests.exe")
 if ($LASTEXITCODE) { throw 'JSON unit tests failed.' }
+& (Join-Path $build "$Config\REDnode_faults_tests.exe")
+if ($LASTEXITCODE) { throw 'Fault watch unit tests failed.' }
 & (Join-Path $build "$Config\REDnode_capture_tests.exe")
 if ($LASTEXITCODE) { throw 'Capture unit tests failed.' }
 & (Join-Path $build "$Config\REDnode_audio_tests.exe")

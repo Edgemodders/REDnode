@@ -183,5 +183,12 @@ void UpdateAudio();               // game thread, each frame: menu pauses, ended
 void SetAudioFront(bool aFront);  // any thread: the game window came to or left the front
 void StopAudio();
 void ClearRefs();
+// faults.cpp: logs the first faults while a risky game call runs (faults.watch, game thread).
+void StartFaults(const std::filesystem::path& aPluginDir);
+void StopFaults();
+bool IsFaultsMethod(const std::string& aMethod);
+std::string Faults(const std::string& aMethod, const json::Value& aParams, std::string& aError);
+void UpdateFaults();  // game thread, each frame: logs the end of a watch
+void FaultsOnExit();  // DllMain's process detach: who called ExitProcess during a watch
 } // namespace detail
 } // namespace rednode::overlay

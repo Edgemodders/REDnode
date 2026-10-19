@@ -287,3 +287,13 @@ RED4EXT_C_EXPORT uint32_t RED4EXT_CALL Supports()
 {
     return RED4EXT_API_VERSION_1;
 }
+
+// The game quitting through ExitProcess while a fault watch is on (an archive swap): write
+// who called it (overlay/faults.cpp). aReserved is non-null when the whole process ends.
+BOOL APIENTRY DllMain(HMODULE aModule, DWORD aReason, LPVOID aReserved)
+{
+    RED4EXT_UNUSED_PARAMETER(aModule);
+    if (aReason == DLL_PROCESS_DETACH && aReserved)
+        rednode::overlay::detail::FaultsOnExit();
+    return TRUE;
+}

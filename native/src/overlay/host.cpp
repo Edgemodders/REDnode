@@ -35,7 +35,12 @@ void StartHost(const std::filesystem::path& aPluginDir)
     }
 
     const auto logFile = aPluginDir.parent_path().parent_path() / L"logs" / L"rednode-overlay.log";
-    std::filesystem::remove(logFile, ec); // one log per game session
+    // One log per game session; the last session's is kept beside it, since after a crash the
+    // next start would otherwise erase the log that shows it.
+    auto previous = logFile;
+    previous.replace_filename(L"rednode-overlay.prev.log");
+    std::filesystem::remove(previous, ec);
+    std::filesystem::rename(logFile, previous, ec);
 
     std::wstring cmd = L"\"" + exe.wstring() + L"\" --apps-dir=\"" + (aPluginDir / L"apps").wstring() +
                        L"\" --parent-pid=" + std::to_wstring(GetCurrentProcessId()) + L" --log=\"" +
