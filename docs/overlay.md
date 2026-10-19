@@ -808,6 +808,19 @@ REDnode 0.26.1 on the laptop. Type what you see into the Test timer's field; **M
 
 Then: the plugin log's `Overlay: cursor` lines for each step, and the notes in the Mod log.
 
+### Cursor flicker: first run
+
+Run on 2026-10-19 on the laptop with REDnode 0.26.1. The user's notes: step 1 flickered (said after the test), step 2 "it flickers", step 3 (pause menu) "no flicker", step 4 a reload of the save first, then circles. The Test timer's note with **Mark** worked.
+
+| What the log shows | In the game (steps 1, 2, 4) | Pause menu (step 3) |
+|---|---|---|
+| Frames, and frames with the arrow drawn | About 45 a second, the arrow drawn on every one | About 230 a second, the arrow drawn on every one |
+| What moved the arrow | Raw input only; no move of more than 150 px at once. With the touchpad still (step 1), no moves at all: the arrow stayed at 79,325 for 10 seconds | Raw input only, no jumps |
+| Window messages | About one `WM_MOUSEMOVE` a frame even with the touchpad still, all ignored (raw input is used) | Only while moving |
+| The Windows cursor | Hidden, held at the centre of the screen (1280,720) by a clip rectangle one pixel wide | Hidden, free to move, clip the whole screen |
+
+What it means: the arrow is drawn on every frame at a steady place, so it is not being moved back and forth, and no frame lacks it. In the game, the game puts the Windows cursor back at the centre every frame, which is what the window messages are. Open, unverified: whether what flickers is the overlay's yellow arrow where it was left, or the Windows pointer at the centre of the screen, which the game moves every frame; and whether the overlay windows flicker too.
+
 ### UI kit
 
 UI is written as markup, not built by hand in code. Two layers keep it optional:
