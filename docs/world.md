@@ -305,6 +305,20 @@ What it means:
 - About 430 ms after each swap, RED Hot Tools' folder watcher fires on its own thread: it sees REDnode's copy into the hot folder, finds no archives left, and reloads ArchiveXL's extensions a second time, which takes under a millisecond. Harmless; it cannot be avoided while the swap goes through the hot folder.
 - RED Hot Tools' `box_occluder.w2mesh` warnings come before and after swaps alike: the game's, not the swap's.
 
+### H1 limit: sound paks crash a swap
+
+Found on 2026-10-19 on the laptop (REDnode 0.26.1, RED Hot Tools 1.3.0), with `EDGEwaveTest.archive` from EDGEwave: a sound override in an opus pak. **Swapping it into a running game crashes the game, on either route; a normal install of the same archive works.**
+
+| Run | Route | Thread | RED Hot Tools' last line | Result |
+|---|---|---|---|---|
+| 10:31:29 | REDcode's **Pack and Try**, which copies into `archive/pc/hot`; RED Hot Tools' folder watcher reloads | 27088, the watcher's | "Loading updated archives..." | Crash |
+| 10:3x | The same archive in `archive/pc/mod`, game started normally | | | Runs |
+| 10:43:19 | REDnode's Hot swap test, `archives.reload` | 23000, the game thread (REDnode's pump) | "Loading updated archives..." | Crash a second later |
+
+What it means: the route is not the cause; loading an archive with sound paks into a running game is. Why is unverified (likely the game's audio engine keeps its paks open while it runs; the crash report's module would tell). Plain archives swap fine on both routes; H0's other crash was a scene mod swapped at the main menu.
+
+Proposed, not yet agreed: REDnode refuses such archives before the swap, with a message that sound paks need a restart, and REDcode's hot deploy does the same. Unverified which file types besides `.opuspak` and `.opusinfo` behave this way.
+
 ### H1 quoted path: retest
 
 Run on 2026-10-19 on the laptop with REDnode 0.26.1 (after its NVIDIA driver update). **Pass.** The path came from File Explorer's **Copy as path**, with its double quotes.
