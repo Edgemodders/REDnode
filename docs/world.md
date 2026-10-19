@@ -377,7 +377,7 @@ Run on 2026-10-19 on the laptop with the REDnode 0.26.2 test build, RED Hot Tool
 | A, default settings | 11:40 to 11:41 | `EDGEwaveTest.archive` refused: "changes the game's sound (2 sound paks, such as sfx_container.opusinfo) ... Install it and restart the game instead"; the game ran on. The nim archive swapped in 77 ms under a fault watch, with no faults. Marks 1 to 3 present. **Pass** |
 | B, `"soundPakSwap": "try"` | 11:46 | Crash. `rednode-faults.log` has the watch's start at 11:46:17 and nothing after it: no fault of the error kind (`0xC...`) reached REDnode's handler, and no `ExitProcess` line |
 | C, also `"swapPause": "pause"` | 11:49 | **No crash.** "game paused for the swap (IsPausedState true)", "1 reloaded in 29 ms", "unpaused (IsPausedState false)"; the game ran on, no faults. But drawing the katana played the base game sound, not the override |
-| Afterwards | 11:51 | A last start: the base katana sound plays |
+| Afterwards | 11:51 | A last start with the archive removed from `archive/pc/mod`: the base katana sound plays. Installed before the test, the same archive had overridden the sound at a normal start |
 
 What it means:
 
@@ -385,7 +385,29 @@ What it means:
 - Run B's ending passed REDnode's handler by: either a handler registered ahead of REDnode's ends the process at the fault, or a C++ exception (skipped by the watch as routine) ends it through `terminate`, or a fail-fast or `TerminateProcess`. Unverified which.
 - Pausing the game with `TimeSystem.SetPausedState` around the swap avoided the crash (one run): what fails is something that runs while the game plays, as the user suspected, plausibly the audio engine's work.
 - A clean swap does not change the sound: the audio engine evidently reads its index (`sfx_container.opusinfo`) at start and keeps it, so newly mounted paks are not used until a restart. Hearing a swapped sound would need the audio engine to reload its index, which the game's script API does not offer; it would mean reverse engineering native audio code. Unverified.
-- Open: whether in the last start the archive was still installed (the swap leaves it in `archive/pc/mod`); if it was, and the base sound played, the swap left the install broken.
+- The last start had the archive removed on purpose, to check the base sound; so nothing shows the swap broke the install. Installed normally, the archive overrides the sound.
+- The user's reading (2026-10-19): with the pause, a new opus pak gets into the engine while the game runs; what remains is making the audio engine read its index again while paused. That is most likely one class and one or a few methods, found by following what reads `sfx_container.opusinfo` at start. Next step: H1c below.
+
+### H1c: how the game loads its sound paks (research)
+
+Found on 2026-10-19 by following the two paths in the game's code (`Cyberpunk2077.exe` of game 2.31, read with MSVC's `dumpbin`; offsets are from the image base and change with each game version). Static reading only; nothing ran in the game yet.
+
+| Offset (2.31) | What it is |
+|---|---|
+| `0xA2E9FC` | The audio engine's start: Wwise's memory manager, stream manager and sound engine, each checked. Partway through it calls the opus index loader with the hash of `base\sound\soundbanks\sfx_container.opusinfo` (kept in a global set by a static initializer at `0xF8C20`) |
+| `0x279ED4` | The opus index loader. It refuses if an index is already loaded (a count at `0x3495DF8`, at most 1), so calling it again does nothing. Otherwise it reads the whole file through the resource depot, checks the magic `SND ` and version `0xF0000002`, copies its tables into one 0x60-byte entry at `0x3B28FD0` (array pointers, the sound and pak counts, and two hash maps: sound hash to row, and one per pak), and opens the first N paks (N from the file's header) for good |
+| `0x3A38CC0` | The open pak table: up to 2,048 entries of 0x70 bytes (count at `0x3495DFC`, a free list at `0x3496E00`): pak number, index number, a reference count, and the depot reader at +0x18 |
+| `0x279890` | Looks up a sound when it plays: the sound hash through the index's hash map gives the pak number, offset and size; it reuses an open pak with that number or opens `sfx_container_<n>.opuspak` through the depot on demand and adds it to the table |
+| `0x6E3740` | Releases a pak entry: drops its reader and puts the slot on the free list |
+
+What it explains:
+
+- The index is read once at start, from the archives mounted then. A swapped archive's `sfx_container.opusinfo` is never read, so the sound keeps the base game's offsets.
+- Paks opened at start keep their readers on the archive they came from, so a sound in one of them plays the base game's data after a swap (run C's katana, plausibly). A pak opened on demand after a swap would be read from the new archive at the old index's offsets: garbage for the decoder, a plausible cause of run B's crash. Unverified which paks the katana and run B touched.
+
+What a reload in REDnode would do, all on the game thread with the game paused: stop playing sounds; release every pak entry (`0x6E3740`) so readers on the old archives go; free the index's arrays and hash maps and set its count to 0; call the loader again (`0x279ED4`) with the same hash, which reads the new index and opens the start paks from the new archives. The functions and tables would be found by byte patterns at start, so a new game version turns the feature off (sound archives refused, as now) rather than crashing.
+
+Proposed next step, not yet agreed: H1c-1, a read-only `audio.opusState` in the plugin that reports the index (sounds, paks) and the open pak table, called before and after drawing the katana and around a paused swap. It confirms this reading in the game without changing anything. H1c-2, the reload itself behind a spike setting, only if H1c-1 matches.
 
 ### H1 quoted path: retest
 
