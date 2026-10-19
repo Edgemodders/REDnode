@@ -47,6 +47,8 @@ nav:
     url: /localization.html
   - title: Tests
     url: /testing.html
+  - title: Changelog
+    url: /changelog.html
   - title: P0 findings
     url: /p0-findings.html
   - title: P1 results

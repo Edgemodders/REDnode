@@ -50,7 +50,7 @@ On GitHub: the **Release zip** workflow (`.github/workflows/release.yml`).
 | Trigger | Result |
 |---|---|
 | Actions tab, **Run workflow** | Builds the zip on a Windows runner and keeps it as the run's artifact, `REDnode-zip` |
-| **Run workflow** with **Make a release** ticked, or `npm run release` (the gh CLI starts the same run on `main`) | The same, then tags the commit `v<VERSION>` and makes a GitHub release with the zip. It stops before building if that version is already released |
+| **Run workflow** with **Make a release** ticked, or `npm run release` (the gh CLI starts the same run on `main`) | The same, then tags the commit `v<VERSION>` and makes a GitHub release with the zip, its notes from the version's section of `docs/changelog.md`. It stops before building if that version is already released or has no section in the changelog |
 
 On this machine, after the usual build:
 
@@ -69,7 +69,11 @@ npm run release:zip      # native\build\release\REDnode-<version>.zip
 1. Edit `description.bbcode` here, commit, push.
 2. Check it: `node tools/check-bbcode.mjs nexus/description.bbcode`.
 3. Paste the whole file into the description field on Nexus and save.
-4. For a new version, first the release gate: every in-game test of the builds since the last release has passed (docs/testing.md). Untested or failed means no release. Then run the workflow with **Make a release** ticked, download the zip from the release, and upload it on Nexus as the main file with the version from `VERSION`. Archive the old file.
+4. For a new version, first the release gate: every in-game test of the builds since the last release has passed (docs/testing.md). Untested or failed means no release. Then:
+   1. In `docs/changelog.md`, rename **Unreleased** to `## <version> (<date>)`, start a new empty **Unreleased** above it, commit and push.
+   2. Run the workflow with **Make a release** ticked. The GitHub release takes its notes from that section.
+   3. Download the zip from the release, and upload it on Nexus as the main file with the version from `VERSION`. Archive the old file.
+   4. In the page's changelog for that version (Manage files, or the Changelogs tab), paste the lines from `npm run release:notes -- --nexus`, one entry per line.
 
 Keep these in step with the repo's status (README, docs/index.md):
 

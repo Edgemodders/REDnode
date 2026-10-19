@@ -6,6 +6,8 @@
 #   Run workflow, "Make a release" ticked       also tags the commit v<VERSION> and makes the
 #                                               GitHub release with the zip; stops first if that
 #                                               tag exists (raise VERSION with tools/version.mjs)
+#                                               or docs/changelog.md has no section for VERSION
+#                                               (the release notes, tools/release/notes.mjs)
 #
 # Release gate: make a release only after every in-game test of the builds since the last
 # release has passed (docs/testing.md). Untested or failed means no release.
@@ -50,6 +52,10 @@ jobs:
           }
           $global:LASTEXITCODE = 0
 
+      - name: Release notes from docs/changelog.md
+        if: inputs.release
+        run: node tools/release/notes.mjs --out "$env:RUNNER_TEMP/notes.md"
+
       - name: Install dependencies
         run: npm ci
         env:
@@ -76,5 +82,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $version = (Get-Content VERSION -Raw).Trim()
-          $notes = "REDnode $version. Install: extract into the game folder, or add the zip to Vortex or EDGEdeck. Needs RED4ext and redscript. Packages that read the game's archives also need REDbridge: press Get REDbridge in the Mod Manager. Docs: https://edgemodders.github.io/REDnode/"
-          gh release create "v$version" "native/build/release/REDnode-$version.zip" --target $env:GITHUB_SHA --title "REDnode $version" --notes $notes --generate-notes
+          gh release create "v$version" "native/build/release/REDnode-$version.zip" --target $env:GITHUB_SHA --title "REDnode $version" --notes-file "$env:RUNNER_TEMP/notes.md" --generate-notes
