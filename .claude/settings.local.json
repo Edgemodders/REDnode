@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run release)",
+      "Bash(gh workflow run release.yml:*)"
+    ]
+  }
+}
