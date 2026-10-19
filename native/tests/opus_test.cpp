@@ -9,9 +9,11 @@
 #include "../src/overlay/jvalue.hpp"
 #include "../src/overlay/overlay.hpp"
 
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <thread>
 
 namespace rednode::overlay
 {
@@ -348,6 +350,48 @@ int main()
     OpusReloadNow(places, r);
     Check(!r.loaded && r.retired == 0 && Has(r.why, "not what REDnode expects") && PakNumber(0) == 5,
           "with no index loaded the reload touches nothing");
+
+    // The park (H1c-2b): a thread stands in for the audio thread, ending a frame every millisecond.
+    BuildTables();
+    places.loader = reinterpret_cast<uint8_t*>(&FakeLoader);
+    std::atomic<bool> running{true};
+    std::atomic<int> frames{0};
+    std::thread audio([&] {
+        while (running)
+        {
+            OpusFrameEnd(places);
+            frames++;
+            Sleep(1);
+        }
+    });
+    const auto waitFor = [](int aStep) {
+        for (int i = 0; i < 500 && OpusStepNow() != aStep; i++)
+            Sleep(1);
+        return OpusStepNow() == aStep;
+    };
+    Check(OpusAskPark(2000) && waitFor(OpusParked), "the audio thread waits at its end of frame when asked");
+    const int parkedAt = frames;
+    Sleep(60);
+    Check(frames == parkedAt, "it does no frames while it waits");
+    Check(!OpusAskPark(2000), "a second wait is refused while one is on");
+    Check(OpusAskReload() && waitFor(OpusDone), "a reload asked while it waits runs on it");
+    const OpusOutcome outcome = OpusTakeOutcome();
+    Check(outcome.done && outcome.reload.loaded && outcome.reload.soundsAfter == 5 && outcome.parkedMs >= 50,
+          "the outcome: the new index, and how long it waited");
+    Sleep(20);
+    Check(frames > parkedAt && OpusStepNow() == OpusIdle, "it goes on after the reload");
+
+    BuildTables();
+    Check(OpusAskPark(2000) && waitFor(OpusParked) && OpusCancel() && waitFor(OpusIdle),
+          "a cancelled wait ends without a reload");
+    Sleep(20);
+    Check(*IndexCount == 1 && PakNumber(0) == 5, "a cancelled wait leaves the index alone");
+    Check(OpusAskPark(30) && waitFor(OpusParked) && waitFor(OpusIdle), "a wait nobody ends stops at its cap");
+    Check(!OpusTakeOutcome().done, "a wait that ran out has no outcome");
+    Check(OpusAskReload() && waitFor(OpusDone) && OpusTakeOutcome().reload.loaded,
+          "a reload asked without a wait runs at the next end of frame");
+    running = false;
+    audio.join();
 
     // Optional: the patterns against a real game exe, mapped as an image without running it.
     // Set REDNODE_GAME_EXE to Cyberpunk2077.exe's path. Prints the offsets (they change with

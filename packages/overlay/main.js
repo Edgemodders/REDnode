@@ -1473,8 +1473,9 @@ function checkTweaks() {
 // on either RED Hot Tools route (docs/world.md, "H1 limit: sound paks crash a swap"), so
 // they are refused. For the spike that looks for a fix, settings.json can let them through:
 //   "soundPakSwap": "try"    swap them anyway
-//   "soundPakSwap": "reload" swap them with the game paused, then have the plugin load the
-//                            game's sound index again on the audio thread (H1c-2)
+//   "soundPakSwap": "reload" swap them with the game paused and its audio thread held at the
+//                            end of a frame, then have the plugin load the game's sound index
+//                            again on that thread before it goes on (H1c-2)
 //   "swapPause": "pause"     pause the game (TimeSystem.SetPausedState) around every swap
 // Each swap also asks the plugin to watch for faults (red4ext/logs/rednode-faults.log).
 // A sound swap let through logs the game's sound pak index and open paks (opus.state, H1c)
@@ -1573,13 +1574,6 @@ async function swapArchives(caller, params) {
 
   const hotDir = path.join(GAME_DIR, 'archive', 'pc', 'hot');
   fs.mkdirSync(hotDir, { recursive: true });
-  // Copied under another name first, so RED Hot Tools never sees half a file.
-  for (const f of files) {
-    const into = path.join(hotDir, f.name);
-    const part = `${into}.rednode-part`;
-    fs.copyFileSync(f.file, part);
-    fs.renameSync(part, into);
-  }
   const names = files.map((f) => f.name).join(', ');
   log(`Archives: ${who} swaps ${names} (RED Hot Tools ${version})`);
   try {
@@ -1591,6 +1585,21 @@ async function swapArchives(caller, params) {
   const pause = settings.swapPause === 'pause' || (sound && soundReload);
   if (sound) await logSoundState('before the swap', caller);
   if (pause) await pauseGame(true);
+  // "reload": the audio thread waits at the end of a frame for the whole swap (H1c-2b), so
+  // it reads no pak while RED Hot Tools changes the archives. No wait, no swap.
+  const reloadSound = sound && soundReload;
+  if (reloadSound && !(await parkAudio(caller))) {
+    if (pause) await pauseGame(false);
+    throw new Error(`${names} was not swapped: the game's audio thread did not wait for the swap (see the host log)`);
+  }
+  // Copied only now, so RED Hot Tools' folder watcher cannot start the swap before the pause
+  // and the wait; and under another name first, so it never sees half a file.
+  for (const f of files) {
+    const into = path.join(hotDir, f.name);
+    const part = `${into}.rednode-part`;
+    fs.copyFileSync(f.file, part);
+    fs.renameSync(part, into);
+  }
   const started = Date.now();
   let error = null;
   try {
@@ -1606,9 +1615,13 @@ async function swapArchives(caller, params) {
   }
   const ms = Date.now() - started;
   if (sound) await logSoundState('after the swap', caller);
-  if (sound && soundReload) {
-    await reloadSoundIndex(caller);
-    await logSoundState('after the reload', caller);
+  if (reloadSound) {
+    if (files.some((f) => !fs.existsSync(path.join(hotDir, f.name)))) {
+      await reloadSoundIndex(caller);
+      await logSoundState('after the reload', caller);
+    } else {
+      await releaseAudio('nothing was swapped');
+    }
   }
   if (pause) await pauseGame(false);
   if (sound && pause) await logSoundState('after the unpause', caller);
@@ -1647,15 +1660,65 @@ async function logSoundState(when, caller) {
   }
 }
 
-// "soundPakSwap": "reload": the plugin loads the game's sound index again on the audio
-// thread, at the end of the next audio frame (opus.cpp). The host asks, then polls until
-// it is done, or cancels it if the audio thread never runs it.
-async function reloadSoundIndex(caller) {
-  const report = (level, text) => {
+// "soundPakSwap": "reload": before the swap the plugin holds the game's audio thread at the
+// end of a frame (opus.park, at most AUDIO_PARK_CAP ms); after it, the audio thread loads
+// the game's sound index again and goes on (opus.reload). The host polls each step.
+const AUDIO_PARK_CAP = 3000;
+const AUDIO_PARK_WAIT = 1000;
+
+function swapReport(caller) {
+  return (level, text) => {
     log(`Archives: ${text}`);
     if (caller.id) mods?.log(caller.id, level, `Archives: ${text}`);
   };
+}
+
+async function parkAudio(caller) {
+  const report = swapReport(caller);
   try {
+    await bridgeCall('opus.park', { capMs: AUDIO_PARK_CAP });
+  } catch (err) {
+    report('error', `the audio thread was not asked to wait (${err.message})`);
+    return false;
+  }
+  const until = Date.now() + AUDIO_PARK_WAIT;
+  for (;;) {
+    let status;
+    try {
+      status = await bridgeCall('opus.reloadStatus', {});
+    } catch (err) {
+      report('error', `no audio thread status (${err.message})`);
+      return false;
+    }
+    if (status.state === 'parked') {
+      log(`Archives: the audio thread waits for the swap (asked ${status.ms} ms ago)`);
+      return true;
+    }
+    if (Date.now() > until) {
+      await releaseAudio('it did not stop in time');
+      report('error', `the audio thread did not stop for the swap within ${AUDIO_PARK_WAIT} ms`);
+      return false;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+async function releaseAudio(why) {
+  try {
+    await bridgeCall('opus.reloadStatus', { cancel: true });
+    log(`Archives: the audio thread goes on without a reload (${why})`);
+  } catch (err) {
+    log(`Archives: could not let the audio thread go (${err.message}); it goes on by itself within ${AUDIO_PARK_CAP} ms`);
+  }
+}
+
+async function reloadSoundIndex(caller) {
+  const report = swapReport(caller);
+  try {
+    const before = await bridgeCall('opus.reloadStatus', {});
+    if (before.state === 'idle' && before.expired) {
+      report('error', `the swap took longer than ${AUDIO_PARK_CAP} ms, so the audio thread went on before the reload`);
+    }
     await bridgeCall('opus.reload', {});
   } catch (err) {
     report('error', `no sound index reload (${err.message})`);
@@ -1672,7 +1735,7 @@ async function reloadSoundIndex(caller) {
     }
     if (status.state === 'done') {
       if (status.loaded) {
-        report('info', `sound index reloaded in ${status.ms} ms: ${status.soundsBefore} sounds before, ${status.soundsAfter} after; ${status.retired} pak entries retired`);
+        report('info', `sound index reloaded in ${status.ms} ms (the audio thread waited ${status.parkedMs} ms): ${status.soundsBefore} sounds before, ${status.soundsAfter} after; ${status.retired} pak entries retired`);
       } else {
         report('error', `sound index reload failed: ${status.why}; ${status.restored ? 'the old index is back' : 'the old index could NOT be put back'}`);
       }

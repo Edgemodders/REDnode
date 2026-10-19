@@ -232,6 +232,29 @@ struct OpusReload
     char why[160] = {};
 };
 void OpusReloadNow(const OpusPlaces& aPlaces, OpusReload& aOut);
+// The hand-off between the bridge (game thread) and the audio thread's end of frame.
+enum OpusStep : int
+{
+    OpusIdle,
+    OpusParkAsked,   // the audio thread is to wait at its next end of frame
+    OpusParked,      // it waits there: no pak tick, no lookups, until let go or the cap
+    OpusReloadAsked, // it is to reload (and stop waiting, if it waits)
+    OpusRunning,
+    OpusDone         // the result waits for OpusTakeOutcome
+};
+struct OpusOutcome
+{
+    bool done = false;
+    OpusReload reload;
+    double ms = 0;
+    uint64_t parkedMs = 0;
+};
+bool OpusAskPark(uint32_t aCapMs);            // idle -> park asked
+bool OpusAskReload();                         // idle or parked -> reload asked
+bool OpusCancel();                            // a request not yet running, or a wait, ends
+int OpusStepNow();
+void OpusFrameEnd(const OpusPlaces& aPlaces); // the audio thread, at the end of each frame
+OpusOutcome OpusTakeOutcome();                // done -> idle, with the result
 bool IsOpusMethod(const std::string& aMethod);
 std::string Opus(const std::string& aMethod, const json::Value& aParams, std::string& aError);
 } // namespace detail

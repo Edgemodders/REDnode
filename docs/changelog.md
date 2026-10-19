@@ -17,6 +17,7 @@ How to keep it:
 
 **Other**
 
+- The fault watch around an archive swap also records breakpoints (a failed assert in the game) in `red4ext/logs/rednode-faults.log`.
 - `archives.soundState()` in the `rednode` package reads the game's sound pak index and the paks it has open, without changing them: an experimental diagnostic for the research into swapping sound into a running game. See [swapping archives](https://edgemodders.github.io/REDnode/overlay-apps.html#swapping-archives-in-the-running-game).
 
 ## 0.26.2 (2026-10-19)

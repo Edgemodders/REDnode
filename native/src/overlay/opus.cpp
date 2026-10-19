@@ -42,6 +42,12 @@
 //     it reads the swapped archive's sfx_container.opusinfo and opens its first paks
 //   - on a refusal or a fault the old entry, count and pak numbers go back
 //
+// H1c-2b: a sound pak swap can crash inside the archive load itself, before any reload,
+// plausibly the audio thread reading paks through the depot while RED Hot Tools changes
+// its archives (unverified). So the host first asks the audio thread to wait (opus.park):
+// the callback holds it at the end of a frame, after the pak tick, until the host asks
+// for the reload (which it then runs) or cancels, or a cap (3 s by default) runs out.
+//
 // The old index's tables and hash maps are not freed (about 2.5 MB per reload).
 
 #include "jvalue.hpp"
@@ -348,36 +354,25 @@ bool g_found = false;
 std::string g_why;
 OpusPlaces g_places;
 
-// The reload's hand-off between the game thread (the bridge) and the audio thread.
-enum ReloadState : int
-{
-    Idle,
-    Asked,
-    Running,
-    Done
-};
+// The hand-off between the game thread (the bridge) and the audio thread (OpusFrameEnd).
 using RegisterFn = int (*)(void* aCallback, uint32_t aLocations, void* aCookie, uint64_t, uint64_t, uint64_t);
-std::atomic<int> g_reload{Idle};
+using UnregisterFn = int (*)(void* aCallback, uint32_t aLocations);
+std::atomic<int> g_step{OpusIdle};
+std::atomic<uint32_t> g_parkCap{0};
+std::atomic<bool> g_expired{false};
+std::atomic<uint64_t> g_parkedFor{0};
 OpusReload g_result;
 double g_tookMs = 0;
 uint64_t g_askedAt = 0;
-using UnregisterFn = int (*)(void* aCallback, uint32_t aLocations);
 AudioCallbacks g_callbacks;
 bool g_callbackOn = false;
+constexpr uint32_t DefaultParkMs = 3000;
+constexpr uint32_t MaxParkMs = 10000;
 
 // Wwise calls it at the end of every audio frame, right after the game's pak tick.
 void AudioFrameEndCallback(void*, uint32_t, void*)
 {
-    int asked = Asked;
-    if (!g_reload.compare_exchange_strong(asked, Running))
-        return;
-    LARGE_INTEGER start, end, freq;
-    QueryPerformanceCounter(&start);
-    OpusReloadNow(g_places, g_result);
-    QueryPerformanceCounter(&end);
-    QueryPerformanceFrequency(&freq);
-    g_tookMs = static_cast<double>(end.QuadPart - start.QuadPart) * 1000.0 / static_cast<double>(freq.QuadPart);
-    g_reload.store(Done);
+    OpusFrameEnd(g_places);
 }
 
 std::vector<CodeRange> GameCode(const uint8_t* aImage)
@@ -394,7 +389,8 @@ std::vector<CodeRange> GameCode(const uint8_t* aImage)
     return code;
 }
 
-std::string ReloadAsk(std::string& aError)
+// Registers REDnode's end-of-frame callback once.
+bool EnsureCallback(std::string& aError)
 {
     const auto* image = reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
     if (!g_callbacks.registerFn)
@@ -404,75 +400,212 @@ std::string ReloadAsk(std::string& aError)
         {
             Log("Opus: no audio callback in this game version: %s", why.c_str());
             aError = "REDnode cannot run code on this game version's audio thread (" + why + ")";
-            return {};
+            return false;
         }
         Log("Opus: found the audio engine's callback registration at +0x%llx and unregistration at +0x%llx",
             static_cast<unsigned long long>(static_cast<const uint8_t*>(g_callbacks.registerFn) - image),
             static_cast<unsigned long long>(static_cast<const uint8_t*>(g_callbacks.unregisterFn) - image));
     }
-    if (!g_callbackOn)
+    if (g_callbackOn)
+        return true;
+    const int rc = reinterpret_cast<RegisterFn>(g_callbacks.registerFn)(reinterpret_cast<void*>(&AudioFrameEndCallback),
+                                                                       AudioFrameEnd, nullptr, 0, 0, 0);
+    if (rc != 1)
     {
-        const int rc = reinterpret_cast<RegisterFn>(g_callbacks.registerFn)(
-            reinterpret_cast<void*>(&AudioFrameEndCallback), AudioFrameEnd, nullptr, 0, 0, 0);
-        if (rc != 1)
+        Log("Opus: the audio engine refused REDnode's callback (%d)", rc);
+        aError = "The audio engine refused REDnode's callback (" + std::to_string(rc) + ")";
+        return false;
+    }
+    g_callbackOn = true;
+    Log("Opus: REDnode's callback runs at the end of each audio frame");
+    return true;
+}
+
+// opus.park {"capMs"?} and opus.reload {}.
+std::string Ask(const json::Value& aParams, bool aPark, std::string& aError)
+{
+    if (!EnsureCallback(aError))
+        return {};
+    if (aPark)
+    {
+        uint32_t cap = DefaultParkMs;
+        if (const auto* given = aParams.Get("capMs"); given && given->kind == json::Value::Kind::Number)
         {
-            Log("Opus: the audio engine refused REDnode's callback (%d)", rc);
-            aError = "The audio engine refused REDnode's callback (" + std::to_string(rc) + ")";
+            if (given->number < 1 || given->number > MaxParkMs)
+            {
+                aError = "capMs is from 1 to " + std::to_string(MaxParkMs);
+                return {};
+            }
+            cap = static_cast<uint32_t>(given->number);
+        }
+        if (!OpusAskPark(cap))
+        {
+            aError = "The audio thread is already asked to wait or to reload";
             return {};
         }
-        g_callbackOn = true;
-        Log("Opus: REDnode's callback runs at the end of each audio frame");
+        g_askedAt = GetTickCount64();
+        Log("Opus: the audio thread is asked to wait (at most %u ms)", cap);
+        return "{\"asked\":\"park\"}";
     }
-    int state = g_reload.load();
-    if (state == Done)
-        g_reload.compare_exchange_strong(state, Idle); // a result nobody read
-    int idle = Idle;
-    if (!g_reload.compare_exchange_strong(idle, Asked))
+    const bool parked = OpusStepNow() == OpusParked;
+    if (!OpusAskReload())
     {
         aError = "A reload of the sound index is already waiting for the audio thread";
         return {};
     }
-    g_askedAt = GetTickCount64();
-    Log("Opus: reload of the sound index asked");
-    return "{\"asked\":true}";
+    if (!parked)
+        g_askedAt = GetTickCount64();
+    Log("Opus: reload of the sound index asked%s", parked ? " (the audio thread is waiting)" : "");
+    return "{\"asked\":\"reload\"}";
 }
 
-std::string ReloadStatus(const json::Value& aParams)
+std::string StepName(int aStep)
+{
+    switch (aStep)
+    {
+    case OpusParkAsked: return "park";
+    case OpusReloadAsked: return "reload";
+    default: return "";
+    }
+}
+
+// opus.reloadStatus {"cancel"?}: waiting, parked, running, done or idle.
+std::string Status(const json::Value& aParams)
 {
     const auto* cancel = aParams.Get("cancel");
     const bool cancelling = cancel && cancel->kind == json::Value::Kind::Bool && cancel->boolean;
-    int state = g_reload.load();
+    const int step = OpusStepNow();
     const auto waited = static_cast<unsigned long long>(GetTickCount64() - g_askedAt);
-    if (state == Asked)
+    if (cancelling && OpusCancel())
     {
-        if (cancelling && g_reload.compare_exchange_strong(state, Idle))
-        {
-            Log("Opus: reload cancelled: the audio thread did not run it in %llu ms", waited);
-            return "{\"state\":\"cancelled\"}";
-        }
-        return "{\"state\":\"waiting\",\"ms\":" + std::to_string(waited) + "}";
+        Log("Opus: %s cancelled after %llu ms", step == OpusParked ? "the wait" : (StepName(step) + " request").c_str(),
+            waited);
+        return "{\"state\":\"cancelled\"}";
     }
-    if (state == Running)
+    switch (step)
+    {
+    case OpusParkAsked:
+    case OpusReloadAsked:
+        return "{\"state\":\"waiting\",\"for\":\"" + StepName(step) + "\",\"ms\":" + std::to_string(waited) + "}";
+    case OpusParked:
+        return "{\"state\":\"parked\",\"ms\":" + std::to_string(waited) + "}";
+    case OpusRunning:
         return "{\"state\":\"running\"}";
-    if (state != Done)
-        return "{\"state\":\"idle\"}";
-    const OpusReload r = g_result;
+    case OpusDone:
+        break;
+    default:
+    {
+        const bool expired = g_expired.exchange(false);
+        if (expired)
+            Log("Opus: the audio thread went on by itself after %llu ms, since nothing let it go",
+                static_cast<unsigned long long>(g_parkedFor.load()));
+        return std::string("{\"state\":\"idle\",\"expired\":") + (expired ? "true" : "false") + "}";
+    }
+    }
+    const OpusOutcome o = OpusTakeOutcome();
     char took[32];
-    std::snprintf(took, sizeof(took), "%.1f", g_tookMs);
-    g_reload.store(Idle);
-    if (r.loaded)
-        Log("Opus: reloaded the sound index on the audio thread in %s ms (%llu ms after asking): %u sounds before, "
-            "%u after; %u pak entries retired",
-            took, waited, r.soundsBefore, r.soundsAfter, r.retired);
+    std::snprintf(took, sizeof(took), "%.1f", o.ms);
+    if (o.reload.loaded)
+        Log("Opus: reloaded the sound index on the audio thread in %s ms (%llu ms after asking; the audio thread "
+            "waited %llu ms): %u sounds before, %u after; %u pak entries retired",
+            took, waited, static_cast<unsigned long long>(o.parkedMs), o.reload.soundsBefore, o.reload.soundsAfter,
+            o.reload.retired);
     else
-        Log("Opus: the sound index reload failed: %s; %s", r.why,
-            r.restored ? "the old index is back" : "the old index could NOT be put back");
-    return "{\"state\":\"done\",\"loaded\":" + std::string(r.loaded ? "true" : "false") +
-           ",\"restored\":" + (r.restored ? "true" : "false") + ",\"retired\":" + std::to_string(r.retired) +
-           ",\"soundsBefore\":" + std::to_string(r.soundsBefore) + ",\"soundsAfter\":" + std::to_string(r.soundsAfter) +
-           ",\"ms\":" + took + ",\"why\":" + JsonString(r.why) + "}";
+        Log("Opus: the sound index reload failed: %s; %s", o.reload.why,
+            o.reload.restored ? "the old index is back" : "the old index could NOT be put back");
+    return "{\"state\":\"done\",\"loaded\":" + std::string(o.reload.loaded ? "true" : "false") +
+           ",\"restored\":" + (o.reload.restored ? "true" : "false") + ",\"retired\":" +
+           std::to_string(o.reload.retired) + ",\"soundsBefore\":" + std::to_string(o.reload.soundsBefore) +
+           ",\"soundsAfter\":" + std::to_string(o.reload.soundsAfter) + ",\"ms\":" + took +
+           ",\"parkedMs\":" + std::to_string(o.parkedMs) + ",\"why\":" + JsonString(o.reload.why) + "}";
 }
 } // namespace
+
+bool OpusAskPark(uint32_t aCapMs)
+{
+    int step = g_step.load();
+    if (step == OpusDone)
+        g_step.compare_exchange_strong(step, OpusIdle); // a result nobody read
+    g_parkCap.store(aCapMs);
+    g_expired.store(false);
+    g_parkedFor.store(0);
+    int idle = OpusIdle;
+    return g_step.compare_exchange_strong(idle, OpusParkAsked);
+}
+
+bool OpusAskReload()
+{
+    int step = g_step.load();
+    if (step == OpusDone && g_step.compare_exchange_strong(step, OpusIdle))
+        step = OpusIdle;
+    if (step == OpusIdle)
+        g_parkedFor.store(0);
+    return (step == OpusIdle || step == OpusParked) && g_step.compare_exchange_strong(step, OpusReloadAsked);
+}
+
+bool OpusCancel()
+{
+    int step = g_step.load();
+    return (step == OpusParkAsked || step == OpusParked || step == OpusReloadAsked) &&
+           g_step.compare_exchange_strong(step, OpusIdle);
+}
+
+int OpusStepNow()
+{
+    return g_step.load();
+}
+
+void OpusFrameEnd(const OpusPlaces& aPlaces)
+{
+    int step = g_step.load();
+    if (step == OpusParkAsked && g_step.compare_exchange_strong(step, OpusParked))
+    {
+        // Wait here, at the end of the frame, until let go or the cap: no pak tick, no lookup.
+        const uint64_t start = GetTickCount64();
+        const uint32_t cap = g_parkCap.load();
+        for (;;)
+        {
+            step = g_step.load();
+            if (step != OpusParked)
+                break;
+            if (GetTickCount64() - start >= cap)
+            {
+                if (g_step.compare_exchange_strong(step, OpusIdle))
+                {
+                    g_expired.store(true);
+                    step = OpusIdle;
+                }
+                break;
+            }
+            Sleep(1);
+        }
+        g_parkedFor.store(GetTickCount64() - start);
+    }
+    if (step == OpusReloadAsked && g_step.compare_exchange_strong(step, OpusRunning))
+    {
+        LARGE_INTEGER begin, done, freq;
+        QueryPerformanceCounter(&begin);
+        OpusReloadNow(aPlaces, g_result);
+        QueryPerformanceCounter(&done);
+        QueryPerformanceFrequency(&freq);
+        g_tookMs = static_cast<double>(done.QuadPart - begin.QuadPart) * 1000.0 / static_cast<double>(freq.QuadPart);
+        g_step.store(OpusDone);
+    }
+}
+
+OpusOutcome OpusTakeOutcome()
+{
+    OpusOutcome o;
+    int step = g_step.load();
+    if (step != OpusDone)
+        return o;
+    o.reload = g_result;
+    o.ms = g_tookMs;
+    o.parkedMs = g_parkedFor.load();
+    o.done = true;
+    g_step.compare_exchange_strong(step, OpusIdle);
+    return o;
+}
 
 bool LocateAudioCallbacks(const std::vector<CodeRange>& aCode, AudioCallbacks& aOut, std::string& aWhy)
 {
@@ -521,7 +654,7 @@ void StopOpus()
 {
     if (!g_callbackOn)
         return;
-    g_reload.store(Idle);
+    OpusCancel();
     const int rc = reinterpret_cast<UnregisterFn>(g_callbacks.unregisterFn)(reinterpret_cast<void*>(&AudioFrameEndCallback),
                                                                            AudioFrameEnd);
     g_callbackOn = false;
@@ -755,7 +888,8 @@ std::string OpusState(const OpusPlaces& aPlaces, const json::Value& aParams, std
 
 bool IsOpusMethod(const std::string& aMethod)
 {
-    return aMethod == "opus.state" || aMethod == "opus.reload" || aMethod == "opus.reloadStatus";
+    return aMethod == "opus.state" || aMethod == "opus.park" || aMethod == "opus.reload" ||
+           aMethod == "opus.reloadStatus";
 }
 
 std::string Opus(const std::string& aMethod, const json::Value& aParams, std::string& aError)
@@ -783,10 +917,10 @@ std::string Opus(const std::string& aMethod, const json::Value& aParams, std::st
         aError = "REDnode does not know this game version's sound pak tables (" + g_why + ")";
         return {};
     }
-    if (aMethod == "opus.reload")
-        return ReloadAsk(aError);
+    if (aMethod == "opus.park" || aMethod == "opus.reload")
+        return Ask(aParams, aMethod == "opus.park", aError);
     if (aMethod == "opus.reloadStatus")
-        return ReloadStatus(aParams);
+        return Status(aParams);
     std::string summary;
     std::string result = OpusState(g_places, aParams, aError, &summary);
     if (aError.empty())

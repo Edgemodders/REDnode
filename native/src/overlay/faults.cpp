@@ -154,6 +154,7 @@ const char* CodeName(DWORD aCode)
     case EXCEPTION_IN_PAGE_ERROR: return "in-page error (a mapped file could not be read)";
     case 0xC0000374: return "heap corruption";
     case 0xC0000409: return "fail fast";
+    case EXCEPTION_BREAKPOINT: return "breakpoint (an assert in the game, or a debugger's)";
     default: return "error";
     }
 }
@@ -163,8 +164,9 @@ LONG CALLBACK OnException(EXCEPTION_POINTERS* aInfo)
     if (GetTickCount64() > g_until.load(std::memory_order_relaxed))
         return EXCEPTION_CONTINUE_SEARCH;
     const auto* record = aInfo->ExceptionRecord;
-    // Errors only: not C++ throws (0xE06D7363), debug output or thread names, which are routine.
-    if ((record->ExceptionCode & 0xF0000000u) != 0xC0000000u)
+    // Errors and breakpoints (a failed assert) only: not C++ throws (0xE06D7363), debug output
+    // or thread names, which are routine.
+    if ((record->ExceptionCode & 0xF0000000u) != 0xC0000000u && record->ExceptionCode != EXCEPTION_BREAKPOINT)
         return EXCEPTION_CONTINUE_SEARCH;
     if (g_logged.fetch_add(1) >= MaxPerWatch)
         return EXCEPTION_CONTINUE_SEARCH;
