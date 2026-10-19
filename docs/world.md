@@ -211,7 +211,7 @@ The host log should have `REDbridge 0.10.0 starting from REDnode` and `Tooltips:
 
 Asked for by EDGEmat and EDGEfab ([#12](https://github.com/Edgemodders/REDnode/issues/12)): seeing a changed asset in the running game without a restart. Agreed with the user on 2026-10-17: try RED Hot Tools first; if it gives trouble, REDnode's own.
 
-**RED Hot Tools** (psiberx, MIT; 1.3.0-rc.2 of 2026-07-12, last commit 2026-07-29; its README still names game 2.21) watches `archive/pc/hot`. When an `.archive` or `.xl` file changes there, it unloads the mod archives, moves the new files into `archive/pc/mod`, loads them again, drops the cached resources they hold, and reloads ArchiveXL's extensions. Its script class `RedHotTools` also has `ReloadArchives()`, `ReloadResources(paths)` and `HotInstall(path)` (a copy into the hot folder); its own CET menu leaves `ReloadArchives()` unused and relies on the folder, as WolvenKit's Hot Reload does.
+**RED Hot Tools** (psiberx, MIT; 1.3.0-rc.2 of 2026-07-12, last commit 2026-07-29; its README still names game 2.21) watches `archive/pc/hot`. When an `.archive`, `.xl` or `.yaml` file arrives there, it waits half a second for more, then on its own thread unloads only the archives of the same name (wherever they are mounted: `archive/pc/mod` or another mod folder; a new one goes to `archive/pc/mod`), moves the new files over them, loads them, drops the cached resources they hold (ink widget libraries are swapped in place), and calls `ArchiveXL.Reload()`. Its log is `red4ext/plugins/RedHotTools/RedHotTools-<date-time>.log`, ending each swap with `Archives reload completed.` (read from its source, `src/App/Archives/ArchiveLoader.cpp`). Its script class `RedHotTools` also has `ReloadArchives()`, `ReloadResources(paths)` and `HotInstall(path)` (a copy into the hot folder); its own CET menu leaves `ReloadArchives()` unused and relies on the folder, as WolvenKit's Hot Reload does.
 
 | Phase | What |
 |---|---|
@@ -248,5 +248,5 @@ What it means:
 
 - RED Hot Tools 1.3.0-rc.2 swaps an archive in a loaded save on game 2.31, and the game runs on and quits cleanly. H1 (`archives.reload`) can build on it.
 - The Welcome window works as built: once, then only from the launcher.
-- The first crash is not explained. The swap ran at the main menu, not in a save, with a mod missing its other parts, and the game died minutes later. A swap reloads every mod archive and ArchiveXL's extensions, so H1's docs should warn that a broken mod can crash the game at a swap even if it loaded at start. Unverified which part crashed.
+- The first crash is not explained. The swap ran at the main menu, not in a save, with a mod missing its other parts, and the game died minutes later. A swap reloads the swapped archive and all of ArchiveXL's extensions, so H1's docs should warn that a broken mod can crash the game at a swap even if it loaded at start. Unverified which part crashed.
 - On quitting from the main menu the plugin logs `could not read IsPreGame; the main menu is only "no player"` once, as the game tears down: harmless, but it could be quieter.
