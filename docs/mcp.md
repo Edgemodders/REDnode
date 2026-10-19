@@ -30,12 +30,13 @@ The server listens only on `127.0.0.1`, port 41820, and every request needs the 
 | `window_console` | What an overlay window's page logged (`console.log`, `console.error` and the like) and its uncaught errors: the last 200 messages since it opened. `level` keeps that level and above; `limit` the newest few (default 50). Node mods log to `logs` instead. REDnode 0.16.0 or later | No |
 | `game_image` | A picture of the game's screen now: the game alone, or with `overlay: true` the overlay windows and cursor on it, as the player sees it. Scaled to at most `maxWidth` (default 1280). HDR is converted to SDR, so its colors are approximate. Fails while the game is loading or minimized. Plugin 0.13.0 or later | No |
 | `tweakdb` | TweakDB from the running game: a flat's type and value (`get`), a record as an object reference for `api_call` (`record`), or the ids of every record of a type (`records`, at most 500 unless `limit` says more). Ids are `"0x..."` hashes. REDnode 0.19.0 or later. Read only: changes go through a package's `tweakdb.set`, which REDnode can undo | No |
+| `archives_reload` | Swaps archives into the running game through RED Hot Tools, as a package's `archives.reload` does: full paths to `.archive`, `.xl` or `.yaml` files, or names of archives in `archive/pc/mod`. Needs RED Hot Tools and a loaded save. Answers with what was swapped and what failed. REDnode 0.26.0 or later | **Yes**: it replaces files in the game's mod folder, and a broken archive can crash the game |
 | `api_call` | A live game call, as `api` makes it: a global function, a static function (`class`), or a method (`self`). Game objects come back as `{ "$ref": n, "$type": "..." }` | **Yes**: it can change the player's game, such as money or health |
 | `api_get` | A property of a game object | No |
 
 A REDnode package can use the same tools: it lists `"permissions": ["mcp"]` in its `rednode-app.json`, the player allows it in the launcher, and `kernel.mcp()` in the `rednode` package gives it the address and its own token. The server then runs for it even with the **MCP server** switch off; that switch only controls access from outside, such as Claude Code. REDagent uses the tools this way.
 
-Claude Code asks before it uses a tool, unless you allow it. Allow the read-only tools freely; keep `api_call` on ask.
+Claude Code asks before it uses a tool, unless you allow it. Allow the read-only tools freely; keep `api_call` and `archives_reload` on ask.
 
 The server also gives the agent short instructions: what REDnode is, what each tool is for, and the game API's rules (the game instance is `{}`, 64-bit numbers are strings, references die when a save loads).
 

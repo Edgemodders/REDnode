@@ -660,7 +660,7 @@ async function stopSound(entry, fadeOut = 0) {
 
 // ---------- the package, REDbridge, REDagent ----------
 
-const INSTALLED = { codeware: '1.20.3', archivexl: '1.26.8', tweakxl: '1.11.4', redbridge: '0.10.0', red4ext: '1.30.0', redscript: '0.5.30' };
+const INSTALLED = { codeware: '1.20.3', archivexl: '1.26.8', tweakxl: '1.11.4', redbridge: '0.10.0', redhottools: '1.3.0', red4ext: '1.30.0', redscript: '0.5.30' };
 const atLeast = (have, want) => {
   const a = have.split('.').map(Number);
   const b = want.split('.').map(Number);
@@ -717,6 +717,34 @@ export const kernel = {
     throw new Error('kernel.mcp(): the MCP server runs in the REDnode host, not on this page');
   },
 };
+
+// archives.reload: the checks the host makes, and a swap that changes nothing on this page.
+const MOD_ARCHIVES = ['Plain.archive', 'MyJacket.archive'];
+let swapping = Promise.resolve();
+export const archives = {
+  reload(files) {
+    const run = swapping.then(() => swapArchives(files));
+    swapping = run.catch(() => {});
+    return run;
+  },
+};
+async function swapArchives(files) {
+  const list = typeof files === 'string' ? [files] : files;
+  if (!Array.isArray(list) || !list.length) throw new Error('archives.reload needs a file, or a list of files');
+  if (!(manifest.permissions ?? []).includes('archives')) {
+    throw new Error('This package does not ask for the "archives" permission in its rednode-app.json');
+  }
+  for (const name of list.map(String)) {
+    const bare = !/[\\/]/.test(name);
+    if (!/\.(archive|xl|ya?ml)$/i.test(name)) throw new Error(`${name}: RED Hot Tools swaps .archive, .xl and .yaml files`);
+    if (bare && !MOD_ARCHIVES.includes(name)) throw new Error(`${name} was not found in archive/pc/mod`);
+  }
+  if (sim.mainMenu) throw new Error('Load a save first: REDnode swaps archives only in a loaded game');
+  const ms = 280 + Math.round(Math.random() * 60);
+  await new Promise((resolve) => setTimeout(resolve, ms));
+  log('info', `archives.reload: the docs page pretends to swap ${list.join(', ')}; in the game RED Hot Tools swaps them in. The page's archive/pc/mod holds ${MOD_ARCHIVES.join(' and ')}`, 'sim');
+  return { reloaded: list.map(String), failed: [], via: 'red-hot-tools', ms };
+}
 
 export const pkg = {
   get id() {

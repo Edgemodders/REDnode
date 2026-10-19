@@ -153,6 +153,7 @@ const roots = {
   world: host.world,
   audio: host.audio,
   kernel: host.kernel,
+  archives: host.archives,
   agent: host.agent,
   ui: host.ui,
   pkg: host.pkg,

@@ -397,6 +397,7 @@ Every node has `set(props)`, which updates the open window at once.
 | `kernel.requirements()` | The package's `requires`, checked against the game folder (see [Requirements](#requirements)) | Node mods and apps |
 | `tweakdb` | TweakDB's records and flats, read from the running game (see [TweakDB](#tweakdb)) | Node mods and apps |
 | `kernel.bridge()` | REDbridge, WolvenKit's engine, for the game's archives and files (see [The game's files through REDbridge](#the-games-files-through-redbridge)). Needs `"permissions": ["bridge"]` and the player's OK | Node mods and apps |
+| `archives.reload(files)` | Swaps changed archives into the running game (see [Swapping archives in the running game](#swapping-archives-in-the-running-game)). Needs `"permissions": ["archives"]`, the player's OK and RED Hot Tools | Node mods and apps |
 
 ```js
 import { pkg, secrets, kernel } from 'rednode';
@@ -449,6 +450,30 @@ await bridge.call('archive.extract', { path: found.items[0].name, outFile: 'C:/t
 ```
 
 Parameters go by name, as REDbridge's [method list](https://edgemodders.github.io/REDbridge/) gives them. The [Packaging test](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/packaging-test) sample lists and searches the archives.
+
+## Swapping archives in the running game
+
+A tool that builds assets, such as a material or mesh editor, can show its result in the game without a restart. `archives.reload` swaps an `.archive` into the running game and waits until the swap is done:
+
+```js
+import { archives } from 'rednode';
+
+const r = await archives.reload(['C:/Projects/MyJacket/packed/archive/pc/mod/MyJacket.archive']);
+console.log(`${r.reloaded.length} swapped in ${r.ms} ms`, r.failed);
+```
+
+| Detail | |
+|---|---|
+| Files | A path, absolute or in the package's folder, to an `.archive` or to ArchiveXL's `.xl` or `.yaml`. A name alone, such as `"MyMod.archive"`, is an archive already in `archive/pc/mod`, reloaded as it is |
+| Where it goes | It replaces the mounted archive of the same name, wherever it is, and stays installed. One the game has not mounted is added to `archive/pc/mod` |
+| Needs | [RED Hot Tools](https://github.com/psiberx/cp2077-red-hot-tools), which does the swap: add `"requires": { "redhottools": ">=1.3" }`. And `"permissions": ["archives"]`, which the player allows in the launcher |
+| When | In a loaded save. At the main menu it is refused |
+| One at a time | Calls made during a swap wait their turn |
+| The answer | `{ reloaded, failed, via: "red-hot-tools", ms }`. A file that could not be swapped is in `failed` with the reason. A missing file, a missing permission, the main menu, or RED Hot Tools not loaded throw |
+
+What the game shows after a swap: objects already in the world keep the old asset until they load it again. Respawn them, or apply their appearance again. A broken archive, or a mod whose other parts are missing, can crash the game at the swap even if it loaded at start.
+
+AI agents have the same as the [MCP tool](mcp.md) `archives_reload`.
 
 ## Spaces and the title bar
 

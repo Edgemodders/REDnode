@@ -37,6 +37,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [Polish 0.24.5](#polish-0245) | In the game | Polish | 2026-10-17 | 0.24.7 | Pass |
 | [W3 REDbridge for players](#w3-redbridge-for-players) | In the game | W3 | 2026-10-17 | 0.25.0 | Pass (with the retest) |
 | [H0 and Welcome](#h0-and-welcome) | In the game | #12, Welcome | 2026-10-18 | 0.25.1 | Pass (laptop, with a retest) |
+| [H1 archives.reload](#h1-archivesreload) | In the game | #12 H1 | Not run | 0.26.0 | |
 
 ## Before any in-game test
 
@@ -327,6 +328,16 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 2. Launcher: switch **Welcome** on, it opens; close it with ✕.
 3. In the game, `EDGEmat_M0_probe.archive` copied into `archive/pc/hot`: RED Hot Tools swaps it; play on half a minute.
 4. Quit. RED Hot Tools loaded, `Archives reload completed`, `Welcome: closed`, no crash.
+
+### H1 archives.reload
+
+[Source](world.md#h1-test). Built, **not run yet**. Checked in the mock game with a stand-in RED Hot Tools. Needs RED Hot Tools, and **Hot swap test** switched on and allowed to swap archives in the launcher. `Plain.archive` is any small archive in `archive/pc/mod` known to work, with no `.xl` and no required mods.
+
+1. Load a save, start the timer.
+2. Hot swap test: `Plain.archive`, **Swap**: "1 swapped in N ms"; note any stutter.
+3. `Nope.archive`, **Swap**: not found.
+4. Play on half a minute.
+5. Quit. Host log: `Archives: hot-test swaps Plain.archive` and `1 reloaded`; RED Hot Tools' log: `Archives reload completed.`; `archive/pc/hot` empty; no crash.
 
 ## MCP server
 

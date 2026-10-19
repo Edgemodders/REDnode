@@ -210,6 +210,18 @@ export const NOTES = {
     ],
     preview: 'The preview\'s REDbridge knows a few made-up files.',
   },
+  'hot-test': {
+    group: 'game',
+    summary: 'Swap an archive into the running game, so a changed mesh, material or texture shows without a restart, and read what happened.',
+    teaches: ['archives.reload', '"archives" permission', 'requires', 'kernel.requirements'],
+    how: [
+      'RED Hot Tools does the swap. REDnode copies the file into its hot folder, has it swap the archive in, and answers with what was swapped and what failed.',
+      'Swapping changes files in the game\'s mod folder, so the package asks for the `archives` permission and the player allows it in the launcher.',
+      'Objects already in the world keep the old asset until they load it again: respawn them, or apply their appearance again.',
+    ],
+    tryThis: ['Type Plain.archive and press Swap.', 'Type Nope.archive and press Swap: the host refuses a file it cannot find.'],
+    preview: 'Nothing is swapped on this page: it checks what the host checks and pretends. Its mod folder holds Plain.archive and MyJacket.archive.',
+  },
   vitals: {
     group: 'hud',
     summary: 'A HUD widget with V\'s health, level and money, read through the generic game API from a web page.',

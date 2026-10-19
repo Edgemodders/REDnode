@@ -280,6 +280,7 @@ export const api = path(['api']);
 export const world = path(['world'], { on: (name, fn) => listen('world', name, fn) });
 export const audio = path(['audio']);
 export const kernel = path(['kernel']);
+export const archives = path(['archives']);
 export const pkg = path(['pkg']);
 export const secrets = path(['secrets']);
 export const channel = { post() {}, on: () => () => {} };

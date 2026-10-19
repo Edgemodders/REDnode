@@ -216,7 +216,7 @@ Asked for by EDGEmat and EDGEfab ([#12](https://github.com/Edgemodders/REDnode/i
 | Phase | What |
 |---|---|
 | H0 Try it | RED Hot Tools 1.3.0-rc.2 in the dev game: it loads on 2.31, and an archive copied into `archive/pc/hot` reloads without trouble |
-| H1 `archives.reload` | In the `rednode` package and as an MCP tool: copy the named archives into the hot folder, wait for RED Hot Tools' "reload completed", return `{ reloaded, failed, via }`. `requires` can name RED Hot Tools |
+| H1 `archives.reload` | In the `rednode` package and as an MCP tool: copy the named archives into the hot folder, have RED Hot Tools swap them, return `{ reloaded, failed, via, ms }`. `requires` can name RED Hot Tools |
 | H2 `world.refresh` | Respawn or re-apply the appearance of objects using a reloaded mesh or material, V's clothing included |
 | Fallback | The same swap in REDnode's plugin, if H0 fails or RED Hot Tools stops being kept up |
 
@@ -250,3 +250,33 @@ What it means:
 - The Welcome window works as built: once, then only from the launcher.
 - The first crash is not explained. The swap ran at the main menu, not in a save, with a mod missing its other parts, and the game died minutes later. A swap reloads the swapped archive and all of ArchiveXL's extensions, so H1's docs should warn that a broken mod can crash the game at a swap even if it loaded at start. Unverified which part crashed.
 - On quitting from the main menu the plugin logs `could not read IsPreGame; the main menu is only "no player"` once, as the game tears down: harmless, but it could be quieter.
+
+### H1 `archives.reload`: built
+
+REDnode 0.26.0. Agreed with the user on 2026-10-18 after reading RED Hot Tools' source: drive RED Hot Tools through its script call rather than its folder alone, so the answer says what happened, and add checks and a queue around it. Our own swap in the plugin stays the fallback: it would mean finding the engine's archive and resource internals again after every game patch, which RED Hot Tools' author already does.
+
+| Piece | What it does |
+|---|---|
+| `packages/overlay/main.js` | `reloadArchives`: checks the caller (a package with the `archives` permission granted, or the MCP server), the files (a path, or a name in `archive/pc/mod`; `.archive`, `.xl`, `.yaml`; no two of the same name), the game (connected, not at the main menu) and RED Hot Tools (`RedHotTools.Version()` answers). Copies each file into `archive/pc/hot` under a temporary name and renames it, so RED Hot Tools never sees half a file, then calls `RedHotTools.ReloadArchives()` on the game thread with a 60-second limit. A file still in the hot folder afterwards failed, and is removed so it is not swapped later. If the call fails, it waits up to 10 seconds for RED Hot Tools' folder watcher instead. One swap at a time. Each swap is logged in the host log and the package's Mod log |
+| `packages/rednode/src/archives.ts` | `archives.reload(files)`, for Node mods and pages |
+| `packages/overlay/mcp.js` | The MCP tool `archives_reload` |
+| `apps/hot-test` | Hot swap test 0.1.0: a field for a name or path, **Swap**, and the answer; asks for `archives`, requires `redhottools` |
+
+Checked in the mock game, with a stand-in RED Hot Tools that moves the hot folder's files into the mod folder: refused at the main menu; a name in `archive/pc/mod` and a full path swapped, the second waiting for the first; a missing file, a `.txt` and two files of one name refused; RED Hot Tools missing refused with where to get it; a failing call answered from the folder watcher's swap; the Hot swap test swapped with the permission and was refused without it.
+
+Unverified until the game: that `RedHotTools.ReloadArchives()` works when called on the game thread (RED Hot Tools' own menu calls only `ArchiveXL.Reload()`), and how long it holds the game's frame.
+
+Later, agreed the same day: open the archive with REDbridge before a swap when REDbridge is installed, to refuse a corrupt one; and keep the replaced archive, with `archives.restore()` to put it back after a bad swap.
+
+### H1 test
+
+REDnode 0.26.0 deployed, with RED Hot Tools. In the launcher, switch on **Hot swap test** and allow it to swap archives (the launcher lists its permission). Pick a small archive in `archive/pc/mod` that you know works, with no `.xl` file and no required mods; the steps call it `Plain.archive`.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Step 1 comes before it can be reached.
+1. Start the game and load a save. Switch on the Test timer, press **Start**, and **Mark**.
+2. In Hot swap test's field type `Plain.archive` and press **Swap**. It answers "1 swapped in N ms". Watch for a stutter at the swap. **Mark**.
+3. Type `Nope.archive` and press **Swap**: it answers that the file was not found. **Mark**.
+4. Play on half a minute. **Mark**.
+5. Quit the game.
+
+Then: the host log has `Archives: hot-test swaps Plain.archive (RED Hot Tools ...)` and `1 reloaded in N ms`, RED Hot Tools' log in its plugin folder has `Archives reload completed.`, `archive/pc/hot` is empty, and nothing crashed.
