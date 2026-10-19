@@ -322,7 +322,7 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 
 ### H0 and Welcome
 
-[Source](world.md#h0-and-welcome-test). Last run 2026-10-18, REDnode 0.25.1, on the user's laptop. **Pass**, with a retest of step 3: the first archive picked, a scene mod missing its other parts and swapped at the main menu, was followed by a crash minutes later; a plain archive in a loaded save passed. Load a save before the swap. [Results](world.md#h0-and-welcome-results). On a PC without EDGEmat's probe, copy any plain `.archive` from `archive/pc/mod` (no `.xl`, no required mods).
+[Source](world.md#h0-and-welcome-test). Last run 2026-10-18, REDnode 0.25.1, on the user's laptop. **Pass**, with a retest of step 3: the first archive picked, a scene mod missing its other parts and swapped at the main menu, crashed the game while RED Hot Tools loaded it (its log stops at "Loading updated archives..."); a plain archive in a loaded save passed. Load a save before the swap. [Results](world.md#h0-and-welcome-results). On a PC without EDGEmat's probe, copy any plain `.archive` from `archive/pc/mod` (no `.xl`, no required mods).
 
 1. Start: the Welcome window at the main menu, Showing lit. F10: Using lit. **Got it** closes it. Load a save, start the timer.
 2. Launcher: switch **Welcome** on, it opens; close it with ✕.

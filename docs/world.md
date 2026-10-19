@@ -236,19 +236,20 @@ Then: RED4ext's log should list RedHotTools as loaded, RED Hot Tools' log should
 
 ### H0 and Welcome: results
 
-Run on 2026-10-18 on the user's laptop (the release zip of REDnode 0.25.1 with the Test timer added, RED Hot Tools installed there), not the dev PC: three starts. **Pass**, from what the user saw, the plugin logs of all three starts, the Mod log and the host log (`rednode-overlay.log` holds only the last start). RED Hot Tools' and RED4ext's logs were not read.
+Run on 2026-10-18 on the user's laptop (the release zip of REDnode 0.25.1 with the Test timer added, RED Hot Tools installed there), not the dev PC: three starts. **Pass**, from what the user saw, the plugin logs of all three starts, the Mod log and the host log (`rednode-overlay.log` holds only the last start), and RED Hot Tools' logs of all three starts (sent the next day). RED4ext's log was not read.
 
 | Start | What the logs show |
 |---|---|
-| 21:29, first run | The Welcome window opened at the main menu; F10 to interactive at 21:30:19; a press on it at 21:30:39 (**Got it**). No save was loaded: the main menu stayed on, so the timer's **Mark** 1 (00:02) and 2 (01:05) were made there, and step 2 reopened Welcome from the launcher (a new 600 x 500 window) and closed it. The game left the front at 21:31:52 for the swap of `TraumaTeamCutscenes.archive`, the frame pump ran on at the main menu, and the log ends at 21:36:04 with no "pump stopped": the crash came some time after, with the game not in front. A scene mod whose other parts were no longer installed, the user's own poor first pick |
-| 21:45, retest | Steps renumbered (1 load and Start, 2 swap, 3 quit). A save loaded at 21:46:43; **Mark** 1 at 21:47:36; out of the game from 21:47:37 to 21:48:17 to copy a single archive known to work into `hot` (it left the folder); a minute of play; **Mark** 2 at 21:49:26 and an extra **Mark** 3 at 21:49:29; "Game thread pump stopped" at 21:49:49, a clean quit |
-| 21:52 | The main menu, then a clean quit at 21:53:08. Welcome did not open: the host opened the launcher and the timer only |
+| 21:29, first run | The Welcome window opened at the main menu; F10 to interactive at 21:30:19; a press on it at 21:30:39 (**Got it**). No save was loaded: the main menu stayed on, so the timer's **Mark** 1 (00:02) and 2 (01:05) were made there, and step 2 reopened Welcome from the launcher (a new 600 x 500 window) and closed it. The game left the front at 21:31:52, the frame pump ran on at the main menu, and the plugin log ends at 21:36:04 with no "pump stopped". RED Hot Tools' log shows the swap of `TraumaTeamCutscenes.archive` starting at 21:36:07 and stopping after "Loading updated archives...": no "Resetting resource cache", no "Archives reload completed". The game died while loading that archive. A scene mod whose other parts were no longer installed, the user's own poor first pick |
+| 21:45, retest | Steps renumbered (1 load and Start, 2 swap, 3 quit). A save loaded at 21:46:43; **Mark** 1 at 21:47:36; out of the game from 21:47:37 to 21:48:17 to copy a single archive known to work into `hot` (it left the folder). RED Hot Tools swapped `###_nim_material_override.archive` at 21:47:53, all steps through "Archives reload completed", in 113 ms, on its watcher's thread. A minute of play; **Mark** 2 at 21:49:26 and an extra **Mark** 3 at 21:49:29; "Game thread pump stopped" at 21:49:49, a clean quit. RED Hot Tools' warnings about `box_occluder.w2mesh` came at 21:47:11, before the swap, so the swap did not cause them |
+| 21:52 | The main menu, then a clean quit at 21:53:08. Welcome did not open: the host opened the launcher and the timer only. No swap |
 
 What it means:
 
 - RED Hot Tools 1.3.0-rc.2 swaps an archive in a loaded save on game 2.31, and the game runs on and quits cleanly. H1 (`archives.reload`) can build on it.
 - The Welcome window works as built: once, then only from the launcher.
-- The first crash is not explained. The swap ran at the main menu, not in a save, with a mod missing its other parts, and the game died minutes later. A swap reloads the swapped archive and all of ArchiveXL's extensions, so H1's docs should warn that a broken mod can crash the game at a swap even if it loaded at start. Unverified which part crashed.
+- The first crash came during the swap itself, in RED Hot Tools' step that loads the new archive (its log stops there). The swap ran at the main menu, not in a save, with a mod missing its other parts. Unverified whether the main menu, the broken mod or both made it crash. H1 refuses swaps at the main menu, and its docs warn that a broken mod can crash the game at a swap even if it loaded at start.
+- A good swap took 113 ms in RED Hot Tools. H1 calls it on the game thread, so expect the game to stop for about that long: a short stutter. Unverified until the H1 test.
 - On quitting from the main menu the plugin logs `could not read IsPreGame; the main menu is only "no player"` once, as the game tears down: harmless, but it could be quieter.
 
 ### H1 `archives.reload`: built
