@@ -11,6 +11,8 @@ How to keep it:
 
 ## Unreleased
 
+## 0.26.2 (2026-10-19)
+
 **Changed**
 
 - `archives.reload` and the MCP tool `archives_reload` refuse an archive that changes the game's sound paks (`.opuspak`, `.opusinfo`), since swapping sound into a running game crashes it. Install such an archive and restart the game.
