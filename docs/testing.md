@@ -38,7 +38,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [W3 REDbridge for players](#w3-redbridge-for-players) | In the game | W3 | 2026-10-17 | 0.25.0 | Pass (with the retest) |
 | [H0 and Welcome](#h0-and-welcome) | In the game | #12, Welcome | 2026-10-18 | 0.25.1 | Pass (laptop, with a retest) |
 | [H1 archives.reload](#h1-archivesreload) | In the game | #12 H1 | 2026-10-19 | 0.26.0 | Pass (laptop) |
-| [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | 2026-10-19 | 0.26.1 | **Open**: the arrow blinks in the game with DLSS on (laptop, NVIDIA), not with DLSS off; drawn on every frame, no jumps |
+| [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | 2026-10-19 | 0.26.1 | **Fixed** by an NVIDIA driver update: the arrow blinked in the game with DLSS on (laptop) and not with DLSS off; drawn on every frame, no jumps. Not a REDnode bug |
 
 ## Before any in-game test
 
@@ -342,7 +342,7 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 
 ### Cursor flicker
 
-[Source](overlay.md#cursor-flicker-test). First run 2026-10-19, REDnode 0.26.1, on the laptop: **open**, flicker in the game and not in the pause menu, though the arrow was drawn on every frame without jumps ([results](overlay.md#cursor-flicker-first-run)). For the laptop where the overlay's arrow flickered in the game. Notes typed in the Test timer go out with the next **Mark**.
+[Source](overlay.md#cursor-flicker-test). First run 2026-10-19, REDnode 0.26.1, on the laptop: flicker in the game and not in the pause menu, though the arrow was drawn on every frame without jumps; it came only with DLSS on. **Fixed** the same day by updating the NVIDIA driver; not a REDnode bug ([results](overlay.md#cursor-flicker-first-run)). For the laptop where the overlay's arrow flickered in the game. Notes typed in the Test timer go out with the next **Mark**.
 
 1. Load a save, F10, start the timer; touchpad still 10 s.
 2. Move slowly 10 s.

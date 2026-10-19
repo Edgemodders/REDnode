@@ -821,7 +821,9 @@ Run on 2026-10-19 on the laptop with REDnode 0.26.1. The user's notes: step 1 fl
 
 What it means: the arrow is drawn on every frame at a steady place, so it is not being moved back and forth, and no frame lacks it. In the game, the game puts the Windows cursor back at the centre every frame, which is what the window messages are.
 
-Found with the user afterwards: it is the overlay's yellow arrow that appears and disappears where it was left; the overlay windows do not flicker. The laptop has an NVIDIA GPU and no other overlays. The game ran DLSS Super Resolution with the transformer model and Frame Generation off; **with DLSS off, the arrow no longer flickers.** Not explained: DLSS upscales the game's picture before the plugin draws, and the windows, drawn in the same pass, are not affected. Unverified whether the arrow is lost on the GPU before Present or after it.
+Found with the user afterwards: it is the overlay's yellow arrow that appears and disappears where it was left; the overlay windows do not flicker. The laptop has an NVIDIA GPU and no other overlays. The game ran DLSS Super Resolution on Balanced with the transformer model and Frame Generation off; **with DLSS off, the arrow no longer flickers.** Not explained: DLSS upscales the game's picture before the plugin draws, and the windows, drawn in the same pass, are not affected.
+
+**Fixed by a driver update** (2026-10-19): after the user updated the laptop's NVIDIA driver, the arrow no longer flickers with DLSS on. So the cause was the old driver with DLSS, not REDnode; no change to the plugin. The driver versions before and after were not noted. For players: if the overlay's arrow blinks with DLSS on, update the GPU driver first. The 0.26.1 cursor diagnostics stay in the plugin log for future reports.
 
 ### UI kit
 
