@@ -5,7 +5,7 @@
 <title>Welcome</title>
 <script src="rednode://ui/rednode-ui.js"></script>
 <style>
-  html, body { margin: 0; width: 600px; height: 500px; overflow: hidden; background: transparent; }
+  html, body { margin: 0; width: 600px; height: 560px; overflow: hidden; background: transparent; }
   rn-window { position: absolute; inset: 0; }
   /* The social banner, cropped to its top: the framework line and the REDNODE wordmark. */
   .banner { height: 100px; margin: -2px -2px 4px; background: #08090d url(social.png) no-repeat 0 -34px / 600px auto;
@@ -16,6 +16,7 @@
   .modes .key.now { color: var(--rn-accent); }
   kbd { font: 700 12px var(--rn-mono); padding: 1px 6px; border: 1px solid var(--rn-line); color: var(--rn-fg); }
   .foot { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+  .warn { font-size: 14px; padding: 6px 10px; border-left: 3px solid var(--rn-accent); background: color-mix(in srgb, var(--rn-accent) 10%, transparent); }
   #now { flex: 1; font: 600 13px var(--rn-mono); letter-spacing: .04em; color: var(--rn-accent-2); }
 </style>
 </head>
@@ -29,6 +30,7 @@
       <span class="key" id="k-interactive">Using</span><span>The mouse and keys work in REDnode's windows. <kbd>Esc</kbd>, or a click on empty screen, gives them back to the game.</span>
       <span class="key" id="k-hidden">Hidden</span><span>Nothing of REDnode is drawn.</span>
     </div>
+    <p class="warn"><b>Careful:</b> <kbd>F9</kbd>, right beside <kbd>F10</kbd>, is the game's Quick Load. Pressed by mistake, it loads your last save and you lose what you did since.</p>
     <div class="foot">
       <span id="now">Press F10 to use the mouse here.</span>
       <rn-button id="ok">Got it</rn-button>

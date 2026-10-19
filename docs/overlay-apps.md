@@ -14,6 +14,8 @@ Status: **developer preview.** See the [overlay design](overlay.md) for how it w
 
 In the game, **F10** cycles three modes: passive (your window is drawn, the game gets input), interactive (your window gets input) and hidden. **Esc**, or a click on empty screen, returns input to the game.
 
+> **Careful with F9.** It sits right beside F10 and is the game's Quick Load: pressed by mistake, it loads the last save, and what the player did since is lost. The Welcome window warns players too.
+
 The player decides where your package shows, in the built-in **Mod Manager** (opened from the launcher):
 
 | Pin | What it means |
