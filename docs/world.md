@@ -457,6 +457,49 @@ What it shows:
 
 What it means for H1c-2: the reading is confirmed. Reloading the index is the missing step, and it can be simpler than planned: reload the index, and drop the cached pak entries with no references so the next play opens them from the new archive. Entries still playing (references above 0) wait, or their sounds stop, before the reload.
 
+### H1c-2: the sound index reload (REDnode 0.26.4)
+
+Agreed with the user on 2026-10-19 after H1c-1. More reading of the 2.31 exe first, on who touches the tables:
+
+| Offset (2.31) | What it is |
+|---|---|
+| `0x6E490C` (thunk `0x6E4904`) | The pak tick: takes finished reads, looks up new sounds (`0x279890`), issues reads (`0x6E4B40`), drops references (`0x6E4AAC`). The audio start registers it as a Wwise global callback at the end of each audio frame (location `0x40`). So the pak table and the lookups belong to the **audio thread**, with no lock: a change from the game thread would race them |
+| `0x1ACBCC0` | RegisterGlobalCallback (callback, location bits, cookie, ...): takes a lock, appends to the location's list. Returns 1 on success |
+| `0x1AD1AE0` | UnregisterGlobalCallback (callback, location bits): takes the same lock, unlinks and frees |
+| `0x6E3740` | Not a plain release: the cache's eviction. When more than 10 entries have no references, it drops the one used longest ago. That is the cache of about 24 paks H1c-1 saw |
+| `0xA2D398` | The loader's hash map setup: clears the map and allocates new storage; the old storage is not freed |
+
+The paks the loader opens at start keep one reference forever, and a lookup takes the first entry with the pak's number. So old entries would hide new ones unless they are retired.
+
+Built on 2026-10-19:
+
+| Part | What |
+|---|---|
+| `native/src/overlay/opus.cpp` | At the first reload, finds RegisterGlobalCallback and UnregisterGlobalCallback by the audio start's registration of the pak tick and the shutdown's unregistration (two patterns; both are needed, or nothing is registered), and registers REDnode's callback at location `0x40`: it runs right after the pak tick, on the audio thread, every audio frame, and does nothing unless a reload was asked. The reload: every pak table entry gets pak number `0xFFFE` (no lookup matches it; idle ones are then evicted by the cache as usual, playing ones finish on their old reader); the index count goes to 0; the game's own loader runs again with the same path hash, so it reads the swapped `sfx_container.opusinfo` and opens its start paks. If the loader refuses the file, or anything faults (`__try`), the old index entry, its count and the pak numbers go back. The old index's memory (about 2.5 MB) is not freed. Bridge methods `opus.reload` (ask) and `opus.reloadStatus` (waiting, running, done with the result, or cancel). The callback is unregistered when the plugin stops |
+| `main.js` | `"soundPakSwap": "reload"`: a sound archive is swapped with the game paused (whatever `swapPause` says), then the host asks for the reload and polls until it is done, or cancels it after 3 s. Logged: the state before the swap, after it, the reload's result, the state after the reload and after the unpause |
+| Unit tests | `native/tests/opus_test.cpp`: both patterns, a fake loader that behaves like the game's (the count first, the entry only on success): a reload, a refused index and a fault, each putting everything back; with `REDNODE_GAME_EXE`, the real exe gives `+0x1acbcc0`, `+0x1ad1ae0` and the loader `+0x279ed4` |
+
+Checked in the mock game: the swap with a reload (and with `swapPause` off, the pause still runs), and an audio thread that never runs it (cancelled after 3 s, then the unpause). Unverified until the game: everything that runs on the audio thread.
+
+Known risks: anything else that reads the index outside the audio thread (none found, but `0x1D80A40` calls the lookup through a vtable, unverified from where); a sound played between the swap and the reload (a frame or two, paused) can still read the new pak at an old offset.
+
+### H1c-2 test
+
+REDnode 0.26.4 on the laptop, with RED Hot Tools and Hot swap test (**Allowed** on), `EDGEwaveTest.archive` **not** installed. In `%APPDATA%\@rednode\overlay\settings.json`, while the game is closed, set `"soundPakSwap": "reload"`; `swapPause` can stay or go (the reload pauses anyway). The katana sound's id is 746693166.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Step 1 comes before it can be reached.
+1. Start the game and load a save with the katana in V's inventory, not drawn. Switch on the Test timer, **Start**, **Mark**.
+2. In Hot swap test, type `746693166` in the sound ids box and press **Sound state**. **Mark**.
+3. Draw the katana and put it away: the base game's sound. **Mark**.
+4. Swap `EDGEwaveTest.archive` (paste its path, **Swap**). The game pauses for a moment. The Mod log shows "sound index reloaded in N ms: ... sounds before, ... after; N pak entries retired", or why it failed. **Mark**.
+5. Draw the katana. Note in the timer which sound played: EDGEwave's (the goal), the base game's, or none. **Mark**.
+6. Press **Sound state** again. **Mark**.
+7. Play for a minute: walk, draw other weapons, shoot, open a menu. Note any sound that is missing or wrong. **Mark**.
+8. Swap `EDGEwaveTest.archive` again (a second reload), then draw the katana and note what played. **Mark**.
+9. Quit the game. Send `rednode-mods.log`, the plugin log (`rednode-*.log` of this session), `rednode-overlay.log` and `rednode-faults.log`.
+
+Afterwards set `"soundPakSwap"` back (remove it) and remove `swapPause`.
+
 ### H1 quoted path: retest
 
 Run on 2026-10-19 on the laptop with REDnode 0.26.1 (after its NVIDIA driver update). **Pass.** The path came from File Explorer's **Copy as path**, with its double quotes.

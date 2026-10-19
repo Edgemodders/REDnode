@@ -40,6 +40,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H1 archives.reload](#h1-archivesreload) | In the game | #12 H1 | 2026-10-19 | 0.26.1 | Pass (laptop), with a quoted path |
 | [H1b sound pak check](#h1b-sound-pak-check) | In the game | #12 H1b | 2026-10-19 | 0.26.2 | Refusal **pass** (laptop). Spike: crash with sound let through, no fault caught; no crash with the game paused, but the sound did not change |
 | [H1c-1 sound state](#h1c-1-sound-state) | In the game | #12 H1c-1 | 2026-10-19 | 0.26.3 | Pass (laptop): the reading holds; the index is never re-read, so the swapped sound played silent |
+| [H1c-2 sound index reload](#h1c-2-sound-index-reload) | In the game | #12 H1c-2 | Not run | 0.26.4 | Built; awaiting its first run (laptop). Also the Welcome window's F9 note |
 | [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | 2026-10-19 | 0.26.1 | **Fixed** by an NVIDIA driver update: the arrow blinked in the game with DLSS on (laptop) and not with DLSS off; drawn on every frame, no jumps. Not a REDnode bug |
 
 ## Before any in-game test
@@ -361,6 +362,20 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 4. Swap the sound archive: three state lines (before, after, after the unpause); no crash.
 5. Draw the katana; note what played; Sound state.
 6. Quit. Plugin log: `Opus: found the sound pak tables`; send the mods, plugin, host and fault logs.
+
+### H1c-2 sound index reload
+
+[Source](world.md#h1c-2-test). Built 2026-10-19 in REDnode 0.26.4: with `"soundPakSwap": "reload"`, a sound archive is swapped with the game paused and the plugin loads the game's sound index again on the audio thread. Needs RED Hot Tools, Hot swap test with **Allowed** on, `EDGEwaveTest.archive` (not installed) and its sound id (746693166), the setting removed afterwards. Not run yet. The same build has the Welcome window's F9 note: switch Welcome on in the Mod Manager to see it.
+
+1. Load a save with the katana not drawn; timer.
+2. Sound state with the sound id.
+3. Draw the katana: the base sound.
+4. Swap the sound archive: "sound index reloaded ..." in the Mod log; no crash.
+5. Draw the katana: EDGEwave's sound is the goal; note what played.
+6. Sound state.
+7. Play a minute; note missing or wrong sounds.
+8. Swap again, draw the katana.
+9. Quit. Plugin log: `Opus: REDnode's callback runs at the end of each audio frame`, `Opus: reloaded the sound index`, and at exit `Opus: REDnode's audio callback unregistered`; send the mods, plugin, host and fault logs.
 
 ### Cursor flicker
 
