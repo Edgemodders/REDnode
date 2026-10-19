@@ -15,6 +15,12 @@
 //             through the depot if no entry has it (pak table: 0x70 bytes each at
 //             0x3A38CC0, used count at 0x3495DFC, at most 2048)
 //   0x3493B58 the index's resource path hash, set by a static initializer
+//   0x3B49050 loaded sounds: 16 bytes each (sound id, references, data object), used
+//             count at 0x3497E38, at most 2048. The pak tick acquires a sound here
+//             (0x6E3D94: an entry with its id gets one more reference, else a new data
+//             object is filled by the lookup) and releases it (0x113A51C: at no
+//             references the object goes and the id is set to 0). Nothing else touches
+//             it, so a sound still held keeps the data of the index it was loaded from
 //
 // This file finds those places by byte patterns in the running game's code (so another
 // game version either matches or reports what it missed) and reads them; only the reload
@@ -56,9 +62,12 @@
 #include <atomic>
 #include <cstdio>
 #include <cstring>
+#include <unordered_map>
 
 namespace rednode::overlay::detail
 {
+std::vector<std::pair<uint32_t, uint32_t>> HeldSounds(const OpusPlaces& aPlaces);
+
 namespace
 {
 constexpr size_t IndexStride = 0x60;
@@ -79,6 +88,9 @@ constexpr const char* PakCountPattern = "0F B7 15 ?? ?? ?? ?? 48 8D 0D ?? ?? ?? 
 constexpr size_t PakCountToTable = 0x38; // lea rax,[pak table]
 // The audio start passes the index's path hash: mov rcx,[hash]; call loader.
 constexpr const char* HashCallPattern = "48 8B 0D ?? ?? ?? ?? E8 ?? ?? ?? ??";
+// The acquire of a loaded sound: movzx edx,[count]; lea r14,[table]; xor esi,esi; mov edi,ecx.
+constexpr const char* LoadedPattern = "0F B7 15 ?? ?? ?? ?? 4C 8D 35 ?? ?? ?? ?? 33 F6 8B F9";
+constexpr size_t LoadedStride = 0x10;
 // The audio start registers the pak tick: lea rcx,[tick thunk]; lea edx,[r9+40h]; call register.
 constexpr const char* RegisterPattern = "48 8D 0D ?? ?? ?? ?? 41 8D 51 40 E8 ?? ?? ?? ??";
 constexpr const char* RegisterStart = "40 53 55 41 56 41 57"; // push rbx, rbp, r14, r15
@@ -459,6 +471,71 @@ std::string Ask(const json::Value& aParams, bool aPark, std::string& aError)
     return "{\"asked\":\"reload\"}";
 }
 
+// The rows of an index by sound id.
+bool IndexRows(const uint8_t* aEntry, std::unordered_map<uint32_t, uint32_t>& aOut)
+{
+    const Index x = ReadIndex(aEntry);
+    if (!x.arrays[0] || x.sounds > MaxSounds)
+        return false;
+    std::vector<uint32_t> ids(x.sounds);
+    if (!Copy(ids.data(), x.arrays[0], ids.size() * 4))
+        return false;
+    aOut.reserve(ids.size());
+    for (uint32_t i = 0; i < x.sounds; i++)
+        aOut.emplace(ids[i], i);
+    return true;
+}
+
+// Where a row of an index points: pak, offset, size.
+bool RowData(const uint8_t* aEntry, uint32_t aRow, uint64_t& aOut)
+{
+    const Index x = ReadIndex(aEntry);
+    uint16_t pak = 0;
+    uint32_t size = 0, offset = 0;
+    if (!Copy(&pak, x.arrays[1] + aRow * 2, 2) || !Copy(&size, x.arrays[4] + aRow * 4, 4) ||
+        !Copy(&offset, x.arrays[5] + aRow * 4, 4))
+        return false;
+    aOut = (static_cast<uint64_t>(pak) << 48) ^ (static_cast<uint64_t>(size) << 24) ^ offset;
+    return true;
+}
+
+// After a reload: the held sounds whose pak, offset or size differ between the old index
+// (still in memory, as it is never freed) and the new one. They keep their old data until
+// the game releases them.
+std::string HeldChanged(const OpusPlaces& aPlaces)
+{
+    if (!aPlaces.loadedTable)
+        return "{\"held\":null}";
+    uint8_t now[IndexStride];
+    std::unordered_map<uint32_t, uint32_t> oldRows, newRows;
+    if (!Copy(now, aPlaces.indexTable, IndexStride) || !IndexRows(g_oldEntry, oldRows) || !IndexRows(now, newRows))
+        return "{\"held\":null}";
+    const auto held = HeldSounds(aPlaces);
+    std::string ids;
+    uint32_t changed = 0;
+    for (const auto& [id, refs] : held)
+    {
+        const auto o = oldRows.find(id);
+        const auto n = newRows.find(id);
+        uint64_t before = 0, after = 0;
+        const bool differs = (o == oldRows.end()) != (n == newRows.end()) ||
+                             (o != oldRows.end() && n != newRows.end() && RowData(g_oldEntry, o->second, before) &&
+                              RowData(now, n->second, after) && before != after);
+        if (!differs)
+            continue;
+        if (changed < 16)
+            ids += (changed ? "," : "") + std::to_string(id);
+        changed++;
+    }
+    if (changed)
+        Log("Opus: %u of %zu held sounds keep their old data until the game lets them go (ids %s%s)", changed,
+            held.size(), ids.c_str(), changed > 16 ? ", ..." : "");
+    else
+        Log("Opus: none of the %zu held sounds changed with the reload", held.size());
+    return "{\"held\":" + std::to_string(held.size()) + ",\"changed\":" + std::to_string(changed) + ",\"ids\":[" +
+           ids + "]}";
+}
+
 std::string StepName(int aStep)
 {
     switch (aStep)
@@ -503,6 +580,7 @@ std::string Status(const json::Value& aParams)
     }
     }
     const OpusOutcome o = OpusTakeOutcome();
+    const std::string stale = o.reload.loaded ? HeldChanged(g_places) : std::string("{\"held\":null}");
     char took[32];
     std::snprintf(took, sizeof(took), "%.1f", o.ms);
     if (o.reload.loaded)
@@ -517,7 +595,8 @@ std::string Status(const json::Value& aParams)
            ",\"restored\":" + (o.reload.restored ? "true" : "false") + ",\"retired\":" +
            std::to_string(o.reload.retired) + ",\"soundsBefore\":" + std::to_string(o.reload.soundsBefore) +
            ",\"soundsAfter\":" + std::to_string(o.reload.soundsAfter) + ",\"ms\":" + took +
-           ",\"parkedMs\":" + std::to_string(o.parkedMs) + ",\"why\":" + JsonString(o.reload.why) + "}";
+           ",\"parkedMs\":" + std::to_string(o.parkedMs) + ",\"why\":" + JsonString(o.reload.why) +
+           ",\"stale\":" + stale + "}";
 }
 } // namespace
 
@@ -759,7 +838,34 @@ bool LocateOpus(const std::vector<CodeRange>& aCode, OpusPlaces& aOut, std::stri
     aOut.pakTable = RipTarget(pakTable, 3, 7);
     aOut.infoHash = hash;
     aOut.loader = const_cast<uint8_t*>(loader);
+    // Optional: without it the state just does not say which sounds are held.
+    std::string ignored;
+    if (const uint8_t* loaded = FindOne(aCode, LoadedPattern, "the loaded sounds", ignored))
+    {
+        aOut.loadedCount = reinterpret_cast<uint16_t*>(RipTarget(loaded, 3, 7));
+        aOut.loadedTable = RipTarget(loaded + 7, 3, 7);
+    }
     return true;
+}
+
+// The loaded sounds still referenced: id -> references. Empty if the table is unknown.
+std::vector<std::pair<uint32_t, uint32_t>> HeldSounds(const OpusPlaces& aPlaces)
+{
+    std::vector<std::pair<uint32_t, uint32_t>> held;
+    uint16_t count = 0;
+    if (!aPlaces.loadedTable || !Copy(&count, aPlaces.loadedCount, 2) || count > MaxPaks)
+        return held;
+    std::vector<uint8_t> raw(static_cast<size_t>(count) * LoadedStride);
+    if (!Copy(raw.data(), aPlaces.loadedTable, raw.size()))
+        return held;
+    for (uint16_t i = 0; i < count; i++)
+    {
+        const auto id = At<uint32_t>(raw.data(), i * LoadedStride);
+        const auto refs = At<uint32_t>(raw.data(), i * LoadedStride + 4);
+        if (id && refs)
+            held.emplace_back(id, refs);
+    }
+    return held;
 }
 
 // opus.state {"sounds": [id, ...]}: the index, the open paks, and the rows of the given sound ids.
@@ -841,7 +947,19 @@ std::string OpusState(const OpusPlaces& aPlaces, const json::Value& aParams, std
     }
     summary += "; " + std::to_string(open) + " paks open" + (open ? ": " + pakLine : "");
 
-    out += "],\"sounds\":[";
+    const auto held = HeldSounds(aPlaces);
+    if (aPlaces.loadedTable)
+        summary += "; " + std::to_string(held.size()) + " sounds held";
+    const auto heldRefs = [&](uint32_t aId) -> int64_t {
+        for (const auto& [id, refs] : held)
+        {
+            if (id == aId)
+                return refs;
+        }
+        return 0;
+    };
+    out += "],\"held\":" + (aPlaces.loadedTable ? std::to_string(held.size()) : std::string("null"));
+    out += ",\"sounds\":[";
     if (const auto* sounds = aParams.Get("sounds"); sounds && sounds->kind == json::Value::Kind::Array)
     {
         bool first = true;
@@ -868,12 +986,17 @@ std::string OpusState(const OpusPlaces& aPlaces, const json::Value& aParams, std
                 Copy(&header, x.arrays[3] + row * 2, 2);
                 Copy(&size, x.arrays[4] + row * 4, 4);
                 Copy(&offset, x.arrays[5] + row * 4, 4);
+                const int64_t refs = heldRefs(id);
                 entry = "{\"id\":" + std::to_string(id) + ",\"found\":true,\"index\":" + std::to_string(i) +
                         ",\"row\":" + std::to_string(row) + ",\"pak\":" + std::to_string(pak) +
                         ",\"offset\":" + std::to_string(offset) + ",\"size\":" + std::to_string(size) +
-                        ",\"headerSize\":" + std::to_string(header) + ",\"x10\":" + std::to_string(x10) + "}";
+                        ",\"headerSize\":" + std::to_string(header) + ",\"x10\":" + std::to_string(x10) +
+                        ",\"held\":" + (aPlaces.loadedTable ? std::to_string(refs) : std::string("null")) + "}";
                 summary += "; sound " + std::to_string(id) + " in pak " + std::to_string(pak) + " at " +
                            std::to_string(offset);
+                if (aPlaces.loadedTable)
+                    summary += refs ? ", held (" + std::to_string(refs) + (refs == 1 ? " reference)" : " references)")
+                                    : ", not held";
                 break;
             }
             out += (first ? "" : ",") + entry;

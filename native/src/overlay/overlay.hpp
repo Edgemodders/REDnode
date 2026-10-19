@@ -199,6 +199,8 @@ struct OpusPlaces
     uint8_t* pakTable = nullptr;    // open paks, 0x70 bytes each
     uint64_t* infoHash = nullptr;   // the resource path hash the game loads its index from
     uint8_t* loader = nullptr;      // the index loader: bool (uint64_t path hash)
+    uint16_t* loadedCount = nullptr; // loaded sounds: entries used so far (null if not found)
+    uint8_t* loadedTable = nullptr;  // their entries, 16 bytes each: id, references, data object
 };
 struct CodeRange
 {

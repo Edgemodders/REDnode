@@ -73,10 +73,27 @@ export interface SoundState {
     /** The game's reader for the file, as hex: a new one means the pak was opened again. */
     reader: string;
   }[];
-  /** The sound ids asked for, and where the index puts each. */
+  /**
+   * How many sounds the game holds loaded (in memory, with references), or null when
+   * REDnode does not know this game version's table of them. A held sound keeps the data
+   * it was loaded with until the game lets it go, even after the index is read again.
+   */
+  held: number | null;
+  /** The sound ids asked for, where the index puts each, and how many references hold it loaded (0: not loaded). */
   sounds: (
     | { id: number; found: false }
-    | { id: number; found: true; index: number; row: number; pak: number; offset: number; size: number; headerSize: number; x10: number }
+    | {
+        id: number;
+        found: true;
+        index: number;
+        row: number;
+        pak: number;
+        offset: number;
+        size: number;
+        headerSize: number;
+        x10: number;
+        held: number | null;
+      }
   )[];
 }
 

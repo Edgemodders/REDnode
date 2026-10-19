@@ -68,6 +68,8 @@ uint64_t* const InfoHash = reinterpret_cast<uint64_t*>(g_mem + 0x1008);
 uint8_t* const IndexTable = g_mem + 0x1100;
 uint8_t* const PakTable = g_mem + 0x1200;
 uint8_t* const Block = g_mem + 0x2000;
+uint16_t* const LoadedCount = reinterpret_cast<uint16_t*>(g_mem + 0x1010);
+uint8_t* const LoadedTable = g_mem + 0x3000;
 
 void Put(size_t aAt, std::initializer_list<int> aBytes)
 {
@@ -92,6 +94,7 @@ constexpr size_t Tick = 0x5A0;
 constexpr size_t Register = 0x5C0;
 constexpr size_t Unregistration = 0x640;
 constexpr size_t Unregister = 0x6C0;
+constexpr size_t Acquire = 0x700;
 
 void BuildCode()
 {
@@ -118,6 +121,9 @@ void BuildCode()
     Rip(Unregistration, 3, 7, Code + Tick);
     Rip(Unregistration + 7, 1, 5, Code + Unregister);
     Put(Unregister, {0x40, 0x55, 0x56, 0x57, 0x48, 0x83, 0xEC, 0x30, 0x48, 0x8B, 0xF9, 0x8B, 0xF2});
+    Put(Acquire, {0x0F, 0xB7, 0x15, 0, 0, 0, 0, 0x4C, 0x8D, 0x35, 0, 0, 0, 0, 0x33, 0xF6, 0x8B, 0xF9});
+    Rip(Acquire, 3, 7, LoadedCount);
+    Rip(Acquire + 7, 3, 7, LoadedTable);
 }
 
 // Three sounds (ids 10, 20, 30 in paks 5, 6, 7) and two entries of the second table, laid
@@ -158,6 +164,13 @@ void BuildTables()
     pak(0, 0, 5, 2, 0x1234);
     pak(1, 0xFFFF, 0, 0, 0); // a free slot
     pak(2, 2, 6, 1, 0x5678);
+
+    // Loaded sounds: 20 held twice, a free slot, 10 held once.
+    *LoadedCount = 3;
+    std::memset(LoadedTable, 0, 0x10 * 3);
+    const uint32_t loaded[][2] = {{20, 2}, {0, 0}, {10, 1}};
+    for (int i = 0; i < 3; i++)
+        std::memcpy(LoadedTable + 0x10 * i, loaded[i], 8);
 }
 
 std::vector<CodeRange> CodeRanges()
@@ -239,13 +252,24 @@ int main()
     Check(Has(state, "\"pak\":5") && Has(state, "\"pak\":6") && !Has(state, "\"slot\":65535"),
           "the open paks are listed and the free slot is not");
     Check(Has(state, "{\"id\":20,\"found\":true,\"index\":0,\"row\":1,\"pak\":6,\"offset\":4096,\"size\":2000,"
-                     "\"headerSize\":41,\"x10\":200}"),
-          "sound 20 is found with its pak, offset and size");
+                     "\"headerSize\":41,\"x10\":200,\"held\":2}"),
+          "sound 20 is found with its pak, offset, size and references");
     Check(Has(state, "{\"id\":99,\"found\":false}"), "an unknown sound is not found");
-    Check(Has(state, "{\"id\":30,\"found\":true"), "an id given as a hex string is read");
+    Check(Has(state, "{\"id\":30,\"found\":true") && Has(state, "\"x10\":300,\"held\":0}"),
+          "an id given as a hex string is read; a sound not loaded is not held");
     Check(Has(summary, "1 index of 3 sounds") && Has(summary, "2 paks open: 5 (2), 6 (1)") &&
-              Has(summary, "sound 20 in pak 6 at 4096"),
+              Has(summary, "2 sounds held") && Has(summary, "sound 20 in pak 6 at 4096, held (2 references)") &&
+              Has(summary, "sound 30 in pak 7 at 8192, not held"),
           "the summary line");
+    Check(places.loadedCount == LoadedCount && places.loadedTable == LoadedTable, "finds the loaded sounds");
+    {
+        OpusPlaces noLoaded = places;
+        noLoaded.loadedTable = nullptr;
+        std::string noSummary;
+        const std::string plain = OpusState(noLoaded, Params(R"({"sounds":[20]})"), error, &noSummary);
+        Check(Has(plain, "\"held\":null") && !Has(noSummary, "held"),
+              "without the loaded sounds the state says nothing of them");
+    }
 
     // The checksum follows the tables.
     const auto before = state.substr(state.find("checksum"), 30);
@@ -420,6 +444,11 @@ int main()
             AudioCallbacks realCallbacks;
             const bool regOk = LocateAudioCallbacks(code, realCallbacks, why);
             Check(regOk, regOk ? "the patterns find the audio callback functions in the game exe" : why.c_str());
+            if (regOk)
+                std::printf("      loaded sounds +0x%llx (count +0x%llx)\n",
+                            static_cast<unsigned long long>(real.loadedTable ? real.loadedTable - image : 0),
+                            static_cast<unsigned long long>(
+                                real.loadedCount ? reinterpret_cast<const uint8_t*>(real.loadedCount) - image : 0));
             if (regOk)
                 std::printf("      callback registration +0x%llx, unregistration +0x%llx, loader +0x%llx\n",
                             static_cast<unsigned long long>(static_cast<const uint8_t*>(realCallbacks.registerFn) - image),

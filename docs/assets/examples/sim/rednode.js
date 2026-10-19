@@ -727,13 +727,13 @@ export const archives = {
     swapping = run.catch(() => {});
     return run;
   },
-  // A made-up index and open paks; sound 123456789 is in pak 42.
+  // A made-up index and open paks; sound 123456789 is in pak 42, held once.
   async soundState(sounds = []) {
     const paks = [0, 3, 42].map((pak, slot) => ({ slot, index: 0, pak, flag: 0, serial: slot, row: -1, refs: 1, reader: `0x${(0x7f001000 + slot * 0x40).toString(16)}` }));
-    const found = sounds.map((id) => (id === 123456789 ? { id, found: true, index: 0, row: 1200, pak: 42, offset: 81920, size: 5400, headerSize: 40, x10: 48000 } : { id, found: false }));
-    const summary = `1 index of 41000 sounds, checksum 0x9e3779b97f4a7c15; ${paks.length} paks open: ${paks.map((p) => `${p.pak} (1)`).join(', ')}${found.filter((s) => s.found).map((s) => `; sound ${s.id} in pak ${s.pak} at ${s.offset}`).join('')}`;
+    const found = sounds.map((id) => (id === 123456789 ? { id, found: true, index: 0, row: 1200, pak: 42, offset: 81920, size: 5400, headerSize: 40, x10: 48000, held: 1 } : { id, found: false }));
+    const summary = `1 index of 41000 sounds, checksum 0x9e3779b97f4a7c15; ${paks.length} paks open: ${paks.map((p) => `${p.pak} (1)`).join(', ')}; 57 sounds held${found.filter((s) => s.found).map((s) => `; sound ${s.id} in pak ${s.pak} at ${s.offset}, held (1 reference)`).join('')}`;
     log('info', 'archives.soundState: the docs page makes up an index; in the game the plugin reads the game\'s own', 'sim');
-    return { infoHash: '0x0', infoPathOk: true, indexes: [{ sounds: 41000, second: 900, bytes: 823600, at: '0x7f000000', checksum: '0x9e3779b97f4a7c15' }], paks, sounds: found, summary };
+    return { infoHash: '0x0', infoPathOk: true, indexes: [{ sounds: 41000, second: 900, bytes: 823600, at: '0x7f000000', checksum: '0x9e3779b97f4a7c15' }], paks, held: 57, sounds: found, summary };
   },
 };
 async function swapArchives(files) {

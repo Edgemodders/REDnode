@@ -1736,6 +1736,13 @@ async function reloadSoundIndex(caller) {
     if (status.state === 'done') {
       if (status.loaded) {
         report('info', `sound index reloaded in ${status.ms} ms (the audio thread waited ${status.parkedMs} ms): ${status.soundsBefore} sounds before, ${status.soundsAfter} after; ${status.retired} pak entries retired`);
+        // Sounds the game holds loaded keep the data they were loaded with until it lets them go.
+        const stale = status.stale;
+        if (stale?.changed) {
+          report('info', `${stale.changed} of ${stale.held} sounds the game holds keep their old data until it lets them go: ${stale.ids.join(', ')}${stale.changed > stale.ids.length ? ', ...' : ''}`);
+        } else if (stale && stale.held !== null) {
+          report('info', `none of the ${stale.held} sounds the game holds changed with the swap`);
+        }
       } else {
         report('error', `sound index reload failed: ${status.why}; ${status.restored ? 'the old index is back' : 'the old index could NOT be put back'}`);
       }
