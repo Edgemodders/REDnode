@@ -304,3 +304,17 @@ What it means:
 - A swap holds the game's frame for about 50 ms, three frames at the laptop's 45 fps. The host's 5-second performance lines show no dip. Unverified whether the user saw a stutter.
 - About 430 ms after each swap, RED Hot Tools' folder watcher fires on its own thread: it sees REDnode's copy into the hot folder, finds no archives left, and reloads ArchiveXL's extensions a second time, which takes under a millisecond. Harmless; it cannot be avoided while the swap goes through the hot folder.
 - RED Hot Tools' `box_occluder.w2mesh` warnings come before and after swaps alike: the game's, not the swap's.
+
+### H1 quoted path: retest
+
+Run on 2026-10-19 on the laptop with REDnode 0.26.1 (after its NVIDIA driver update). **Pass.** The path came from File Explorer's **Copy as path**, with its double quotes.
+
+| Time | What happened |
+|---|---|
+| 09:29:17 | Test timer started, **Mark** 1 (a save loaded at 09:28:31) |
+| 09:29:21 | The quoted path: "1 swapped in 70 ms". The host log names the bare file, `Archives: hot-test swaps ###_nim_material_override.archive`; RED Hot Tools: "Archives reload completed." in 52 ms on the game thread. **Mark** 2 |
+| 09:29:36 | The quoted path with spaces around it: "1 swapped in 75 ms" (RED Hot Tools 56 ms). **Mark** 3 |
+| 09:30:34 | Played on; **Mark** 4 |
+| 09:30:43 | "Game thread pump stopped after 41029 frames": a clean quit |
+
+The Mod log line repeats the path as typed, quotes included; the host and RED Hot Tools see it without them. RED Hot Tools' watcher fired its harmless second reload again, about 430 ms after each swap. The cursor lines from the same run show the arrow drawn on every frame, about 44 fps in the game, with no jumps.

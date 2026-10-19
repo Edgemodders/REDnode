@@ -37,7 +37,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [Polish 0.24.5](#polish-0245) | In the game | Polish | 2026-10-17 | 0.24.7 | Pass |
 | [W3 REDbridge for players](#w3-redbridge-for-players) | In the game | W3 | 2026-10-17 | 0.25.0 | Pass (with the retest) |
 | [H0 and Welcome](#h0-and-welcome) | In the game | #12, Welcome | 2026-10-18 | 0.25.1 | Pass (laptop, with a retest) |
-| [H1 archives.reload](#h1-archivesreload) | In the game | #12 H1 | 2026-10-19 | 0.26.0 | Pass (laptop) |
+| [H1 archives.reload](#h1-archivesreload) | In the game | #12 H1 | 2026-10-19 | 0.26.1 | Pass (laptop), with a quoted path |
 | [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | 2026-10-19 | 0.26.1 | **Fixed** by an NVIDIA driver update: the arrow blinked in the game with DLSS on (laptop) and not with DLSS off; drawn on every frame, no jumps. Not a REDnode bug |
 
 ## Before any in-game test
@@ -332,7 +332,7 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 
 ### H1 archives.reload
 
-[Source](world.md#h1-test). Last run 2026-10-19, REDnode 0.26.0, on the user's laptop. **Pass**: a swap took about 70 ms on the game thread, `Nope.archive` was refused, the permission check refused a swap before **Allowed** was on, and the game quit cleanly. A path pasted in double quotes was refused; fixed after the test, to check in the next build. [Results](world.md#h1-test-results). Needs RED Hot Tools, and **Hot swap test** switched on in the launcher with **Allowed** on beside its "Asks for swapping archives..." line (the permission, not a swap). `Plain.archive` is any small archive in `archive/pc/mod` known to work, with no `.xl` and no required mods.
+[Source](world.md#h1-test). Last run 2026-10-19, REDnode 0.26.0, on the user's laptop. **Pass**: a swap took about 70 ms on the game thread, `Nope.archive` was refused, the permission check refused a swap before **Allowed** was on, and the game quit cleanly. A path pasted in double quotes was refused; fixed after the test. Retest 2026-10-19, REDnode 0.26.1, on the laptop: **pass**, a path from **Copy as path** swapped with its quotes, and with spaces around them (70 and 75 ms). [Results](world.md#h1-test-results), [retest](world.md#h1-quoted-path-retest). To check quotes again: paste a path from **Copy as path** in step 2. Needs RED Hot Tools, and **Hot swap test** switched on in the launcher with **Allowed** on beside its "Asks for swapping archives..." line (the permission, not a swap). `Plain.archive` is any small archive in `archive/pc/mod` known to work, with no `.xl` and no required mods.
 
 1. Load a save, start the timer.
 2. Hot swap test: `Plain.archive`, **Swap**: "1 swapped in N ms"; note any stutter.
