@@ -6,7 +6,7 @@
 //                                Authorization: Bearer <token> (see the launcher)
 //
 // Tools: logs, apps, game_state, perf, gameapi_lookup, window_text, window_image,
-// window_console, game_image, api_call, api_get, tweakdb. See docs/mcp.md.
+// window_console, game_image, api_call, api_get, tweakdb, archives_reload. See docs/mcp.md.
 
 'use strict';
 
@@ -24,8 +24,9 @@ REDnode runs overlay apps (web pages drawn on top of the game) and Node mods (No
 - window_text, window_image: what an overlay window shows. window_console: what its page logged.
 - game_image: the game's screen as the player sees it, with or without the overlay.
 - tweakdb: TweakDB flats and records, read from the running game.
+- archives_reload: swaps changed archives into the running game through RED Hot Tools, for seeing an asset change without a restart.
 - api_call, api_get: live calls into the game. Game objects come back as {"$ref": n, "$type": "..."}; pass {"$ref": n} back as self. Most functions take the game instance first: pass {}. 64-bit numbers are strings. References die when a save loads.
-api_call can change the player's game, such as their money or health: ask before changes the user did not request.
+api_call can change the player's game, such as their money or health, and archives_reload replaces files in the game's mod folder: ask before changes the user did not request.
 Guide: https://edgemodders.github.io/REDnode/overlay-apps.html`;
 
 const text = (t) => ({ content: [{ type: 'text', text: typeof t === 'string' ? t : JSON.stringify(t, null, 2) }] });
@@ -34,7 +35,8 @@ const READ = { readOnlyHint: true, openWorldHint: false };
 
 /**
  * @param {object} host  functions from main.js: log, version, logs, apps, setOpen, restart,
- *                       state, perf, lookup, webContentsOf, consoleOf, captureGame, call
+ *                       state, perf, lookup, webContentsOf, consoleOf, captureGame, call,
+ *                       reloadArchives
  */
 function createMcp(host) {
   let server = null;
@@ -320,6 +322,30 @@ function createMcp(host) {
           }
           const r = await host.call(op === 'get' ? 'tweakdb.get' : 'tweakdb.record', { path });
           return text(r ?? `TweakDB has no ${op === 'get' ? 'flat' : 'record'} "${path}"`);
+        } catch (err) {
+          return fail(err.message);
+        }
+      },
+    );
+
+    mcp.registerTool(
+      'archives_reload',
+      {
+        title: 'Swap archives',
+        description:
+          'Swaps archives into the running game, so a changed mesh, material or texture is used without a restart. ' +
+          'Each file is a full path to an .archive (or an ArchiveXL .xl or .yaml), which replaces the mounted archive ' +
+          'of the same name or is added to archive/pc/mod, or the name of an archive already in archive/pc/mod, ' +
+          'reloaded as it is. Needs RED Hot Tools in the game and a loaded save. Objects already in the world keep ' +
+          'the old asset until they load it again (respawn, or re-apply the appearance). A broken archive can crash the game.',
+        inputSchema: {
+          files: z.array(z.string()).min(1).describe('Full paths, or names of archives in archive/pc/mod'),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+      },
+      async ({ files }) => {
+        try {
+          return text(await host.reloadArchives(files));
         } catch (err) {
           return fail(err.message);
         }

@@ -75,6 +75,7 @@ const PERMISSIONS = {
   bridge: "REDbridge, WolvenKit's engine: reads the game's archives and files, and can write files where the package asks",
   front: "staying above other packages' windows, with REDnode's own tools",
   solo: "hiding every other package's windows while it asks (solo mode)",
+  archives: "swapping archives in the game's mod folder while the game runs (hot-loading, through RED Hot Tools)",
 };
 // What a package may offer other packages in its manifest's "provides".
 const PROVIDES = ['agent'];
@@ -1364,15 +1365,15 @@ function hostPerf() {
 // ---------- the bridge for apps ----------
 
 // Calls a bridge method in the game. Apps and mods both come through here.
-function bridgeCall(method, params) {
+function bridgeCall(method, params, ms = 5000) {
   if (typeof method !== 'string') return Promise.reject(new Error('method must be a string'));
   if (!connected) return Promise.reject(new Error('Not connected to the game'));
   const id = nextRequestId++;
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       pending.delete(id);
-      reject(new Error('The game did not answer within 5 seconds'));
-    }, 5000);
+      reject(new Error(`The game did not answer within ${ms / 1000} seconds`));
+    }, ms);
     pending.set(id, { resolve, reject, timer });
     sendJson({ id, method, params });
   });
@@ -1408,6 +1409,7 @@ async function packageCall(id, method, params) {
   // half-restored value as the original.
   if (id && undoing.has(id)) await undoing.get(id);
   if (typeof method === 'string' && method.startsWith('sound.')) return soundCall(id, method, params);
+  if (method === 'archives.reload') return reloadArchives({ id }, params);
   if (method === 'tweakdb.set' && id && params?.path) {
     const path = String(params.path);
     if (!tweakJournal.has(id)) tweakJournal.set(id, new Map());
@@ -1453,6 +1455,128 @@ function packageRunning(id) {
 
 function checkTweaks() {
   for (const id of [...tweakJournal.keys()]) if (!packageRunning(id)) undoTweaks(id, 'the package stopped');
+}
+
+// ---------- hot-loading archives (#12, H1) ----------
+//
+// A package with the "archives" permission, or an agent through the MCP server, swaps
+// archives in the running game. RED Hot Tools does the swap: the host copies the files
+// into archive/pc/hot and calls RedHotTools.ReloadArchives() on the game thread. That
+// unloads the archives of the same name, moves the new files over them, loads them,
+// drops their cached resources and reloads ArchiveXL's extensions, then returns, so the
+// answer says what happened. RED Hot Tools' own folder watcher may start the same swap
+// first; the two share a lock, and the call returns once both are done. One swap at a time.
+
+const HOT_TYPES = new Set(['.archive', '.xl', '.yaml', '.yml']);
+const HOT_TIMEOUT = 60000;
+const HOT_LOG = 'its log in red4ext/plugins/RedHotTools';
+let hotQueue = Promise.resolve();
+
+function reloadArchives(caller, params) {
+  const run = hotQueue.then(() => swapArchives(caller, params));
+  hotQueue = run.catch(() => {});
+  return run;
+}
+
+// A name alone is an archive already in archive/pc/mod, reloaded as it is; a path is
+// absolute, or in the package's folder.
+function hotFiles(entry, files) {
+  const list = typeof files === 'string' ? [files] : files;
+  if (!Array.isArray(list) || !list.length) throw new Error('archives.reload needs a file, or a list of files');
+  if (!GAME_DIR) throw new Error('REDnode does not know the game folder');
+  const modDir = path.join(GAME_DIR, 'archive', 'pc', 'mod');
+  const seen = new Set();
+  return list.map((given) => {
+    const name = String(given);
+    const bare = !/[\\/]/.test(name);
+    let file;
+    if (bare) file = path.join(modDir, name);
+    else if (path.isAbsolute(name)) file = name;
+    else if (entry) file = path.resolve(entry.dir, name);
+    else throw new Error(`${name}: give a full path, or the name of an archive in archive/pc/mod`);
+    if (!HOT_TYPES.has(path.extname(file).toLowerCase())) throw new Error(`${name}: RED Hot Tools swaps .archive, .xl and .yaml files`);
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`${name} was not found${bare ? ' in archive/pc/mod' : ''}`);
+    const base = path.basename(file).toLowerCase();
+    if (seen.has(base)) throw new Error(`Two files are named ${path.basename(file)}: the game knows an archive by its name`);
+    seen.add(base);
+    return { given: name, file, name: path.basename(file) };
+  });
+}
+
+async function swapArchives(caller, params) {
+  const entry = caller.id ? apps.get(caller.id) : null;
+  if (!caller.mcp) {
+    if (!entry) throw new Error('Only a package can swap archives');
+    if (!isGranted(caller.id, 'archives')) {
+      throw new Error(
+        entry.manifest.permissions.includes('archives')
+          ? `Allow "${entry.manifest.name}" to swap archives in the REDnode launcher first`
+          : 'This package does not ask for the "archives" permission in its rednode-app.json',
+      );
+    }
+  }
+  const who = caller.mcp ? 'an agent (MCP)' : caller.id;
+  const files = hotFiles(entry, params?.files);
+  if (!connected) throw new Error('Not connected to the game');
+  if (uiState.mainMenu) throw new Error('Load a save first: REDnode swaps archives only in a loaded game');
+  let version;
+  try {
+    version = await bridgeCall('rtti.call', { class: 'RedHotTools', fn: 'Version', args: [] });
+  } catch (err) {
+    throw new Error(
+      'RED Hot Tools is not loaded in the game, and it does the swap: install it from ' +
+        `https://github.com/psiberx/cp2077-red-hot-tools/releases and restart the game (${err.message})`,
+    );
+  }
+
+  const hotDir = path.join(GAME_DIR, 'archive', 'pc', 'hot');
+  fs.mkdirSync(hotDir, { recursive: true });
+  // Copied under another name first, so RED Hot Tools never sees half a file.
+  for (const f of files) {
+    const into = path.join(hotDir, f.name);
+    const part = `${into}.rednode-part`;
+    fs.copyFileSync(f.file, part);
+    fs.renameSync(part, into);
+  }
+  const names = files.map((f) => f.name).join(', ');
+  log(`Archives: ${who} swaps ${names} (RED Hot Tools ${version})`);
+  const started = Date.now();
+  let error = null;
+  try {
+    await bridgeCall('rtti.call', { class: 'RedHotTools', fn: 'ReloadArchives', args: [] }, HOT_TIMEOUT);
+  } catch (err) {
+    // RED Hot Tools' folder watcher swaps the files on its own within a second: wait for it.
+    error = err.message;
+    log(`Archives: RedHotTools.ReloadArchives failed (${error}); waiting for its folder watcher`);
+    const waitUntil = Date.now() + 10000;
+    while (Date.now() < waitUntil && files.some((f) => fs.existsSync(path.join(hotDir, f.name)))) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
+  const ms = Date.now() - started;
+  const reloaded = [];
+  const failed = [];
+  for (const f of files) {
+    const left = path.join(hotDir, f.name);
+    if (!fs.existsSync(left)) {
+      reloaded.push(f.given);
+      continue;
+    }
+    // Left behind: removed, so RED Hot Tools does not swap it later on its own.
+    try {
+      fs.rmSync(left);
+    } catch {
+      // best effort
+    }
+    failed.push({ file: f.given, why: error ?? `RED Hot Tools did not take it; see ${HOT_LOG}` });
+  }
+  const summary = `${reloaded.length} reloaded${failed.length ? `, ${failed.length} failed` : ''} in ${ms} ms`;
+  log(`Archives: ${summary}${error ? ` (${error})` : ''}`);
+  if (caller.id) {
+    const why = failed.length ? `: ${failed[0].why}` : '';
+    mods?.log(caller.id, failed.length ? 'error' : 'info', `Archives: ${names}: ${summary}${why}`);
+  }
+  return { reloaded, failed, via: 'red-hot-tools', ms };
 }
 
 // ---------- sound per package (Sound API, S1) ----------
@@ -2370,6 +2494,7 @@ function mcpHost() {
     },
     consoleOf: (id) => windowOfApp(id)?.console ?? null,
     call: bridgeCall,
+    reloadArchives: (files) => reloadArchives({ mcp: true }, { files }),
   };
 }
 

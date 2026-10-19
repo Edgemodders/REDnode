@@ -453,6 +453,10 @@ function createMods(host) {
     stopAll() {
       for (const p of [...processes.values()]) stopProcess(p);
     },
+    /** A line in the Mod log for a package, from the host. */
+    log(id, level, text) {
+      modLog(id, level, text);
+    },
   };
 }
 
