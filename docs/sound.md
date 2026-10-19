@@ -63,6 +63,26 @@ From Audioware's documentation (D) and what a modder needs (N). "Match" is to ha
 | **S3 Effects and voices** | Reverb, EQ presets, voice lines with subtitles | Later |
 | **S4 Game events** | Hearing, muting and replacing the game's own sound events, with Tier 1 | Later |
 
+## EDGEwave and the Sound API
+
+[EDGEwave](https://github.com/Edgemodders/EDGEwave) is EDGE's sound editor in VS Code: a modder edits, mixes and adds effects to a sound, then puts it into the game through REDmod or an archive. Agreed with the user on 2026-10-18: the two are halves of one job, not rivals.
+
+| | EDGEwave | REDnode's Sound API |
+|---|---|---|
+| When | Before the game starts: the result is packed, and REDmod or the archive puts it in place | While the game runs: a package's code decides what plays, when and where |
+| Result | Fixed: an event always sounds the new way | Conditional: only in this quest, near this object, while V is on a call |
+
+Where the phases meet:
+
+| REDnode | EDGEwave | Together |
+|---|---|---|
+| S1 Play, S2 Space | A6 plays game events and a package's sounds in the running game through REDnode | EDGEwave uses REDnode |
+| S3 effects | A2 Mix's effect chains (high-pass, low-pass, EQ, distortion, compressor, reverb) and presets (Radio, Holocall, PA speaker, Muffled through a wall), rendered into the WAV in Web Audio (`src/audio/mix.ts`) | S3 applies the same chains live. **Decided:** S3's `effects` setting takes EDGEwave's effect objects as they are (`{ type: "lowpass", hz, q }`, `{ type: "reverb", seconds, mix }` and so on), and the presets keep EDGEwave's names and values, so a chain copied from EDGEwave works in `audio.play`. miniaudio has filters and EQ but no reverb, distortion or compressor, so those are REDnode's own; whether they sound like Web Audio's is unverified |
+| S3 voice lines | No route: voice lines are `.wem` files, which need Wwise. EDGEwave's research list names "REDnode's Sound API" as a way around it | EDGEwave edits the line; a REDnode package plays it as WAV or OGG with subtitles |
+| S4 game events | A3's REDmod routes replace an event (dropping its Wwise logic) or silence it (`mod_skip`), for the whole game | S4 does it live and per package, with Tier 1 hooks on the game's audio calls |
+
+**Requested of EDGEwave** ([EDGEwave #2](https://github.com/Edgemodders/EDGEwave/issues/2)): a fifth Into the Game route, **As a REDnode sound**, writing the render into a REDnode package's folder with a `sounds` entry in its manifest. S1 already plays it; nothing to pack.
+
 ## Research before S1
 
 | Question | How to find out |
