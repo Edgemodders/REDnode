@@ -321,10 +321,10 @@ Checked in the docs simulation (Hot swap: a swap, a missing file, a quoted path,
 
 On the laptop. This test uses the released REDnode 0.26.15 and the pack's test zip, the way a player would put them in, so it also checks the release.
 
-Before: with the game closed, delete `red4ext/plugins/REDnode` from the game folder (the test apps from earlier builds go with it; settings and grants stay in `%APPDATA%\@rednode\overlay`). Extract `REDnode-0.26.15.zip` from the GitHub release into the game folder, then `REDnode-Sound-Tools-0.1.0-draft.zip`.
+Before: with the game closed, delete `red4ext/plugins/REDnode` from the game folder (the test apps from earlier builds go with it; settings and grants stay in `%APPDATA%\@rednode\overlay`). Extract `REDnode-0.26.15.zip` from the GitHub release into the game folder, then `REDnode-Sound-Tools-0.1.0-draft.zip`. The Test timer is not in the release zip (it is a test tool, not a sample), so also extract its own zip, `REDnode-Test-timer-0.2.0.zip`, built from `packages/overlay/apps/timer`.
 
 0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
-1. Start the game; the plugin log's first line says "REDnode 0.26.15 loading". Load a save. In the Mod Manager: **Sound Tracer**, **Sound Search** and **Hot swap** are listed, off, with nothing missing; the Hot swap test is gone. **Mark**.
+1. Start the game. The plugin log, the file `red4ext/logs/rednode-<date>.log` (not the Mod log app), starts with "REDnode 0.26.15 loading". Load a save. In the Mod Manager: **Sound Tracer**, **Sound Search** and **Hot swap** are listed, off, with nothing missing; the Hot swap test is gone. **Mark**.
 2. Switch on **Hot swap** and allow it to change archives. Its top line says it is ready. Swap an archive you have (a plain one, then a sound one such as EDGEwaveTest.archive): the answer says it was swapped, and for the sound one, that the sound index was loaded again. **Mark**.
 3. Press **↻** on the first swap in **Recent**: it swaps again. **Mark**.
 4. Switch on **Sound Tracer** and **Sound Search**: a short trace plays a Played row; a search for `katana` plays a recording. **Mark**.
