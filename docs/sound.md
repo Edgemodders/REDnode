@@ -274,6 +274,30 @@ Seen in the logs, for later:
 | The **Live log mod** (left on from the last test) cost the game thread 2 to 6 ms every 2 s | Its `game.player.position` call. The bridge's `player.position` looks up `GetPlayer` and `GetWorldPosition` by name on every call; caching them is a likely fix (unverified) |
 | The first **Start trace** of a session: the 266 ms pattern search on the game thread again | As in the SP2 retest; move it off the game thread |
 
+### SP3 Sound Search: built (REDnode 0.26.15)
+
+| Part | What |
+|---|---|
+| The move | The Sound Tracer and the Hot swap test now live in `packs/sound-tools/apps/`, outside REDnode's build (`overlay:package` and the player zip no longer take them). The docs' example pages read `packs/*/apps` too |
+| Host | `sound.search`: a catalogue of every event in the game's sound index (20,569, with their recordings) and every event REDbridge's list names (17,586 with tags; 3,110 of them have no recordings in the index), 23,679 in all. All the words typed must appear in the name or its tags; a number finds an event by id, or the events that play that sound id. Names-first ranking; rebuilt when the index changes or the names arrive. Under 10 ms a search on the dev PC |
+| `rednode` package | `audio.searchSounds(query, { limit })`, experimental |
+| `packs/sound-tools/apps/sound-search` | Sound Search 0.1.0 (900 x 640, closed at start, no permissions): **Search** and **Scratch** tabs. A result shows the event's name, id, tags and how many recordings; ▸ lists the recordings, each with ▶, Stop, ☆ and Copy; the event has ▶ (its recordings in turn), **G** (posted through the game), Stop, ☆ and Copy. A search by sound id opens the events with that recording marked. ☆ saves an event or a recording to **Scratch**, kept in the window's local storage: checked to survive a host restart. Copy all and Clear on Scratch; Stop all for the window |
+
+Checked in the mock game against the dev PC's real index and REDbridge (dev and packaged host: `katana` 45 events, `fs concrete walk` 10, 746693166 → `w_melee_katana_equip`, the event the katana sound belongs to) and in the docs simulation (search, open, play, save, Scratch after a reload, no window scroll). Not yet in the game.
+
+### SP3 test (REDnode 0.26.15)
+
+The update zip holds REDnode 0.26.15 and the pack's apps (Sound Tracer, Sound Search, Hot swap test). The plugin log's first line says "REDnode 0.26.15 loading". REDbridge installed for names.
+
+0. Switch on **Test timer**, press **Start**, and press **Mark** after each step.
+1. Load a save. In the Mod Manager switch on **Sound Search**. **Mark**.
+2. Type `katana`. The line under the box first says names are loading, then lists the katana events. Open `w_melee_katana_equip` with **▸** and play its recordings one by one with their **▶**. **Mark**.
+3. Type `fs concrete walk`: the concrete footstep sets. Press **▶** on one a few times: a different step each press. **Mark**.
+4. Type `746693166`: `w_melee_katana_equip` opens with that recording marked. **Mark**.
+5. Press **☆** on an event and on one recording. Open the **Scratch** tab: both are there; play them. **Mark**.
+6. Quit the game, start it again, load a save and open Sound Search: the **Scratch** tab still has both. Press **✕** on one. **Mark**.
+7. Quit the game. Send `rednode-mods.log`, the plugin log and `rednode-overlay.log`.
+
 **Requested of EDGEwave** ([EDGEwave #2](https://github.com/Edgemodders/EDGEwave/issues/2)): a fifth Into the Game route, **As a REDnode sound**, writing the render into a REDnode package's folder with a `sounds` entry in its manifest. S1 already plays it; nothing to pack.
 
 ## Research before S1

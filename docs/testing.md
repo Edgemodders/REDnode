@@ -45,6 +45,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H1d sound swaps](#h1d-sound-swaps) | In the game | #12 H1d | 2026-10-19 | 0.26.8 | **Pass** (laptop): two sound swaps with the defaults, the old index freed each time (3270 KB), no faults; EDGEwave's katana sound played; no missing sounds or stutter; the Welcome window's F9 note shows ([results](world.md#h1d-test-results)) |
 | [SP1 sound spike](#sp1-sound-spike) | In the game | Sound Tools SP1, #14 | 2026-10-20 | 0.26.9 | **Pass** (laptop): the hooks attached at runtime, no cost seen, none dropped; an event and a raw sound played ([results](sound.md#sp1-test-results)) |
 | [SP2 Sound Tracer](#sp2-sound-tracer) | In the game | Sound Tools SP2, #14 | 2026-10-20 | 0.26.14 | **Pass** (laptop): the 0.26.13 retest passed but for Play on Played rows; 0.26.14 plays an event's own recordings, passed ([results](sound.md#sp2b-test-results)) |
+| [SP3 Sound Search](#sp3-sound-search) | In the game | Sound Tools SP3 | Not run | 0.26.15 | Built; checked in the mock game and the docs simulation, awaiting its first run (laptop) |
 | [UI builder list](#ui-builder-list) | In the game | `ui.list` | 2026-10-20 | 0.26.13 | **Pass** (laptop): the list scrolls, the window does not, follow and Clear work |
 | [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | 2026-10-19 | 0.26.1 | **Fixed** by an NVIDIA driver update: the arrow blinked in the game with DLSS on (laptop) and not with DLSS off; drawn on every frame, no jumps. Not a REDnode bug |
 
@@ -441,6 +442,18 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 6. Copy a Loaded row, paste it in the bottom box, Enter: the same sound plays.
 7. Play an ambience row, then close the Tracer with its ✕: the trace and the ambience stop.
 8. Quit; send `rednode-sound-trace.log` and the usual logs.
+
+### SP3 Sound Search
+
+[Source](sound.md#sp3-test-rednode-02615). Built 2026-10-20 in REDnode 0.26.15: Sound Search in the Sound Tools pack (`packs/sound-tools/apps/sound-search`), `audio.searchSounds`, and the Tracer and Hot swap test moved into the pack. Not run yet.
+
+1. Load a save; switch on Sound Search; timer.
+2. `katana`: names load, then the katana events; open `w_melee_katana_equip`, play its recordings.
+3. `fs concrete walk`: ▶ a few times, a different step each press.
+4. `746693166`: `w_melee_katana_equip` opens with it marked.
+5. ☆ an event and a recording; the Scratch tab has both, and plays them.
+6. Restart the game: Scratch still has both; ✕ one.
+7. Quit; send the logs.
 
 ### UI builder list
 
