@@ -5,8 +5,11 @@
 //   node tools/release/notes.mjs [version] --nexus    plain lines for Nexus's changelog field
 //   --out <file>                                      writes the notes to a file (UTF-8)
 //
+// The GitHub notes end with a line for each app pack in packs/, whose zip the release workflow
+// attaches beside REDnode's (tools/release/pack-zip.mjs).
+//
 // The version defaults to VERSION.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -49,8 +52,24 @@ if (nexus) {
   write(result.join('\n'));
 } else {
   write(`${section.join('\n').trim()}
-
+${packNotes()}
 **Install:** extract into the game folder, or add the zip to Vortex or EDGEdeck. Needs RED4ext and redscript. Packages that read the game's archives also need REDbridge: press **Get REDbridge** in the Mod Manager. Docs: https://edgemodders.github.io/REDnode/ (changelog: https://edgemodders.github.io/REDnode/changelog.html)`);
+}
+
+// One line per app pack: its zip, what it is, the REDnode it needs, its guide and changelog.
+function packNotes() {
+  const dir = root + 'packs/';
+  if (!existsSync(dir)) return '';
+  const lines = readdirSync(dir)
+    .filter((id) => existsSync(`${dir}${id}/pack.json`))
+    .map((id) => {
+      const p = JSON.parse(readFileSync(`${dir}${id}/pack.json`, 'utf8'));
+      const zip = `${p.name.replace(/\s+/g, '-')}-${p.version}.zip`;
+      const needs = p.rednode.replace(/^>=\s*/, '');
+      const guide = p.guide ? ` Guide: ${p.guide}` : '';
+      return `**Also attached: ${p.name} ${p.version}** (\`${zip}\`). ${p.summary ?? ''} Extract it into the game folder after REDnode; it needs REDnode ${needs} or later.${guide} (changelog: https://github.com/Edgemodders/REDnode/blob/main/packs/${id}/changelog.md)`;
+    });
+  return lines.length ? `\n${lines.join('\n\n')}\n` : '';
 }
 
 function write(text) {

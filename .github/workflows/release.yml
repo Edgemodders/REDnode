@@ -1,6 +1,9 @@
 # Builds the REDnode player zip: the plugin, its scripts, the packaged overlay host and the
 # samples, laid out like the game folder (tools/release/player-zip.mjs). The same zip goes to
-# Nexus Mods (uploaded by hand) and to the GitHub release.
+# Nexus Mods (uploaded by hand) and to the GitHub release. Every app pack in packs/ (such as
+# REDnode Sound Tools) is built too and attached to the release as its own file
+# (tools/release/pack-zip.mjs); a pack with changes under Unreleased in its changelog stops
+# the run until its version is raised.
 #
 #   Run workflow (Actions tab)                  builds the zip and keeps it as the run's artifact
 #   Run workflow, "Make a release" ticked       also tags the commit v<VERSION> and makes the
@@ -70,6 +73,9 @@ jobs:
       - name: Build the zip
         run: npm run release:zip
 
+      - name: Build the app packs' zips
+        run: npm run release:pack -- --all
+
       - uses: actions/upload-artifact@v4
         with:
           name: REDnode-zip
@@ -82,4 +88,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $version = (Get-Content VERSION -Raw).Trim()
-          gh release create "v$version" "native/build/release/REDnode-$version.zip" --target $env:GITHUB_SHA --title "REDnode $version" --notes-file "$env:RUNNER_TEMP/notes.md" --generate-notes
+          $packs = Get-ChildItem native/build/release -Filter '*.zip' | Where-Object Name -ne "REDnode-$version.zip" | ForEach-Object FullName
+          gh release create "v$version" "native/build/release/REDnode-$version.zip" @packs --target $env:GITHUB_SHA --title "REDnode $version" --notes-file "$env:RUNNER_TEMP/notes.md" --generate-notes
