@@ -61,7 +61,8 @@
   #social .wave { right: 80px; top: 230px; width: 300px; height: 120px; opacity: .55; gap: 5px; }
   #social .wave i { width: 7px; }
 
-  /* nexus: 1280 x 640, the social layout 55 px lower under the EDGEmodders header */
+  /* nexus: 1280 x 640, the social layout 55 px lower, leaving the top for the EDGEmodders
+     header the owner adds by hand (after REDnode's own nexus.png) */
   #nexus { width: 1280px; height: 640px; }
   #nexus .corner { width: 36px; height: 36px; left: 16px; top: 16px; }
   #nexus .corner.br { left: auto; top: auto; right: 16px; bottom: 16px; }
@@ -77,12 +78,6 @@
   #nexus .row span + span { margin-top: 8px; }
   #nexus .wave { right: 86px; top: 290px; width: 300px; height: 120px; opacity: .55; gap: 5px; }
   #nexus .wave i { width: 7px; }
-  #nexus .band { position: absolute; left: 52px; top: 40px; width: 1108px; height: 96px; background: #000; }
-  #nexus .stripes { position: absolute; left: 0; top: 44px; width: 470px; height: 74px; }
-  #nexus .stripes i { position: absolute; top: 0; width: 6px; height: 74px; transform: skewX(-32deg); transform-origin: bottom left; }
-  #nexus .tagbar { position: absolute; left: 418px; top: 48px; width: 474px; height: 62px; background: var(--yellow);
-    clip-path: polygon(52px 0, 100% 0, calc(100% - 30px) 100%, 0 100%);
-    font: 700 48px/62px var(--display); letter-spacing: .02em; color: #08090d; text-align: center; padding-left: 10px; box-sizing: border-box; }
 
   /* icon: 256 x 256 */
   #icon { width: 256px; height: 256px; clip-path: polygon(0 0, 214px 0, 256px 42px, 256px 256px, 42px 256px, 0 214px); }
@@ -99,17 +94,6 @@
 <script>
   // Which image: ?kind=banner, social, nexus or icon (or the same as the URL's hash).
   const kind = new URLSearchParams(location.search).get('kind') || location.hash.slice(1) || 'banner';
-  // The EDGEmodders header of the Nexus image, after REDnode's own nexus.png: diagonal
-  // stripes from green to yellow, then a slanted yellow tag on a black band.
-  const header = () => {
-    const stripes = [];
-    for (let i = 0; i < 27; i++) {
-      const t = i / 26;
-      const color = `rgb(${Math.round(93 + (252 - 93) * t)}, ${Math.round(255 - (255 - 238) * t)}, ${Math.round(161 - (161 - 10) * t)})`;
-      stripes.push(`<i style="left:${46 + i * 15}px;background:${color};opacity:${(0.35 + 0.65 * t).toFixed(2)}"></i>`);
-    }
-    return `<div class="band"></div><div class="stripes">${stripes.join('')}</div><div class="tagbar">EDGEMODDERS</div>`;
-  };
   const wave = (n, h, seed = 7) => {
     let x = seed;
     const bars = [];
@@ -134,7 +118,7 @@
   const art = {
     banner: `${text('// REDnode app pack · Cyberpunk 2077 PC')}<div class="panel">${rows}</div>${wave(52, 90)}`,
     social: `${text('// REDnode app pack · Cyberpunk 2077 PC')}<div class="panel">${rows}</div>${wave(28, 120, 11)}`,
-    nexus: `${header()}${text('// REDnode app pack · Cyberpunk 2077 PC')}<div class="panel">${rows}</div>${wave(28, 120, 11)}`,
+    nexus: `${text('// REDnode app pack · Cyberpunk 2077 PC')}<div class="panel">${rows}</div>${wave(28, 120, 11)}`,
     icon: `<div class="title">S<b>T</b></div>${wave(13, 34, 3)}`,
   }[kind];
   document.body.innerHTML = `<div id="${kind}" class="art"><div class="corner tl"></div><div class="corner br"></div>${art}</div>`;

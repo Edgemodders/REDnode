@@ -7,7 +7,7 @@ The source of the Sound Tools pack's own Nexus Mods page, beside REDnode's (`nex
 | `description.bbcode` | The page's description, in Nexus's BBCode. Paste the whole file into the description field (the editor's source mode, or switch to BBCode) |
 | `brand/banner.png` | 2560 x 640, at the top of the description (loaded from GitHub) |
 | `brand/social.png` | 1280 x 640, for links shared on social sites |
-| `brand/nexus.png` | 1280 x 640, the page's primary image: the social image under the EDGEmodders header, after REDnode's own Nexus image |
+| `brand/nexus.png` | 1280 x 640, the page's primary image: the social layout moved down 55 px, with the top left empty for the EDGEmodders header, which the owner adds by hand (as on REDnode's own Nexus image). Drawing it again clears the header: add it again after |
 | `brand/icon.png` | 256 x 256 |
 | `brand/source.html` | What the images are drawn from (below) |
 | `README.md` | This page |
