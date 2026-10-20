@@ -96,7 +96,7 @@ How the pack is made and shipped, decided with the user on 2026-10-20:
 | Question | Decision |
 |---|---|
 | Where its source lives | In this repo, in its own folder, `packs/sound-tools/`, outside the REDnode build: `npm run overlay:package` and the player zip do not take it in. The apps move there from `packages/overlay/apps` (Sound Tracer, Hot swap test); Sound Search starts there |
-| How it ships | Its own zip and its own Nexus page, with its own version and changelog section. The zip lays the apps out as `red4ext/plugins/REDnode/apps/<app>/`, so it installs into an existing REDnode (by hand, Vortex or Mod Organizer 2) without touching REDnode's own files |
+| How it ships | Its own zip and its own Nexus page, with its own version and changelog section. The page's source is in `packs/sound-tools/nexus/` (description with screenshot placeholders, brand images drawn from `brand/source.html` by `tools/brand/render.cjs`, the form fields), made on 2026-10-20 at the user's request. The zip lays the apps out as `red4ext/plugins/REDnode/apps/<app>/`, so it installs into an existing REDnode (by hand, Vortex or Mod Organizer 2) without touching REDnode's own files |
 | Requirements on its page | REDnode (the first release with SP2's and SP3's APIs), RED Hot Tools (for Hot swap), REDbridge (optional, for event names) |
 | A too-old REDnode | Each app's manifest asks for `"requires": { "rednode": ">=<version>" }`, so the Mod Manager names the problem. Unverified: whether `requires` finds REDnode's own DLL version; checked in SP4 |
 | Release gate | The same rule as REDnode's: no pack release until its apps' in-game tests have passed and a REDnode release carries the APIs they use |
