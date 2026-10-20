@@ -33,6 +33,13 @@ export interface ReloadResult {
   via: "red-hot-tools";
   /** How long the swap took, in milliseconds. */
   ms: number;
+  /**
+   * Only when an archive with the game's sound paks was swapped: whether the game's sound
+   * index was loaded again (`"reloaded"`: the new sounds play), and what to know about it.
+   * A sound that played just before the swap may keep its old version until the game loads
+   * it again (for a weapon, equip it again).
+   */
+  sound?: { index: "reloaded" | "failed" | "not reloaded"; note: string };
 }
 
 /**
@@ -107,11 +114,16 @@ export const archives = {
    * such as `"MyMod.archive"`, is an archive already in `archive/pc/mod`, reloaded as
    * it is. `.archive` files and ArchiveXL's `.xl` and `.yaml` files are accepted.
    *
+   * An archive that changes the game's sound paks (`.opuspak`, `.opusinfo`, such as
+   * EDGEwave's sound overrides) is swapped with the game paused and its audio held, and
+   * then the game's sound index is loaded again, so the new sounds play; `sound` in the
+   * answer says how it went. A sound that played just before the swap may keep its old
+   * version until the game loads it again (for a weapon, equip it again).
+   *
    * Throws when the package lacks the `archives` permission, at the main menu, when
-   * RED Hot Tools is not loaded, or when a file is missing. Also throws for an archive
-   * that changes the game's sound paks (`.opuspak`, `.opusinfo`): swapping those into a
-   * running game crashes it, so install it and restart instead. A file that could not
-   * be swapped is in `failed`, not thrown.
+   * RED Hot Tools is not loaded, or when a file is missing; also for a sound archive on a
+   * game version whose sound tables REDnode does not know (install it and restart
+   * instead). A file that could not be swapped is in `failed`, not thrown.
    *
    * @example
    * ```ts

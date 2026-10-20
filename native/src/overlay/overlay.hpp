@@ -201,6 +201,7 @@ struct OpusPlaces
     uint8_t* loader = nullptr;      // the index loader: bool (uint64_t path hash)
     uint16_t* loadedCount = nullptr; // loaded sounds: entries used so far (null if not found)
     uint8_t* loadedTable = nullptr;  // their entries, 16 bytes each: id, references, data object
+    uint8_t* gameFree = nullptr;     // the game's free, as the loader calls it: void (uint32_t pool, void*)
 };
 struct CodeRange
 {
@@ -231,9 +232,11 @@ struct OpusReload
     uint32_t retired = 0;
     uint32_t soundsBefore = 0;
     uint32_t soundsAfter = 0;
+    bool freed = false;      // the old index's tables and hash maps went back to the game's allocator
+    uint64_t freedBytes = 0;
     char why[160] = {};
 };
-void OpusReloadNow(const OpusPlaces& aPlaces, OpusReload& aOut);
+void OpusReloadNow(const OpusPlaces& aPlaces, OpusReload& aOut, bool aFreeOld = false);
 // The hand-off between the bridge (game thread) and the audio thread's end of frame.
 enum OpusStep : int
 {
@@ -252,7 +255,7 @@ struct OpusOutcome
     uint64_t parkedMs = 0;
 };
 bool OpusAskPark(uint32_t aCapMs);            // idle -> park asked
-bool OpusAskReload();                         // idle or parked -> reload asked
+bool OpusAskReload(bool aFreeOld = true);     // idle or parked -> reload asked
 bool OpusCancel();                            // a request not yet running, or a wait, ends
 int OpusStepNow();
 void OpusFrameEnd(const OpusPlaces& aPlaces); // the audio thread, at the end of each frame

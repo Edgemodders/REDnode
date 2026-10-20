@@ -14,6 +14,7 @@
 #include <cstring>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace rednode::overlay
 {
@@ -84,6 +85,29 @@ void Rip(size_t aAt, size_t aDisp, size_t aLength, const void* aTarget)
     std::memcpy(Code + aAt + aDisp, &disp, 4);
 }
 
+// The game's free, as the reload calls it: records what it was given.
+struct Freed
+{
+    uint32_t pool;
+    void* memory;
+};
+std::vector<Freed> g_freed;
+void FakeFree(uint32_t aPool, void* aMemory)
+{
+    g_freed.push_back({aPool, aMemory});
+}
+
+// Hash map storage as the game lays it out: a header of 8 bytes (the capacity in the second
+// half), then the slots; the index keeps a pointer just past the header.
+alignas(16) uint8_t g_oldMaps[2][32];
+alignas(16) uint8_t g_newMaps[2][32];
+uint8_t* MakeMap(uint8_t* aBase, uint32_t aCapacity)
+{
+    std::memset(aBase, 0, 32);
+    std::memcpy(aBase + 4, &aCapacity, 4);
+    return aBase + 8;
+}
+
 constexpr size_t Loader = 0x100;
 constexpr size_t Magic = 0x200;
 constexpr size_t Opener = 0x300;
@@ -102,6 +126,9 @@ void BuildCode()
     Put(Loader, {0x48, 0x89, 0x5C, 0x24, 0x08});
     Put(Loader + 0x1C, {0x0F, 0xB7, 0x05, 0, 0, 0, 0, 0xBA, 0x01, 0, 0, 0, 0x66, 0x89, 0x45, 0x6F, 0x66, 0x3B, 0xC2});
     Rip(Loader + 0x1C, 3, 7, IndexCount);
+    // The loader frees the file's buffer: mov rdx,r12; xor ecx,ecx; call free.
+    Put(Loader + 0x40, {0x49, 0x8B, 0xD4, 0x33, 0xC9, 0xE8, 0, 0, 0, 0});
+    Rip(Loader + 0x45, 1, 5, reinterpret_cast<const void*>(&FakeFree));
     Put(Magic, {0x43, 0x81, 0x3C, 0x2C, 0x53, 0x4E, 0x44, 0x20, 0x90, 0x90, 0x48, 0x8D, 0x05, 0, 0, 0, 0});
     Rip(Magic + 10, 3, 7, IndexTable);
     Put(Opener, {0x0F, 0xB7, 0x15, 0, 0, 0, 0, 0x48, 0x8D, 0x0D, 0, 0, 0, 0, 0x41, 0x0F, 0xB7, 0xC6, 0x33, 0xDB});
@@ -152,6 +179,9 @@ void BuildTables()
     std::memcpy(IndexTable, at, sizeof(at));
     std::memcpy(IndexTable + 0x38, &n, 4);
     std::memcpy(IndexTable + 0x3C, &m, 4);
+    uint8_t* maps[2] = {MakeMap(g_oldMaps[0], 2), MakeMap(g_oldMaps[1], 1)};
+    std::memcpy(IndexTable + 0x40, &maps[0], 8);
+    std::memcpy(IndexTable + 0x50, &maps[1], 8);
 
     std::memset(PakTable, 0, 0x70 * 3);
     auto pak = [](int i, uint16_t slot, uint16_t number, uint32_t refs, uint64_t reader) {
@@ -198,6 +228,9 @@ bool FakeLoader(uint64_t aHash)
     std::memcpy(IndexTable, at, sizeof(at));
     std::memcpy(IndexTable + 0x38, &n, 4);
     std::memcpy(IndexTable + 0x3C, &m, 4);
+    uint8_t* maps[2] = {MakeMap(g_newMaps[0], 4), MakeMap(g_newMaps[1], 1)};
+    std::memcpy(IndexTable + 0x40, &maps[0], 8);
+    std::memcpy(IndexTable + 0x50, &maps[1], 8);
     uint8_t* e = PakTable + 0x70 * (*PakCount);
     const uint16_t slot = *PakCount, pak = 9;
     std::memcpy(e, &slot, 2);
@@ -242,6 +275,7 @@ int main()
               places.pakTable == PakTable && places.infoHash == InfoHash,
           "each place is the one its pattern points at");
     Check(places.loader == Code + Loader, "the loader is the function the count check is in");
+    Check(places.gameFree == reinterpret_cast<const uint8_t*>(&FakeFree), "the game's free is the one the loader calls");
 
     std::string error, summary;
     const std::string state = OpusState(places, Params(R"({"sounds":[20, 99, "0x1e"]})"), error, &summary);
@@ -362,7 +396,35 @@ int main()
           "a refused index puts the old index and pak numbers back");
     g_loaderAccepts = true;
 
+    // Freeing the old index (H1d): its two hash maps (from their headers), then its tables.
+    BuildTables();
+    g_freed.clear();
+    OpusReloadNow(places, r, true);
+    Check(r.loaded && r.freed && g_freed.size() == 3 && g_freed[0].pool == 0 && g_freed[0].memory == g_oldMaps[0] &&
+              g_freed[1].memory == g_oldMaps[1] && g_freed[2].memory == Block,
+          "a reload gives the old maps, then the old tables, back to the game's allocator");
+    Check(r.freedBytes == (2 * 8 + 8) + (1 * 8 + 8) + (3 * 20 + 2 * 4), "and says how much it freed");
+    BuildTables();
+    g_freed.clear();
+    OpusReloadNow(places, r, false);
+    Check(r.loaded && !r.freed && g_freed.empty(), "without the free the old index stays");
+    BuildTables();
+    g_freed.clear();
+    g_loaderAccepts = false;
+    OpusReloadNow(places, r, true);
+    Check(!r.loaded && g_freed.empty(), "a refused index frees nothing");
+    g_loaderAccepts = true;
+    {
+        OpusPlaces noFree = places;
+        noFree.gameFree = nullptr;
+        BuildTables();
+        g_freed.clear();
+        OpusReloadNow(noFree, r, true);
+        Check(r.loaded && !r.freed && g_freed.empty(), "without the game's free the old index stays");
+    }
+
     // A fault in the loader: caught, and everything goes back.
+    BuildTables();
     places.loader = reinterpret_cast<uint8_t*>(&FaultLoader);
     OpusReloadNow(places, r);
     Check(!r.loaded && r.restored && Has(r.why, "fault") && *IndexCount == 1 && PakNumber(0) == 5,
@@ -444,6 +506,9 @@ int main()
             AudioCallbacks realCallbacks;
             const bool regOk = LocateAudioCallbacks(code, realCallbacks, why);
             Check(regOk, regOk ? "the patterns find the audio callback functions in the game exe" : why.c_str());
+            if (regOk)
+                std::printf("      free +0x%llx\n",
+                            static_cast<unsigned long long>(real.gameFree ? real.gameFree - image : 0));
             if (regOk)
                 std::printf("      loaded sounds +0x%llx (count +0x%llx)\n",
                             static_cast<unsigned long long>(real.loadedTable ? real.loadedTable - image : 0),

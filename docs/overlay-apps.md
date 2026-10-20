@@ -471,10 +471,10 @@ console.log(`${r.reloaded.length} swapped in ${r.ms} ms`, r.failed);
 | Needs | [RED Hot Tools](https://github.com/psiberx/cp2077-red-hot-tools), which does the swap: add `"requires": { "redhottools": ">=1.3" }`. And `"permissions": ["archives"]`, which the player allows in the launcher |
 | When | In a loaded save. At the main menu it is refused |
 | One at a time | Calls made during a swap wait their turn |
-| Not sound | An archive that changes the game's sound paks (`.opuspak`, `.opusinfo`) is refused: swapping them into a running game crashes it. Install it and restart the game. To hear a sound in the game without a restart, play it with REDnode's own [`audio`](#your-own-sounds) instead |
-| The answer | `{ reloaded, failed, via: "red-hot-tools", ms }`. A file that could not be swapped is in `failed` with the reason. A missing file, a missing permission, the main menu, sound paks, or RED Hot Tools not loaded throw |
+| Sound | An archive that changes the game's sound paks (`.opuspak`, `.opusinfo`, such as EDGEwave's sound overrides) is swapped with the game paused and its audio held for the swap, then REDnode loads the game's sound index again, so the new sounds play. A sound that played just before the swap may keep its old version until the game loads it again (for a weapon, equip it again). On a game version whose sound tables REDnode does not know, such an archive is refused: install it and restart the game |
+| The answer | `{ reloaded, failed, via: "red-hot-tools", ms }`, plus `sound: { index, note }` when sound paks were swapped (`index` is `"reloaded"` when the new sounds play). A file that could not be swapped is in `failed` with the reason. A missing file, a missing permission, the main menu, sound paks on an unknown game version, or RED Hot Tools not loaded throw |
 
-`archives.soundState(soundIds?)` reads the game's sound pak index and the paks it has open, without changing them, and where the index puts the sound ids given. It is an experimental diagnostic for the research into swapping sound ([H1c](world.md#h1c-how-the-game-loads-its-sound-paks-research)); its shape may change.
+`archives.soundState(soundIds?)` reads the game's sound pak index and the paks it has open, without changing them, and where the index puts the sound ids given. It also says how many sounds the game holds loaded. It is a diagnostic from the research into swapping sound ([H1c](world.md#h1c-how-the-game-loads-its-sound-paks-research)); its shape may change.
 
 What the game shows after a swap: objects already in the world keep the old asset until they load it again. Respawn them, or apply their appearance again. A broken archive, or a mod whose other parts are missing, can crash the game at the swap even if it loaded at start.
 

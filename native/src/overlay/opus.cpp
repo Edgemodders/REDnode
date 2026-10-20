@@ -54,7 +54,10 @@
 // the callback holds it at the end of a frame, after the pak tick, until the host asks
 // for the reload (which it then runs) or cancels, or a cap (3 s by default) runs out.
 //
-// The old index's tables and hash maps are not freed (about 2.5 MB per reload).
+// H1d: after a reload the old index's tables and its two hash maps go back to the game's
+// allocator, through the free the loader itself calls (pool 0); a hash map's storage starts
+// 8 bytes before its pointer. Freed on the audio thread, right after the new index is in:
+// the lookups copy values out of the index, so nothing keeps a pointer into the old one.
 
 #include "jvalue.hpp"
 #include "overlay.hpp"
@@ -62,7 +65,6 @@
 #include <atomic>
 #include <cstdio>
 #include <cstring>
-#include <unordered_map>
 
 namespace rednode::overlay::detail
 {
@@ -91,6 +93,9 @@ constexpr const char* HashCallPattern = "48 8B 0D ?? ?? ?? ?? E8 ?? ?? ?? ??";
 // The acquire of a loaded sound: movzx edx,[count]; lea r14,[table]; xor esi,esi; mov edi,ecx.
 constexpr const char* LoadedPattern = "0F B7 15 ?? ?? ?? ?? 4C 8D 35 ?? ?? ?? ?? 33 F6 8B F9";
 constexpr size_t LoadedStride = 0x10;
+// In the loader, after the file is read: mov rdx,r12; xor ecx,ecx; call free (the file's buffer).
+constexpr const char* FreeCallPattern = "49 8B D4 33 C9 E8 ?? ?? ?? ??";
+constexpr size_t LoaderSearch = 0x300;
 // The audio start registers the pak tick: lea rcx,[tick thunk]; lea edx,[r9+40h]; call register.
 constexpr const char* RegisterPattern = "48 8D 0D ?? ?? ?? ?? 41 8D 51 40 E8 ?? ?? ?? ??";
 constexpr const char* RegisterStart = "40 53 55 41 56 41 57"; // push rbx, rbp, r14, r15
@@ -285,6 +290,38 @@ DWORD ReloadGuarded(const OpusPlaces* aPlaces, uint16_t aPaks, OpusReload* aOut)
     }
 }
 
+using FreeFn = void (*)(uint32_t aPool, void* aMemory);
+
+// Gives the old index's tables and hash maps back to the game: the maps first, then the
+// block of tables. 0, or the code of a fault.
+DWORD FreeGuarded(const OpusPlaces* aPlaces, const uint8_t* aEntry, uint64_t* aBytes)
+{
+    __try
+    {
+        const auto gameFree = reinterpret_cast<FreeFn>(aPlaces->gameFree);
+        for (size_t at : {size_t{0x40}, size_t{0x50}})
+        {
+            uint8_t* map = *reinterpret_cast<uint8_t* const*>(aEntry + at);
+            if (!map)
+                continue;
+            *aBytes += static_cast<uint64_t>(*reinterpret_cast<const uint32_t*>(map - 4)) * 8 + 8;
+            gameFree(0, map - 8);
+        }
+        uint8_t* block = *reinterpret_cast<uint8_t* const*>(aEntry);
+        if (block)
+        {
+            *aBytes += static_cast<uint64_t>(*reinterpret_cast<const uint32_t*>(aEntry + 0x38)) * 20 +
+                       static_cast<uint64_t>(*reinterpret_cast<const uint32_t*>(aEntry + 0x3C)) * 4;
+            gameFree(0, block);
+        }
+        return 0;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        return GetExceptionCode();
+    }
+}
+
 // Puts the old index entry, its count and the pak numbers back.
 bool Restore(const OpusPlaces* aPlaces, uint16_t aPaks)
 {
@@ -373,6 +410,7 @@ std::atomic<int> g_step{OpusIdle};
 std::atomic<uint32_t> g_parkCap{0};
 std::atomic<bool> g_expired{false};
 std::atomic<uint64_t> g_parkedFor{0};
+std::atomic<bool> g_freeOld{true};
 OpusReload g_result;
 double g_tookMs = 0;
 uint64_t g_askedAt = 0;
@@ -460,7 +498,9 @@ std::string Ask(const json::Value& aParams, bool aPark, std::string& aError)
         return "{\"asked\":\"park\"}";
     }
     const bool parked = OpusStepNow() == OpusParked;
-    if (!OpusAskReload())
+    const auto* freeParam = aParams.Get("free");
+    const bool freeOld = !(freeParam && freeParam->kind == json::Value::Kind::Bool && !freeParam->boolean);
+    if (!OpusAskReload(freeOld))
     {
         aError = "A reload of the sound index is already waiting for the audio thread";
         return {};
@@ -469,71 +509,6 @@ std::string Ask(const json::Value& aParams, bool aPark, std::string& aError)
         g_askedAt = GetTickCount64();
     Log("Opus: reload of the sound index asked%s", parked ? " (the audio thread is waiting)" : "");
     return "{\"asked\":\"reload\"}";
-}
-
-// The rows of an index by sound id.
-bool IndexRows(const uint8_t* aEntry, std::unordered_map<uint32_t, uint32_t>& aOut)
-{
-    const Index x = ReadIndex(aEntry);
-    if (!x.arrays[0] || x.sounds > MaxSounds)
-        return false;
-    std::vector<uint32_t> ids(x.sounds);
-    if (!Copy(ids.data(), x.arrays[0], ids.size() * 4))
-        return false;
-    aOut.reserve(ids.size());
-    for (uint32_t i = 0; i < x.sounds; i++)
-        aOut.emplace(ids[i], i);
-    return true;
-}
-
-// Where a row of an index points: pak, offset, size.
-bool RowData(const uint8_t* aEntry, uint32_t aRow, uint64_t& aOut)
-{
-    const Index x = ReadIndex(aEntry);
-    uint16_t pak = 0;
-    uint32_t size = 0, offset = 0;
-    if (!Copy(&pak, x.arrays[1] + aRow * 2, 2) || !Copy(&size, x.arrays[4] + aRow * 4, 4) ||
-        !Copy(&offset, x.arrays[5] + aRow * 4, 4))
-        return false;
-    aOut = (static_cast<uint64_t>(pak) << 48) ^ (static_cast<uint64_t>(size) << 24) ^ offset;
-    return true;
-}
-
-// After a reload: the held sounds whose pak, offset or size differ between the old index
-// (still in memory, as it is never freed) and the new one. They keep their old data until
-// the game releases them.
-std::string HeldChanged(const OpusPlaces& aPlaces)
-{
-    if (!aPlaces.loadedTable)
-        return "{\"held\":null}";
-    uint8_t now[IndexStride];
-    std::unordered_map<uint32_t, uint32_t> oldRows, newRows;
-    if (!Copy(now, aPlaces.indexTable, IndexStride) || !IndexRows(g_oldEntry, oldRows) || !IndexRows(now, newRows))
-        return "{\"held\":null}";
-    const auto held = HeldSounds(aPlaces);
-    std::string ids;
-    uint32_t changed = 0;
-    for (const auto& [id, refs] : held)
-    {
-        const auto o = oldRows.find(id);
-        const auto n = newRows.find(id);
-        uint64_t before = 0, after = 0;
-        const bool differs = (o == oldRows.end()) != (n == newRows.end()) ||
-                             (o != oldRows.end() && n != newRows.end() && RowData(g_oldEntry, o->second, before) &&
-                              RowData(now, n->second, after) && before != after);
-        if (!differs)
-            continue;
-        if (changed < 16)
-            ids += (changed ? "," : "") + std::to_string(id);
-        changed++;
-    }
-    if (changed)
-        Log("Opus: %u of %zu held sounds keep their old data until the game lets them go (ids %s%s)", changed,
-            held.size(), ids.c_str(), changed > 16 ? ", ..." : "");
-    else
-        Log("Opus: none of the %zu held sounds changed with the reload", held.size());
-    return "{\"held\":" + std::to_string(held.size()) + ",\"changed\":" + std::to_string(changed) + ",\"ids\":[" +
-           ids + "]}";
 }
 
 std::string StepName(int aStep)
@@ -580,14 +555,15 @@ std::string Status(const json::Value& aParams)
     }
     }
     const OpusOutcome o = OpusTakeOutcome();
-    const std::string stale = o.reload.loaded ? HeldChanged(g_places) : std::string("{\"held\":null}");
     char took[32];
     std::snprintf(took, sizeof(took), "%.1f", o.ms);
     if (o.reload.loaded)
         Log("Opus: reloaded the sound index on the audio thread in %s ms (%llu ms after asking; the audio thread "
-            "waited %llu ms): %u sounds before, %u after; %u pak entries retired",
+            "waited %llu ms): %u sounds before, %u after; %u pak entries retired; %s",
             took, waited, static_cast<unsigned long long>(o.parkedMs), o.reload.soundsBefore, o.reload.soundsAfter,
-            o.reload.retired);
+            o.reload.retired,
+            o.reload.freed ? ("the old index freed (" + std::to_string(o.reload.freedBytes / 1024) + " KB)").c_str()
+                           : (o.reload.why[0] ? o.reload.why : "the old index kept in memory"));
     else
         Log("Opus: the sound index reload failed: %s; %s", o.reload.why,
             o.reload.restored ? "the old index is back" : "the old index could NOT be put back");
@@ -595,8 +571,8 @@ std::string Status(const json::Value& aParams)
            ",\"restored\":" + (o.reload.restored ? "true" : "false") + ",\"retired\":" +
            std::to_string(o.reload.retired) + ",\"soundsBefore\":" + std::to_string(o.reload.soundsBefore) +
            ",\"soundsAfter\":" + std::to_string(o.reload.soundsAfter) + ",\"ms\":" + took +
-           ",\"parkedMs\":" + std::to_string(o.parkedMs) + ",\"why\":" + JsonString(o.reload.why) +
-           ",\"stale\":" + stale + "}";
+           ",\"parkedMs\":" + std::to_string(o.parkedMs) + ",\"freed\":" + (o.reload.freed ? "true" : "false") +
+           ",\"freedBytes\":" + std::to_string(o.reload.freedBytes) + ",\"why\":" + JsonString(o.reload.why) + "}";
 }
 } // namespace
 
@@ -612,8 +588,9 @@ bool OpusAskPark(uint32_t aCapMs)
     return g_step.compare_exchange_strong(idle, OpusParkAsked);
 }
 
-bool OpusAskReload()
+bool OpusAskReload(bool aFreeOld)
 {
+    g_freeOld.store(aFreeOld);
     int step = g_step.load();
     if (step == OpusDone && g_step.compare_exchange_strong(step, OpusIdle))
         step = OpusIdle;
@@ -664,7 +641,7 @@ void OpusFrameEnd(const OpusPlaces& aPlaces)
     {
         LARGE_INTEGER begin, done, freq;
         QueryPerformanceCounter(&begin);
-        OpusReloadNow(aPlaces, g_result);
+        OpusReloadNow(aPlaces, g_result, g_freeOld.load());
         QueryPerformanceCounter(&done);
         QueryPerformanceFrequency(&freq);
         g_tookMs = static_cast<double>(done.QuadPart - begin.QuadPart) * 1000.0 / static_cast<double>(freq.QuadPart);
@@ -740,7 +717,7 @@ void StopOpus()
     Log("Opus: REDnode's audio callback unregistered (%d)", rc);
 }
 
-void OpusReloadNow(const OpusPlaces& aPlaces, OpusReload& aOut)
+void OpusReloadNow(const OpusPlaces& aPlaces, OpusReload& aOut, bool aFreeOld)
 {
     aOut = OpusReload{};
     uint16_t indexes = 0, paks = 0;
@@ -767,6 +744,14 @@ void OpusReloadNow(const OpusPlaces& aPlaces, OpusReload& aOut)
         Copy(now, aPlaces.indexTable, IndexStride))
     {
         aOut.soundsAfter = At<uint32_t>(now, 0x38);
+        // The old tables are not used any more: the entry now points at the new ones.
+        if (aFreeOld && aPlaces.gameFree && std::memcmp(g_oldEntry, now, 8) != 0)
+        {
+            const DWORD freeFault = FreeGuarded(&aPlaces, g_oldEntry, &aOut.freedBytes);
+            aOut.freed = !freeFault;
+            if (freeFault)
+                std::snprintf(aOut.why, sizeof(aOut.why), "a fault (0x%08lx) freeing the old index", freeFault);
+        }
         return;
     }
     if (fault)
@@ -838,6 +823,14 @@ bool LocateOpus(const std::vector<CodeRange>& aCode, OpusPlaces& aOut, std::stri
     aOut.pakTable = RipTarget(pakTable, 3, 7);
     aOut.infoHash = hash;
     aOut.loader = const_cast<uint8_t*>(loader);
+    // The free the loader calls, found in its own body: one match there. Optional: without
+    // it a reload leaves the old index in memory.
+    {
+        const std::vector<CodeRange> body{{loader, loader + LoaderSearch}};
+        std::string none;
+        if (const uint8_t* call = FindOne(body, FreeCallPattern, "the loader's free", none))
+            aOut.gameFree = RipTarget(call + 5, 1, 5);
+    }
     // Optional: without it the state just does not say which sounds are held.
     std::string ignored;
     if (const uint8_t* loaded = FindOne(aCode, LoadedPattern, "the loaded sounds", ignored))
@@ -1028,10 +1021,10 @@ std::string Opus(const std::string& aMethod, const json::Value& aParams, std::st
         };
         if (g_found)
             Log("Opus: found the sound pak tables in %llu ms (index count +0x%llx, index +0x%llx, pak count +0x%llx, "
-                "paks +0x%llx, path hash +0x%llx, loader +0x%llx)",
+                "paks +0x%llx, path hash +0x%llx, loader +0x%llx, free %s)",
                 static_cast<unsigned long long>(GetTickCount64() - started), rel(g_places.indexCount),
                 rel(g_places.indexTable), rel(g_places.pakCount), rel(g_places.pakTable), rel(g_places.infoHash),
-                rel(g_places.loader));
+                rel(g_places.loader), g_places.gameFree ? "found" : "not found");
         else
             Log("Opus: the sound pak tables were not found in this game version: %s", g_why.c_str());
     }

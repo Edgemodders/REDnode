@@ -24,7 +24,7 @@ REDnode runs overlay apps (web pages drawn on top of the game) and Node mods (No
 - window_text, window_image: what an overlay window shows. window_console: what its page logged.
 - game_image: the game's screen as the player sees it, with or without the overlay.
 - tweakdb: TweakDB flats and records, read from the running game.
-- archives_reload: swaps changed archives into the running game through RED Hot Tools, for seeing an asset change without a restart. Archives that change the game's sound paks are refused: they need a restart.
+- archives_reload: swaps changed archives into the running game through RED Hot Tools, for seeing an asset change without a restart. Archives that change the game's sound paks are swapped with the game paused and its sound index loaded again; a sound that just played may keep its old version until the game loads it again (for a weapon, equip it again).
 - api_call, api_get: live calls into the game. Game objects come back as {"$ref": n, "$type": "..."}; pass {"$ref": n} back as self. Most functions take the game instance first: pass {}. 64-bit numbers are strings. References die when a save loads.
 api_call can change the player's game, such as their money or health, and archives_reload replaces files in the game's mod folder: ask before changes the user did not request.
 Guide: https://edgemodders.github.io/REDnode/overlay-apps.html`;
@@ -337,7 +337,9 @@ function createMcp(host) {
           'Each file is a full path to an .archive (or an ArchiveXL .xl or .yaml), which replaces the mounted archive ' +
           'of the same name or is added to archive/pc/mod, or the name of an archive already in archive/pc/mod, ' +
           'reloaded as it is. Needs RED Hot Tools in the game and a loaded save. Objects already in the world keep ' +
-          'the old asset until they load it again (respawn, or re-apply the appearance). A broken archive can crash the game.',
+          'the old asset until they load it again (respawn, or re-apply the appearance). An archive with the game\'s sound paks ' +
+          '(.opuspak, .opusinfo) is swapped with the game paused and its sound index loaded again; a sound that just played ' +
+          'may keep its old version until the game loads it again (for a weapon, equip it again). A broken archive can crash the game.',
         inputSchema: {
           files: z.array(z.string()).min(1).describe('Full paths, or names of archives in archive/pc/mod'),
         },
