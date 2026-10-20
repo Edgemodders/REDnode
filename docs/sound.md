@@ -105,6 +105,45 @@ Two kinds of id play differently:
 | **SP3 Sound Search** | Search, play, the Scratch tab | An in-game test |
 | **SP4 The pack** | Hot swap made ready for players; the pack's zip; a **Sound Tools** docs page (install, each app, workflows such as Tracer to Search to an EDGEwave override to a hot swap) with screenshots rendered from the apps, and placeholders for in-game shots until the user takes them; example app pages; a note on #14 | The user's release |
 
+### SP1 spike: what the exe showed
+
+Static reading of the 2.31 exe on 2026-10-19 (the helpers stay in the scratchpad; no game code is committed):
+
+| Question | Answer |
+|---|---|
+| Can REDnode read a sound by id itself? | **Yes.** The 1,879 sound paks sit uncompressed in `archive/pc/content/audio_2_soundbanks.archive`, so a sound is a plain slice of that file: the index gives its pak, offset, RIFF header size and length, and an Ogg Opus stream follows the header. The katana sound (746693166: pak 881, offset 260133, 15,649 bytes) decoded to 1.87 s of mono audio in 67 ms with `opus-decoder` (MIT), with no REDbridge |
+| Where are events posted? | Wwise's `PostEvent` by id at `+0x1ac8e70`: it looks the event up in Wwise's table, queues it and returns a new playing id (0 if Wwise is not running). The game's own wrapper (`+0x1ac8d90`) and Wwise's by-name versions (`+0x1ac9090`, `+0x1ac91c0`) all call it, so one hook sees every post. The by-name versions hash with `GetIDFromString` (`+0x1ac68a0`: lower case, FNV-1 32) |
+| Where are sounds loaded? | The lookup at `+0x279890`, `bool (sound id, entry out)`. Its two callers are the pak tick's acquire (from memory) and the streaming IO hook's open, so one hook sees every load |
+| Names for event ids | WolvenKit's list through REDbridge (`sound.events`, from game 1.6) for the spike. The game keeps its own table too: `audioAudioEventArray` pairs each event's `redId` (a CName) with its `wwiseId`. Reading it from the running game would name every 2.31 event (not researched yet) |
+| Playing an event by name | The plugin's `audio.play` (from P1) already posts an event through `GameAudioSystem.Play` with no entity |
+| `soundState`'s sound fields | They were shifted: what 0.26.8 printed as the offset (179386 for the katana) is the decoded size. The index in memory keeps the file's column order, so 0.26.9 names them `offset`, `headerSize`, `length` and `decodedBytes` |
+
+### SP1 spike: built (REDnode 0.26.9)
+
+| Part | What |
+|---|---|
+| `opus.cpp` | `LocateSoundTrace`: PostEvent and the lookup by their prologues (each unique in 2.31); the lookup must read the index count the opus tables found |
+| `soundtrace.cpp` | The hooks, through RED4ext's hooking (REDnode's first), attached at the first `trace.start` and kept until the plugin stops; they record only while tracing. A detour calls the game's function first, then copies four numbers into a ring under a slim lock. The game thread sends the records about ten times a second as a `sound-trace` event |
+| `game-sounds.js` (host) | A sound by id: the index and pak from the first archive in `archive/pc/mod` that has them (name order, unverified as the game's own order), else the game's own; decoded to WAV in a temp cache |
+| `main.js` (host) | `sound.playGame`, `sound.event`, `sound.trace` for packages; the trace runs while any package traces and stops with the last one |
+| `rednode` package | `audio.playGame(id)`, `audio.event(name)`, `audio.trace(onTrace)`, experimental |
+| `apps/sound-spike` | The test app (not in the player zip): trace with live counts and the latest rows, a summary in the Mod log (most posted events with names, game objects, whether V's entity id is one of them), play an event, play a sound by id |
+| Unit tests | The patterns on fake code, and on the real exe with `REDNODE_GAME_EXE` |
+
+Checked in the mock game, unpackaged and packaged: the trace starts, sends batches and stops with the package; an event posts; the katana sound plays from the game's archive and ends; an unknown id is refused with the index's name. Unverified until the game: attaching the hooks while the game runs (RED4ext suspends the other threads for it, unverified), how many posts and loads a second, whether the ring drops records, what a Wwise game object id is, and how both play paths sound.
+
+### SP1 test
+
+REDnode 0.26.9 on the laptop (the plugin log's first line says "REDnode 0.26.9 loading"). The Sound spike app is in the update and starts closed. REDbridge gives the names: if the app says "No event names", use **Get REDbridge** in the Mod Manager and switch the app off and on.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Step 1 comes before it can be reached.
+1. Load a save. In the Mod Manager switch on **Sound spike** and allow it the **bridge** permission in the launcher. Its first line says how many event names it loaded. Switch on the Test timer, **Start**, **Mark**.
+2. Press **Start trace**. Stand still for 10 seconds, then walk, draw the katana, swing it, put it away, and open and close the inventory, about 30 seconds in all. Watch the counts line; note any stutter. Press **Stop trace**. **Mark**.
+3. **Start trace** again. Shoot a gun near people or drive for about 30 seconds. **Stop trace**. **Mark**.
+4. Type `ui_menu_onpress` in the event box and press **Play event**: a menu click? Then type an event name from the Mod log's "most posted" line and play it: what did you hear? **Mark**.
+5. Type `746693166` in the sound box and press **Play sound**: the katana sound, without the game's effects? **Mark**.
+6. Quit the game. Send `rednode-mods.log`, the plugin log (`rednode-*.log` of this session) and `rednode-overlay.log`.
+
 **Requested of EDGEwave** ([EDGEwave #2](https://github.com/Edgemodders/EDGEwave/issues/2)): a fifth Into the Game route, **As a REDnode sound**, writing the render into a REDnode package's folder with a `sounds` entry in its manifest. S1 already plays it; nothing to pack.
 
 ## Research before S1
