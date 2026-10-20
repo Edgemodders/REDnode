@@ -231,6 +231,11 @@ function onMessage(m) {
         state: () => host.game.onState(send),
         world: () => host.world.on(m.name, send),
         solo: () => host.ui.onSolo(send),
+        trace: () => {
+          let stop = null;
+          host.audio.trace(send).then((s) => (stop = s));
+          return () => stop?.();
+        },
       }[m.kind]?.();
       if (off) offs.set(m.id, off);
       break;

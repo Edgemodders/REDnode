@@ -219,7 +219,8 @@ export const NOTES = {
       'RED Hot Tools does the swap. REDnode copies the file into its hot folder, has it swap the archive in, and answers with what was swapped and what failed.',
       'Swapping changes files in the game\'s mod folder, so the package asks for the `archives` permission and the player allows it in the launcher.',
       'Objects already in the world keep the old asset until they load it again: respawn them, or apply their appearance again.',
-      'Sound state reads the game\'s sound pak index and the paks it has open, without changing them: an experimental diagnostic for the research into swapping sound (archives with sound paks are refused, since they crash a running game).',
+      'An archive with the game\'s sound paks swaps too: the host pauses the game, holds its audio thread, and loads the game\'s sound index again afterwards. A sound that just played may keep its old version until the game loads it again.',
+      'Sound state reads the game\'s sound pak index and the paks it has open, without changing them: an experimental diagnostic from the research into swapping sound.',
     ],
     tryThis: [
       'Type Plain.archive and press Swap.',
@@ -227,6 +228,23 @@ export const NOTES = {
       'Type 123456789 in the sound ids box and press Sound state: the summary says which pak holds it.',
     ],
     preview: 'Nothing is swapped on this page: it checks what the host checks and pretends. Its mod folder holds Plain.archive and MyJacket.archive.',
+  },
+  'sound-spike': {
+    group: 'game',
+    summary: 'Listen to the game\'s sounds as they play, then play one again: an event by name, or a single sound by its id.',
+    teaches: ['audio.trace', 'audio.event', 'audio.playGame', 'kernel.bridge', '"bridge" permission'],
+    how: [
+      'audio.trace hooks the game\'s audio engine: every event the game posts (with its Wwise id and the game object it plays on) and every sound it loads (by sound id) arrive in batches, about ten a second.',
+      'Event ids are hashes of their names. REDbridge\'s sound.events gives the names WolvenKit knows, so the app shows names where it can.',
+      'audio.event posts an event by name through the game, with the game\'s own mix and effects; audio.playGame plays one recording by its sound id through REDnode\'s engine, raw.',
+      'The test app of Sound Tools\' first phase (SP1): Stop trace writes a summary to the Mod log.',
+    ],
+    tryThis: [
+      'Press Start trace and watch the counts, then Stop trace.',
+      'Type ui_menu_onpress and press Play event.',
+      'Type 746693166 and press Play sound; then 1, which is not in the index.',
+    ],
+    preview: 'The sounds on this page are made up and play as a tone: in the game the plugin hooks its audio engine and plays the real recordings.',
   },
   vitals: {
     group: 'hud',

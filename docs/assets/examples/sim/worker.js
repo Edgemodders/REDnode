@@ -289,7 +289,13 @@ export const game = {
 
 export const api = path(['api']);
 export const world = path(['world'], { on: (name, fn) => listen('world', name, fn) });
-export const audio = path(['audio']);
+// audio.trace's callback runs here; the page sends it each batch as an event.
+export const audio = path(['audio'], {
+  async trace(fn) {
+    const off = listen('trace', null, fn);
+    return async () => off();
+  },
+});
 export const kernel = path(['kernel']);
 export const archives = path(['archives']);
 export const pkg = path(['pkg']);

@@ -646,7 +646,45 @@ export const audio = {
   async stopAll(o = {}) {
     await Promise.all([...sounds.values()].map((e) => stopSound(e, o.fadeOut)));
   },
+  // The game's own sounds live in the game's archives: this page plays a tone instead.
+  async playGame(sound) {
+    if (!Number.isInteger(sound) || sound < 0) throw new Error('A sound id is a whole number from 0 to 4294967295');
+    if (!SIM_SOUNDS.has(sound)) throw new Error(`Sound ${sound} is not in the game's sound index (audio_2_soundbanks.archive)`);
+    blip();
+    log('info', `audio.playGame(${sound}): the game's sounds play only in the game; this page plays a tone`, 'sim');
+    const seconds = SIM_SOUNDS.get(sound);
+    const ended = new Promise((r) => setTimeout(() => r({ why: 'ended' }), seconds * 1000));
+    return new Remote('Sound', { async stop() {}, async set() {} }, { persistent: true, fields: { id: nextSound++, ended, seconds } });
+  },
+  async event(name) {
+    blip();
+    log('info', `audio.event("${name}"): game sound events play only in the game; this page plays a tone`, 'sim');
+  },
+  // Made-up batches in the shape the plugin sends: posts of a few named events, and loads.
+  async trace(onTrace) {
+    log('info', 'audio.trace: the docs page makes up the game\'s sounds; in the game the plugin hooks its audio engine', 'sim');
+    const t0 = Date.now();
+    const timer = setInterval(() => {
+      const ms = Date.now() - t0;
+      const posts = [];
+      const loads = [];
+      for (const [name, every] of SIM_EVENTS) {
+        if (Math.random() < every) posts.push({ ms, event: wwiseHash(name), object: Math.random() < 0.5 ? '18446744073709551615' : '7340032', playing: 1000 + Math.floor(ms / 10) });
+      }
+      if (Math.random() < 0.3) loads.push({ ms, sound: [...SIM_SOUNDS.keys()][Math.floor(Math.random() * SIM_SOUNDS.size)], found: true });
+      onTrace({ posts, loads, dropped: 0 });
+    }, 100);
+    return async () => clearInterval(timer);
+  },
 };
+// Wwise's id for a name: FNV-1 32 over the lower-case name.
+function wwiseHash(name) {
+  let h = 2166136261;
+  for (const ch of name.toLowerCase()) h = (Math.imul(h, 16777619) ^ ch.charCodeAt(0)) >>> 0;
+  return h;
+}
+const SIM_EVENTS = [['amb_int_custom_megabuilding_01_ventilation', 0.2], ['w_melee_katana_draw', 0.05], ['v_foley_walk_concrete', 0.6], ['ui_menu_onpress', 0.05], ['dev_vending_machine_can_falls', 0.02]];
+const SIM_SOUNDS = new Map([[746693166, 1.87], [123456789, 0.5], [99887766, 2.4]]);
 async function stopSound(entry, fadeOut = 0) {
   if (!entry.src || entry.done) return;
   entry.stopped = true;
@@ -704,6 +742,10 @@ export const kernel = {
       async call(method, params = {}) {
         if (method === 'bridge.info') return { version: '0.10.0', archives: ARCHIVES.length, files: ARCHIVES.reduce((n, [, f]) => n + f, 0) };
         if (method === 'archive.archives') return ARCHIVES.map(([name, files]) => ({ name, files }));
+        if (method === 'sound.events') {
+          const events = SIM_EVENTS.slice(0, 4).map(([name]) => ({ name, hash: wwiseHash(name), tags: [] }));
+          return { gameVersion: '1.6', count: events.length, events };
+        }
         if (method === 'archive.search') {
           const q = String(params.query ?? '').toLowerCase();
           const items = DEPOT.filter((p) => p.toLowerCase().includes(q)).map((name) => ({ name }));
@@ -730,7 +772,7 @@ export const archives = {
   // A made-up index and open paks; sound 123456789 is in pak 42, held once.
   async soundState(sounds = []) {
     const paks = [0, 3, 42].map((pak, slot) => ({ slot, index: 0, pak, flag: 0, serial: slot, row: -1, refs: 1, reader: `0x${(0x7f001000 + slot * 0x40).toString(16)}` }));
-    const found = sounds.map((id) => (id === 123456789 ? { id, found: true, index: 0, row: 1200, pak: 42, offset: 81920, size: 5400, headerSize: 40, x10: 48000, held: 1 } : { id, found: false }));
+    const found = sounds.map((id) => (id === 123456789 ? { id, found: true, index: 0, row: 1200, pak: 42, offset: 81920, length: 5400, headerSize: 40, decodedBytes: 48000, held: 1 } : { id, found: false }));
     const summary = `1 index of 41000 sounds, checksum 0x9e3779b97f4a7c15; ${paks.length} paks open: ${paks.map((p) => `${p.pak} (1)`).join(', ')}; 57 sounds held${found.filter((s) => s.found).map((s) => `; sound ${s.id} in pak ${s.pak} at ${s.offset}, held (1 reference)`).join('')}`;
     log('info', 'archives.soundState: the docs page makes up an index; in the game the plugin reads the game\'s own', 'sim');
     return { infoHash: '0x0', infoPathOk: true, indexes: [{ sounds: 41000, second: 900, bytes: 823600, at: '0x7f000000', checksum: '0x9e3779b97f4a7c15' }], paks, held: 57, sounds: found, summary };
