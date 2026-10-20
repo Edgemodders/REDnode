@@ -112,7 +112,7 @@ Two kinds of id play differently:
 |---|---|---|
 | **SP1 Spike** | Find where events are posted with their names, and confirm the sound lookup (`0x279890` in 2.31) for loads; check `GameAudioSystem.Play` by name; read one variation's bytes and play them (does the archive keep the paks uncompressed, or does REDbridge extract them) | An in-game check |
 | **SP2 Sound Tracer** (done, 2026-10-20) | The hooks and `audio.trace` came with SP1. SP2 adds event names in the host (REDbridge's list, loaded when a trace starts, so no package needs the bridge permission for them), every post and load written to `rednode-sound-trace.log`, and the app: a window that never scrolls, two scrolling columns of the newest 2,000 rows, filter, pause, clear, copy, **Play** on each row and a paste box. What posted an event and its distance from V wait for a way from a Wwise game object to an entity (SP1 found they differ) | An in-game test |
-| **SP3 Sound Search** | Search, play, the Scratch tab. An event's variations come from the index's event groups (found in SP2b) | An in-game test |
+| **SP3 Sound Search** (done, 2026-10-20) | Search, play, the Scratch tab. An event's variations come from the index's event groups (found in SP2b) | An in-game test |
 | **SP4 The pack** | Hot swap made ready for players; the pack's own zip and Nexus page source; a **Sound Tools** docs page (install, each app, workflows such as Tracer to Search to an EDGEwave override to a hot swap) with screenshots rendered from the apps, and placeholders for in-game shots until the user takes them; example app pages; a note on #14 | The user's release |
 
 ### SP1 spike: what the exe showed
@@ -297,6 +297,12 @@ The update zip holds REDnode 0.26.15 and the pack's apps (Sound Tracer, Sound Se
 5. Press **☆** on an event and on one recording. Open the **Scratch** tab: both are there; play them. **Mark**.
 6. Quit the game, start it again, load a save and open Sound Search: the **Scratch** tab still has both. Press **✕** on one. **Mark**.
 7. Quit the game. Send `rednode-mods.log`, the plugin log and `rednode-overlay.log`.
+
+### SP3 test: results
+
+Run on 2026-10-20 on the laptop, REDnode 0.26.15. **Passed**, every step: the search by words, by event id and by sound id, the recordings one by one, ☆ to Scratch, and Scratch still full after the game was started again (step 6, in a second session; the timer counted it as that session's step 1). No errors in the logs. **SP3 is done.**
+
+Also in the mod log of the morning: a sound archive swap of the user's own (EDGEwaveTest.archive, with 0.26.14's build) went through as H1d made it: the audio held 391 ms, the index loaded again in 4.9 ms, the old index freed.
 
 **Requested of EDGEwave** ([EDGEwave #2](https://github.com/Edgemodders/EDGEwave/issues/2)): a fifth Into the Game route, **As a REDnode sound**, writing the render into a REDnode package's folder with a `sounds` entry in its manifest. S1 already plays it; nothing to pack.
 
