@@ -31,6 +31,7 @@ const { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED } = requi
 const bridgeInstall = require('./bridge-install');
 const { createLookup } = require('./gameapi-lookup');
 const { soundPaksIn } = require('./archive-index');
+const { gameSoundWav } = require('./game-sounds');
 const crypto = require('node:crypto');
 
 // REDNODE_OVERLAY_PIPE lets tests use a private pipe instead of the game's.
@@ -1223,6 +1224,9 @@ function onGameMessage(m) {
     case 'sound-end':
       onSoundEnd(m);
       return;
+    case 'sound-trace':
+      onSoundTrace(m);
+      return;
     case 'pointer-lock': {
       // The plugin began or ended a window's pointer lock: the page's Pointer Lock follows.
       const w = windows.get(m.window);
@@ -1854,9 +1858,59 @@ async function soundCall(id, method, params) {
     }
     case 'sound.list':
       return bridgeCall('sound.list', { owner: id });
+    case 'sound.playGame': {
+      // One of the game's own sounds by its id, decoded from its pak (game-sounds.js), played
+      // by REDnode's engine like a package's file.
+      const sound = Number(params.sound);
+      const found = await gameSoundWav(GAME_DIR, sound);
+      const opts = {};
+      for (const k of PLAY_KEYS) if (params[k] !== undefined) opts[k] = params[k];
+      if (opts.semitones !== undefined) {
+        opts.rate = (Number(opts.rate) || 1) * 2 ** (Number(opts.semitones) / 12);
+        delete opts.semitones;
+      }
+      await ensureMix();
+      const r = await bridgeCall('sound.play', { ...opts, file: found.file, owner: id });
+      soundOwners.set(r.id, id);
+      return { id: r.id, sound, seconds: found.seconds, channels: found.channels, pak: found.pak, from: found.from };
+    }
+    case 'sound.event': {
+      // A game sound event by name, posted through the game's AudioSystem.Play with no entity.
+      const name = String(params.name ?? '').trim();
+      if (!name) throw new Error('Name a sound event');
+      return bridgeCall('audio.play', { name });
+    }
+    case 'sound.trace': {
+      // The Sound Tracer's hooks (soundtrace.cpp): on while any package traces.
+      if (params.on === false) {
+        tracers.delete(id);
+        if (!tracers.size && connected) return bridgeCall('trace.stop', {});
+        return { tracing: tracers.size > 0 };
+      }
+      const r = await bridgeCall('trace.start', {});
+      tracers.add(id);
+      log(`Sound trace: ${id} traces (PostEvent ${r.postEvent}, lookup ${r.lookup}, hooks ${r.attached.join(', ')})`);
+      return r;
+    }
     default:
       throw new Error(`${method} is not available to packages`);
   }
+}
+
+// Packages tracing the game's sounds (sound.trace), and what the plugin sends them.
+const tracers = new Set();
+
+function onSoundTrace(m) {
+  for (const id of tracers) {
+    if (!packageRunning(id)) continue;
+    mods?.toMod(id, m);
+    for (const w of windowsOfPackage(id)) toPage(w, m);
+  }
+}
+
+function checkTracers() {
+  for (const id of [...tracers]) if (!packageRunning(id)) tracers.delete(id);
+  if (!tracers.size && connected) bridgeCall('trace.stop', {}).catch(() => {});
 }
 
 function stopSounds(id, fadeOut = 300) {
@@ -1866,6 +1920,7 @@ function stopSounds(id, fadeOut = 300) {
 
 function checkSounds() {
   for (const id of new Set(soundOwners.values())) if (!packageRunning(id)) stopSounds(id);
+  if (tracers.size) checkTracers();
 }
 
 // The plugin announced that a sound ended: tell its package (its mod and its pages).
@@ -3130,6 +3185,7 @@ app.whenReady().then(() => {
     stopped: (id) => {
       undoTweaks(id, 'the mod stopped');
       stopSounds(id);
+      if (tracers.delete(id) && !tracers.size && connected) bridgeCall('trace.stop', {}).catch(() => {});
     },
     onLog: onModLog,
   });

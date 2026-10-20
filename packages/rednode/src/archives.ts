@@ -45,7 +45,9 @@ export interface ReloadResult {
 /**
  * What {@link archives.soundState} read: the game's sound pak index and the paks it has
  * open. Experimental: a diagnostic for the research into swapping sound paks (H1c), so
- * its shape may change. Field names past `pak` are guesses from the game's code.
+ * its shape may change. The sound fields follow the index file's columns (0.26.8's
+ * `"at"` in a game run matched the decoded size of the katana sound in the game's archive,
+ * so the names moved in 0.26.9); the pak fields past `pak` are guesses from the game's code.
  */
 export interface SoundState {
   /** One line for logs, as the plugin log has it. */
@@ -86,7 +88,12 @@ export interface SoundState {
    * it was loaded with until the game lets it go, even after the index is read again.
    */
   held: number | null;
-  /** The sound ids asked for, where the index puts each, and how many references hold it loaded (0: not loaded). */
+  /**
+   * The sound ids asked for, where the index puts each, and how many references hold it loaded
+   * (0: not loaded). `offset` is where the sound starts in its pak, `headerSize` the size of its
+   * RIFF header (the Ogg Opus stream follows it), `length` its size in the pak with the header,
+   * and `decodedBytes` its size decoded.
+   */
   sounds: (
     | { id: number; found: false }
     | {
@@ -96,9 +103,9 @@ export interface SoundState {
         row: number;
         pak: number;
         offset: number;
-        size: number;
+        length: number;
         headerSize: number;
-        x10: number;
+        decodedBytes: number;
         held: number | null;
       }
   )[];

@@ -1,6 +1,6 @@
 {
   "name": "@rednode/overlay",
-  "version": "0.26.8",
+  "version": "0.26.9",
   "private": true,
   "description": "REDnode overlay host and Tier 2 runtime: overlay apps and Node mods. See docs/overlay.md.",
   "license": "MIT",
@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
+    "opus-decoder": "0.7.12",
     "zod": "4.1.12"
   }
 }

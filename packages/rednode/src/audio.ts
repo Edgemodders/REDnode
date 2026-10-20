@@ -175,4 +175,101 @@ export const audio = {
     const list = (await call("sound.list", {})) as (SoundInfo & { owner?: string })[];
     return list.map(({ owner: _owner, ...info }) => info);
   },
+
+  /**
+   * Plays one of the game's own sound effects by its sound id (one variation, as the game's
+   * `sfx_container.opusinfo` lists it), through REDnode's engine like a file of your package:
+   * the raw recording, without the game's effects. The game's archives store it as Opus; it
+   * is decoded on first use. An archive in `archive/pc/mod` that carries the sound index wins
+   * over the game's own, so a hot-swapped sound plays its new version.
+   *
+   * Experimental (Sound Tools, SP1): its shape may change.
+   *
+   * @example
+   * ```ts
+   * import { audio } from "rednode";
+   *
+   * const s = await audio.playGame(746693166); // a katana sound
+   * await s.ended;
+   * ```
+   */
+  async playGame(sound: number, options?: PlayOptions): Promise<Sound & { seconds: number }> {
+    listen();
+    const r = (await call("sound.playGame", { sound, ...options })) as { id: number; seconds: number };
+    return Object.assign(handle(r.id), { seconds: r.seconds });
+  },
+
+  /**
+   * Posts one of the game's sound events by name, as the game's `AudioSystem.Play` does with
+   * no entity: the game plays it through its own mix, with the event's own logic (variations,
+   * effects). The game must know the name; an unknown one plays nothing.
+   *
+   * Experimental (Sound Tools, SP1): its shape may change.
+   *
+   * @example
+   * ```ts
+   * import { audio } from "rednode";
+   *
+   * await audio.event("ui_menu_onpress");
+   * ```
+   */
+  async event(name: string): Promise<void> {
+    await call("sound.event", { name });
+  },
+
+  /**
+   * Listens to the game's sounds: `onTrace` gets, about ten times a second, the events the
+   * game posted to its audio engine (Wwise) and the sounds it loaded. Resolves once the trace
+   * runs, with a function that stops it. The trace also stops when your package stops.
+   *
+   * Experimental (Sound Tools, SP1): its shape may change.
+   *
+   * @example
+   * ```ts
+   * import { audio } from "rednode";
+   *
+   * const stop = await audio.trace(({ posts, loads }) => {
+   *   for (const p of posts) console.log(`event ${p.event} on object ${p.object}`);
+   *   for (const l of loads) console.log(`sound ${l.sound} loaded`);
+   * });
+   * setTimeout(stop, 10_000);
+   * ```
+   */
+  async trace(onTrace: (batch: TraceBatch) => void): Promise<() => Promise<void>> {
+    const off = transport().listen((m) => {
+      if (m.event !== "sound-trace") return;
+      const posts = ((m.posts as [number, number, string, number][]) ?? []).map(([ms, event, object, playing]) => ({
+        ms,
+        event,
+        object,
+        playing,
+      }));
+      const loads = ((m.loads as [number, number, boolean][]) ?? []).map(([ms, sound, found]) => ({ ms, sound, found }));
+      onTrace({ posts, loads, dropped: Number(m.dropped ?? 0) });
+    });
+    try {
+      await call("sound.trace", { on: true });
+    } catch (err) {
+      off();
+      throw err;
+    }
+    return async () => {
+      off();
+      await call("sound.trace", { on: false });
+    };
+  },
 };
+
+/** What {@link audio.trace} hands over each time. */
+export interface TraceBatch {
+  /**
+   * Events the game posted to Wwise: `ms` since the trace started, the event's Wwise id (FNV-1
+   * of its lower-case name), the Wwise game object it was posted on (a 64-bit number, as a
+   * string), and the playing id Wwise gave it (0: the post failed).
+   */
+  posts: { ms: number; event: number; object: string; playing: number }[];
+  /** Sounds the game loaded: `ms`, the sound id, and whether the index had it. */
+  loads: { ms: number; sound: number; found: boolean }[];
+  /** Records lost since the last batch because too many came at once. */
+  dropped: number;
+}
