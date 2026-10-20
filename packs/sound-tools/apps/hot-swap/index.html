@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hot swap</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<script type="importmap">{ "imports": { "rednode": "rednode://sdk/index.js" } }</script>
+<style>
+  /* Hot swap (REDnode Sound Tools): an archive into the running game through RED Hot Tools,
+     sound archives included; recent swaps kept to swap again. The window never scrolls. */
+  html, body { margin: 0; width: 680px; height: 520px; overflow: hidden; background: transparent; }
+  rn-window { position: absolute; inset: 6px; }
+  .bar { display: flex; gap: 8px; align-items: center; flex: none; }
+  .bar rn-input { flex: 1; min-width: 0; }
+  .line { margin: 0; flex: none; font: 12px var(--rn-mono); color: var(--rn-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .line.bad { color: var(--rn-danger); }
+  .result { flex: none; min-height: 40px; margin: 0; padding: 8px 10px; font: 12px/1.5 var(--rn-mono); color: var(--rn-dim); white-space: pre-wrap; overflow-wrap: anywhere;
+    border: 1px solid var(--rn-line); border-left: 3px solid var(--rn-line); }
+  .result.good { color: var(--rn-fg); border-left-color: var(--rn-accent-2); }
+  .result.bad { color: var(--rn-danger); border-left-color: var(--rn-danger); }
+  h3 { margin: 4px 0 0; flex: none; font: 700 12px var(--rn-display); letter-spacing: .12em; text-transform: uppercase; color: var(--rn-accent); }
+  .list { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; font: 12px var(--rn-mono); border: 1px solid var(--rn-line); }
+  .row { display: flex; align-items: center; gap: 6px; padding: 3px 6px; color: var(--rn-fg); }
+  .row:nth-child(even) { background: color-mix(in srgb, var(--rn-panel-2) 45%, transparent); }
+  .row:hover { background: color-mix(in srgb, var(--rn-accent) 14%, transparent); }
+  .t { flex: none; color: var(--rn-dim); }
+  .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n small { color: var(--rn-dim); font-size: 11px; margin-left: 6px; }
+  .tag { flex: none; font-size: 11px; color: var(--rn-dim); }
+  .tag.ok { color: var(--rn-accent-2); }
+  .tag.bad { color: var(--rn-danger); }
+  .row button { flex: none; width: 22px; height: 18px; padding: 0; font: 11px var(--rn-mono); cursor: pointer;
+    color: var(--rn-accent-2); background: transparent; border: 1px solid color-mix(in srgb, var(--rn-accent-2) 50%, transparent); }
+  .row button:hover:not(:disabled) { background: color-mix(in srgb, var(--rn-accent-2) 18%, transparent); }
+  .row button:disabled { opacity: .3; cursor: default; }
+  .empty { padding: 12px 10px; color: var(--rn-dim); font: 12px var(--rn-mono); line-height: 1.6; }
+  .note { margin: 0; flex: none; font: 12px/1.45 var(--rn-mono); color: var(--rn-dim); }
+</style>
+</head>
+<body>
+<rn-window id="win" title="Hot swap" draggable closable>
+  <p id="needs" class="line">Checking what Hot swap needs...</p>
+  <div class="bar">
+    <rn-input id="file" placeholder="MyMod.archive in archive/pc/mod, or its full path; Enter swaps"></rn-input>
+    <rn-button id="swap">Swap</rn-button>
+  </div>
+  <p id="result" class="result">Swap an archive into the game while it runs: a new one, or a newer build of one you have installed.</p>
+  <h3>Recent</h3>
+  <div class="list" id="recent"></div>
+  <p class="note">Sound archives: the game pauses for a moment while REDnode loads its sound index again. A sound that played just before the swap can keep its old version until the game loads it again (for a weapon, equip it again).</p>
+</rn-window>
+<script type="module">
+  import { archives, kernel, ui } from 'rednode';
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const two = (n) => String(n).padStart(2, '0');
+  const clock = (t) => {
+    const d = new Date(t);
+    return `${two(d.getHours())}:${two(d.getMinutes())}`;
+  };
+  // Windows' Copy as path puts quotes around the path: they are not part of it.
+  const clean = (s) => String(s).trim().replace(/^"(.*)"$/, '$1');
+  const baseName = (p) => p.split(/[\\/]/).pop();
+
+  // ---- what it needs: RED Hot Tools, and REDnode new enough ----
+
+  (async () => {
+    try {
+      const missing = (await kernel.requirements()).filter((r) => !r.ok);
+      $('needs').textContent = missing.length
+        ? `Missing: ${missing.map((r) => `${r.name} ${r.wants} (${r.note || r.found || 'not installed'})`).join(', ')}`
+        : 'Ready: RED Hot Tools is installed.';
+      $('needs').className = missing.length ? 'line bad' : 'line';
+    } catch (err) {
+      $('needs').textContent = err.message;
+      $('needs').className = 'line bad';
+    }
+  })();
+
+  // ---- recent swaps, kept in this window's local storage ----
+
+  const KEY = 'rednode.hot-swap.recent.v1';
+  const KEEP = 30;
+  let recent = [];
+  try {
+    recent = JSON.parse(localStorage.getItem(KEY) ?? '[]');
+  } catch {
+    recent = [];
+  }
+
+  function keep() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(recent));
+    } catch {
+      // the list still works for this session
+    }
+    draw();
+  }
+
+  function draw() {
+    const list = $('recent');
+    if (!recent.length) {
+      list.innerHTML = '<div class="empty">Your swaps show here, newest first. ↻ swaps one again: build your mod, press ↻, and see it in the game.</div>';
+      return;
+    }
+    list.innerHTML = recent
+      .map((r, i) => {
+        const dir = r.file.slice(0, r.file.length - baseName(r.file).length);
+        return (
+          `<div class="row" data-i="${i}">` +
+          `<span class="t">${clock(r.at)}</span>` +
+          `<span class="n" title="${esc(r.file)}">${esc(baseName(r.file))}${dir ? `<small>${esc(dir)}</small>` : ''}</span>` +
+          `<span class="tag ${r.ok ? 'ok' : 'bad'}" title="${esc(r.text)}">${r.ok ? (r.sound ? 'swapped, sound' : 'swapped') : 'failed'}</span>` +
+          `<button data-act="again" title="Swap it again">&#8635;</button>` +
+          `<button data-act="copy" title="Copy its path">&#10697;</button>` +
+          `<button data-act="remove" title="Take it off the list">&#10005;</button></div>`
+        );
+      })
+      .join('');
+  }
+
+  $('recent').addEventListener('click', (ev) => {
+    const b = ev.target.closest('button[data-act]');
+    if (!b || b.disabled) return;
+    const r = recent[Number(b.closest('.row').dataset.i)];
+    if (!r) return;
+    if (b.dataset.act === 'again') swap(r.file);
+    else if (b.dataset.act === 'copy') ui.copy(r.file).catch(() => {});
+    else if (b.dataset.act === 'remove') {
+      recent = recent.filter((x) => x !== r);
+      keep();
+    }
+  });
+
+  // ---- swapping ----
+
+  let busy = false;
+
+  function show(text, tone) {
+    $('result').textContent = text;
+    $('result').className = `result ${tone}`;
+  }
+
+  async function swap(raw) {
+    const file = clean(raw ?? $('file').value);
+    if (!file || busy) return;
+    busy = true;
+    $('swap').setAttribute('disabled', '');
+    show(`Swapping ${baseName(file)}...`, '');
+    let entry;
+    try {
+      const r = await archives.reload([file]);
+      const lines = [];
+      if (r.reloaded.length) lines.push(`${baseName(file)} swapped into the game in ${r.ms} ms.`);
+      for (const f of r.failed) lines.push(`Not swapped: ${f.why}`);
+      if (r.sound) {
+        lines.push(r.sound.index === 'reloaded' ? 'The game\'s sound index was loaded again: the new sounds play now.' : `Sound index: ${r.sound.index}.`);
+        if (r.sound.note) lines.push(r.sound.note);
+      }
+      const ok = r.reloaded.length > 0 && !r.failed.length;
+      show(lines.join('\n'), ok ? 'good' : 'bad');
+      entry = { file, at: Date.now(), ok, sound: !!r.sound, text: lines.join(' ') };
+    } catch (err) {
+      show(err.message, 'bad');
+      entry = { file, at: Date.now(), ok: false, sound: false, text: err.message };
+    } finally {
+      busy = false;
+      $('swap').removeAttribute('disabled');
+    }
+    recent = [entry, ...recent.filter((x) => x.file.toLowerCase() !== file.toLowerCase())].slice(0, KEEP);
+    keep();
+  }
+
+  $('swap').addEventListener('click', () => swap());
+  $('file').addEventListener('submit', () => swap());
+  draw();
+</script>
+</body>
+</html>

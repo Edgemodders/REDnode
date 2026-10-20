@@ -11,5 +11,8 @@
   "anchor": "top-left",
   "x": 120,
   "y": 90,
-  "open": false
+  "open": false,
+  "requires": {
+    "rednode": ">=0.26.15"
+  }
 }

@@ -549,8 +549,24 @@ let manifest = { sounds: {} };
 let manifestBase = location.href;
 /** The package's manifest, for its sounds and requirements. */
 export function useManifest(m, base) {
+  manifestSet = true;
   manifest = m ?? manifest;
   manifestBase = base ?? manifestBase;
+}
+// A page app's own manifest, read beside the page the first time it is needed (a Node
+// mod's runner hands it over with useManifest instead).
+let manifestSet = false;
+let manifestLoad = null;
+async function pageManifest() {
+  if (manifestSet) return manifest;
+  manifestLoad ??= fetch(new URL('rednode-app.json', location.href))
+    .then((r) => (r.ok ? r.json() : null))
+    .then((m) => {
+      if (m && !manifestSet) manifest = { sounds: {}, ...m };
+      return manifest;
+    })
+    .catch(() => manifest);
+  return manifestLoad;
 }
 
 const buffers = new Map();
@@ -840,6 +856,7 @@ export const archives = {
 async function swapArchives(files) {
   const list = typeof files === 'string' ? [files] : files;
   if (!Array.isArray(list) || !list.length) throw new Error('archives.reload needs a file, or a list of files');
+  await pageManifest();
   if (!(manifest.permissions ?? []).includes('archives')) {
     throw new Error('This package does not ask for the "archives" permission in its rednode-app.json');
   }
