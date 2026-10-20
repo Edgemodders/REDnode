@@ -192,6 +192,31 @@ REDnode 0.26.10 on the laptop (the plugin log's first line says "REDnode 0.26.10
 6. Press **Copy** on a row in Loaded, paste it into the box at the bottom (Ctrl+V) and press Enter: the same sound plays. **Mark**.
 7. Press **Stop trace** and quit the game. Send `rednode-sound-trace.log`, `rednode-mods.log`, the plugin log (`rednode-*.log` of this session) and `rednode-overlay.log`.
 
+### SP2 first run: what the user saw (0.26.10)
+
+On 2026-10-20 on the laptop, before the full steps (no logs sent). The user's earlier notes about the window and the rows that could not scroll were about the **Sound spike** app, not the Tracer; the Tracer was built to them anyway. A screenshot of the spike in 0.26.10 showed 26 of 27 events named, so the host's names work in the game.
+
+| Seen | Cause | In 0.26.11 |
+|---|---|---|
+| The Tracer was too narrow: a sideways scroll bar | The two columns were `3fr 2fr`, which cannot shrink below their rows' content, so long rows pushed the window body wider than the window | Columns of `minmax(0, …)`, lists that never scroll sideways, ids that never shrink; the window is 900 wide. Measured with no sideways overflow at 900 and at 780 |
+| **Play** on a Played row was silent | `audio.event` posted the event with no entity. A menu click needs none, but footsteps, foley and weapons are positional and need an emitter to be heard | `audio.event` posts on V by default (`AudioSystem.Play` with V's entity id); `{ on: "none" }` keeps the old way. Unverified until the retest: some events may still need switches or states the game sets first |
+| Loaded sounds play, but long ones cannot be stopped | No stop | A **Stop** beside each **Play** (on while that row's sound plays; for an event, until stopped) and **Stop all** at the bottom. `audio.event` returns `stop()`, through the game's `AudioSystem.Stop` on the same entity |
+
+Also found while checking: the new Stop code clashed with an existing name in the page, which would have stopped the whole app from loading; caught by the preview, fixed before the build.
+
+### SP2 retest (REDnode 0.26.11)
+
+REDnode 0.26.11 on the laptop (the plugin log's first line says "REDnode 0.26.11 loading"). Steps 1 to 4 and 6 are the SP2 test's; 5 is new.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. Load a save. In the Mod Manager switch on **Sound Tracer**. Is the whole window visible, with no sideways scroll bar? **Mark**.
+2. Press **Start trace**. Walk, draw the katana, swing it, put it away, open and close the inventory, about 30 seconds. Does the window stay put while both columns fill and scroll? Does the line under the buttons count named events? **Mark**.
+3. Scroll the Played column up: it should stay where you put it while rows come in. Scroll back to the bottom: it follows again. Type `katana` in the filter, then clear it. **Mark**.
+4. Press **Pause**, wait about 5 seconds, press **Resume**: the rows from the pause appear. **Mark**.
+5. Press **Play** on three named rows in Played: a footstep or foley one, a katana one, an ambience one. Which could you hear? Press **Stop** on any that keeps playing. Then press **Play** on a long row in Loaded and **Stop** it, and try **Stop all**. **Mark**.
+6. Press **Copy** on a row in Loaded, paste it into the box at the bottom (Ctrl+V) and press Enter: the same sound plays. **Mark**.
+7. Press **Stop trace** and quit the game. Send `rednode-sound-trace.log`, `rednode-mods.log`, the plugin log (`rednode-*.log` of this session) and `rednode-overlay.log`.
+
 **Requested of EDGEwave** ([EDGEwave #2](https://github.com/Edgemodders/EDGEwave/issues/2)): a fifth Into the Game route, **As a REDnode sound**, writing the render into a REDnode package's folder with a `sounds` entry in its manifest. S1 already plays it; nothing to pack.
 
 ## Research before S1

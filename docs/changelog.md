@@ -16,7 +16,7 @@ How to keep it:
 - Swapping sound into the running game: `archives.reload` and the MCP tool `archives_reload` now swap archives that change the game's sound paks (`.opuspak`, `.opusinfo`, such as EDGEwave's sound overrides) instead of refusing them. The swap runs with the game paused and its audio held, then REDnode loads the game's sound index again, so the new sounds play without a restart. A sound that played just before the swap may keep its old version until the game loads it again (for a weapon, equip it again). The answer's `sound` field says how it went.
 - `ui.copy(text)` in the `rednode` package puts text on the Windows clipboard, from a Node mod or an overlay app.
 - `audio.trace` names the events it lists where REDnode knows the name (REDbridge's list of events), and REDnode writes every traced event and sound to `red4ext/logs/rednode-sound-trace.log`.
-- Experimental, for the coming Sound Tools: `audio.playGame(id)` plays one of the game's own sound effects by its sound id through REDnode's engine; `audio.event(name)` posts a game sound event by name; `audio.trace(onTrace)` lists the events the game posts to its audio engine and the sounds it loads, as they happen.
+- Experimental, for the coming Sound Tools: `audio.playGame(id)` plays one of the game's own sound effects by its sound id through REDnode's engine; `audio.event(name)` posts a game sound event by name on V, so positional sounds are heard (`{ on: "none" }` for none), and returns `stop()`; `audio.trace(onTrace)` lists the events the game posts to its audio engine and the sounds it loads, as they happen.
 
 **Fixed**
 
