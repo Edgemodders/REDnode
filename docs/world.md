@@ -571,6 +571,24 @@ REDnode 0.26.7 on the laptop (check the plugin log's first line says "REDnode 0.
 
 Afterwards remove `soundPakSwap` and `swapPause` from the settings, and `EDGEwaveTest.archive` from `archive\pc\mod` if it should not stay installed.
 
+### H1c-3 test: results
+
+Run on the laptop on 2026-10-19 between 20:06 and 20:53 (REDnode 0.26.6, then 0.26.7 from 20:41), with `"soundPakSwap": "reload"`, swaps in gameplay. Four swaps with the audio thread held (it waited 375 to 407 ms each time, the reload took 5 to 9 ms), **no crash**, no faults.
+
+| Session | Katana before the swap | After the swap |
+|---|---|---|
+| 20:06, 20:11, 20:41 | Not equipped or not drawn; "not held" | **EDGEwave's sound**, every time |
+| 20:47 | Equipped and drawn, then put away | The base game's sound (step 6); after unequipping and equipping again, **EDGEwave's sound** (step 7) |
+
+What it shows:
+
+- **The swap works**: with the index reloaded, a sound the game loads after the swap plays from the new archive.
+- **The held-sounds table was not the cause.** At the 20:49 swap the game held one sound in it, unchanged by the reload, and not the katana's. Something else kept the katana's old data after it had just played, until the weapon was equipped again; likely Wwise's own stream cache, which keeps recently streamed data by file id (unverified). Re-equipping plausibly makes the game load the weapon's sounds again.
+- **The arrow**: on 0.26.7 the overlay's arrow showed and stayed in the game (the user's note at 20:42), drawn from its texture.
+- **Holding the audio thread** around the swap: four swaps without a crash (the two crashes since H1b came without it, one from the pause menu). A small sample.
+
+For players and modders today: after a sound swap, a sound that has just played may keep its old version until the game loads it again (for a weapon, equip it again). Next, to agree: make the reload the normal behaviour for sound archives (with the hold), and look for the stream cache's flush.
+
 ### H1 quoted path: retest
 
 Run on 2026-10-19 on the laptop with REDnode 0.26.1 (after its NVIDIA driver update). **Pass.** The path came from File Explorer's **Copy as path**, with its double quotes.
