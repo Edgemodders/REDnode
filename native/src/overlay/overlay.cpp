@@ -26,6 +26,16 @@ void detail::Log(const char* aFormat, ...)
     g_sdk->logger->Info(g_handle, buffer);
 }
 
+const RED4ext::v1::Sdk* detail::GetSdk()
+{
+    return g_sdk;
+}
+
+RED4ext::v1::PluginHandle detail::GetHandle()
+{
+    return g_handle;
+}
+
 std::string JsonString(std::string_view aText)
 {
     std::string out = "\"";
@@ -84,6 +94,7 @@ void Update(uint64_t aFrame)
     detail::PollGameState(aFrame);
     detail::UpdateAudio();
     detail::UpdateFaults();
+    detail::UpdateTrace();
 }
 
 uint64_t detail::NowMs()
@@ -101,6 +112,7 @@ void Stop()
     detail::UninstallInput();
     detail::UninstallCompositor();
     detail::StopAudio();
+    detail::StopTrace();
     detail::StopOpus();
     detail::StopLink();
     detail::StopHost();

@@ -119,6 +119,8 @@ constexpr size_t Register = 0x5C0;
 constexpr size_t Unregistration = 0x640;
 constexpr size_t Unregister = 0x6C0;
 constexpr size_t Acquire = 0x700;
+constexpr size_t PostEvent = 0x740;
+constexpr size_t Lookup = 0x780;
 
 void BuildCode()
 {
@@ -151,6 +153,14 @@ void BuildCode()
     Put(Acquire, {0x0F, 0xB7, 0x15, 0, 0, 0, 0, 0x4C, 0x8D, 0x35, 0, 0, 0, 0, 0x33, 0xF6, 0x8B, 0xF9});
     Rip(Acquire, 3, 7, LoadedCount);
     Rip(Acquire + 7, 3, 7, LoadedTable);
+    // The Sound Tracer's places: Wwise's PostEvent and the sound lookup (which reads the index count).
+    Put(PostEvent, {0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x6C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18, 0x57,
+                    0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41, 0x57, 0x48, 0x83, 0xEC, 0x30, 0x80, 0x3D, 0, 0, 0, 0,
+                    0x00, 0x4D, 0x8B, 0xF9, 0x45, 0x8B, 0xE0, 0x4C, 0x8B, 0xEA, 0x8B, 0xE9, 0x0F, 0x84});
+    Put(Lookup, {0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x54, 0x24, 0x10, 0x55, 0x56, 0x57, 0x41, 0x54, 0x41,
+                 0x55, 0x41, 0x56, 0x41, 0x57, 0x48, 0x8D, 0x6C, 0x24, 0xD9, 0x48, 0x81, 0xEC, 0x90, 0x00, 0x00,
+                 0x00, 0x44, 0x0F, 0xB7, 0x3D, 0, 0, 0, 0});
+    Rip(Lookup + 0x21, 4, 8, IndexCount);
 }
 
 // Three sounds (ids 10, 20, 30 in paks 5, 6, 7) and two entries of the second table, laid
@@ -163,17 +173,17 @@ void BuildTables()
     const uint32_t n = 3, m = 2;
     const uint32_t ids[] = {10, 20, 30};
     const uint16_t paks[] = {5, 6, 7};
-    const uint32_t x10[] = {100, 200, 300};
-    const uint16_t headers[] = {40, 41, 42};
-    const uint32_t sizes[] = {1000, 2000, 3000};
     const uint32_t offsets[] = {0, 4096, 8192};
+    const uint16_t headers[] = {40, 41, 42};
+    const uint32_t lengths[] = {1000, 2000, 3000};
+    const uint32_t decoded[] = {100, 200, 300};
     uint8_t* at[7] = {Block, Block + 4 * n, Block + 6 * n, Block + 10 * n, Block + 12 * n, Block + 16 * n, Block + 20 * n};
     std::memcpy(at[0], ids, sizeof(ids));
     std::memcpy(at[1], paks, sizeof(paks));
-    std::memcpy(at[2], x10, sizeof(x10));
+    std::memcpy(at[2], offsets, sizeof(offsets));
     std::memcpy(at[3], headers, sizeof(headers));
-    std::memcpy(at[4], sizes, sizeof(sizes));
-    std::memcpy(at[5], offsets, sizeof(offsets));
+    std::memcpy(at[4], lengths, sizeof(lengths));
+    std::memcpy(at[5], decoded, sizeof(decoded));
     std::memset(at[6], 0xAB, 4 * m);
     std::memset(IndexTable, 0, 0x60);
     std::memcpy(IndexTable, at, sizeof(at));
@@ -285,11 +295,11 @@ int main()
     Check(Has(state, "\"checksum\":\"0x"), "the index has a checksum");
     Check(Has(state, "\"pak\":5") && Has(state, "\"pak\":6") && !Has(state, "\"slot\":65535"),
           "the open paks are listed and the free slot is not");
-    Check(Has(state, "{\"id\":20,\"found\":true,\"index\":0,\"row\":1,\"pak\":6,\"offset\":4096,\"size\":2000,"
-                     "\"headerSize\":41,\"x10\":200,\"held\":2}"),
-          "sound 20 is found with its pak, offset, size and references");
+    Check(Has(state, "{\"id\":20,\"found\":true,\"index\":0,\"row\":1,\"pak\":6,\"offset\":4096,\"length\":2000,"
+                     "\"headerSize\":41,\"decodedBytes\":200,\"held\":2}"),
+          "sound 20 is found with its pak, offset, length, decoded size and references");
     Check(Has(state, "{\"id\":99,\"found\":false}"), "an unknown sound is not found");
-    Check(Has(state, "{\"id\":30,\"found\":true") && Has(state, "\"x10\":300,\"held\":0}"),
+    Check(Has(state, "{\"id\":30,\"found\":true") && Has(state, "\"decodedBytes\":300,\"held\":0}"),
           "an id given as a hex string is read; a sound not loaded is not held");
     Check(Has(summary, "1 index of 3 sounds") && Has(summary, "2 paks open: 5 (2), 6 (1)") &&
               Has(summary, "2 sounds held") && Has(summary, "sound 20 in pak 6 at 4096, held (2 references)") &&
@@ -348,6 +358,24 @@ int main()
     BuildCode();
     Rip(Caller + 7, 1, 5, Code + Magic);
     Check(!LocateOpus(CodeRanges(), none, why) && Has(why, "no call"), "no call of the loader is refused");
+
+    // The Sound Tracer's places.
+    BuildCode();
+    SoundTracePlaces trace;
+    Check(LocateSoundTrace(CodeRanges(), IndexCount, trace, why) && trace.postEvent == Code + PostEvent &&
+              trace.lookup == Code + Lookup,
+          "finds Wwise's PostEvent and the sound lookup");
+    Check(!LocateSoundTrace(CodeRanges(), PakCount, trace, why) && Has(why, "index count"),
+          "a lookup that reads something else than the index count is refused");
+    Code[PostEvent + 0x24] = 0x90;
+    Check(!LocateSoundTrace(CodeRanges(), IndexCount, trace, why) && Has(why, "PostEvent"),
+          "no PostEvent is refused");
+    BuildCode();
+    Put(0x7C0, {0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x54, 0x24, 0x10, 0x55, 0x56, 0x57, 0x41, 0x54, 0x41,
+                0x55, 0x41, 0x56, 0x41, 0x57, 0x48, 0x8D, 0x6C, 0x24, 0xD9, 0x48, 0x81, 0xEC, 0x90, 0x00, 0x00,
+                0x00, 0x44, 0x0F, 0xB7, 0x3D, 0, 0, 0, 0});
+    Check(!LocateSoundTrace(CodeRanges(), IndexCount, trace, why) && Has(why, "more than once"),
+          "two lookups are refused");
 
     // The audio engine's callback registration.
     BuildCode();
@@ -526,6 +554,12 @@ int main()
                 std::printf("      index count +0x%llx, index +0x%llx, pak count +0x%llx, paks +0x%llx, path hash +0x%llx\n",
                             rel(real.indexCount), rel(real.indexTable), rel(real.pakCount), rel(real.pakTable),
                             rel(real.infoHash));
+            SoundTracePlaces realTrace;
+            const bool traceOk = LocateSoundTrace(code, ok ? real.indexCount : nullptr, realTrace, why);
+            Check(traceOk, traceOk ? "the patterns find PostEvent and the sound lookup in the game exe" : why.c_str());
+            if (traceOk)
+                std::printf("      PostEvent +0x%llx, sound lookup +0x%llx\n", rel(realTrace.postEvent),
+                            rel(realTrace.lookup));
             FreeLibrary(mapped);
         }
     }

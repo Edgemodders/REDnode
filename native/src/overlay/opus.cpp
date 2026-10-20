@@ -104,6 +104,14 @@ constexpr const char* LeaCallPattern = "48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ??";
 constexpr const char* UnregisterStart = "40 55 56 57 48 83 EC 30 48 8B F9 8B F2"; // push rbp, rsi, rdi; mov rdi,rcx; mov esi,edx
 constexpr uint32_t AudioFrameEnd = 0x40;
 constexpr uint16_t RetiredPak = 0xFFFE;
+// The Sound Tracer (SP1). Wwise's PostEvent by id: its prologue, then cmp byte ptr [initialized],0;
+// mov r15,r9; mov r12d,r8d; mov r13,rdx; mov ebp,ecx; je (0x1AC8E70 in 2.31).
+constexpr const char* PostEventPattern = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 41 54 41 55 41 56 41 57 "
+                                         "48 83 EC 30 80 3D ?? ?? ?? ?? 00 4D 8B F9 45 8B E0 4C 8B EA 8B E9 0F 84";
+// A sound's lookup: its prologue, then movzx r15d,[index count] (0x279890 in 2.31).
+constexpr const char* LookupPattern = "48 89 5C 24 08 48 89 54 24 10 55 56 57 41 54 41 55 41 56 41 57 "
+                                      "48 8D 6C 24 D9 48 81 EC 90 00 00 00 44 0F B7 3D ?? ?? ?? ??";
+constexpr size_t LookupToIndexCount = 0x21; // the movzx, 8 bytes, displacement at +4
 
 struct Pattern
 {
@@ -351,7 +359,8 @@ T At(const uint8_t* aRaw, size_t aOffset)
 
 struct Index
 {
-    const uint8_t* arrays[7]; // ids (u32), pak (u16), +0x10 (u32), header size? (u16), size? (u32), offset? (u32), second table (u32)
+    const uint8_t* arrays[7]; // the file's columns: ids (u32), paks (u16), offsets in the pak (u32), RIFF header
+                              // sizes (u16), lengths (u32), decoded sizes (u32); then the second table (u32)
     uint32_t sounds;
     uint32_t second;
 };
@@ -973,17 +982,17 @@ std::string OpusState(const OpusPlaces& aPlaces, const json::Value& aParams, std
                     row < 0)
                     continue;
                 uint16_t pak = 0, header = 0;
-                uint32_t x10 = 0, size = 0, offset = 0;
+                uint32_t offset = 0, length = 0, decoded = 0;
                 Copy(&pak, x.arrays[1] + row * 2, 2);
-                Copy(&x10, x.arrays[2] + row * 4, 4);
+                Copy(&offset, x.arrays[2] + row * 4, 4);
                 Copy(&header, x.arrays[3] + row * 2, 2);
-                Copy(&size, x.arrays[4] + row * 4, 4);
-                Copy(&offset, x.arrays[5] + row * 4, 4);
+                Copy(&length, x.arrays[4] + row * 4, 4);
+                Copy(&decoded, x.arrays[5] + row * 4, 4);
                 const int64_t refs = heldRefs(id);
                 entry = "{\"id\":" + std::to_string(id) + ",\"found\":true,\"index\":" + std::to_string(i) +
                         ",\"row\":" + std::to_string(row) + ",\"pak\":" + std::to_string(pak) +
-                        ",\"offset\":" + std::to_string(offset) + ",\"size\":" + std::to_string(size) +
-                        ",\"headerSize\":" + std::to_string(header) + ",\"x10\":" + std::to_string(x10) +
+                        ",\"offset\":" + std::to_string(offset) + ",\"length\":" + std::to_string(length) +
+                        ",\"headerSize\":" + std::to_string(header) + ",\"decodedBytes\":" + std::to_string(decoded) +
                         ",\"held\":" + (aPlaces.loadedTable ? std::to_string(refs) : std::string("null")) + "}";
                 summary += "; sound " + std::to_string(id) + " in pak " + std::to_string(pak) + " at " +
                            std::to_string(offset);
@@ -1008,26 +1017,64 @@ bool IsOpusMethod(const std::string& aMethod)
            aMethod == "opus.reloadStatus";
 }
 
+bool LocateSoundTrace(const std::vector<CodeRange>& aCode, const uint16_t* aIndexCount, SoundTracePlaces& aOut,
+                      std::string& aWhy)
+{
+    const uint8_t* post = FindOne(aCode, PostEventPattern, "Wwise's PostEvent", aWhy);
+    if (!post)
+        return false;
+    const uint8_t* lookup = FindOne(aCode, LookupPattern, "the sound lookup", aWhy);
+    if (!lookup)
+        return false;
+    if (aIndexCount && RipTarget(lookup + LookupToIndexCount, 4, 8) != reinterpret_cast<const uint8_t*>(aIndexCount))
+    {
+        aWhy = "the sound lookup does not read the index count";
+        return false;
+    }
+    aOut.postEvent = const_cast<uint8_t*>(post);
+    aOut.lookup = const_cast<uint8_t*>(lookup);
+    return true;
+}
+
+namespace
+{
+void EnsureLocated()
+{
+    if (g_tried)
+        return;
+    g_tried = true;
+    const auto* image = reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
+    const uint64_t started = GetTickCount64();
+    g_found = LocateOpus(GameCode(image), g_places, g_why);
+    const auto rel = [&](const void* p) {
+        return static_cast<unsigned long long>(static_cast<const uint8_t*>(p) - image);
+    };
+    if (g_found)
+        Log("Opus: found the sound pak tables in %llu ms (index count +0x%llx, index +0x%llx, pak count +0x%llx, "
+            "paks +0x%llx, path hash +0x%llx, loader +0x%llx, free %s)",
+            static_cast<unsigned long long>(GetTickCount64() - started), rel(g_places.indexCount),
+            rel(g_places.indexTable), rel(g_places.pakCount), rel(g_places.pakTable), rel(g_places.infoHash),
+            rel(g_places.loader), g_places.gameFree ? "found" : "not found");
+    else
+        Log("Opus: the sound pak tables were not found in this game version: %s", g_why.c_str());
+}
+} // namespace
+
+bool FindSoundTrace(SoundTracePlaces& aOut, std::string& aWhy)
+{
+    EnsureLocated();
+    if (!g_found)
+    {
+        aWhy = "REDnode does not know this game version's sound pak tables (" + g_why + ")";
+        return false;
+    }
+    const auto* image = reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
+    return LocateSoundTrace(GameCode(image), g_places.indexCount, aOut, aWhy);
+}
+
 std::string Opus(const std::string& aMethod, const json::Value& aParams, std::string& aError)
 {
-    if (!g_tried)
-    {
-        g_tried = true;
-        const auto* image = reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
-        const uint64_t started = GetTickCount64();
-        g_found = LocateOpus(GameCode(image), g_places, g_why);
-        const auto rel = [&](const void* p) {
-            return static_cast<unsigned long long>(static_cast<const uint8_t*>(p) - image);
-        };
-        if (g_found)
-            Log("Opus: found the sound pak tables in %llu ms (index count +0x%llx, index +0x%llx, pak count +0x%llx, "
-                "paks +0x%llx, path hash +0x%llx, loader +0x%llx, free %s)",
-                static_cast<unsigned long long>(GetTickCount64() - started), rel(g_places.indexCount),
-                rel(g_places.indexTable), rel(g_places.pakCount), rel(g_places.pakTable), rel(g_places.infoHash),
-                rel(g_places.loader), g_places.gameFree ? "found" : "not found");
-        else
-            Log("Opus: the sound pak tables were not found in this game version: %s", g_why.c_str());
-    }
+    EnsureLocated();
     if (!g_found)
     {
         aError = "REDnode does not know this game version's sound pak tables (" + g_why + ")";

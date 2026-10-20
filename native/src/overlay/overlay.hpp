@@ -262,5 +262,31 @@ void OpusFrameEnd(const OpusPlaces& aPlaces); // the audio thread, at the end of
 OpusOutcome OpusTakeOutcome();                // done -> idle, with the result
 bool IsOpusMethod(const std::string& aMethod);
 std::string Opus(const std::string& aMethod, const json::Value& aParams, std::string& aError);
+// The Sound Tracer's places (SP1), found by byte patterns next to the opus tables:
+//   postEvent  Wwise's PostEvent by id: uint32_t (event id, game object id, flags, callback,
+//              cookie, external sources, playing id) -> the new playing id, 0 if it failed.
+//              Every post goes through it, from the game's own wrapper and from Wwise's
+//              by-name versions alike. Called on the game's threads
+//   lookup     a sound's lookup in the index: bool (sound id, entry out). The pak tick's
+//              acquire (memory) and the streaming IO hook's open both call it, so every
+//              sound the game loads passes here, on the audio and streaming threads
+struct SoundTracePlaces
+{
+    uint8_t* postEvent = nullptr;
+    uint8_t* lookup = nullptr;
+};
+// aIndexCount, when known, must be what the lookup's first read points at.
+bool LocateSoundTrace(const std::vector<CodeRange>& aCode, const uint16_t* aIndexCount, SoundTracePlaces& aOut,
+                      std::string& aWhy);
+bool FindSoundTrace(SoundTracePlaces& aOut, std::string& aWhy); // in the running game
+// soundtrace.cpp: trace.start, trace.stop, trace.state. The hooks are attached at the first
+// trace.start and stay until the plugin stops; they record only while tracing.
+bool IsTraceMethod(const std::string& aMethod);
+std::string Trace(const std::string& aMethod, const json::Value& aParams, std::string& aError);
+void UpdateTrace(); // game thread, each frame: sends what was recorded, about 10 times a second
+void StopTrace();
+// overlay.cpp
+const RED4ext::v1::Sdk* GetSdk();
+RED4ext::v1::PluginHandle GetHandle();
 } // namespace detail
 } // namespace rednode::overlay

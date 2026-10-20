@@ -16,6 +16,7 @@
 //   opus.state       {"sounds":[id]}: the game's sound pak index and open paks, read only, in opus.cpp
 //   opus.reload      {}: ask the audio thread to load the sound index again (H1c-2 spike), in opus.cpp
 //   opus.reloadStatus {"cancel"?}: waiting, running or done, with the reload's result
+//   trace.start, trace.stop, trace.state   the Sound Tracer's hooks (SP1), in soundtrace.cpp
 
 #include "json.hpp"
 #include "jvalue.hpp"
@@ -167,7 +168,8 @@ std::string Handle(const std::string& aJson, uint64_t aFrame)
         return PlayerPosition(id);
     if (method == "audio.play")
         return AudioPlay(id, aJson);
-    if (IsReflectMethod(method) || IsAudioMethod(method) || IsFaultsMethod(method) || IsOpusMethod(method))
+    if (IsReflectMethod(method) || IsAudioMethod(method) || IsFaultsMethod(method) || IsOpusMethod(method) ||
+        IsTraceMethod(method))
     {
         json::Value request;
         std::string error;
@@ -179,6 +181,7 @@ std::string Handle(const std::string& aJson, uint64_t aFrame)
         std::string result = IsAudioMethod(method)    ? Audio(method, given, error)
                              : IsFaultsMethod(method) ? Faults(method, given, error)
                              : IsOpusMethod(method)   ? Opus(method, given, error)
+                             : IsTraceMethod(method)  ? Trace(method, given, error)
                                                       : Reflect(method, given, error);
         if (!error.empty())
             return Error(id, error.c_str());
