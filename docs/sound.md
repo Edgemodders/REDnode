@@ -204,7 +204,9 @@ On 2026-10-20 on the laptop, before the full steps (no logs sent). The user's ea
 
 Also found while checking: the new Stop code clashed with an existing name in the page, which would have stopped the whole app from loading; caught by the preview, fixed before the build.
 
-### SP2 retest (REDnode 0.26.12)
+### SP2 retest (REDnode 0.26.12, or 0.26.13)
+
+REDnode 0.26.13 retires the **Sound spike** app (agreed with the user on 2026-10-20: the Tracer does all it did) and, for the user's note that its window scrolled whole, adds `ui.list` to the UI builder: a scrolling list of lines that fills a window's free height (sample `apps/list-mod`). The retest steps below are the same on 0.26.13; delete `red4ext/plugins/REDnode/apps/sound-spike` from the game folder, since extracting an update does not remove it.
 
 REDnode 0.26.12 adds what the user asked next: the Tracer had no close button (its window lacked the kit's `closable` attribute, copied from the UI kit app). Sound Tracer 0.2.1 has one. Closing it switches the app off, which stops the trace and its sounds; and since an event posted on V plays in the game, the host now stops every event a package posted (through `AudioSystem.Stop`) when the package stops, for any package. Checked in the mock game: a mod that posted an ambience and crashed had it stopped.
 
