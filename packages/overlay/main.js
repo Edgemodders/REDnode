@@ -1863,6 +1863,8 @@ async function soundCall(id, method, params) {
     }
     case 'sound.list':
       return bridgeCall('sound.list', { owner: id });
+    case 'sound.search':
+      return searchSounds(params);
     case 'sound.eventSounds':
       // An event's recordings (its variations), from the game's sound index.
       return eventSounds(GAME_DIR, params.event);
@@ -1937,6 +1939,7 @@ async function soundCall(id, method, params) {
 const tracers = new Set();
 const variationTurn = new Map(); // "package|event" -> the next variation sound.playGame plays
 let eventNames = null; // Map(Wwise id -> event name), once loaded
+let eventTags = new Map(); // Wwise id -> the list's tags for it (a category, a weapon...)
 let eventNamesLoading = false;
 let traceStarted = 0; // the clock time the plugin's trace started, for the log
 let traceLogMoved = false;
@@ -1948,10 +1951,69 @@ function loadEventNames() {
     .call('sound.events', {})
     .then((list) => {
       eventNames = new Map(list.events.map((e) => [e.hash >>> 0, e.name]));
+      eventTags = new Map(list.events.map((e) => [e.hash >>> 0, e.tags ?? []]));
       log(`Sound trace: ${eventNames.size} event names from REDbridge (WolvenKit's list, game ${list.gameVersion ?? '?'})`);
     })
     .catch((err) => log(`Sound trace: no event names, only ids (${err.message})`))
     .finally(() => (eventNamesLoading = false));
+}
+
+// Sound Search (Sound Tools, SP3): every event the game's sound index has recordings for,
+// and every event REDbridge's list names, searched by words of the name or its tags, by
+// event id, or by sound id (the events that play that recording). Rebuilt when the index
+// changes (a hot swap) or the names arrive.
+let soundCatalog = null; // { index, named, events: [{ event, name, tags, sounds, text }], bySound }
+
+function soundCatalogNow() {
+  const index = gameSoundIndex(GAME_DIR);
+  const named = eventNames?.size ?? 0;
+  if (soundCatalog?.index === index && soundCatalog.named === named) return soundCatalog;
+  const ids = new Set(index.events.keys());
+  for (const id of eventNames?.keys() ?? []) ids.add(id);
+  const events = [...ids].map((event) => {
+    const name = eventNames?.get(event) ?? null;
+    const tags = eventTags.get(event) ?? [];
+    return { event, name, tags, sounds: index.events.get(event) ?? [], text: `${name ?? ''} ${tags.join(' ')}`.toLowerCase() };
+  });
+  const bySound = new Map();
+  for (const e of events) {
+    for (const s of e.sounds) {
+      if (!bySound.has(s)) bySound.set(s, []);
+      bySound.get(s).push(e);
+    }
+  }
+  soundCatalog = { index, named, events, bySound };
+  return soundCatalog;
+}
+
+function searchSounds(params) {
+  loadEventNames();
+  const query = String(params.query ?? '').trim().toLowerCase();
+  const limit = Math.min(1000, Math.max(1, Math.floor(Number(params.limit) || 200)));
+  const c = soundCatalogNow();
+  let hits = [];
+  if (/^#?\d+$/.test(query)) {
+    const id = Number(query.replace('#', '')) >>> 0;
+    hits = [
+      ...c.events.filter((e) => e.event === id).map((e) => ({ ...e, match: 'event' })),
+      ...(c.bySound.get(id) ?? []).map((e) => ({ ...e, match: 'sound', sound: id })),
+    ];
+  } else if (query) {
+    const words = query.split(/\s+/);
+    const first = words[0];
+    hits = c.events.filter((e) => e.name && words.every((w) => e.text.includes(w)));
+    // Names that start with the first word come first, then the shorter, then by name.
+    const rank = (e) => (e.name.toLowerCase().startsWith(first) ? 0 : e.name.toLowerCase().includes(first) ? 1 : 2);
+    hits.sort((a, b) => rank(a) - rank(b) || a.name.length - b.name.length || a.name.localeCompare(b.name));
+    hits = hits.map((e) => ({ ...e, match: 'name' }));
+  }
+  return {
+    total: hits.length,
+    results: hits.slice(0, limit).map(({ text: _text, ...e }) => e),
+    names: eventNames ? 'ready' : eventNamesLoading ? 'loading' : 'none',
+    events: c.events.length,
+    recorded: c.index.events.size,
+  };
 }
 
 function traceLogFile() {

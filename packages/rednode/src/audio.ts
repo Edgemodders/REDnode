@@ -241,6 +241,28 @@ export const audio = {
   },
 
   /**
+   * Searches the game's sound events: words of a name (all must appear in the event's name
+   * or tags, in any order), an event id, or a sound id (the events that play that
+   * recording). The catalogue holds every event the game's sound index has recordings for
+   * and every event REDbridge's list names (WolvenKit's, game 1.6); names arrive a few
+   * seconds after the first search while REDbridge starts, so `names` says `"loading"`
+   * until then, and `"none"` without REDbridge, when only ids match.
+   *
+   * Experimental (Sound Tools, SP3): its shape may change.
+   *
+   * @example
+   * ```ts
+   * import { audio } from "rednode";
+   *
+   * const { results, total } = await audio.searchSounds("katana draw");
+   * for (const e of results) console.log(`${e.name ?? e.event}: ${e.sounds.length} recordings`);
+   * ```
+   */
+  async searchSounds(query: string, options: { limit?: number } = {}): Promise<SoundSearch> {
+    return (await call("sound.search", { query, limit: options.limit })) as SoundSearch;
+  },
+
+  /**
    * Posts one of the game's sound events by name through the game's `AudioSystem.Play`: the
    * game plays it through its own mix, with the event's own logic (variations, effects). The
    * game must know the name; an unknown one plays nothing.
@@ -317,6 +339,33 @@ export const audio = {
     };
   },
 };
+
+/** What {@link audio.searchSounds} finds. */
+export interface SoundSearch {
+  /** How many events matched; `results` holds the first `limit` (200 by default). */
+  total: number;
+  results: SoundEventInfo[];
+  /** Whether the names have loaded: until `"ready"`, only ids match. */
+  names: "ready" | "loading" | "none";
+  /** Events in the catalogue, and how many of them have recordings in the game's sound index. */
+  events: number;
+  recorded: number;
+}
+
+/** One game sound event, as {@link audio.searchSounds} lists it. */
+export interface SoundEventInfo {
+  /** Its Wwise id. */
+  event: number;
+  /** Its name, when REDbridge's list has it. */
+  name: string | null;
+  /** The list's tags for it, such as a category or a weapon. */
+  tags: string[];
+  /** The sound ids of its recordings, which {@link audio.playGame} plays with `{ event }`. */
+  sounds: number[];
+  /** What matched: words of its name or tags, its event id, or one of its sound ids (`sound`). */
+  match: "name" | "event" | "sound";
+  sound?: number;
+}
 
 /** A game sound playing through REDnode's engine, from {@link audio.playGame}. */
 export type GameSound = Sound & {
