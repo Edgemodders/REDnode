@@ -39,7 +39,7 @@ red4ext/plugins/REDnode/
 
 | What | Where it comes from |
 |---|---|
-| The samples | `SAMPLES` in `tools/release/player-zip.mjs`: Hello mod, Ask mod, UI kit, Vitals, Coords, Perf. The other apps in `packages/overlay/apps` are tests and stay out. The zip's copies have `"open": false` |
+| The samples | `SAMPLES` in `tools/release/player-zip.mjs`: Hello mod, Ask mod, UI kit, Vitals, Coords, Perf, Test timer (since 0.26.16). The other apps in `packages/overlay/apps` are tests and stay out. The zip's copies have `"open": false` |
 | REDbridge | Not in the zip. REDnode runs without it; packages that use `kernel.bridge()` find the copy EDGEdeck or REDcode fetched. REDbridge is GPL-3.0 and 60 MB, and already reaches players through those two |
 | REDagent | Not in the zip. It is its own download (its repo), installed into the same `apps` folder |
 

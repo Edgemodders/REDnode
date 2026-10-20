@@ -32,7 +32,7 @@ const zip = join(out, `REDnode-${version}.zip`);
 
 // The samples players get. Each starts off; the player switches it on in the launcher.
 // The other apps in packages/overlay/apps are tests and stay in the repo.
-const SAMPLES = ['hello-mod', 'ask-mod', 'kit', 'vitals', 'coords', 'perf'];
+const SAMPLES = ['hello-mod', 'ask-mod', 'kit', 'vitals', 'coords', 'perf', 'timer'];
 
 for (const need of ['REDnode.dll', 'Scripts', join('host', 'REDnode-overlay.exe')]) {
   if (!existsSync(join(plugin, need))) {

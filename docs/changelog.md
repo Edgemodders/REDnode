@@ -14,6 +14,7 @@ How to keep it:
 **New**
 
 - A package's `requires` can name `rednode` with a version, for app packs that need a REDnode new enough. The overlay host answers with its own version.
+- The **Test timer** is now a sample in the download, off until you switch it on: a stopwatch whose **Mark** writes the step and the time to the Mod log and `red4ext/logs/rednode-mods.log`, to match log lines to what you did while testing a mod.
 
 ## 0.26.15 (2026-10-20)
 
