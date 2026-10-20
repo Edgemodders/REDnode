@@ -668,10 +668,12 @@ export const audio = {
       const ms = Date.now() - t0;
       const posts = [];
       const loads = [];
-      for (const [name, every] of SIM_EVENTS) {
-        if (Math.random() < every) posts.push({ ms, event: wwiseHash(name), object: Math.random() < 0.5 ? '18446744073709551615' : '7340032', playing: 1000 + Math.floor(ms / 10) });
-      }
+      // The host names events from REDbridge's list, which knows the first four of these.
+      SIM_EVENTS.forEach(([name, every], i) => {
+        if (Math.random() < every) posts.push({ ms, event: wwiseHash(name), name: i < 4 ? name : undefined, object: String(950 + Math.floor(Math.random() * 300)), playing: 1000 + Math.floor(ms / 10) });
+      });
       if (Math.random() < 0.3) loads.push({ ms, sound: [...SIM_SOUNDS.keys()][Math.floor(Math.random() * SIM_SOUNDS.size)], found: true });
+      if (Math.random() < 0.05) loads.push({ ms, sound: 300000000 + Math.floor(Math.random() * 1e8), found: false });
       onTrace({ posts, loads, dropped: 0 });
     }, 100);
     return async () => clearInterval(timer);
@@ -843,6 +845,14 @@ export const agent = {
 export const ui = {
   window() {
     throw new Error('rednode: ui.window is for Node mods. Overlay apps write HTML with the UI kit.');
+  },
+  // The page's clipboard here; in the game the host writes the Windows clipboard.
+  async copy(text) {
+    try {
+      await navigator.clipboard.writeText(String(text));
+    } catch {
+      log('info', `ui.copy: this browser did not allow the clipboard here; in the game the text is copied`, 'sim');
+    }
   },
   async solo(on) {
     sim.solo = !!on;

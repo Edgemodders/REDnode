@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sound Tracer</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<script type="importmap">{ "imports": { "rednode": "rednode://sdk/index.js" } }</script>
+<style>
+  /* Sound Tracer (REDnode Sound Tools, SP2): the game's sound events and loads, live.
+     The window never scrolls; each column is its own scrolling list of the newest rows. */
+  html, body { margin: 0; width: 780px; height: 600px; overflow: hidden; background: transparent; }
+  rn-window { position: absolute; inset: 6px; }
+  .bar { display: flex; gap: 8px; align-items: center; flex: none; }
+  .bar rn-input { flex: 1; min-width: 0; }
+  .line { margin: 0; flex: none; font: 12px var(--rn-mono); color: var(--rn-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .line.bad { color: var(--rn-danger); }
+  .line.good { color: var(--rn-fg); }
+  .cols { flex: 1; min-height: 0; display: grid; grid-template-columns: 3fr 2fr; gap: 10px; }
+  section { min-height: 0; display: flex; flex-direction: column; border: 1px solid var(--rn-line); }
+  section > header { flex: none; display: flex; justify-content: space-between; padding: 5px 8px;
+    font: 700 12px var(--rn-display); letter-spacing: .12em; text-transform: uppercase; color: var(--rn-accent);
+    border-bottom: 1px solid var(--rn-line); }
+  section > header span { font: 12px var(--rn-mono); letter-spacing: 0; text-transform: none; color: var(--rn-dim); }
+  .list { flex: 1; min-height: 0; overflow-y: auto; font: 12px var(--rn-mono); }
+  .row { display: flex; align-items: center; gap: 6px; padding: 2px 6px; color: var(--rn-fg); }
+  .row:nth-child(even) { background: color-mix(in srgb, var(--rn-panel-2) 45%, transparent); }
+  .row:hover { background: color-mix(in srgb, var(--rn-accent) 14%, transparent); }
+  .row.hidden { display: none; }
+  .t { color: var(--rn-dim); flex: none; }
+  .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n small { color: var(--rn-dim); font-size: 11px; margin-left: 6px; }
+  .tag { color: var(--rn-dim); font-size: 11px; flex: none; }
+  .row button { flex: none; width: 22px; height: 18px; padding: 0; font: 11px var(--rn-mono); cursor: pointer;
+    color: var(--rn-accent-2); background: transparent; border: 1px solid color-mix(in srgb, var(--rn-accent-2) 50%, transparent); }
+  .row button:hover:not(:disabled) { background: color-mix(in srgb, var(--rn-accent-2) 18%, transparent); }
+  .row button:disabled { opacity: .3; cursor: default; }
+  .empty { padding: 10px 8px; color: var(--rn-dim); font: 12px var(--rn-mono); }
+</style>
+</head>
+<body>
+<rn-window id="win" title="Sound Tracer" draggable>
+  <div class="bar">
+    <rn-button id="run">Start trace</rn-button>
+    <rn-button id="pause" variant="ghost" disabled>Pause</rn-button>
+    <rn-button id="clear" variant="ghost">Clear</rn-button>
+    <rn-input id="filter" placeholder="Filter: a name, an id or an object"></rn-input>
+  </div>
+  <p id="stats" class="line">Not tracing. Start a trace, then play: every sound event and load shows here.</p>
+  <div class="cols">
+    <section>
+      <header>Played <span id="playedCount"></span></header>
+      <div class="list" id="played"><div class="empty">Events the game posts to its audio engine</div></div>
+    </section>
+    <section>
+      <header>Loaded <span id="loadedCount"></span></header>
+      <div class="list" id="loaded"><div class="empty">Sounds the game loads by id</div></div>
+    </section>
+  </div>
+  <div class="bar">
+    <rn-input id="paste" placeholder="Paste an event name, an event id or a sound id, then Enter"></rn-input>
+    <rn-button id="play">Play</rn-button>
+  </div>
+  <p id="said" class="line"></p>
+</rn-window>
+<script type="module">
+  import { audio, ui } from 'rednode';
+
+  // Each column keeps its newest rows only, so a long trace never grows without limit.
+  // Every row also goes to red4ext/logs/rednode-sound-trace.log, written by the host.
+  const KEEP = 2000;
+  const $ = (id) => document.getElementById(id);
+  const names = new Map(); // event id -> name, as the trace brings them
+  let stop = null;
+  let started = 0; // when the trace started: rows' clock times count from it
+  let since = 0; // when the counts started: the trace's start or the last Clear
+  let paused = false;
+  let waiting = { played: [], loaded: [] };
+  let counts = { posts: 0, loads: 0, missing: 0, dropped: 0 };
+  let events = new Set();
+  let filter = '';
+
+  const two = (n) => String(n).padStart(2, '0');
+  const clock = (t) => {
+    const d = new Date(t);
+    return `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}.${String(Math.floor(d.getMilliseconds() / 100))}`;
+  };
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+  function say(text, tone = '') {
+    $('said').textContent = text;
+    $('said').className = `line ${tone}`;
+  }
+
+  // ---- trace ----
+
+  $('run').addEventListener('click', async () => {
+    if (stop) {
+      const s = stop;
+      stop = null;
+      await s().catch(() => {});
+      setPaused(false);
+      $('run').textContent = 'Start trace';
+      $('pause').setAttribute('disabled', '');
+      showStats();
+      return;
+    }
+    try {
+      stop = await audio.trace(onBatch);
+      started = since = Date.now();
+      counts = { posts: 0, loads: 0, missing: 0, dropped: 0 };
+      events = new Set();
+      $('run').textContent = 'Stop trace';
+      $('pause').removeAttribute('disabled');
+      showStats();
+    } catch (err) {
+      $('stats').textContent = `Could not start the trace: ${err.message}`;
+      $('stats').className = 'line bad';
+    }
+  });
+
+  function onBatch({ posts, loads, dropped }) {
+    counts.dropped += dropped;
+    const played = posts.map((p) => {
+      counts.posts++;
+      events.add(p.event);
+      if (p.name) names.set(p.event, p.name);
+      return playedRow(p);
+    });
+    const loaded = loads.map((l) => {
+      counts.loads++;
+      if (!l.found) counts.missing++;
+      return loadedRow(l);
+    });
+    add('played', played);
+    add('loaded', loaded);
+    showStats();
+  }
+
+  function showStats() {
+    const s = Math.max(1, (Date.now() - since) / 1000);
+    const named = [...events].filter((id) => names.has(id)).length;
+    const time = `${Math.floor(s / 60)}:${two(Math.floor(s % 60))}`;
+    $('stats').textContent =
+      `${stop ? `Tracing ${time}` : 'Stopped'}: ${counts.posts} played (${(counts.posts / s).toFixed(1)}/s) of ${events.size} events, ` +
+      `${named} named; ${counts.loads} loaded, ${counts.missing} not in the index` +
+      (counts.dropped ? `; ${counts.dropped} lost` : '') +
+      (paused ? `; paused, ${waiting.played.length + waiting.loaded.length} new` : '');
+    $('stats').className = counts.dropped ? 'line bad' : 'line good';
+    $('playedCount').textContent = counts.posts ? String(counts.posts) : '';
+    $('loadedCount').textContent = counts.loads ? String(counts.loads) : '';
+  }
+
+  // ---- rows ----
+
+  function playedRow(p) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const label = p.name ?? `#${p.event}`;
+    row.dataset.key = p.name ?? String(p.event);
+    row.dataset.kind = 'event';
+    row.dataset.text = `${label} ${p.event} ${p.object}`.toLowerCase();
+    const playTip = p.name ? `Play ${p.name} through the game` : 'No name for this event: the game plays events by name';
+    row.innerHTML =
+      `<span class="t">${clock(started + p.ms)}</span>` +
+      `<span class="n" title="Event ${p.event} on game object ${esc(p.object)}">${esc(label)}${p.name ? `<small>${p.event}</small>` : ''}</span>` +
+      `<span class="tag">${p.playing ? esc(p.object) : 'failed'}</span>` +
+      `<button data-act="play" title="${esc(playTip)}"${p.name ? '' : ' disabled'}>&#9654;</button>` +
+      `<button data-act="copy" title="Copy ${esc(row.dataset.key)}">&#10697;</button>`;
+    return row;
+  }
+
+  function loadedRow(l) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.dataset.key = String(l.sound);
+    row.dataset.kind = 'sound';
+    row.dataset.text = `${l.sound}${l.found ? '' : ' not in the index'}`;
+    const playTip = l.found ? `Play sound ${l.sound} as recorded, without the game's effects` : 'Not in the opus index (likely inside a Wwise bank): cannot be played by id';
+    row.innerHTML =
+      `<span class="t">${clock(started + l.ms)}</span>` +
+      `<span class="n">${l.sound}</span>` +
+      (l.found ? '' : '<span class="tag">not in the index</span>') +
+      `<button data-act="play" title="${esc(playTip)}"${l.found ? '' : ' disabled'}>&#9654;</button>` +
+      `<button data-act="copy" title="Copy ${l.sound}">&#10697;</button>`;
+    return row;
+  }
+
+  function add(which, rows) {
+    if (!rows.length) return;
+    if (paused) {
+      const w = waiting[which];
+      w.push(...rows);
+      if (w.length > KEEP) w.splice(0, w.length - KEEP);
+      return;
+    }
+    const list = $(which);
+    list.querySelector('.empty')?.remove();
+    const atEnd = list.scrollTop + list.clientHeight >= list.scrollHeight - 8;
+    const frag = document.createDocumentFragment();
+    for (const row of rows) {
+      if (filter && !row.dataset.text.includes(filter)) row.classList.add('hidden');
+      frag.append(row);
+    }
+    list.append(frag);
+    while (list.childElementCount > KEEP) list.firstElementChild.remove();
+    if (atEnd) list.scrollTop = list.scrollHeight;
+  }
+
+  function setPaused(on) {
+    paused = on;
+    $('pause').textContent = on ? 'Resume' : 'Pause';
+    if (!on) {
+      const w = waiting;
+      waiting = { played: [], loaded: [] };
+      add('played', w.played);
+      add('loaded', w.loaded);
+    }
+    showStats();
+  }
+
+  $('pause').addEventListener('click', () => setPaused(!paused));
+
+  $('clear').addEventListener('click', () => {
+    for (const which of ['played', 'loaded']) $(which).replaceChildren();
+    waiting = { played: [], loaded: [] };
+    counts = { posts: 0, loads: 0, missing: 0, dropped: 0 };
+    events = new Set();
+    since = Date.now();
+    showStats();
+  });
+
+  $('filter').addEventListener('input', (e) => {
+    filter = e.detail.value.trim().toLowerCase();
+    for (const row of document.querySelectorAll('.list .row')) {
+      row.classList.toggle('hidden', !!filter && !row.dataset.text.includes(filter));
+    }
+  });
+
+  for (const which of ['played', 'loaded']) {
+    $(which).addEventListener('click', (e) => {
+      const button = e.target.closest('button[data-act]');
+      if (!button || button.disabled) return;
+      const row = button.closest('.row');
+      if (button.dataset.act === 'copy') copy(row.dataset.key);
+      else if (row.dataset.kind === 'event') playEvent(row.dataset.key);
+      else playSound(Number(row.dataset.key));
+    });
+  }
+
+  // ---- copy and play ----
+
+  async function copy(text) {
+    try {
+      await ui.copy(text);
+      say(`Copied ${text}`);
+    } catch (err) {
+      say(`Could not copy ${text}: ${err.message}`, 'bad');
+    }
+  }
+
+  async function playEvent(name) {
+    try {
+      await audio.event(name);
+      say(`Played ${name} through the game`, 'good');
+    } catch (err) {
+      say(`${name}: ${err.message}`, 'bad');
+    }
+  }
+
+  async function playSound(id) {
+    try {
+      const s = await audio.playGame(id);
+      say(`Playing sound ${id} (${s.seconds.toFixed(2)} s), as recorded`, 'good');
+    } catch (err) {
+      say(`Sound ${id}: ${err.message}`, 'bad');
+    }
+  }
+
+  // A pasted number is an event id when the trace has seen it with a name, else a sound id.
+  async function playPasted() {
+    const text = $('paste').value.trim().replace(/^#/, '');
+    if (!text) return;
+    if (!/^\d+$/.test(text)) return playEvent(text);
+    const id = Number(text);
+    if (names.has(id)) return playEvent(names.get(id));
+    try {
+      const s = await audio.playGame(id);
+      say(`Playing sound ${id} (${s.seconds.toFixed(2)} s), as recorded`, 'good');
+    } catch (err) {
+      say(`${id}: ${err.message}. An event id plays only once the trace has shown its name.`, 'bad');
+    }
+  }
+
+  $('play').addEventListener('click', playPasted);
+  $('paste').addEventListener('submit', playPasted);
+</script>
+</body>
+</html>

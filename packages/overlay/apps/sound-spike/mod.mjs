@@ -106,6 +106,7 @@ async function toggle() {
 function onBatch(batch) {
   dropped += batch.dropped;
   for (const p of batch.posts) {
+    if (p.name) names.set(p.event, p.name);
     posts++;
     if (!p.playing) failedPosts++;
     byEvent.set(p.event, (byEvent.get(p.event) ?? 0) + 1);

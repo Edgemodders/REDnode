@@ -1,0 +1,15 @@
+{
+  "id": "sound-tracer",
+  "name": "Sound Tracer",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "Lists the game's sounds live: the events it posts to Wwise (Played) and the sounds it loads (Loaded). Filter, pause, copy, and play any row again. Part of REDnode Sound Tools.",
+  "entry": "index.html",
+  "kind": "window",
+  "width": 780,
+  "height": 600,
+  "anchor": "top-left",
+  "x": 80,
+  "y": 110,
+  "open": false
+}

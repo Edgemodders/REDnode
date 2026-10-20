@@ -221,6 +221,7 @@ export const ui = {
       },
     };
   },
+  copy: (text) => call({ path: ['ui', 'copy'], args: [text] }),
   solo: (on) => call({ path: ['ui', 'solo'], args: [on] }),
   onSolo: (fn) => listen('solo', null, fn),
 };

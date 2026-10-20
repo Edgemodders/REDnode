@@ -246,6 +246,25 @@ export const NOTES = {
     ],
     preview: 'The sounds on this page are made up and play as a tone: in the game the plugin hooks its audio engine and plays the real recordings.',
   },
+  'sound-tracer': {
+    group: 'game',
+    summary: 'The game\'s sounds, live: every event it posts to its audio engine and every sound it loads, each with a button to play it again.',
+    teaches: ['audio.trace', 'audio.event', 'audio.playGame', 'a window that never scrolls'],
+    how: [
+      'audio.trace hands over batches about ten times a second. Played rows are events, named when REDnode knows the name (REDbridge\'s list, loaded by the host, so no permission is needed). Loaded rows are sound ids.',
+      'Each column is its own scrolling list that keeps the newest 2,000 rows; the window around them has a fixed size and never scrolls. Rows stick to the bottom unless you scroll up.',
+      'Play on an event posts it by name through the game, with the game\'s mix. Play on a sound plays that one recording through REDnode\'s engine, raw. An event without a name cannot be played: the game plays events by name.',
+      'The host also writes every row to red4ext/logs/rednode-sound-trace.log, so nothing is lost when a column drops old rows.',
+      'Part of REDnode Sound Tools.',
+    ],
+    tryThis: [
+      'Press Start trace and watch both columns fill.',
+      'Type katana in the filter.',
+      'Press Pause, wait, then Resume: the rows that came in the meantime are added.',
+      'Paste 746693166 in the box at the bottom and press Enter.',
+    ],
+    preview: 'The sounds on this page are made up and play as a tone: in the game the plugin hooks its audio engine and plays the real recordings.',
+  },
   vitals: {
     group: 'hud',
     summary: 'A HUD widget with V\'s health, level and money, read through the generic game API from a web page.',
