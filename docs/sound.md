@@ -167,6 +167,31 @@ The user's notes for SP2:
 | Keep the history from growing without limit | Each column keeps the newest 2,000 rows |
 | Are the rows logged anywhere? | They were not: the spike logged only the counts and its summary. SP2's host writes every post and load to `red4ext/logs/rednode-sound-trace.log`, with names |
 
+### SP2 Sound Tracer: built (REDnode 0.26.10)
+
+| Part | What |
+|---|---|
+| `apps/sound-tracer` | The app, an overlay page with the UI kit (780 x 600, closed at start, no permissions). **Played** lists events with their time, name (or `#id`), id and game object; **Loaded** lists sound ids, greyed when not in the opus index. Each row has **Play** and **Copy**. The window never scrolls: each column scrolls on its own, keeps its newest 2,000 rows, and follows the newest row unless scrolled up. Filter, Pause (new rows wait and come in on Resume), Clear, and a box at the bottom that plays a pasted event name, event id (once the trace has shown its name) or sound id |
+| Names (host) | `main.js` loads REDbridge's `sound.events` when a trace starts and adds `names` to each batch, so `audio.trace`'s posts carry `name`. A package needs no bridge permission for them. Without REDbridge the rows show ids, and the overlay log says why |
+| Trace log (host) | Every post and load, with names and clock times, goes to `red4ext/logs/rednode-sound-trace.log`; the last session's file is kept as `rednode-sound-trace.prev.log` |
+| `ui.copy(text)` | New in the `rednode` package: writes the Windows clipboard through the host, for mods and pages (an overlay window's own `navigator.clipboard` is not reliable). Write only |
+| The spike app | Takes names from the batches too |
+
+Checked in the mock game (the host with REDbridge's 17,586 names: a known event named in the batches and the log; the clipboard written; the old log kept) and in the example page's simulation (the window does not scroll, the columns do, filter, pause, paste and row buttons). Not yet seen in the game.
+
+### SP2 test
+
+REDnode 0.26.10 on the laptop (the plugin log's first line says "REDnode 0.26.10 loading"). REDbridge must be installed for names (Get REDbridge in the Mod Manager). Then:
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. Load a save. In the Mod Manager switch on **Sound Tracer**; it opens without asking for a permission. **Mark**.
+2. Press **Start trace**. Walk, draw the katana, swing it, put it away, open and close the inventory, about 30 seconds. Does the window stay put while both columns fill and scroll? After a few seconds, does the line under the buttons count named events? **Mark**.
+3. Scroll the Played column up: it should stay where you put it while rows come in. Scroll back to the bottom: it follows again. Type `katana` in the filter, then clear it. **Mark**.
+4. Press **Pause**, wait about 5 seconds, press **Resume**: the rows from the pause appear. **Mark**.
+5. Press **Play** on a named row in Played, then on a row in Loaded. What did you hear? **Mark**.
+6. Press **Copy** on a row in Loaded, paste it into the box at the bottom (Ctrl+V) and press Enter: the same sound plays. **Mark**.
+7. Press **Stop trace** and quit the game. Send `rednode-sound-trace.log`, `rednode-mods.log`, the plugin log (`rednode-*.log` of this session) and `rednode-overlay.log`.
+
 **Requested of EDGEwave** ([EDGEwave #2](https://github.com/Edgemodders/EDGEwave/issues/2)): a fifth Into the Game route, **As a REDnode sound**, writing the render into a REDnode package's folder with a `sounds` entry in its manifest. S1 already plays it; nothing to pack.
 
 ## Research before S1
