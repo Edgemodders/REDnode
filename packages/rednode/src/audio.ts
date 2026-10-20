@@ -177,13 +177,18 @@ export const audio = {
   },
 
   /**
-   * Plays one of the game's own sound effects by its sound id (one variation, as the game's
-   * `sfx_container.opusinfo` lists it), through REDnode's engine like a file of your package:
-   * the raw recording, without the game's effects. The game's archives store it as Opus; it
-   * is decoded on first use. An archive in `archive/pc/mod` that carries the sound index wins
+   * Plays one of the game's own sound effects through REDnode's engine like a file of your
+   * package: the raw recording, without the game's effects or position, so you hear it
+   * wherever the sound happens in the game. The game's archives store it as Opus; it is
+   * decoded on first use. An archive in `archive/pc/mod` that carries the sound index wins
    * over the game's own, so a hot-swapped sound plays its new version.
    *
-   * Experimental (Sound Tools, SP1): its shape may change.
+   * Give a sound id (one variation, as the game's `sfx_container.opusinfo` lists it), or
+   * `{ event }` with an event's name or Wwise id to play one of that event's recordings:
+   * `variation` (from 0) picks one, otherwise they come in turn. Stop events, and events
+   * whose sound lives in a Wwise bank, have no recordings there and reject.
+   *
+   * Experimental (Sound Tools): its shape may change.
    *
    * @example
    * ```ts
@@ -191,12 +196,48 @@ export const audio = {
    *
    * const s = await audio.playGame(746693166); // a katana sound
    * await s.ended;
+   * const step = await audio.playGame({ event: "lcm_fs_bare_feet_concrete_walk" });
+   * console.log(`variation ${step.variation + 1} of ${step.variations}`);
    * ```
    */
-  async playGame(sound: number, options?: PlayOptions): Promise<Sound & { seconds: number }> {
+  async playGame(
+    sound: number | { event: string | number; variation?: number },
+    options?: PlayOptions,
+  ): Promise<GameSound> {
     listen();
-    const r = (await call("sound.playGame", { sound, ...options })) as { id: number; seconds: number };
-    return Object.assign(handle(r.id), { seconds: r.seconds });
+    const which = typeof sound === "number" ? { sound } : { event: sound.event, variation: sound.variation };
+    const r = (await call("sound.playGame", { ...which, ...options })) as {
+      id: number;
+      sound: number;
+      seconds: number;
+      event?: number;
+      variation?: number;
+      variations?: number;
+    };
+    return Object.assign(handle(r.id), {
+      seconds: r.seconds,
+      sound: r.sound,
+      ...(r.event !== undefined ? { event: r.event, variation: r.variation!, variations: r.variations! } : {}),
+    });
+  },
+
+  /**
+   * The sound ids of an event's recordings (its variations), by its name or Wwise id, from
+   * the game's sound index: what {@link audio.playGame} picks from with `{ event }`. Empty
+   * for a stop event, or one whose sound lives in a Wwise bank.
+   *
+   * Experimental (Sound Tools): its shape may change.
+   *
+   * @example
+   * ```ts
+   * import { audio } from "rednode";
+   *
+   * const { sounds } = await audio.eventSounds("lcm_fs_bare_feet_concrete_walk");
+   * console.log(`${sounds.length} footstep variations`);
+   * ```
+   */
+  async eventSounds(event: string | number): Promise<{ event: number; sounds: number[] }> {
+    return (await call("sound.eventSounds", { event })) as { event: number; sounds: number[] };
   },
 
   /**
@@ -252,10 +293,12 @@ export const audio = {
     const off = transport().listen((m) => {
       if (m.event !== "sound-trace") return;
       const names = (m.names as Record<string, string> | undefined) ?? {};
+      const recordings = (m.recordings as Record<string, number> | undefined) ?? {};
       const posts = ((m.posts as [number, number, string, number][]) ?? []).map(([ms, event, object, playing]) => ({
         ms,
         event,
         name: names[event],
+        recordings: recordings[event],
         object,
         playing,
       }));
@@ -273,6 +316,18 @@ export const audio = {
       await call("sound.trace", { on: false });
     };
   },
+};
+
+/** A game sound playing through REDnode's engine, from {@link audio.playGame}. */
+export type GameSound = Sound & {
+  /** Its length in seconds. */
+  seconds: number;
+  /** Its sound id. */
+  sound: number;
+  /** With `{ event }`: the event's Wwise id, which recording this is (from 0), and how many it has. */
+  event?: number;
+  variation?: number;
+  variations?: number;
 };
 
 /** A game sound event posted by {@link audio.event}. */
@@ -297,8 +352,12 @@ export interface TraceBatch {
    * loads when a trace starts; your package needs no permission for them. Events newer than
    * the list, or traced before the list has loaded, have no name. A Wwise game object is not
    * an entity id (Sound Tools SP1).
+   *
+   * `recordings` counts the event's recordings in the game's sound index, which
+   * {@link audio.playGame} plays with `{ event }`: 0 for a stop event, or one whose sound
+   * lives in a Wwise bank.
    */
-  posts: { ms: number; event: number; name?: string; object: string; playing: number }[];
+  posts: { ms: number; event: number; name?: string; recordings?: number; object: string; playing: number }[];
   /** Sounds the game loaded: `ms`, the sound id, and whether the index had it. */
   loads: { ms: number; sound: number; found: boolean }[];
   /** Records lost since the last batch because too many came at once. */

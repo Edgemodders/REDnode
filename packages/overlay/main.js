@@ -31,7 +31,7 @@ const { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED } = requi
 const bridgeInstall = require('./bridge-install');
 const { createLookup } = require('./gameapi-lookup');
 const { soundPaksIn } = require('./archive-index');
-const { gameSoundWav } = require('./game-sounds');
+const { gameSoundWav, eventSounds, soundIndex: gameSoundIndex } = require('./game-sounds');
 const crypto = require('node:crypto');
 
 // REDNODE_OVERLAY_PIPE lets tests use a private pipe instead of the game's.
@@ -1863,10 +1863,27 @@ async function soundCall(id, method, params) {
     }
     case 'sound.list':
       return bridgeCall('sound.list', { owner: id });
+    case 'sound.eventSounds':
+      // An event's recordings (its variations), from the game's sound index.
+      return eventSounds(GAME_DIR, params.event);
     case 'sound.playGame': {
       // One of the game's own sounds by its id, decoded from its pak (game-sounds.js), played
-      // by REDnode's engine like a package's file.
-      const sound = Number(params.sound);
+      // by REDnode's engine like a package's file. With "event" instead of "sound", one of that
+      // event's recordings: "variation" (from 0) picks one, else they come in turn per package.
+      let sound = Number(params.sound);
+      let picked = null;
+      if (params.event !== undefined) {
+        const { event, sounds } = eventSounds(GAME_DIR, params.event);
+        if (!sounds.length) {
+          throw new Error(`Event ${params.event} has no recordings in the game's sound index: a stop event, or one whose sound lives in a Wwise bank`);
+        }
+        const key = `${id}|${event}`;
+        const at = Number.isInteger(params.variation) ? params.variation : variationTurn.get(key) ?? 0;
+        if (at < 0 || at >= sounds.length) throw new Error(`Event ${params.event} has ${sounds.length} recordings: variation runs from 0 to ${sounds.length - 1}`);
+        variationTurn.set(key, (at + 1) % sounds.length);
+        sound = sounds[at];
+        picked = { event, variation: at, variations: sounds.length };
+      }
       const found = await gameSoundWav(GAME_DIR, sound);
       const opts = {};
       for (const k of PLAY_KEYS) if (params[k] !== undefined) opts[k] = params[k];
@@ -1877,7 +1894,7 @@ async function soundCall(id, method, params) {
       await ensureMix();
       const r = await bridgeCall('sound.play', { ...opts, file: found.file, owner: id });
       soundOwners.set(r.id, id);
-      return { id: r.id, sound, seconds: found.seconds, channels: found.channels, pak: found.pak, from: found.from };
+      return { id: r.id, sound, seconds: found.seconds, channels: found.channels, pak: found.pak, from: found.from, ...picked };
     }
     case 'sound.event':
     case 'sound.stopEvent': {
@@ -1918,6 +1935,7 @@ async function soundCall(id, method, params) {
 // carries `names` for the events in it that have one. Every post and load also goes to
 // rednode-sound-trace.log beside the mod log; the last session's file is kept as .prev.log.
 const tracers = new Set();
+const variationTurn = new Map(); // "package|event" -> the next variation sound.playGame plays
 let eventNames = null; // Map(Wwise id -> event name), once loaded
 let eventNamesLoading = false;
 let traceStarted = 0; // the clock time the plugin's trace started, for the log
@@ -1987,6 +2005,15 @@ function logTraceBatch(m) {
 }
 
 function onSoundTrace(m) {
+  if (m.posts?.length) {
+    try {
+      const events = gameSoundIndex(GAME_DIR).events;
+      m.recordings = {};
+      for (const [, event] of m.posts) m.recordings[event] = events.get(event >>> 0)?.length ?? 0;
+    } catch {
+      // no game folder or index: the batch goes without counts
+    }
+  }
   if (eventNames && m.posts?.length) {
     m.names = {};
     for (const [, event] of m.posts) {

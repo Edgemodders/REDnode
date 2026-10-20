@@ -127,10 +127,38 @@ function soundIndex(gameDir) {
     return (i) => (width === 4 ? buf.readUInt32LE(start + i * 4) : buf.readUInt16LE(start + i * 2));
   };
   const ids = col(4), paks = col(2), offsets = col(4), riff = col(2), lengths = col(4);
+  col(4); // decoded sizes
   const rows = new Map();
   for (let i = 0; i < n; i++) rows.set(ids(i), { pak: paks(i), offset: offsets(i), riff: riff(i), length: lengths(i) });
-  index = { key, rows, source: path.basename(at.file) };
+  // Then the event groups: an event's Wwise id, a count, and the ids of the sounds it plays
+  // (its variations). Stop events and events whose sound lives in a Wwise bank have none here.
+  const events = new Map();
+  while (o + 8 <= buf.length) {
+    const event = buf.readUInt32LE(o);
+    const count = buf.readUInt32LE(o + 4);
+    o += 8;
+    const sounds = [];
+    for (let i = 0; i < count && o + 4 <= buf.length; i++, o += 4) {
+      const s = buf.readUInt32LE(o);
+      if (rows.has(s)) sounds.push(s);
+    }
+    events.set(event, sounds);
+  }
+  index = { key, rows, events, source: path.basename(at.file) };
   return index;
+}
+
+/** Wwise's id for an event name: FNV-1 32 over the lower-case name. */
+function eventId(name) {
+  let h = 2166136261;
+  for (const ch of String(name).toLowerCase()) h = (Math.imul(h, 16777619) ^ (ch.charCodeAt(0) & 0xff)) >>> 0;
+  return h;
+}
+
+/** The sound ids of an event's recordings (its variations), by its name or Wwise id: [] when it has none here. */
+function eventSounds(gameDir, event) {
+  const id = typeof event === 'number' ? event >>> 0 : /^\d+$/.test(String(event).trim()) ? Number(String(event).trim()) >>> 0 : eventId(String(event).trim());
+  return { event: id, sounds: soundIndex(gameDir).events.get(id) ?? [] };
 }
 
 /** A sound's Ogg Opus bytes and where they came from. Throws when the index does not list it. */
@@ -252,4 +280,4 @@ async function gameSoundWav(gameDir, id) {
   return { file, pak: found.pak, index: found.index, from: found.from, channels, seconds };
 }
 
-module.exports = { gameSoundWav, soundBytes, soundIndex, opusToWav };
+module.exports = { gameSoundWav, soundBytes, soundIndex, eventSounds, eventId, opusToWav };
