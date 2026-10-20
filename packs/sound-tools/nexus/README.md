@@ -16,6 +16,7 @@ The source of the Sound Tools pack's own Nexus Mods page, beside REDnode's (`nex
 
 | In `description.bbcode` | Replace with |
 |---|---|
+| The release notes line under the tagline | It links all of REDnode's GitHub releases and REDnode's changelog for now; point it at the pack's own release and changelog section once SP4 makes them |
 | `REDNODE_PAGE` (three links) | REDnode's Nexus mod id, once its page is up again |
 | `(REDnode version: ...)` | The first REDnode release with the Sound Tools APIs, for example `0.27.0`, as plain text |
 | `Screenshot 1` to `Screenshot 4` (cyan italics) | Upload each picture to the page's Images tab, then replace its line with `[img]<the image's Nexus URL>[/img]` and a one-line caption |

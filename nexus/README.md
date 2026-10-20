@@ -75,6 +75,8 @@ npm run release:zip      # native\build\release\REDnode-<version>.zip
    3. Download the zip from the release, and upload it on Nexus as the main file with the version from `VERSION`. Archive the old file.
    4. In the page's changelog for that version (Manage files, or the Changelogs tab), paste the lines from `npm run release:notes -- --nexus`, one entry per line.
 
+Under the tagline, a line links the latest GitHub release and the changelog page. It names no version, so it never needs updating.
+
 Keep these in step with the repo's status (README, docs/index.md):
 
 | Where in the description | Update when |
