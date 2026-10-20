@@ -630,7 +630,7 @@ Run on the laptop on 2026-10-19 between 23:03 and 23:09 (REDnode 0.26.8, no soun
 
 No faults in either 15 s watch. Freeing with the game's own free held up through two frees and four more minutes of play, so 0.26.8's defaults stay.
 
-One thing not explained: this session's index at the start had checksum `0x31d115933a11cfcb`, where every earlier session had `0x84b342b65b6327fd`; after the swap it was `0x67add29894c2a988`, the same as in earlier runs. So the game loaded a different `sfx_container.opusinfo` at start, perhaps from another sound mod installed since (unverified).
+One thing not explained: this session's index at the start had checksum `0x31d115933a11cfcb`, where every earlier session had `0x84b342b65b6327fd`; after the swap it was `0x67add29894c2a988`, the same as in earlier runs. So the game loaded a different `sfx_container.opusinfo` at start: the user had been deploying sounds from an EDGEwave session since the last test, which explains it.
 
 **The user's theory for the sound that lingers** (2026-10-19): an object chain keeps a reference to the sound's loaded data, such as the equipped weapon's emitter; unequipping drops it, and the next play loads the new data. If so, some objects may never drop theirs. It fits H1c-3: the game's table of loaded sounds held nothing of the katana's, so the reference would be elsewhere (the emitter, or Wwise's stream of the old pak). The user will test it with the Sound Tracer, which therefore shows plays and loads apart: a sound that plays with no load after a swap is being served from a reference kept from before.
 
