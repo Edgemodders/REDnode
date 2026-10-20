@@ -1,0 +1,9 @@
+{
+  "id": "list-mod",
+  "name": "Live log mod",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "A Node mod with a scrolling list (ui.list): V's position every two seconds, game events and state changes, newest at the bottom. The window never scrolls; the list does.",
+  "main": "mod.mjs",
+  "open": false
+}
