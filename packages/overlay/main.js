@@ -439,6 +439,9 @@ function installedNow() {
     // REDbridge is not in the game folder, but packages may require it (W3).
     const b = redbridge.status();
     if (b.found) installed.set('redbridge', { name: 'REDbridge', kind: 'tool', version: b.version, path: b.exe });
+    // REDnode itself, for app packs that need a version of it: the host's own version,
+    // which is REDnode's (one version for every part), whatever RED4ext has logged.
+    installed.set('rednode', { name: 'REDnode', kind: 'red4ext', version: VERSION, path: __dirname });
   }
   return installed;
 }

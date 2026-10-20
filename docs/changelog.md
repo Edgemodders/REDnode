@@ -11,6 +11,10 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- A package's `requires` can name `rednode` with a version, for app packs that need a REDnode new enough. The overlay host answers with its own version.
+
 ## 0.26.15 (2026-10-20)
 
 Folds in 0.26.2, which was not released on its own.
