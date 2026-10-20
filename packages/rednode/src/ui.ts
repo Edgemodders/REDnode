@@ -380,6 +380,27 @@ export const ui = {
   },
 
   /**
+   * Puts text on the Windows clipboard, for the player to paste anywhere. Works in
+   * Node mods and in overlay apps; use it instead of `navigator.clipboard`, which an
+   * overlay window cannot always reach. It only writes: no package can read the
+   * clipboard.
+   *
+   * @example
+   * ```ts
+   * import { ui } from "rednode";
+   *
+   * await ui.copy("746693166");
+   * ```
+   */
+  async copy(text: string): Promise<void> {
+    try {
+      await transport().call("clipboard.write", { text: String(text) });
+    } catch (err) {
+      throw cleanError(err);
+    }
+  },
+
+  /**
    * Calls the handler when this package's solo mode starts or ends, also when the
    * player ends it from the launcher. Returns a function that stops listening.
    */

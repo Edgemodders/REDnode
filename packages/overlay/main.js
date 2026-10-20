@@ -1414,6 +1414,11 @@ async function packageCall(id, method, params) {
   // half-restored value as the original.
   if (id && undoing.has(id)) await undoing.get(id);
   if (typeof method === 'string' && method.startsWith('sound.')) return soundCall(id, method, params);
+  // ui.copy: any package may write the clipboard (never read it).
+  if (method === 'clipboard.write') {
+    clipboard.writeText(String(params?.text ?? ''));
+    return true;
+  }
   if (method === 'archives.reload') return reloadArchives({ id }, params);
   if (method === 'archives.soundState') return bridgeCall('opus.state', { sounds: Array.isArray(params?.sounds) ? params.sounds : [] });
   if (method === 'tweakdb.set' && id && params?.path) {
@@ -1883,12 +1888,13 @@ async function soundCall(id, method, params) {
     case 'sound.trace': {
       // The Sound Tracer's hooks (soundtrace.cpp): on while any package traces.
       if (params.on === false) {
-        tracers.delete(id);
-        if (!tracers.size && connected) return bridgeCall('trace.stop', {});
+        if (tracers.delete(id) && !tracers.size) return stopTrace(`${id} stopped it`);
         return { tracing: tracers.size > 0 };
       }
       const r = await bridgeCall('trace.start', {});
+      if (!tracers.size) startTraceLog();
       tracers.add(id);
+      loadEventNames();
       log(`Sound trace: ${id} traces (PostEvent ${r.postEvent}, lookup ${r.lookup}, hooks ${r.attached.join(', ')})`);
       return r;
     }
@@ -1898,9 +1904,88 @@ async function soundCall(id, method, params) {
 }
 
 // Packages tracing the game's sounds (sound.trace), and what the plugin sends them.
+// Names for event ids come from REDbridge's list (WolvenKit's, game 1.6), loaded by the host
+// when a trace starts, so a tracing package needs no bridge permission for them: each batch
+// carries `names` for the events in it that have one. Every post and load also goes to
+// rednode-sound-trace.log beside the mod log; the last session's file is kept as .prev.log.
 const tracers = new Set();
+let eventNames = null; // Map(Wwise id -> event name), once loaded
+let eventNamesLoading = false;
+let traceStarted = 0; // the clock time the plugin's trace started, for the log
+let traceLogMoved = false;
+
+function loadEventNames() {
+  if (eventNames || eventNamesLoading) return;
+  eventNamesLoading = true;
+  redbridge
+    .call('sound.events', {})
+    .then((list) => {
+      eventNames = new Map(list.events.map((e) => [e.hash >>> 0, e.name]));
+      log(`Sound trace: ${eventNames.size} event names from REDbridge (WolvenKit's list, game ${list.gameVersion ?? '?'})`);
+    })
+    .catch((err) => log(`Sound trace: no event names, only ids (${err.message})`))
+    .finally(() => (eventNamesLoading = false));
+}
+
+function traceLogFile() {
+  return path.join(path.dirname(modLogFile()), 'rednode-sound-trace.log');
+}
+
+function writeTraceLog(text) {
+  try {
+    fs.appendFileSync(traceLogFile(), text);
+  } catch (err) {
+    log(`Sound trace: could not write ${traceLogFile()}: ${err.message}`);
+  }
+}
+
+function startTraceLog() {
+  traceStarted = Date.now();
+  if (!traceLogMoved) {
+    traceLogMoved = true;
+    const file = traceLogFile();
+    try {
+      if (fs.existsSync(file)) fs.renameSync(file, file.replace(/\.log$/, '.prev.log'));
+    } catch (err) {
+      log(`Sound trace: could not keep the last trace log: ${err.message}`);
+    }
+  }
+  writeTraceLog(`\n---- Sound trace, ${new Date(traceStarted).toString()} ----\n`);
+}
+
+function stopTrace(why) {
+  writeTraceLog(`---- stopped at ${clock(Date.now())}: ${why} ----\n`);
+  return connected ? bridgeCall('trace.stop', {}) : { tracing: false };
+}
+
+function clock(t) {
+  const d = new Date(t);
+  const two = (n) => String(n).padStart(2, '0');
+  return `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3, '0')}`;
+}
+
+function logTraceBatch(m) {
+  const rows = [];
+  for (const [ms, event, object, playing] of m.posts ?? []) {
+    const name = eventNames?.get(event >>> 0);
+    rows.push([ms, `played ${name ?? `#${event}`}${name ? ` (${event})` : ''} on ${object}${playing ? '' : ', failed'}`]);
+  }
+  for (const [ms, sound, found] of m.loads ?? []) rows.push([ms, `loaded ${sound}${found ? '' : ' (not in the index)'}`]);
+  rows.sort((a, b) => a[0] - b[0]);
+  let text = rows.map(([ms, line]) => `${clock(traceStarted + ms)} ${line}\n`).join('');
+  if (m.dropped) text += `${clock(Date.now())} ${m.dropped} dropped\n`;
+  if (text) writeTraceLog(text);
+}
 
 function onSoundTrace(m) {
+  if (eventNames && m.posts?.length) {
+    m.names = {};
+    for (const [, event] of m.posts) {
+      const name = eventNames.get(event >>> 0);
+      if (name) m.names[event] = name;
+    }
+  }
+  if (tracers.size) logTraceBatch(m);
   for (const id of tracers) {
     if (!packageRunning(id)) continue;
     mods?.toMod(id, m);
@@ -1909,8 +1994,9 @@ function onSoundTrace(m) {
 }
 
 function checkTracers() {
+  const before = tracers.size;
   for (const id of [...tracers]) if (!packageRunning(id)) tracers.delete(id);
-  if (!tracers.size && connected) bridgeCall('trace.stop', {}).catch(() => {});
+  if (before && !tracers.size) Promise.resolve(stopTrace('its package stopped')).catch(() => {});
 }
 
 function stopSounds(id, fadeOut = 300) {
@@ -3185,7 +3271,7 @@ app.whenReady().then(() => {
     stopped: (id) => {
       undoTweaks(id, 'the mod stopped');
       stopSounds(id);
-      if (tracers.delete(id) && !tracers.size && connected) bridgeCall('trace.stop', {}).catch(() => {});
+      if (tracers.delete(id) && !tracers.size) Promise.resolve(stopTrace(`${id} stopped`)).catch(() => {});
     },
     onLog: onModLog,
   });

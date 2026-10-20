@@ -229,7 +229,7 @@ export const audio = {
    * import { audio } from "rednode";
    *
    * const stop = await audio.trace(({ posts, loads }) => {
-   *   for (const p of posts) console.log(`event ${p.event} on object ${p.object}`);
+   *   for (const p of posts) console.log(`event ${p.name ?? p.event} on object ${p.object}`);
    *   for (const l of loads) console.log(`sound ${l.sound} loaded`);
    * });
    * setTimeout(stop, 10_000);
@@ -238,9 +238,11 @@ export const audio = {
   async trace(onTrace: (batch: TraceBatch) => void): Promise<() => Promise<void>> {
     const off = transport().listen((m) => {
       if (m.event !== "sound-trace") return;
+      const names = (m.names as Record<string, string> | undefined) ?? {};
       const posts = ((m.posts as [number, number, string, number][]) ?? []).map(([ms, event, object, playing]) => ({
         ms,
         event,
+        name: names[event],
         object,
         playing,
       }));
@@ -264,10 +266,16 @@ export const audio = {
 export interface TraceBatch {
   /**
    * Events the game posted to Wwise: `ms` since the trace started, the event's Wwise id (FNV-1
-   * of its lower-case name), the Wwise game object it was posted on (a 64-bit number, as a
-   * string), and the playing id Wwise gave it (0: the post failed).
+   * of its lower-case name), its name when REDnode knows it, the Wwise game object it was
+   * posted on (a 64-bit number, as a string), and the playing id Wwise gave it (0: the post
+   * failed).
+   *
+   * Names come from REDbridge's list of events (WolvenKit's, from game 1.6), which the host
+   * loads when a trace starts; your package needs no permission for them. Events newer than
+   * the list, or traced before the list has loaded, have no name. A Wwise game object is not
+   * an entity id (Sound Tools SP1).
    */
-  posts: { ms: number; event: number; object: string; playing: number }[];
+  posts: { ms: number; event: number; name?: string; object: string; playing: number }[];
   /** Sounds the game loaded: `ms`, the sound id, and whether the index had it. */
   loads: { ms: number; sound: number; found: boolean }[];
   /** Records lost since the last batch because too many came at once. */
