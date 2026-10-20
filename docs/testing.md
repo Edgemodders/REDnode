@@ -43,7 +43,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H1c-2 sound index reload](#h1c-2-sound-index-reload) | In the game | #12 H1c-2 | 2026-10-19 | 0.26.4 | **Crash** at step 4 with the setting still "try". Second run with "reload" (still 0.26.4): no crash, the index reloaded; the katana played the base sound after the first swap (held by the game) and **EDGEwave's sound** after the second |
 | [H1c-3 held sounds](#h1c-3-held-sounds) | In the game | #12 H1c-3 | 2026-10-19 | 0.26.7 | **Pass** (laptop): four swaps with the audio thread held, no crash; EDGEwave's sound plays after a swap, except a sound that just played, which switches once the weapon is equipped again (not the held-sounds table: a cache not yet found). 0.26.7's arrow shows and stays ([results](world.md#h1c-3-test-results)). The Welcome window's F9 note not checked yet |
 | [H1d sound swaps](#h1d-sound-swaps) | In the game | #12 H1d | 2026-10-19 | 0.26.8 | **Pass** (laptop): two sound swaps with the defaults, the old index freed each time (3270 KB), no faults; EDGEwave's katana sound played; no missing sounds or stutter; the Welcome window's F9 note shows ([results](world.md#h1d-test-results)) |
-| [SP1 sound spike](#sp1-sound-spike) | In the game | Sound Tools SP1, #14 | Not run | 0.26.9 | Built; awaiting its first run (laptop) |
+| [SP1 sound spike](#sp1-sound-spike) | In the game | Sound Tools SP1, #14 | Passed | 0.26.9 | Passed on the laptop on 2026-10-20 |
 | [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | 2026-10-19 | 0.26.1 | **Fixed** by an NVIDIA driver update: the arrow blinked in the game with DLSS on (laptop) and not with DLSS off; drawn on every frame, no jumps. Not a REDnode bug |
 
 ## Before any in-game test
@@ -408,7 +408,11 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 
 ### SP1 sound spike
 
-[Source](sound.md#sp1-test). Built 2026-10-19 in REDnode 0.26.9: the Sound Tracer's hooks (Wwise's PostEvent and the sound lookup), an event played by name, a game sound played by id. The Sound spike app, switched on, with the bridge permission. Not run yet.
+[Source](sound.md#sp1-test). Built 2026-10-19 in REDnode 0.26.9: the Sound Tracer's hooks (Wwise's PostEvent and the sound lookup), an event played by name, a game sound played by id. The Sound spike app, switched on, with the bridge permission.
+
+| Run | Build | Result |
+|---|---|---|
+| 2026-10-20, laptop | 0.26.9 | **Passed** ([results](sound.md#sp1-test-results)): the hooks attached at runtime in under 1 ms, no cost seen, 407 posts and 314 loads in 117 s with none dropped; an event and a raw sound played. No names, since the app loaded them before the bridge permission was allowed |
 
 1. Load a save; switch on Sound spike; timer.
 2. Trace about 30 s: still, walk, katana, inventory. Note any stutter.

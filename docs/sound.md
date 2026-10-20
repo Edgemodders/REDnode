@@ -101,7 +101,7 @@ Two kinds of id play differently:
 | Phase | Builds | Stops for |
 |---|---|---|
 | **SP1 Spike** | Find where events are posted with their names, and confirm the sound lookup (`0x279890` in 2.31) for loads; check `GameAudioSystem.Play` by name; read one variation's bytes and play them (does the archive keep the paks uncompressed, or does REDbridge extract them) | An in-game check |
-| **SP2 Sound Tracer** | The hooks in the plugin, on only while tracing; an `audio.trace` stream in the `rednode` package; the app | An in-game test |
+| **SP2 Sound Tracer** | The hooks and `audio.trace` came with SP1. SP2 adds event names in the host (REDbridge's list, loaded when a trace starts, so no package needs the bridge permission for them), every post and load written to `rednode-sound-trace.log`, and the app: a window that never scrolls, two scrolling columns of the newest 2,000 rows, filter, pause, clear, copy, **Play** on each row and a paste box. What posted an event and its distance from V wait for a way from a Wwise game object to an entity (SP1 found they differ) | An in-game test |
 | **SP3 Sound Search** | Search, play, the Scratch tab | An in-game test |
 | **SP4 The pack** | Hot swap made ready for players; the pack's zip; a **Sound Tools** docs page (install, each app, workflows such as Tracer to Search to an EDGEwave override to a hot swap) with screenshots rendered from the apps, and placeholders for in-game shots until the user takes them; example app pages; a note on #14 | The user's release |
 
@@ -143,6 +143,29 @@ REDnode 0.26.9 on the laptop (the plugin log's first line says "REDnode 0.26.9 l
 4. Type `ui_menu_onpress` in the event box and press **Play event**: a menu click? Then type an event name from the Mod log's "most posted" line and play it: what did you hear? **Mark**.
 5. Type `746693166` in the sound box and press **Play sound**: the katana sound, without the game's effects? **Mark**.
 6. Quit the game. Send `rednode-mods.log`, the plugin log (`rednode-*.log` of this session) and `rednode-overlay.log`.
+
+### SP1 test: results
+
+Run on 2026-10-20 on the laptop, REDnode 0.26.9. **Passed.** The user ran one trace of about two minutes (walking, the katana, the inventory) instead of steps 2 and 3, then the play steps.
+
+| Check | Result |
+|---|---|
+| Attaching the hooks while the game runs | Both attached in under 1 ms at the first **Start trace** (`Sound trace: hooks attached in 0 ms`), and detached when the plugin stopped. No crash, no faults, a clean exit |
+| Cost | None seen: 47 to 53 fps in the same spot before and during the trace; the user noticed no stutter |
+| Rates | 117 s: 407 posts (about 3.5 a second) of 83 different events from 321 game objects, none failed; 314 loads of 141 sounds; **0 dropped** (the ring holds 16,384) |
+| Loads not in the index | 50 of the 314 loads asked for a sound the opus index does not have. Likely sounds kept inside Wwise's own banks rather than the opus paks (unverified) |
+| What a game object is | Not an entity id. V's entity id is 1; the game objects were numbers from 950 to about 1,250. They look like ids the game's audio code hands out to emitters (unverified), so "what posted it" and "distance from V" need the mapping from game object to entity first |
+| Names | None: the app loaded its names at start, before the user allowed it the bridge permission, and never tried again. The ids alone came through. SP2 fixes it in the host (below) |
+| Play event | `ui_menu_onpress` played the menu click through the game |
+| Play sound | 746693166 played the raw katana sound (1.87 s, started in 245 ms with the decode); a mistyped id (74669316) was refused: not in the game's sound index |
+
+The user's notes for SP2:
+
+| Note | In SP2 |
+|---|---|
+| The window was too short for its contents, so the whole window scrolled, and the rows could not be scrolled | The window never scrolls; each column is its own scrolling list |
+| Keep the history from growing without limit | Each column keeps the newest 2,000 rows |
+| Are the rows logged anywhere? | They were not: the spike logged only the counts and its summary. SP2's host writes every post and load to `red4ext/logs/rednode-sound-trace.log`, with names |
 
 **Requested of EDGEwave** ([EDGEwave #2](https://github.com/Edgemodders/EDGEwave/issues/2)): a fifth Into the Game route, **As a REDnode sound**, writing the render into a REDnode package's folder with a `sounds` entry in its manifest. S1 already plays it; nothing to pack.
 
