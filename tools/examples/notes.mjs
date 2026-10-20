@@ -229,22 +229,16 @@ export const NOTES = {
     ],
     preview: 'Nothing is swapped on this page: it checks what the host checks and pretends. Its mod folder holds Plain.archive and MyJacket.archive.',
   },
-  'sound-spike': {
-    group: 'game',
-    summary: 'Listen to the game\'s sounds as they play, then play one again: an event by name, or a single sound by its id.',
-    teaches: ['audio.trace', 'audio.event', 'audio.playGame', 'kernel.bridge', '"bridge" permission'],
+  'list-mod': {
+    group: 'mods',
+    summary: 'A Node mod window built around a scrolling list: a live log that keeps its newest lines.',
+    teaches: ['ui.list', 'list.push', 'list.clear', 'game.onState'],
     how: [
-      'audio.trace hooks the game\'s audio engine: every event the game posts (with its Wwise id and the game object it plays on) and every sound it loads (by sound id) arrive in batches, about ten a second.',
-      'Event ids are hashes of their names. REDbridge\'s sound.events gives the names WolvenKit knows, so the app shows names where it can.',
-      'audio.event posts an event by name through the game, with the game\'s own mix and effects; audio.playGame plays one recording by its sound id through REDnode\'s engine, raw.',
-      'The test app of Sound Tools\' first phase (SP1): Stop trace writes a summary to the Mod log.',
+      'ui.list makes a list of lines that scrolls on its own. push adds lines at the bottom; only the new lines travel to the window, so feeding it often stays cheap.',
+      'It keeps the newest lines only (keep, here 300) and follows the newest line unless the player has scrolled up.',
+      'Without a height, the list fills the space the other nodes leave, so the window keeps its size and never scrolls: give it a height in pixels to fix it instead.',
     ],
-    tryThis: [
-      'Press Start trace and watch the counts, then Stop trace.',
-      'Type ui_menu_onpress and press Play event.',
-      'Type 746693166 and press Play sound; then 1, which is not in the index.',
-    ],
-    preview: 'The sounds on this page are made up and play as a tone: in the game the plugin hooks its audio engine and plays the real recordings.',
+    tryThis: ['Watch a line arrive every two seconds.', 'Scroll the list up: it stays put while lines arrive; scroll back down and it follows again.', 'Press Clear.'],
   },
   'sound-tracer': {
     group: 'game',
