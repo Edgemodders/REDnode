@@ -1886,7 +1886,13 @@ async function soundCall(id, method, params) {
       const name = String(params.name ?? '').trim();
       if (!name) throw new Error('Name a sound event');
       const on = params.on === 'none' ? 'none' : 'player';
-      return bridgeCall(method === 'sound.event' ? 'audio.play' : 'audio.stopEvent', { name, on });
+      const r = await bridgeCall(method === 'sound.event' ? 'audio.play' : 'audio.stopEvent', { name, on });
+      const key = `${on}\n${name}`;
+      if (method === 'sound.event') {
+        if (!postedEvents.has(id)) postedEvents.set(id, new Set());
+        postedEvents.get(id).add(key);
+      } else postedEvents.get(id)?.delete(key);
+      return r;
     }
     case 'sound.trace': {
       // The Sound Tracer's hooks (soundtrace.cpp): on while any package traces.
@@ -2002,13 +2008,24 @@ function checkTracers() {
   if (before && !tracers.size) Promise.resolve(stopTrace('its package stopped')).catch(() => {});
 }
 
+// Game sound events a package posted (sound.event), as "on\nname": the game plays them, so
+// when the package stops the host stops them through AudioSystem.Stop, or a looping one
+// (an ambience) would play on after the package is gone.
+const postedEvents = new Map(); // package id -> Set
+
 function stopSounds(id, fadeOut = 300) {
-  if (![...soundOwners.values()].includes(id) || !connected) return;
-  bridgeCall('sound.stop', { owner: id, fadeOut }).catch(() => {});
+  const events = postedEvents.get(id);
+  postedEvents.delete(id);
+  if (!connected) return;
+  for (const key of events ?? []) {
+    const [on, name] = key.split('\n');
+    bridgeCall('audio.stopEvent', { name, on }).catch(() => {});
+  }
+  if ([...soundOwners.values()].includes(id)) bridgeCall('sound.stop', { owner: id, fadeOut }).catch(() => {});
 }
 
 function checkSounds() {
-  for (const id of new Set(soundOwners.values())) if (!packageRunning(id)) stopSounds(id);
+  for (const id of new Set([...soundOwners.values(), ...postedEvents.keys()])) if (!packageRunning(id)) stopSounds(id);
   if (tracers.size) checkTracers();
 }
 
