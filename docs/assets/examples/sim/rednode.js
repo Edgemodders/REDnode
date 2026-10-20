@@ -667,6 +667,25 @@ export const audio = {
     return new Remote('Sound', { async stop() {}, async set() {} }, { persistent: true, fields: { id: nextSound++, ended, seconds, sound, ...picked } });
   },
   // Which made-up sounds each made-up event plays; the game reads this from its sound index.
+  // A made-up catalogue in the shape the host searches: names with tags, recordings by id.
+  async searchSounds(query, options = {}) {
+    const q = String(query ?? '').trim().toLowerCase();
+    const limit = Math.min(1000, Math.max(1, Math.floor(Number(options.limit) || 200)));
+    const events = SIM_CATALOG.map(([name, tags]) => {
+      const event = wwiseHash(name);
+      return { event, name, tags, sounds: SIM_RECORDINGS.get(event) ?? [] };
+    });
+    events.push({ event: 3391947913, name: null, tags: [], sounds: [99887766] }); // an event newer than the names list
+    let hits = [];
+    if (/^#?\d+$/.test(q)) {
+      const id = Number(q.replace('#', '')) >>> 0;
+      hits = [...events.filter((e) => e.event === id).map((e) => ({ ...e, match: 'event' })), ...events.filter((e) => e.sounds.includes(id)).map((e) => ({ ...e, match: 'sound', sound: id }))];
+    } else if (q) {
+      const words = q.split(/\s+/);
+      hits = events.filter((e) => e.name && words.every((w) => `${e.name} ${e.tags.join(' ')}`.toLowerCase().includes(w))).map((e) => ({ ...e, match: 'name' }));
+    }
+    return { total: hits.length, results: hits.slice(0, limit), names: 'ready', events: events.length, recorded: events.filter((e) => e.sounds.length).length };
+  },
   async eventSounds(event) {
     const id = typeof event === 'number' || /^\d+$/.test(String(event).trim()) ? Number(event) >>> 0 : wwiseHash(String(event).trim());
     return { event: id, sounds: SIM_RECORDINGS.get(id) ?? [] };
@@ -710,8 +729,21 @@ const SIM_RECORDINGS = new Map([
   [wwiseHash('v_foley_walk_concrete'), [123456789, 99887766]],
   [wwiseHash('ui_menu_onpress'), [123456789]],
   [wwiseHash('dev_vending_machine_can_falls'), [99887766]],
+  [wwiseHash('w_melee_katana_equip'), [746693166, 123456789, 99887766]],
+  [wwiseHash('lcm_fs_bare_feet_concrete_walk'), [123456789, 99887766]],
 ]);
 const simTurn = new Map();
+// The made-up catalogue Sound Search finds: names with the list's tags.
+const SIM_CATALOG = [
+  ['w_melee_katana_draw', ['Melee', 'Katana']],
+  ['w_melee_katana_equip', ['Melee', 'Katana']],
+  ['v_foley_walk_concrete', ['footsteps', 'player']],
+  ['lcm_fs_bare_feet_concrete_walk', ['footsteps', 'Footsteps_Metadata']],
+  ['ui_menu_onpress', ['UI']],
+  ['dev_vending_machine_can_falls', ['Devices']],
+  ['amb_int_custom_megabuilding_01_ventilation', ['Ambience']],
+  ['v_car_global_medium_tyre_traffic_stop', ['Vehicles']],
+];
 async function stopSound(entry, fadeOut = 0) {
   if (!entry.src || entry.done) return;
   entry.stopped = true;

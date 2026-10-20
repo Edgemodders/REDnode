@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sound Search</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<script type="importmap">{ "imports": { "rednode": "rednode://sdk/index.js" } }</script>
+<style>
+  /* Sound Search (REDnode Sound Tools, SP3): the game's sound events by name, tag, event id
+     or sound id, each with its recordings; a Scratch tab keeps what you save between sessions.
+     The window never scrolls; each list scrolls on its own. */
+  html, body { margin: 0; width: 900px; height: 640px; overflow: hidden; background: transparent; }
+  rn-window { position: absolute; inset: 6px; }
+  .bar { display: flex; gap: 8px; align-items: center; flex: none; }
+  .bar rn-input { flex: 1; min-width: 0; }
+  .tabs { display: flex; gap: 0; flex: none; border-bottom: 1px solid var(--rn-line); }
+  .tabs button { padding: 7px 16px; font: 700 13px var(--rn-display); letter-spacing: .12em; text-transform: uppercase; cursor: pointer;
+    color: var(--rn-dim); background: transparent; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tabs button.on { color: var(--rn-accent); border-bottom-color: var(--rn-accent); }
+  .view { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+  .view[hidden] { display: none; }
+  .line { margin: 0; flex: none; font: 12px var(--rn-mono); color: var(--rn-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .line.bad { color: var(--rn-danger); }
+  .line.good { color: var(--rn-fg); }
+  .list { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; font: 12px var(--rn-mono); border: 1px solid var(--rn-line); }
+  .row { display: flex; align-items: center; gap: 6px; padding: 3px 6px; color: var(--rn-fg); }
+  .item:nth-child(even) > .row { background: color-mix(in srgb, var(--rn-panel-2) 45%, transparent); }
+  .row:hover { background: color-mix(in srgb, var(--rn-accent) 14%, transparent); }
+  .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n small { color: var(--rn-dim); font-size: 11px; margin-left: 6px; }
+  .tags { flex: 0 1 auto; min-width: 0; max-width: 200px; color: var(--rn-dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .count { flex: none; width: 44px; text-align: right; color: var(--rn-dim); font-size: 11px; }
+  .row button { flex: none; width: 22px; height: 18px; padding: 0; font: 11px var(--rn-mono); cursor: pointer;
+    color: var(--rn-accent-2); background: transparent; border: 1px solid color-mix(in srgb, var(--rn-accent-2) 50%, transparent); }
+  .row button:hover:not(:disabled) { background: color-mix(in srgb, var(--rn-accent-2) 18%, transparent); }
+  .row button:disabled { opacity: .3; cursor: default; }
+  .row button.open { width: 18px; border: 0; color: var(--rn-dim); }
+  .row button.saved { color: var(--rn-accent); border-color: var(--rn-accent); }
+  .subs { padding-left: 30px; }
+  .subs .row { padding: 1px 6px; }
+  .subs .n { color: var(--rn-dim); }
+  .subs .hit .n { color: var(--rn-accent); }
+  .empty { padding: 12px 10px; color: var(--rn-dim); font: 12px var(--rn-mono); line-height: 1.6; }
+</style>
+</head>
+<body>
+<rn-window id="win" title="Sound Search" draggable closable>
+  <div class="tabs">
+    <button id="tabSearch" class="on">Search</button>
+    <button id="tabScratch">Scratch</button>
+  </div>
+
+  <div class="view" id="search">
+    <div class="bar">
+      <rn-input id="query" placeholder="Words of a name or tag, an event id, or a sound id"></rn-input>
+    </div>
+    <p id="status" class="line">Type to search the game's sound events.</p>
+    <div class="list" id="results"><div class="empty">Search by words of a name or its tags (all must match: <b>fs concrete walk</b>), by an event id, or by a sound id to find the events that play it. ▶ plays an event's recordings in turn; ▸ shows them one by one.</div></div>
+  </div>
+
+  <div class="view" id="scratch" hidden>
+    <div class="bar">
+      <rn-button id="copyAll" variant="ghost">Copy all</rn-button>
+      <rn-button id="clearScratch" variant="ghost">Clear</rn-button>
+      <span class="line" id="scratchInfo"></span>
+    </div>
+    <div class="list" id="saved"></div>
+  </div>
+
+  <div class="bar">
+    <p id="said" class="line" style="flex: 1"></p>
+    <rn-button id="stopAll" variant="ghost" disabled title="Stop every sound and event this window started">Stop all</rn-button>
+  </div>
+</rn-window>
+<script type="module">
+  import { audio, ui } from 'rednode';
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const label = (e) => e.name ?? `#${e.event}`;
+
+  function say(text, tone = '') {
+    $('said').textContent = text;
+    $('said').className = `line ${tone}`;
+  }
+
+  // ---- tabs ----
+
+  function showTab(which) {
+    $('search').hidden = which !== 'search';
+    $('scratch').hidden = which !== 'scratch';
+    $('tabSearch').classList.toggle('on', which === 'search');
+    $('tabScratch').classList.toggle('on', which === 'scratch');
+    if (which === 'scratch') drawScratch();
+  }
+  $('tabSearch').addEventListener('click', () => showTab('search'));
+  $('tabScratch').addEventListener('click', () => showTab('scratch'));
+
+  // ---- Scratch: kept in this window's local storage, so it survives game sessions ----
+
+  const KEY = 'rednode.sound-search.scratch.v1';
+  let scratch = [];
+  try {
+    scratch = JSON.parse(localStorage.getItem(KEY) ?? '[]');
+  } catch {
+    scratch = [];
+  }
+  const scratchKey = (x) => (x.kind === 'event' ? `event:${x.event}` : `sound:${x.sound}`);
+  const isSaved = (key) => scratch.some((x) => scratchKey(x) === key);
+
+  function storeScratch() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(scratch));
+    } catch (err) {
+      say(`Could not keep the Scratch tab: ${err.message}`, 'bad');
+    }
+    $('tabScratch').textContent = scratch.length ? `Scratch (${scratch.length})` : 'Scratch';
+    for (const b of document.querySelectorAll('button[data-act=save]')) {
+      const on = isSaved(b.dataset.key);
+      b.classList.toggle('saved', on);
+      b.innerHTML = on ? '&#9733;' : '&#9734;';
+      b.title = on ? 'Saved in Scratch: press to take it out' : 'Save to Scratch';
+    }
+  }
+
+  function toggleSave(entry) {
+    const key = scratchKey(entry);
+    if (isSaved(key)) {
+      scratch = scratch.filter((x) => scratchKey(x) !== key);
+      say(`Took ${entryLabel(entry)} out of Scratch`);
+    } else {
+      scratch.push({ ...entry, saved: Date.now() });
+      say(`Saved ${entryLabel(entry)} to Scratch`);
+    }
+    storeScratch();
+    if (!$('scratch').hidden) drawScratch();
+  }
+
+  const entryLabel = (x) => (x.kind === 'event' ? x.name ?? `#${x.event}` : `sound ${x.sound}${x.name ? ` (${x.name})` : ''}`);
+
+  // ---- rows ----
+
+  const saveButton = (key) => {
+    const on = isSaved(key);
+    return `<button data-act="save" data-key="${key}" class="${on ? 'saved' : ''}" title="${on ? 'Saved in Scratch: press to take it out' : 'Save to Scratch'}">${on ? '&#9733;' : '&#9734;'}</button>`;
+  };
+
+  // An event: open (its recordings), name, tags, count, ▶ (its recordings in turn), G
+  // (posted through the game), Stop, Save, Copy.
+  function eventItem(e, { open = false, scratchRow = false } = {}) {
+    const item = document.createElement('div');
+    item.className = 'item';
+    item.dataset.event = String(e.event);
+    const pk = `event:${e.event}`;
+    const n = e.sounds?.length ?? e.recordings ?? 0;
+    const playTip = n
+      ? `Play ${label(e)}'s ${n} recordings in turn, as recorded`
+      : 'No recordings in the game\'s sound index: a stop event, or its sound lives in a Wwise bank';
+    const gameTip = e.name ? `Post ${e.name} through the game, on V: the game's own mix, but a positional sound may be silent` : 'No name: the game posts events by name';
+    item.innerHTML =
+      `<div class="row" data-pk="${pk}">` +
+      `<button class="open" data-act="open" title="${n ? 'Show its recordings' : 'No recordings'}"${n ? '' : ' disabled'}>${open ? '&#9662;' : '&#9656;'}</button>` +
+      `<span class="n" title="Event ${e.event}">${esc(label(e))}${e.name ? `<small>${e.event}</small>` : ''}</span>` +
+      `<span class="tags" title="${esc((e.tags ?? []).join(', '))}">${esc((e.tags ?? []).join(' · '))}</span>` +
+      `<span class="count">${n ? `${n} rec` : 'none'}</span>` +
+      `<button data-act="play" title="${esc(playTip)}"${n ? '' : ' disabled'}>&#9654;</button>` +
+      `<button data-act="game" title="${esc(gameTip)}"${e.name ? '' : ' disabled'}>G</button>` +
+      stopButton(pk) +
+      (scratchRow ? '' : saveButton(pk)) +
+      `<button data-act="copy" title="Copy ${esc(e.name ?? e.event)}">&#10697;</button>` +
+      (scratchRow ? `<button data-act="remove" title="Take it out of Scratch">&#10005;</button>` : '') +
+      `</div><div class="subs" hidden></div>`;
+    item._event = e;
+    if (open) fillRecordings(item);
+    return item;
+  }
+
+  function fillRecordings(item) {
+    const e = item._event;
+    const subs = item.querySelector('.subs');
+    subs.innerHTML = (e.sounds ?? [])
+      .map((s, i) => {
+        const pk = `sound:${s}`;
+        return (
+          `<div class="row${e.sound === s ? ' hit' : ''}" data-pk="${pk}" data-sound="${s}" data-variation="${i}">` +
+          `<span class="n">recording ${i + 1} of ${e.sounds.length}<small>sound ${s}</small></span>` +
+          `<button data-act="play" title="Play sound ${s}, as recorded">&#9654;</button>` +
+          stopButton(pk) +
+          saveButton(pk) +
+          `<button data-act="copy" title="Copy ${s}">&#10697;</button></div>`
+        );
+      })
+      .join('');
+    subs.hidden = false;
+    item.querySelector('button[data-act=open]').innerHTML = '&#9662;';
+  }
+
+  function toggleOpen(item) {
+    const subs = item.querySelector('.subs');
+    if (!subs.hidden) {
+      subs.hidden = true;
+      item.querySelector('button[data-act=open]').innerHTML = '&#9656;';
+    } else fillRecordings(item);
+  }
+
+  // ---- search ----
+
+  let lastQuery = '';
+  let timer = null;
+  let retry = null;
+
+  async function search(query) {
+    clearTimeout(retry);
+    lastQuery = query;
+    const list = $('results');
+    if (!query) {
+      $('status').textContent = 'Type to search the game\'s sound events.';
+      $('status').className = 'line';
+      return;
+    }
+    try {
+      const r = await audio.searchSounds(query, { limit: 200 });
+      if (query !== lastQuery) return; // a newer search is on its way
+      list.replaceChildren(...r.results.map((e) => eventItem(e, { open: e.match === 'sound' })));
+      if (!r.results.length) list.innerHTML = `<div class="empty">Nothing matches <b>${esc(query)}</b>.${r.names === 'ready' ? '' : ' Names are not loaded, so only ids match for now.'}</div>`;
+      const names = r.names === 'ready' ? '' : r.names === 'loading' ? '; names loading, only ids match yet' : '; no names (REDbridge is not installed), only ids match';
+      $('status').textContent =
+        `${r.total} event${r.total === 1 ? '' : 's'} match` + (r.total > r.results.length ? `, showing ${r.results.length}: add words to narrow it` : '') + ` (of ${r.events}; ${r.recorded} with recordings)${names}`;
+      $('status').className = `line ${r.names === 'ready' ? 'good' : ''}`;
+      if (r.names === 'loading') retry = setTimeout(() => search(lastQuery), 1500);
+    } catch (err) {
+      $('status').textContent = err.message;
+      $('status').className = 'line bad';
+    }
+  }
+
+  $('query').addEventListener('input', (e) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => search(e.detail.value.trim()), 250);
+  });
+  $('query').addEventListener('submit', (e) => {
+    clearTimeout(timer);
+    search(e.detail.value.trim());
+  });
+
+  // ---- Scratch view ----
+
+  function drawScratch() {
+    const list = $('saved');
+    $('scratchInfo').textContent = scratch.length ? `${scratch.length} saved; kept between game sessions` : '';
+    if (!scratch.length) {
+      list.innerHTML = '<div class="empty">Nothing saved yet. Press ☆ on an event or a recording in Search to keep it here.</div>';
+      return;
+    }
+    list.replaceChildren(
+      ...scratch.map((x) => {
+        if (x.kind === 'event') return eventItem(x, { scratchRow: true });
+        const item = document.createElement('div');
+        item.className = 'item';
+        const pk = `sound:${x.sound}`;
+        item.innerHTML =
+          `<div class="row" data-pk="${pk}" data-sound="${x.sound}">` +
+          `<span class="n">sound ${x.sound}${x.name || x.event ? `<small>recording ${(x.variation ?? 0) + 1} of ${esc(x.name ?? `#${x.event}`)}</small>` : ''}</span>` +
+          `<button data-act="play" title="Play sound ${x.sound}, as recorded">&#9654;</button>` +
+          stopButton(pk) +
+          `<button data-act="copy" title="Copy ${x.sound}">&#10697;</button>` +
+          `<button data-act="remove" title="Take it out of Scratch">&#10005;</button></div>`;
+        item._saved = x;
+        return item;
+      }),
+    );
+  }
+
+  $('clearScratch').addEventListener('click', () => {
+    if (!scratch.length) return;
+    const n = scratch.length;
+    scratch = [];
+    storeScratch();
+    drawScratch();
+    say(`Cleared Scratch (${n})`);
+  });
+
+  $('copyAll').addEventListener('click', () => {
+    if (!scratch.length) return say('Scratch is empty');
+    copy(scratch.map((x) => (x.kind === 'event' ? `${x.name ?? ''}\t${x.event}` : `${x.sound}\t${x.name ?? x.event ?? ''}`)).join('\n'), `${scratch.length} saved entries`);
+  });
+
+  // ---- clicks on any row ----
+
+  for (const id of ['results', 'saved']) {
+    $(id).addEventListener('click', (ev) => {
+      const button = ev.target.closest('button[data-act]');
+      if (!button || button.disabled) return;
+      const row = button.closest('.row');
+      const item = button.closest('.item');
+      const e = item._event;
+      const sound = row.dataset.sound ? Number(row.dataset.sound) : null;
+      switch (button.dataset.act) {
+        case 'open':
+          return toggleOpen(item);
+        case 'play':
+          return sound !== null ? playSound(sound) : playRecordings(e.event, label(e));
+        case 'game':
+          return postEvent(e.name, row.dataset.pk);
+        case 'stop':
+          return stopRow(row.dataset.pk);
+        case 'copy':
+          return sound !== null ? copy(String(sound)) : copy(String(e.name ?? e.event));
+        case 'save':
+          if (sound !== null) return toggleSave({ kind: 'sound', sound, event: e.event, name: e.name, variation: Number(row.dataset.variation) });
+          return toggleSave({ kind: 'event', event: e.event, name: e.name, tags: e.tags ?? [], sounds: e.sounds ?? [] });
+        case 'remove': {
+          const x = item._saved ?? { kind: 'event', event: e.event };
+          scratch = scratch.filter((y) => scratchKey(y) !== scratchKey(x));
+          storeScratch();
+          drawScratch();
+          return say(`Took ${entryLabel({ ...x, name: x.name ?? e?.name })} out of Scratch`);
+        }
+        default:
+          return undefined;
+      }
+    });
+  }
+
+  // ---- play, stop and copy ----
+
+  // What this window has playing, by row key ('event:<id>' or 'sound:<id>'), each with how
+  // to stop it. A sound leaves when it ends; an event posted through the game stays
+  // stoppable until stopped.
+  const active = new Map();
+
+  function stopButton(pk) {
+    return `<button data-act="stop" title="Stop"${active.has(pk) ? '' : ' disabled'}>&#9632;</button>`;
+  }
+
+  function refresh(pk) {
+    for (const b of document.querySelectorAll(`.row[data-pk="${CSS.escape(pk)}"] button[data-act=stop]`)) b.disabled = !active.has(pk);
+    if (active.size) $('stopAll').removeAttribute('disabled');
+    else $('stopAll').setAttribute('disabled', '');
+  }
+
+  function addActive(pk, fn) {
+    if (!active.has(pk)) active.set(pk, new Set());
+    active.get(pk).add(fn);
+    refresh(pk);
+  }
+
+  function dropActive(pk, fn) {
+    const set = active.get(pk);
+    if (!set) return;
+    set.delete(fn);
+    if (!set.size) active.delete(pk);
+    refresh(pk);
+  }
+
+  async function stopRow(pk, quiet = false) {
+    const set = active.get(pk);
+    if (!set) return;
+    active.delete(pk);
+    refresh(pk);
+    const results = await Promise.allSettled([...set].map((fn) => fn()));
+    const failed = results.find((r) => r.status === 'rejected');
+    if (failed) say(`Could not stop: ${failed.reason?.message ?? failed.reason}`, 'bad');
+    else if (!quiet) say('Stopped');
+  }
+
+  $('stopAll').addEventListener('click', async () => {
+    const keys = [...active.keys()];
+    await Promise.all(keys.map((pk) => stopRow(pk, true)));
+    say(`Stopped ${keys.length === 1 ? 'one' : keys.length}`);
+  });
+
+  function track(pk, s) {
+    const stopFn = () => s.stop();
+    addActive(pk, stopFn);
+    s.ended.then(() => dropActive(pk, stopFn));
+  }
+
+  // An event's recordings, the next one each press, heard wherever the sound is in the game.
+  async function playRecordings(event, name) {
+    const pk = `event:${event}`;
+    try {
+      await stopRow(pk, true);
+      const s = await audio.playGame({ event });
+      track(pk, s);
+      say(`Playing ${name}: recording ${s.variation + 1} of ${s.variations} (sound ${s.sound}, ${s.seconds.toFixed(2)} s), as recorded`, 'good');
+    } catch (err) {
+      say(`${name}: ${err.message}`, 'bad');
+    }
+  }
+
+  async function playSound(id) {
+    const pk = `sound:${id}`;
+    try {
+      await stopRow(pk, true);
+      const s = await audio.playGame(id);
+      track(pk, s);
+      say(`Playing sound ${id} (${s.seconds.toFixed(2)} s), as recorded`, 'good');
+    } catch (err) {
+      say(`Sound ${id}: ${err.message}`, 'bad');
+    }
+  }
+
+  async function postEvent(name, pk) {
+    try {
+      const e = await audio.event(name);
+      addActive(pk, () => e.stop());
+      say(`Posted ${name} ${e.on === 'player' ? 'on V' : 'with no entity (no player yet)'}, through the game`, 'good');
+    } catch (err) {
+      say(`${name}: ${err.message}`, 'bad');
+    }
+  }
+
+  async function copy(text, what = text) {
+    try {
+      await ui.copy(text);
+      say(`Copied ${what}`);
+    } catch (err) {
+      say(`Could not copy: ${err.message}`, 'bad');
+    }
+  }
+
+  storeScratch();
+</script>
+</body>
+</html>
