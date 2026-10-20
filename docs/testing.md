@@ -42,6 +42,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H1c-1 sound state](#h1c-1-sound-state) | In the game | #12 H1c-1 | 2026-10-19 | 0.26.3 | Pass (laptop): the reading holds; the index is never re-read, so the swapped sound played silent |
 | [H1c-2 sound index reload](#h1c-2-sound-index-reload) | In the game | #12 H1c-2 | 2026-10-19 | 0.26.4 | **Crash** at step 4 with the setting still "try". Second run with "reload" (still 0.26.4): no crash, the index reloaded; the katana played the base sound after the first swap (held by the game) and **EDGEwave's sound** after the second |
 | [H1c-3 held sounds](#h1c-3-held-sounds) | In the game | #12 H1c-3 | 2026-10-19 | 0.26.7 | **Pass** (laptop): four swaps with the audio thread held, no crash; EDGEwave's sound plays after a swap, except a sound that just played, which switches once the weapon is equipped again (not the held-sounds table: a cache not yet found). 0.26.7's arrow shows and stays ([results](world.md#h1c-3-test-results)). The Welcome window's F9 note not checked yet |
+| [H1d sound swaps](#h1d-sound-swaps) | In the game | #12 H1d | Not run | 0.26.8 | Built; awaiting its first run (laptop). Also the Welcome window's F9 note |
 | [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | 2026-10-19 | 0.26.1 | **Fixed** by an NVIDIA driver update: the arrow blinked in the game with DLSS on (laptop) and not with DLSS off; drawn on every frame, no jumps. Not a REDnode bug |
 
 ## Before any in-game test
@@ -391,6 +392,18 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 7. Unequip, wait, Sound state, equip, draw: which sound?
 8. If still the base sound: load the save, draw.
 9. Quit; send both sessions' logs.
+
+### H1d sound swaps
+
+[Source](world.md#h1d-test). Built 2026-10-19 in REDnode 0.26.8: sound archives swap with the hold and the reload by default, and the old index is freed. No sound settings; `EDGEwaveTest.archive` not installed; swap in gameplay. Not run yet.
+
+1. Load a save with the katana not equipped; timer.
+2. Swap: "sound index reloaded ... the old index freed", and the note.
+3. Equip and draw the katana: EDGEwave's sound.
+4. Swap again; draw: which sound?
+5. Two minutes of play; note missing or wrong sounds, stutter.
+6. Welcome window: the F9 note.
+7. Quit; send the logs.
 
 ### Cursor flicker
 

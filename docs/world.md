@@ -589,6 +589,32 @@ What it shows:
 
 For players and modders today: after a sound swap, a sound that has just played may keep its old version until the game loads it again (for a weapon, equip it again). Next, to agree: make the reload the normal behaviour for sound archives (with the hold), and look for the stream cache's flush.
 
+### H1d: sound swaps by default (REDnode 0.26.8)
+
+Agreed with the user on 2026-10-19 after H1c-3 (then the optional app pack, with a Sound Tracer; the stream cache's flush as a later spike). Built the same day:
+
+| Part | What |
+|---|---|
+| `main.js` | A sound archive swaps with the hold and the reload by default: no setting needed. Before the swap the host checks that the plugin knows this game version's sound tables (`opus.state`); if not, the archive is refused with the reason. `"soundPakSwap"` stays for research: `"refuse"` (as before), `"try"` (plain, no hold or reload). The answer gets `sound: { index, note }`; the Mod log gets the note about sounds that just played |
+| `opus.cpp` | After a reload, the old index's tables and its two hash maps go back to the game's allocator, through the free the loader itself calls (found in the loader's body: `mov rdx,r12; xor ecx,ecx; call`, `+0x1a6f260` in 2.31). A hash map's storage starts 8 bytes before its pointer, with its capacity in the header. `"soundIndexFree": "keep"` in the host's settings keeps the old index instead. The 0.26.6 comparison of held sounds is gone (it read the old index after the reload, and the table was not the cause) |
+| `rednode` package, MCP | `archives.reload`'s answer and docs, and `archives_reload`'s description, say how sound swaps work |
+| Unit tests | The free the loader calls is found; a reload frees the old maps from their headers, then the tables, and says how much; nothing is freed without the flag, without the free, or when the new index is refused |
+
+Checked in the mock game with no sound settings. Unverified until the game: the free (a wrong guess would corrupt the game's heap, so it is the first thing the test watches).
+
+### H1d test
+
+REDnode 0.26.8 on the laptop (the plugin log's first line says "REDnode 0.26.8 loading"), with RED Hot Tools and Hot swap test (**Allowed** on). **Remove `soundPakSwap` and `swapPause` from `%APPDATA%\@rednode\overlay\settings.json`** (the defaults are what is tested), and `EDGEwaveTest.archive` from `archive\pc\mod` before the game starts. Swap in gameplay with F10.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Step 1 comes before it can be reached.
+1. Start the game and load a save with the katana in V's inventory, not equipped. Switch on the Test timer, **Start**, **Mark**.
+2. Swap `EDGEwaveTest.archive`. The Mod log says "sound index reloaded ... the old index freed (... KB)" and the note about sounds that just played. **Mark**.
+3. Equip the katana and draw it: EDGEwave's sound expected. **Mark**.
+4. Swap `EDGEwaveTest.archive` again (it frees the index the first swap loaded). Draw the katana: which sound? **Mark**.
+5. Play for two minutes: walk, draw other weapons, shoot, open the map and a menu. Note any sound that is missing or wrong, and any stutter. **Mark**.
+6. In the Mod Manager switch on **Welcome**: it shows the note about F9. Close it. **Mark**.
+7. Quit the game. Send `rednode-mods.log`, the plugin log (`rednode-*.log` of this session), `rednode-overlay.log` and `rednode-faults.log`.
+
 ### H1 quoted path: retest
 
 Run on 2026-10-19 on the laptop with REDnode 0.26.1 (after its NVIDIA driver update). **Pass.** The path came from File Explorer's **Copy as path**, with its double quotes.
