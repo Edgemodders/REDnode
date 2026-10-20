@@ -4,6 +4,8 @@ What changed in each release of the Sound Tools pack, for its Nexus page and its
 
 ## Unreleased
 
+## 0.1.0 (2026-10-20)
+
 **New**
 
 - **Sound Tracer**: every sound event the game posts and every sound it loads, live, in two columns. Play an event's recordings or a single sound, post an event through the game, filter, pause, copy, and paste any name or id to play it. Every row also goes to `red4ext/logs/rednode-sound-trace.log`.

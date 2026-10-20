@@ -315,7 +315,7 @@ Also in the mod log of the morning: a sound archive swap of the user's own (EDGE
 | [Sound Tools](sound-tools.md) docs page | Install, each app with a picture from the docs simulation and a placeholder for one from the game, the modding loop, the calls for mod makers, building the pack. In the docs' nav |
 | Docs simulation | Page apps read their own manifest (for permissions), so Hot swap's example page swaps |
 
-Checked in the docs simulation (Hot swap: a swap, a missing file, a quoted path, ↻, Recent after a reload). Not yet in the game.
+Checked in the docs simulation (Hot swap: a swap, a missing file, a quoted path, ↻, Recent after a reload), then in the game (below).
 
 ### SP4 test (the pack as a player installs it)
 
@@ -330,6 +330,24 @@ Before: with the game closed, delete `red4ext/plugins/REDnode` from the game fol
 4. Switch on **Sound Tracer** and **Sound Search**: a short trace plays a Played row; a search for `katana` plays a recording. **Mark**.
 5. Quit, start the game again, open Hot swap: **Recent** still lists the swaps. **Mark**.
 6. Quit. Send `rednode-mods.log`, the plugin log and `rednode-overlay.log`.
+
+### SP4 test: results
+
+Run on 2026-10-20 on the laptop, with the released REDnode 0.26.15 (installed fresh from the GitHub release's zip), the pack's test zip, and the Test timer from its own zip (the timer is not in the release zip; the first run stopped there and the test's steps now say so). **Passed**, every step. **SP4 is done, and with it the Sound Tools pack.**
+
+| Step | What the logs show |
+|---|---|
+| 1 | The plugin log starts with "REDnode 0.26.15 loading"; the host found 14 apps, the pack's three among them, and no `hot-test` |
+| 2 | A plain archive (`clothing_Fia_00Leggings.archive`) swapped in 78 ms; then EDGEwaveTest.archive: the audio thread waited 360 ms, the index loaded again in 7.1 ms, the old index freed (3,270 KB), the whole swap 64 ms of the game's time, and the app's note about a sound that just played |
+| 3 | ↻ on Recent swapped the leggings again (72 ms) |
+| 4 | A trace of 634 played events and the loaded sounds, written to `rednode-sound-trace.log`; a Played row and a `katana` recording played |
+| 5 | In a new session, Recent still listed the swaps, and ↻ on EDGEwaveTest.archive swapped it again: audio held 391 ms, index reloaded in 5.3 ms, 0 faults in the 15 s watch |
+
+Also tried by the user: a swap with the `archives` permission switched off. The app showed the refusal in its window, as it should.
+
+Seen in the logs, not new: the first sound swap of a session costs a 187 ms search for the sound tables on the game thread (like the first `trace.start`; to move off the thread later). At quit, the host logged "Released 1 shared frame(s) the game did not answer" a few times while the game shut down.
+
+The user's verdict on Hot swap: Recent and ↻ are a good addition.
 
 **Requested of EDGEwave** ([EDGEwave #2](https://github.com/Edgemodders/EDGEwave/issues/2)): a fifth Into the Game route, **As a REDnode sound**, writing the render into a REDnode package's folder with a `sounds` entry in its manifest. S1 already plays it; nothing to pack.
 

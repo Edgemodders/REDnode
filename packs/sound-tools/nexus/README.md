@@ -1,6 +1,6 @@
 # REDnode Sound Tools on Nexus Mods
 
-The source of the Sound Tools pack's own Nexus Mods page, beside REDnode's (`nexus/` at the repo root). Not on Nexus yet: the page goes up with the pack's first release, after SP3 (Sound Search) and SP4 (the pack's zip) have passed in game and a REDnode release carries the APIs the apps use (docs/sound.md, "Sound Tools: SP1 to SP4").
+The source of the Sound Tools pack's own Nexus Mods page, beside REDnode's (`nexus/` at the repo root). Not on Nexus yet. Everything the page needs has passed in game: SP4 on 2026-10-20, over the released REDnode 0.26.15, which carries the APIs the apps use (docs/sound.md, "SP4 test: results").
 
 | File | What it is |
 |---|---|
@@ -16,18 +16,15 @@ The source of the Sound Tools pack's own Nexus Mods page, beside REDnode's (`nex
 
 | In `description.bbcode` | Replace with |
 |---|---|
-| The release notes line under the tagline | It links all of REDnode's GitHub releases and REDnode's changelog for now; point it at the pack's own release and changelog section once SP4 makes them |
 | `REDNODE_PAGE` (three links) | REDnode's Nexus mod id, once its page is up again |
-| `(REDnode version: ...)` | The first REDnode release with the Sound Tools APIs, for example `0.27.0`, as plain text |
 | `Screenshot 1` to `Screenshot 4` (cyan italics) | Upload each picture to the page's Images tab, then replace its line with `[img]<the image's Nexus URL>[/img]` and a one-line caption |
-| The Sound Search section | Matches Sound Search 0.1.0 (SP3); check it again once SP3 has passed in game |
 
 ## The Nexus form
 
 | Field | Value |
 |---|---|
 | Mod name | REDnode Sound Tools |
-| Version | The pack's version (its apps' `rednode-app.json`; set in SP4) |
+| Version | The pack's version, from `packs/sound-tools/pack.json` (0.1.0) |
 | Category | Modders Resources and Tutorials |
 | Brief overview | Hear what Cyberpunk 2077 plays: trace every game sound live, search all of its sound events, play any recording, and hot-swap sound mods into the running game. An app pack for REDnode. (255 characters at most; this is 184) |
 | Author | Edgemodders |
@@ -72,4 +69,4 @@ The fonts come from Google Fonts, so drawing needs the internet. The facts on th
 1. Edit `description.bbcode` here, commit, push.
 2. Check it: `node tools/check-bbcode.mjs packs/sound-tools/nexus/description.bbcode`.
 3. Paste the whole file into the description field on Nexus and save.
-4. For a new version: the release gate first (every in-game test of what goes in has passed, docs/testing.md), then the pack's changelog section, the zip, and the upload. The details come with SP4.
+4. For a new version: the release gate first (every in-game test of what goes in has passed, docs/testing.md), then raise `version` in `pack.json` (and `rednode` with each app's `requires`, if the pack needs a newer REDnode), rename **Unreleased** in the pack's changelog to `## <version> (<date>)`, run `npm run release:pack`, upload the zip as the main file, and paste that changelog section into the page's changelog for the version.
