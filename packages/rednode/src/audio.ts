@@ -200,21 +200,34 @@ export const audio = {
   },
 
   /**
-   * Posts one of the game's sound events by name, as the game's `AudioSystem.Play` does with
-   * no entity: the game plays it through its own mix, with the event's own logic (variations,
-   * effects). The game must know the name; an unknown one plays nothing.
+   * Posts one of the game's sound events by name through the game's `AudioSystem.Play`: the
+   * game plays it through its own mix, with the event's own logic (variations, effects). The
+   * game must know the name; an unknown one plays nothing.
    *
-   * Experimental (Sound Tools, SP1): its shape may change.
+   * By default the event plays on V, so a positional sound (footsteps, a weapon, a door) is
+   * heard where the player stands. `{ on: "none" }` posts it with no entity, as the game
+   * plays UI sounds. Some events loop until stopped: call `stop()` on what this returns.
+   *
+   * Experimental (Sound Tools): its shape may change.
    *
    * @example
    * ```ts
    * import { audio } from "rednode";
    *
-   * await audio.event("ui_menu_onpress");
+   * const e = await audio.event("amb_int_custom_megabuilding_01_ventilation");
+   * setTimeout(() => e.stop(), 5000);
    * ```
    */
-  async event(name: string): Promise<void> {
-    await call("sound.event", { name });
+  async event(name: string, options: { on?: "player" | "none" } = {}): Promise<PostedEvent> {
+    const on = options.on ?? "player";
+    const r = (await call("sound.event", { name, on })) as { on?: "player" | "none" } | undefined;
+    return {
+      name,
+      on: r?.on ?? on,
+      stop: async () => {
+        await call("sound.stopEvent", { name, on });
+      },
+    };
   },
 
   /**
@@ -261,6 +274,16 @@ export const audio = {
     };
   },
 };
+
+/** A game sound event posted by {@link audio.event}. */
+export interface PostedEvent {
+  /** The event's name. */
+  name: string;
+  /** Where it played: on V (`"player"`), or with no entity (`"none"`, also when no save is loaded). */
+  on: "player" | "none";
+  /** Stops the event through the game's `AudioSystem.Stop`, on the same entity. */
+  stop(): Promise<void>;
+}
 
 /** What {@link audio.trace} hands over each time. */
 export interface TraceBatch {

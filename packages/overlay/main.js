@@ -1879,11 +1879,14 @@ async function soundCall(id, method, params) {
       soundOwners.set(r.id, id);
       return { id: r.id, sound, seconds: found.seconds, channels: found.channels, pak: found.pak, from: found.from };
     }
-    case 'sound.event': {
-      // A game sound event by name, posted through the game's AudioSystem.Play with no entity.
+    case 'sound.event':
+    case 'sound.stopEvent': {
+      // A game sound event by name, through the game's AudioSystem.Play or Stop: on V
+      // ("on": "player") or with no entity ("none", as UI sounds play).
       const name = String(params.name ?? '').trim();
       if (!name) throw new Error('Name a sound event');
-      return bridgeCall('audio.play', { name });
+      const on = params.on === 'none' ? 'none' : 'player';
+      return bridgeCall(method === 'sound.event' ? 'audio.play' : 'audio.stopEvent', { name, on });
     }
     case 'sound.trace': {
       // The Sound Tracer's hooks (soundtrace.cpp): on while any package traces.

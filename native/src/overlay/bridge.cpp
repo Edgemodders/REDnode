@@ -6,8 +6,10 @@
 // Methods:
 //   game.info        the REDnode frame counter
 //   player.position  V's world position, through GetPlayer and Entity.GetWorldPosition
-//   audio.play       {"params":{"name":"ui_menu_onpress"}}: plays a game sound event
-//                    through AudioSystem.Play with no entity, as UI sounds are played
+//   audio.play       {"params":{"name":"ui_menu_onpress","on":"player"?}}: plays a game sound
+//                    event through AudioSystem.Play, with no entity (as UI sounds are played)
+//                    or on V with "on":"player" (positional sounds need an emitter to be heard)
+//   audio.stopEvent  {"params":{"name":"...","on":"player"?}}: AudioSystem.Stop, the same way
 //   rtti.call, rtti.get, rtti.set, rtti.new, rtti.release   the generic game API, in reflect.cpp
 //   tweakdb.get, tweakdb.record, tweakdb.records           TweakDB, read, in reflect.cpp
 //   sound.play, sound.stop, sound.set, sound.list, sound.mix, audio.tone
@@ -119,11 +121,37 @@ RED4ext::CBaseFunction* FindStatic(RED4ext::CClass* aClass, const char* aName)
     return nullptr;
 }
 
-std::string AudioPlay(long long aId, const std::string& aJson)
+// V's entity id (entEntityID, one 64-bit hash), or 0 when there is no player yet.
+uint64_t PlayerEntityId()
+{
+    auto* rtti = RED4ext::CRTTISystem::Get();
+    auto* getPlayer = rtti->GetFunction("GetPlayer;GameInstance");
+    if (!getPlayer)
+        return 0;
+    RED4ext::ScriptGameInstance game;
+    RED4ext::Handle<RED4ext::IScriptable> player;
+    RED4ext::StackArgs_t args;
+    args.emplace_back(nullptr, &game);
+    if (!RED4ext::ExecuteFunction(static_cast<void*>(nullptr), getPlayer, &player, args) || !player)
+        return 0;
+    auto* getId = FindMethod(player->GetType(), "GetEntityID");
+    uint64_t id = 0;
+    if (!getId || !RED4ext::ExecuteFunction(player.GetPtr(), getId, &id))
+        return 0;
+    return id;
+}
+
+// AudioSystem.Play or Stop for a game sound event. "on":"player" posts it on V, so a
+// positional sound (footsteps, a weapon) plays where the player can hear it; without it
+// there is no entity, which suits UI sounds. With no player yet, it falls back to none.
+std::string AudioEvent(long long aId, const std::string& aJson, bool aStop)
 {
     std::string name;
     if (!json::String(aJson, "name", name) || name.empty())
-        return Error(aId, "audio.play needs params.name, a sound event name");
+        return Error(aId, aStop ? "audio.stopEvent needs params.name, a sound event name"
+                                : "audio.play needs params.name, a sound event name");
+    std::string on;
+    json::String(aJson, "on", on);
 
     auto* rtti = RED4ext::CRTTISystem::Get();
     auto* gameClass = rtti->GetClass("ScriptGameInstance");
@@ -138,21 +166,22 @@ std::string AudioPlay(long long aId, const std::string& aJson)
     if (!RED4ext::ExecuteFunction(static_cast<void*>(nullptr), getAudio, &audio, args) || !audio)
         return Error(aId, "No audio system");
 
-    auto* play = FindMethod(audio->GetType(), "Play");
-    if (!play)
-        return Error(aId, "AudioSystem.Play not found");
+    auto* fn = FindMethod(audio->GetType(), aStop ? "Stop" : "Play");
+    if (!fn)
+        return Error(aId, aStop ? "AudioSystem.Stop not found" : "AudioSystem.Play not found");
 
     RED4ext::CName eventName(name.c_str());
-    uint64_t noEntity = 0;     // entEntityID: a single 64-bit hash, 0 for none
-    RED4ext::CName noEmitter;  // None
-    RED4ext::StackArgs_t playArgs;
-    playArgs.emplace_back(nullptr, &eventName);
-    playArgs.emplace_back(nullptr, &noEntity);
-    playArgs.emplace_back(nullptr, &noEmitter);
-    if (!RED4ext::ExecuteFunction(audio.GetPtr(), play, nullptr, playArgs))
-        return Error(aId, "AudioSystem.Play failed");
+    uint64_t entity = on == "player" ? PlayerEntityId() : 0; // entEntityID: 0 for none
+    RED4ext::CName noEmitter;                                  // None
+    RED4ext::StackArgs_t callArgs;
+    callArgs.emplace_back(nullptr, &eventName);
+    callArgs.emplace_back(nullptr, &entity);
+    callArgs.emplace_back(nullptr, &noEmitter);
+    if (!RED4ext::ExecuteFunction(audio.GetPtr(), fn, nullptr, callArgs))
+        return Error(aId, aStop ? "AudioSystem.Stop failed" : "AudioSystem.Play failed");
 
-    return Reply(aId, "\"result\":{\"played\":" + JsonString(name) + "}");
+    return Reply(aId, std::string("\"result\":{\"") + (aStop ? "stopped" : "played") + "\":" + JsonString(name) +
+                          ",\"on\":\"" + (entity ? "player" : "none") + "\"}");
 }
 
 std::string Handle(const std::string& aJson, uint64_t aFrame)
@@ -167,7 +196,9 @@ std::string Handle(const std::string& aJson, uint64_t aFrame)
     if (method == "player.position")
         return PlayerPosition(id);
     if (method == "audio.play")
-        return AudioPlay(id, aJson);
+        return AudioEvent(id, aJson, false);
+    if (method == "audio.stopEvent")
+        return AudioEvent(id, aJson, true);
     if (IsReflectMethod(method) || IsAudioMethod(method) || IsFaultsMethod(method) || IsOpusMethod(method) ||
         IsTraceMethod(method))
     {

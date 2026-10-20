@@ -36,7 +36,7 @@ export type { TweakId, Flat, RecordTypeName } from "./tweakdb.js";
 export { audio } from "./audio.js";
 export { archives } from "./archives.js";
 export type { ReloadResult, SoundState } from "./archives.js";
-export type { Sound, SoundCategory, SoundEnd, SoundInfo, PlayOptions, TraceBatch } from "./audio.js";
+export type { Sound, SoundCategory, SoundEnd, SoundInfo, PlayOptions, TraceBatch, PostedEvent } from "./audio.js";
 export type { GameRef, ApiExtras } from "./api.js";
 export type {
   Anchor,
