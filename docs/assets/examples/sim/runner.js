@@ -300,9 +300,37 @@ function apply(type, el, props) {
     case 'progress':
       for (const k of ['label', 'value', 'max']) if (k in props) attr(el, k, props[k]);
       break;
+    case 'list':
+      if ('keep' in props) el.dataset.keep = String(props.keep ?? 500);
+      if ('follow' in props) el.dataset.follow = props.follow === false ? 'no' : 'yes';
+      if ('height' in props) {
+        el.style.height = props.height ? `${Number(props.height)}px` : '';
+        el.classList.toggle('fill', !props.height);
+      }
+      if ('lines' in props) {
+        el.replaceChildren();
+        addLines(el, props.lines ?? [], true);
+      }
+      if ('push' in props) addLines(el, props.push ?? [], false);
+      break;
     default:
       break;
   }
+}
+// ui.list's lines, as builder.js adds them.
+function addLines(el, lines, toEnd) {
+  const atEnd = toEnd || el.scrollTop + el.clientHeight >= el.scrollHeight - 8;
+  const frag = document.createDocumentFragment();
+  for (const line of lines) {
+    const div = document.createElement('div');
+    div.className = 'line';
+    div.textContent = String(line);
+    frag.append(div);
+  }
+  el.append(frag);
+  const keep = Number(el.dataset.keep) || 500;
+  while (el.childElementCount > keep) el.firstElementChild.remove();
+  if (atEnd && el.dataset.follow !== 'no') el.scrollTop = el.scrollHeight;
 }
 const toMod = (node, type, value) => worker?.postMessage({ t: 'ui-event', node, type, value });
 
@@ -337,6 +365,10 @@ function render(spec) {
     case 'progress':
       el = document.createElement('rn-progress');
       break;
+    case 'list':
+      el = document.createElement('div');
+      el.className = 'list fill';
+      break;
     case 'row':
     case 'column':
       el = document.createElement('div');
@@ -348,7 +380,7 @@ function render(spec) {
       el.textContent = `Unknown node type: ${spec.type}`;
       return el;
   }
-  apply(spec.type, el, spec.props ?? {});
+  apply(spec.type, el, spec.type === 'list' ? { height: undefined, ...spec.props } : spec.props ?? {});
   elements.set(spec.id, { el, type: spec.type });
   for (const child of spec.children ?? []) el.append(render(child));
   return el;
@@ -376,6 +408,7 @@ function openWindow(id, spec) {
   for (const child of spec.children ?? []) content.append(render(child));
   win.append(content);
   stage.append(win);
+  for (const list of win.querySelectorAll('.list')) list.scrollTop = list.scrollHeight;
   windows.set(id, win);
   placeholder();
 }

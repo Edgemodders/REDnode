@@ -184,6 +184,24 @@ export const ui = {
     return self;
   },
   progress: (value, o = {}) => node('progress', { value, ...o }),
+  // Like the package: push sends only the new lines; both ends keep the newest "keep".
+  list(o = {}) {
+    const keep = Math.min(5000, Math.max(1, Math.floor(Number(o.keep) || 500)));
+    const self = node('list', { ...o, keep, lines: (o.lines ?? []).map(String).slice(-keep) });
+    return Object.assign(self, {
+      push(...lines) {
+        const add = lines.map(String);
+        if (!add.length) return;
+        self.props.lines.push(...add);
+        if (self.props.lines.length > keep) self.props.lines.splice(0, self.props.lines.length - keep);
+        const n = nodes.get(self.id);
+        if (n.window && !windows.get(n.window)?.closed) send({ t: 'ui-update', node: self.id, props: { push: add } });
+      },
+      clear() {
+        self.set({ lines: [] });
+      },
+    });
+  },
   row: (...children) => node('row', {}, {}, children),
   column: (...children) => node('column', {}, {}, children),
   window(options) {

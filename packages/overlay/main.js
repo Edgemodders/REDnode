@@ -3068,7 +3068,13 @@ const ui = {
     const b = built.get(builtKey(modId, win));
     const target = b && findNode(b.spec, node);
     if (!target) return;
-    Object.assign(target.props, props);
+    const { push, ...rest } = props;
+    Object.assign(target.props, rest);
+    if (Array.isArray(push) && target.type === 'list') {
+      // ui.list's push: only the new lines travel; the kept copy drops the oldest past "keep".
+      const keep = Math.min(5000, Math.max(1, Number(target.props.keep) || 500));
+      target.props.lines = [...(target.props.lines ?? []), ...push.map(String)].slice(-keep);
+    }
     const w = windowOfApp(builtKey(modId, win));
     if (w) toPage(w, { event: 'builder', op: 'update', node, props });
   },

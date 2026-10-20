@@ -88,6 +88,29 @@ export interface ProgressProps {
   max?: number;
 }
 
+/** Properties of {@link ui.list}. */
+export interface ListProps {
+  /** The lines shown, oldest first. Add to them with {@link UiList.push}. */
+  lines: string[];
+  /** How many lines the list keeps; older ones drop off the top. 1 to 5,000; 500 by default. */
+  keep?: number;
+  /** A fixed height in pixels. Without it the list fills the window's free height, so the window itself never scrolls. */
+  height?: number;
+  /** Scroll to each new line while the player is at the bottom (`true`, the default). Scrolled up, the list stays put either way. */
+  follow?: boolean;
+}
+
+/** A scrolling list of lines, from {@link ui.list}. */
+export interface UiList extends UiNode<ListProps> {
+  /**
+   * Adds lines at the bottom. Only the new lines go to the window, so a list fed many
+   * times a second stays cheap; the oldest drop off past `keep`.
+   */
+  push(...lines: string[]): void;
+  /** Empties the list. */
+  clear(): void;
+}
+
 /** Options of {@link ui.window}. */
 export interface WindowOptions {
   /** Names the window within the mod, so its saved position is found again. Defaults to `"main"`. */
@@ -288,6 +311,40 @@ export const ui = {
   /** A progress bar from 0 to `max` (100 by default). */
   progress(value: number, options: Omit<ProgressProps, "value"> = {}): UiNode<ProgressProps> {
     return node("progress", { value, ...options });
+  },
+
+  /**
+   * A list of lines that scrolls on its own, for a log or a live feed. It keeps the newest
+   * lines only (`keep`, 500 by default), follows the newest line unless the player has
+   * scrolled up, and without a `height` fills the window's free height, so the window
+   * itself never scrolls.
+   *
+   * @example
+   * ```ts
+   * import { game, ui } from "rednode";
+   *
+   * const log = ui.list({ keep: 1000 });
+   * ui.window({ title: "Events", width: 420, height: 360, children: [log, ui.button("Clear", () => log.clear())] });
+   * game.on("PlayerPuppet.OnGameAttached", (e) => log.push(`${new Date().toLocaleTimeString()} ${e.name}`));
+   * ```
+   */
+  list(options: Partial<ListProps> = {}): UiList {
+    const keep = Math.min(5000, Math.max(1, Math.floor(Number(options.keep) || 500)));
+    const self = node<ListProps>("list", { ...options, keep, lines: (options.lines ?? []).map(String).slice(-keep) });
+    const props = self.props as ListProps;
+    return Object.assign(self, {
+      push(...lines: string[]) {
+        const add = lines.map(String);
+        if (!add.length) return;
+        props.lines.push(...add);
+        if (props.lines.length > keep) props.lines.splice(0, props.lines.length - keep);
+        const at = nodes.get(self.id)?.window;
+        if (at) transport().ui?.update(at, self.id, { push: add });
+      },
+      clear() {
+        self.set({ lines: [] });
+      },
+    });
   },
 
   /** Puts nodes side by side. */

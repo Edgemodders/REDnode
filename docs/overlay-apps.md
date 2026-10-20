@@ -374,6 +374,7 @@ game.on('PlayerPuppet.OnGameAttached', () => console.log('A save was loaded'));
 | `ui.slider(label, onChange, { min, max, step, value, unit })` | A slider |
 | `ui.input({ label, placeholder, value, onChange, onSubmit })` | A text field |
 | `ui.progress(value, { label, max })` | A progress bar |
+| `ui.list({ lines, keep, height, follow })` | A list of lines that scrolls on its own, for a log or a live feed. `push(...lines)` adds at the bottom (only the new lines travel to the window) and `clear()` empties it. It keeps the newest `keep` lines (500 by default, up to 5,000) and follows the newest one unless the player has scrolled up. Without `height` it fills the space the other nodes leave, so the window keeps its size and never scrolls |
 | `ui.row(...nodes)`, `ui.column(...nodes)` | Layout |
 | `ui.window({ title, width, height, anchor, x, y, children, onClose })` | Opens the window. The player can drag it in interactive mode, and its position is saved. A saved position applies only while the window keeps the size it was saved with; after a size change it opens at its anchor again |
 

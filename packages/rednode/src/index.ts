@@ -49,6 +49,8 @@ export type {
   SliderProps,
   InputProps,
   ProgressProps,
+  ListProps,
+  UiList,
 } from "./ui.js";
 export { defineInterceptor, interceptor } from "./interceptor.js";
 export type {
