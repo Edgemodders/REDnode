@@ -615,6 +615,23 @@ REDnode 0.26.8 on the laptop (the plugin log's first line says "REDnode 0.26.8 l
 6. In the Mod Manager switch on **Welcome**: it shows the note about F9. Close it. **Mark**.
 7. Quit the game. Send `rednode-mods.log`, the plugin log (`rednode-*.log` of this session), `rednode-overlay.log` and `rednode-faults.log`.
 
+### H1d test: results
+
+Run on the laptop on 2026-10-19 between 23:03 and 23:09 (REDnode 0.26.8, no sound settings), swaps in gameplay. **Passed**: "everything worked", no problems. Two marks were missed, so the steps are matched by the logs:
+
+| When | What the logs show |
+|---|---|
+| 23:05:06 | First swap: game paused, the audio thread held (375 ms), the index reloaded in 9.1 ms, 26 pak entries retired, **the old index freed (3270 KB)**. The Mod log shows the note about sounds that just played |
+| 23:05:25 | Second swap, before drawing the katana: held 344 ms, reloaded in 4.7 ms, 28 entries retired, **the index the first swap loaded freed (3270 KB)** |
+| 23:06:06 | The katana drawn: **EDGEwave's sound** (the user's note) |
+| 23:06 to 23:08 | About two minutes of play: no sound reported missing or wrong, no stutter |
+| 23:08:27 | The Welcome window opened, with the F9 note |
+| 23:09:38 | Quit: the game exited normally, REDnode's audio callback unregistered |
+
+No faults in either 15 s watch. Freeing with the game's own free held up through two frees and four more minutes of play, so 0.26.8's defaults stay.
+
+One thing not explained: this session's index at the start had checksum `0x31d115933a11cfcb`, where every earlier session had `0x84b342b65b6327fd`; after the swap it was `0x67add29894c2a988`, the same as in earlier runs. So the game loaded a different `sfx_container.opusinfo` at start, perhaps from another sound mod installed since (unverified).
+
 ### H1 quoted path: retest
 
 Run on 2026-10-19 on the laptop with REDnode 0.26.1 (after its NVIDIA driver update). **Pass.** The path came from File Explorer's **Copy as path**, with its double quotes.
