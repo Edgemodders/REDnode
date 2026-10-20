@@ -556,7 +556,7 @@ The real exe gives the table at `+0x3b49050` (count `+0x3497e38`). Next, dependi
 
 ### H1c-3 test
 
-REDnode 0.26.6 on the laptop (check the plugin log's first line says "REDnode 0.26.6 loading"), with RED Hot Tools and Hot swap test (**Allowed** on), `"soundPakSwap": "reload"` in the settings. **Before each game start, remove `EDGEwaveTest.archive` from `archive\pc\mod`** (a swap moves it there). Swap in gameplay with F10. The katana sound's id is 746693166.
+REDnode 0.26.7 on the laptop (check the plugin log's first line says "REDnode 0.26.7 loading"; 0.26.7 also draws the overlay's arrow from a texture), with RED Hot Tools and Hot swap test (**Allowed** on), `"soundPakSwap": "reload"` in the settings. **Before each game start, remove `EDGEwaveTest.archive` from `archive\pc\mod`** (a swap moves it there). Swap in gameplay with F10. The katana sound's id is 746693166.
 
 0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Step 1 comes before it can be reached.
 1. Start the game and load a save where the katana is in V's inventory but **not equipped** in a weapon slot. Switch on the Test timer, **Start**, **Mark**.

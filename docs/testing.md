@@ -41,7 +41,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H1b sound pak check](#h1b-sound-pak-check) | In the game | #12 H1b | 2026-10-19 | 0.26.2 | Refusal **pass** (laptop). Spike: crash with sound let through, no fault caught; no crash with the game paused, but the sound did not change |
 | [H1c-1 sound state](#h1c-1-sound-state) | In the game | #12 H1c-1 | 2026-10-19 | 0.26.3 | Pass (laptop): the reading holds; the index is never re-read, so the swapped sound played silent |
 | [H1c-2 sound index reload](#h1c-2-sound-index-reload) | In the game | #12 H1c-2 | 2026-10-19 | 0.26.4 | **Crash** at step 4 with the setting still "try". Second run with "reload" (still 0.26.4): no crash, the index reloaded; the katana played the base sound after the first swap (held by the game) and **EDGEwave's sound** after the second |
-| [H1c-3 held sounds](#h1c-3-held-sounds) | In the game | #12 H1c-3 | Not run | 0.26.6 | Built; awaiting its first run (laptop). Also checks 0.26.5's wait (H1c-2b) and the Welcome window's F9 note |
+| [H1c-3 held sounds](#h1c-3-held-sounds) | In the game | #12 H1c-3 | Not run | 0.26.7 | Built; awaiting its first run (laptop). Also checks 0.26.5's wait (H1c-2b), the Welcome window's F9 note, and 0.26.7's arrow drawn from a texture ([cursor](overlay.md#cursor-drawn-from-a-texture-0267)) |
 | [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | 2026-10-19 | 0.26.1 | **Fixed** by an NVIDIA driver update: the arrow blinked in the game with DLSS on (laptop) and not with DLSS off; drawn on every frame, no jumps. Not a REDnode bug |
 
 ## Before any in-game test

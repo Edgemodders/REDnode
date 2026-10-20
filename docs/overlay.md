@@ -825,6 +825,12 @@ Found with the user afterwards: it is the overlay's yellow arrow that appears an
 
 **Fixed by a driver update** (2026-10-19): after the user updated the laptop's NVIDIA driver, the arrow no longer flickers with DLSS on. So the cause was the old driver with DLSS, not REDnode; no change to the plugin. The driver versions before and after were not noted. For players: if the overlay's arrow blinks with DLSS on, update the GPU driver first. The 0.26.1 cursor diagnostics stay in the plugin log for future reports.
 
+### Cursor: drawn from a texture (0.26.7)
+
+Seen again on the laptop on 2026-10-19 (REDnode 0.26.4 to 0.26.6): after a save loaded (from the "press space" screen on), the overlay's arrow showed only briefly and rarely, with DLSS on or off, while the windows showed and the hover still lit buttons; in the pause menu it was fine. The plugin log said the arrow was drawn on every frame at the right place. So only the arrow's own draw failed. It was the one thing the overlay drew without a texture: the pixel shader tested each pixel against the arrow's outline (with a null texture view bound). Why that fails on the laptop's NVIDIA driver in the game and not in menus is not known.
+
+REDnode 0.26.7 makes the arrow once on the CPU (`native/src/overlay/cursor.hpp`: the same outline, 36 x 48 texels, 4 x 4 samples a texel, premultiplied BGRA) into a texture in the slot that held the null view, and draws it exactly as a window is drawn. The shader's arrow stays only as the fallback if the texture cannot be made (the plugin log says which: `Overlay: the arrow is drawn from a 36 x 48 texture, like a window`). Unit tests in `native/tests/capture_test.cpp`. Unverified until the laptop shows it in the game.
+
 ### UI kit
 
 UI is written as markup, not built by hand in code. Two layers keep it optional:
