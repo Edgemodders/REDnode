@@ -48,7 +48,7 @@ red4ext/plugins/REDnode/apps/
   hot-swap/
 ```
 
-Each app's manifest has `"open": false` and asks for `"requires": { "rednode": ">=<version>" }` (unverified until SP4: whether `requires` reads REDnode's own DLL version). The command that builds the zip comes with SP4.
+Each app's manifest asks for `"requires": { "rednode": ">=<version>" }`, the REDnode in `packs/sound-tools/pack.json`. `npm run release:pack` builds the zip into `native/build/release/` (each app off at start, with a `LICENSE.txt`); it stops if `packs/sound-tools/changelog.md` has no section for the version, and `-- --draft` builds a test zip without that check.
 
 ### File description on Nexus
 

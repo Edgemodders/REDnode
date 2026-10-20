@@ -304,6 +304,33 @@ Run on 2026-10-20 on the laptop, REDnode 0.26.15. **Passed**, every step: the se
 
 Also in the mod log of the morning: a sound archive swap of the user's own (EDGEwaveTest.archive, with 0.26.14's build) went through as H1d made it: the audio held 391 ms, the index loaded again in 4.9 ms, the old index freed.
 
+### SP4 The pack: built (2026-10-20)
+
+| Part | What |
+|---|---|
+| **Hot swap** 0.1.0 (`packs/sound-tools/apps/hot-swap`) | Replaces the Hot swap test (`hot-test`, removed): a page app in the style of the other two. A field for an archive's name or path (quotes from Copy as path taken off) and **Swap**; the answer in words, with the sound index's note for a sound archive; **Recent**, the last 30 swaps kept between sessions, each with ↻ (swap again), Copy and ✕; a line that says what is missing (RED Hot Tools, a REDnode too old). Asks for `archives`; requires `rednode` and `redhottools` 1.3. The research-only Sound state button is gone. A new id, so the player allows `archives` once more |
+| `requires: { "rednode": ">=0.26.15" }` | In every app of the pack. REDnode 0.26.15 answers it from the version RED4ext logs for REDnode (its DLL has no version resource); when RED4ext's newest log has no such line, it counts REDnode as installed with its version unknown, and lets it pass (seen on the dev PC). So an older REDnode is only caught from the next REDnode on: its host answers `rednode` with its own version |
+| `packs/sound-tools/pack.json`, `changelog.md` | The pack's name, version (0.1.0), apps and REDnode; its own changelog |
+| `npm run release:pack` (`tools/release/pack-zip.mjs`) | `native/build/release/REDnode-Sound-Tools-<version>.zip`: the three apps under `red4ext/plugins/REDnode/apps/`, off at start, a `LICENSE.txt` each. Checks the apps against `pack.json`; stops without a changelog section for the version (`--draft` for a test zip). 20 KB |
+| [Sound Tools](sound-tools.md) docs page | Install, each app with a picture from the docs simulation and a placeholder for one from the game, the modding loop, the calls for mod makers, building the pack. In the docs' nav |
+| Docs simulation | Page apps read their own manifest (for permissions), so Hot swap's example page swaps |
+
+Checked in the docs simulation (Hot swap: a swap, a missing file, a quoted path, ↻, Recent after a reload). Not yet in the game.
+
+### SP4 test (the pack as a player installs it)
+
+On the laptop. This test uses the released REDnode 0.26.15 and the pack's test zip, the way a player would put them in, so it also checks the release.
+
+Before: with the game closed, delete `red4ext/plugins/REDnode` from the game folder (the test apps from earlier builds go with it; settings and grants stay in `%APPDATA%\@rednode\overlay`). Extract `REDnode-0.26.15.zip` from the GitHub release into the game folder, then `REDnode-Sound-Tools-0.1.0-draft.zip`.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. Start the game; the plugin log's first line says "REDnode 0.26.15 loading". Load a save. In the Mod Manager: **Sound Tracer**, **Sound Search** and **Hot swap** are listed, off, with nothing missing; the Hot swap test is gone. **Mark**.
+2. Switch on **Hot swap** and allow it to change archives. Its top line says it is ready. Swap an archive you have (a plain one, then a sound one such as EDGEwaveTest.archive): the answer says it was swapped, and for the sound one, that the sound index was loaded again. **Mark**.
+3. Press **↻** on the first swap in **Recent**: it swaps again. **Mark**.
+4. Switch on **Sound Tracer** and **Sound Search**: a short trace plays a Played row; a search for `katana` plays a recording. **Mark**.
+5. Quit, start the game again, open Hot swap: **Recent** still lists the swaps. **Mark**.
+6. Quit. Send `rednode-mods.log`, the plugin log and `rednode-overlay.log`.
+
 **Requested of EDGEwave** ([EDGEwave #2](https://github.com/Edgemodders/EDGEwave/issues/2)): a fifth Into the Game route, **As a REDnode sound**, writing the render into a REDnode package's folder with a `sounds` entry in its manifest. S1 already plays it; nothing to pack.
 
 ## Research before S1

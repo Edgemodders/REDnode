@@ -46,6 +46,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [SP1 sound spike](#sp1-sound-spike) | In the game | Sound Tools SP1, #14 | 2026-10-20 | 0.26.9 | **Pass** (laptop): the hooks attached at runtime, no cost seen, none dropped; an event and a raw sound played ([results](sound.md#sp1-test-results)) |
 | [SP2 Sound Tracer](#sp2-sound-tracer) | In the game | Sound Tools SP2, #14 | 2026-10-20 | 0.26.14 | **Pass** (laptop): the 0.26.13 retest passed but for Play on Played rows; 0.26.14 plays an event's own recordings, passed ([results](sound.md#sp2b-test-results)) |
 | [SP3 Sound Search](#sp3-sound-search) | In the game | Sound Tools SP3 | 2026-10-20 | 0.26.15 | **Pass** (laptop): every step, Scratch kept across a game restart ([results](sound.md#sp3-test-results)) |
+| [SP4 The pack](#sp4-the-pack) | In the game | Sound Tools SP4 | Not run | 0.26.15 + pack 0.1.0 | Built; the pack installed over the REDnode 0.26.15 release, awaiting its first run (laptop) |
 | [UI builder list](#ui-builder-list) | In the game | `ui.list` | 2026-10-20 | 0.26.13 | **Pass** (laptop): the list scrolls, the window does not, follow and Clear work |
 | [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | 2026-10-19 | 0.26.1 | **Fixed** by an NVIDIA driver update: the arrow blinked in the game with DLSS on (laptop) and not with DLSS off; drawn on every frame, no jumps. Not a REDnode bug |
 
@@ -458,6 +459,17 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 5. ☆ an event and a recording; the Scratch tab has both, and plays them.
 6. Restart the game: Scratch still has both; ✕ one.
 7. Quit; send the logs.
+
+### SP4 The pack
+
+[Source](sound.md#sp4-test-the-pack-as-a-player-installs-it). Built 2026-10-20: Hot swap for players, the pack's zip (`npm run release:pack`), `requires: rednode`, the Sound Tools docs page. Run with the released REDnode 0.26.15 and the pack's test zip, put in as a player would. Not run yet.
+
+1. Fresh `red4ext/plugins/REDnode` from the 0.26.15 release, then the pack zip. The three apps listed, off, nothing missing; the Hot swap test gone.
+2. Hot swap: allow it, swap a plain archive and a sound archive.
+3. ↻ on a recent swap.
+4. A short trace and a search, each playing something.
+5. Restart: Recent kept.
+6. Quit; send the logs.
 
 ### UI builder list
 
