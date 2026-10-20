@@ -656,9 +656,11 @@ export const audio = {
     const ended = new Promise((r) => setTimeout(() => r({ why: 'ended' }), seconds * 1000));
     return new Remote('Sound', { async stop() {}, async set() {} }, { persistent: true, fields: { id: nextSound++, ended, seconds } });
   },
-  async event(name) {
+  async event(name, options = {}) {
     blip();
     log('info', `audio.event("${name}"): game sound events play only in the game; this page plays a tone`, 'sim');
+    const stop = async () => log('info', `audio.event("${name}").stop(): stopped`, 'sim');
+    return new Remote('PostedEvent', { stop }, { persistent: true, fields: { name, on: options.on ?? 'player' } });
   },
   // Made-up batches in the shape the plugin sends: posts of a few named events, and loads.
   async trace(onTrace) {

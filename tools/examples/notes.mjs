@@ -253,7 +253,7 @@ export const NOTES = {
     how: [
       'audio.trace hands over batches about ten times a second. Played rows are events, named when REDnode knows the name (REDbridge\'s list, loaded by the host, so no permission is needed). Loaded rows are sound ids.',
       'Each column is its own scrolling list that keeps the newest 2,000 rows; the window around them has a fixed size and never scrolls. Rows stick to the bottom unless you scroll up.',
-      'Play on an event posts it by name through the game, with the game\'s mix. Play on a sound plays that one recording through REDnode\'s engine, raw. An event without a name cannot be played: the game plays events by name.',
+      'Play on an event posts it by name on V through the game, with the game\'s mix; Stop beside it stops it (some events loop). Play on a sound plays that one recording through REDnode\'s engine, raw. An event without a name cannot be played: the game plays events by name. Stop all stops everything the Tracer started.',
       'The host also writes every row to red4ext/logs/rednode-sound-trace.log, so nothing is lost when a column drops old rows.',
       'Part of REDnode Sound Tools.',
     ],

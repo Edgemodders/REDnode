@@ -8,20 +8,20 @@
 <style>
   /* Sound Tracer (REDnode Sound Tools, SP2): the game's sound events and loads, live.
      The window never scrolls; each column is its own scrolling list of the newest rows. */
-  html, body { margin: 0; width: 780px; height: 600px; overflow: hidden; background: transparent; }
+  html, body { margin: 0; width: 900px; height: 600px; overflow: hidden; background: transparent; }
   rn-window { position: absolute; inset: 6px; }
   .bar { display: flex; gap: 8px; align-items: center; flex: none; }
   .bar rn-input { flex: 1; min-width: 0; }
   .line { margin: 0; flex: none; font: 12px var(--rn-mono); color: var(--rn-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .line.bad { color: var(--rn-danger); }
   .line.good { color: var(--rn-fg); }
-  .cols { flex: 1; min-height: 0; display: grid; grid-template-columns: 3fr 2fr; gap: 10px; }
-  section { min-height: 0; display: flex; flex-direction: column; border: 1px solid var(--rn-line); }
+  .cols { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 10px; }
+  section { min-width: 0; min-height: 0; display: flex; flex-direction: column; border: 1px solid var(--rn-line); }
   section > header { flex: none; display: flex; justify-content: space-between; padding: 5px 8px;
     font: 700 12px var(--rn-display); letter-spacing: .12em; text-transform: uppercase; color: var(--rn-accent);
     border-bottom: 1px solid var(--rn-line); }
   section > header span { font: 12px var(--rn-mono); letter-spacing: 0; text-transform: none; color: var(--rn-dim); }
-  .list { flex: 1; min-height: 0; overflow-y: auto; font: 12px var(--rn-mono); }
+  .list { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; font: 12px var(--rn-mono); }
   .row { display: flex; align-items: center; gap: 6px; padding: 2px 6px; color: var(--rn-fg); }
   .row:nth-child(even) { background: color-mix(in srgb, var(--rn-panel-2) 45%, transparent); }
   .row:hover { background: color-mix(in srgb, var(--rn-accent) 14%, transparent); }
@@ -29,7 +29,8 @@
   .t { color: var(--rn-dim); flex: none; }
   .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n small { color: var(--rn-dim); font-size: 11px; margin-left: 6px; }
-  .tag { color: var(--rn-dim); font-size: 11px; flex: none; }
+  .n.id { flex: 1 0 auto; }
+  .tag { color: var(--rn-dim); font-size: 11px; flex: 0 1 auto; min-width: 0; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row button { flex: none; width: 22px; height: 18px; padding: 0; font: 11px var(--rn-mono); cursor: pointer;
     color: var(--rn-accent-2); background: transparent; border: 1px solid color-mix(in srgb, var(--rn-accent-2) 50%, transparent); }
   .row button:hover:not(:disabled) { background: color-mix(in srgb, var(--rn-accent-2) 18%, transparent); }
@@ -59,6 +60,7 @@
   <div class="bar">
     <rn-input id="paste" placeholder="Paste an event name, an event id or a sound id, then Enter"></rn-input>
     <rn-button id="play">Play</rn-button>
+    <rn-button id="stopAll" variant="ghost" disabled title="Stop every sound and event the Tracer started">Stop all</rn-button>
   </div>
   <p id="said" class="line"></p>
 </rn-window>
@@ -159,12 +161,14 @@
     row.dataset.key = p.name ?? String(p.event);
     row.dataset.kind = 'event';
     row.dataset.text = `${label} ${p.event} ${p.object}`.toLowerCase();
-    const playTip = p.name ? `Play ${p.name} through the game` : 'No name for this event: the game plays events by name';
+    row.dataset.pk = `event:${row.dataset.key}`;
+    const playTip = p.name ? `Play ${p.name} on V through the game` : 'No name for this event: the game plays events by name';
     row.innerHTML =
       `<span class="t">${clock(started + p.ms)}</span>` +
       `<span class="n" title="Event ${p.event} on game object ${esc(p.object)}">${esc(label)}${p.name ? `<small>${p.event}</small>` : ''}</span>` +
       `<span class="tag">${p.playing ? esc(p.object) : 'failed'}</span>` +
       `<button data-act="play" title="${esc(playTip)}"${p.name ? '' : ' disabled'}>&#9654;</button>` +
+      stopButton(row.dataset.pk) +
       `<button data-act="copy" title="Copy ${esc(row.dataset.key)}">&#10697;</button>`;
     return row;
   }
@@ -174,13 +178,15 @@
     row.className = 'row';
     row.dataset.key = String(l.sound);
     row.dataset.kind = 'sound';
+    row.dataset.pk = `sound:${l.sound}`;
     row.dataset.text = `${l.sound}${l.found ? '' : ' not in the index'}`;
     const playTip = l.found ? `Play sound ${l.sound} as recorded, without the game's effects` : 'Not in the opus index (likely inside a Wwise bank): cannot be played by id';
     row.innerHTML =
       `<span class="t">${clock(started + l.ms)}</span>` +
-      `<span class="n">${l.sound}</span>` +
-      (l.found ? '' : '<span class="tag">not in the index</span>') +
+      `<span class="n id">${l.sound}</span>` +
+      (l.found ? '' : '<span class="tag" title="Not in the opus index">not indexed</span>') +
       `<button data-act="play" title="${esc(playTip)}"${l.found ? '' : ' disabled'}>&#9654;</button>` +
+      stopButton(row.dataset.pk) +
       `<button data-act="copy" title="Copy ${l.sound}">&#10697;</button>`;
     return row;
   }
@@ -242,6 +248,7 @@
       if (!button || button.disabled) return;
       const row = button.closest('.row');
       if (button.dataset.act === 'copy') copy(row.dataset.key);
+      else if (button.dataset.act === 'stop') stopRow(row.dataset.pk);
       else if (row.dataset.kind === 'event') playEvent(row.dataset.key);
       else playSound(Number(row.dataset.key));
     });
@@ -258,19 +265,67 @@
     }
   }
 
+  // What the Tracer has playing, by row key ('event:<name>' or 'sound:<id>'), with how to
+  // stop it. A row's Stop is on while its key is here. Events have no end the Tracer can
+  // see, so they stay stoppable until stopped; a sound leaves when it ends.
+  const active = new Map();
+
+  function stopButton(pk) {
+    return `<button data-act="stop" title="Stop"${active.has(pk) ? '' : ' disabled'}>&#9632;</button>`;
+  }
+
+  function setActive(pk, stopFn) {
+    if (stopFn) active.set(pk, stopFn);
+    else active.delete(pk);
+    for (const b of document.querySelectorAll(`.row[data-pk="${CSS.escape(pk)}"] button[data-act=stop]`)) b.disabled = !stopFn;
+    if (active.size) $('stopAll').removeAttribute('disabled');
+    else $('stopAll').setAttribute('disabled', '');
+  }
+
+  async function stopRow(pk) {
+    const fn = active.get(pk);
+    if (!fn) return;
+    setActive(pk, null);
+    try {
+      await fn();
+      say(`Stopped ${pk.slice(pk.indexOf(':') + 1)}`);
+    } catch (err) {
+      say(`Could not stop: ${err.message}`, 'bad');
+    }
+  }
+
+  $('stopAll').addEventListener('click', async () => {
+    const keys = [...active.keys()];
+    await Promise.all(keys.map((pk) => stopRow(pk)));
+    say(`Stopped ${keys.length === 1 ? 'one sound' : `${keys.length} sounds`}`);
+  });
+
   async function playEvent(name) {
     try {
-      await audio.event(name);
-      say(`Played ${name} through the game`, 'good');
+      const e = await audio.event(name);
+      setActive(`event:${name}`, () => e.stop());
+      say(`Played ${name} ${e.on === 'player' ? 'on V' : 'with no entity (no player yet)'}, through the game`, 'good');
     } catch (err) {
       say(`${name}: ${err.message}`, 'bad');
     }
   }
 
+  // Plays one sound by id; playing it again first stops the copy already playing.
+  async function startSound(id) {
+    const pk = `sound:${id}`;
+    if (active.has(pk)) await active.get(pk)().catch(() => {});
+    const s = await audio.playGame(id);
+    const stopFn = () => s.stop();
+    setActive(pk, stopFn);
+    s.ended.then(() => {
+      if (active.get(pk) === stopFn) setActive(pk, null);
+    });
+    say(`Playing sound ${id} (${s.seconds.toFixed(2)} s), as recorded`, 'good');
+  }
+
   async function playSound(id) {
     try {
-      const s = await audio.playGame(id);
-      say(`Playing sound ${id} (${s.seconds.toFixed(2)} s), as recorded`, 'good');
+      await startSound(id);
     } catch (err) {
       say(`Sound ${id}: ${err.message}`, 'bad');
     }
@@ -284,8 +339,7 @@
     const id = Number(text);
     if (names.has(id)) return playEvent(names.get(id));
     try {
-      const s = await audio.playGame(id);
-      say(`Playing sound ${id} (${s.seconds.toFixed(2)} s), as recorded`, 'good');
+      await startSound(id);
     } catch (err) {
       say(`${id}: ${err.message}. An event id plays only once the trace has shown its name.`, 'bad');
     }
