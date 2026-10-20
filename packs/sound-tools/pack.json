@@ -1,0 +1,7 @@
+{
+  "id": "sound-tools",
+  "name": "REDnode Sound Tools",
+  "version": "0.1.0",
+  "rednode": ">=0.26.15",
+  "apps": ["sound-tracer", "sound-search", "hot-swap"]
+}
