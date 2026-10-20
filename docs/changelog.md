@@ -11,6 +11,10 @@ How to keep it:
 
 ## Unreleased
 
+**Fixed**
+
+- The overlay's arrow could vanish in the game after a save loaded on some NVIDIA setups, while the windows still showed. It is now drawn from a texture, the same way as the windows.
+
 **Changed**
 
 - The Welcome window warns that F9, right beside F10, is the game's Quick Load.

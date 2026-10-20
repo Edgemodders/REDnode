@@ -15,6 +15,7 @@
 // second the window's alpha is read back from the GPU for click-through.
 
 #include "capture.hpp"
+#include "cursor.hpp"
 #include "overlay.hpp"
 
 #include <RED4ext/GpuApi/DeviceData.hpp>
@@ -199,7 +200,7 @@ struct Gpu
     ComPtr<ID3D12PipelineState> pso;
     DXGI_FORMAT psoFormat = DXGI_FORMAT_UNKNOWN;
     ComPtr<ID3D12DescriptorHeap> rtvHeap;
-    ComPtr<ID3D12DescriptorHeap> srvHeap; // MaxWindows + 1; the last slot is a null view for the cursor
+    ComPtr<ID3D12DescriptorHeap> srvHeap; // MaxWindows + 1; the last slot is the cursor's texture
     UINT rtvSize = 0;
     UINT srvSize = 0;
 
@@ -223,6 +224,13 @@ struct Gpu
     // Shared textures copied in each frame slot, kept until that slot's GPU work is done.
     std::vector<ComPtr<ID3D12Resource>> slotShared[FramesInFlight];
     std::vector<uint32_t> slotAcks[FramesInFlight];
+
+    // The arrow as a texture (cursor.hpp), drawn like a window; uploaded on the first frame.
+    // Without it the shader draws the arrow itself, as before 0.26.7.
+    ComPtr<ID3D12Resource> cursorTex;
+    ComPtr<ID3D12Resource> cursorUpload;
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT cursorFootprint{};
+    bool cursorUploaded = false;
 
     bool failed = false;
 } g;
@@ -431,6 +439,90 @@ bool CreatePipeline(DXGI_FORMAT aFormat)
     return true;
 }
 
+// The arrow's texture and its upload buffer, filled now and copied on the first frame.
+// A failure only logs: the shader's own arrow is the fallback.
+void CreateCursorTexture()
+{
+    g.cursorTex.Reset();
+    g.cursorUpload.Reset();
+    g.cursorUploaded = false;
+
+    D3D12_HEAP_PROPERTIES heap{};
+    heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12_RESOURCE_DESC desc{};
+    desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    desc.Width = cursor::TexWidth;
+    desc.Height = cursor::TexHeight;
+    desc.DepthOrArraySize = 1;
+    desc.MipLevels = 1;
+    desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    desc.SampleDesc.Count = 1;
+    HRESULT hr = g.device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
+                                                   nullptr, IID_PPV_ARGS(&g.cursorTex));
+    if (FAILED(hr))
+    {
+        Log("Overlay: no texture for the arrow (0x%08lX); the shader draws it", static_cast<unsigned long>(hr));
+        return;
+    }
+
+    UINT64 total = 0;
+    g.device->GetCopyableFootprints(&desc, 0, 1, 0, &g.cursorFootprint, nullptr, nullptr, &total);
+    D3D12_HEAP_PROPERTIES upload{};
+    upload.Type = D3D12_HEAP_TYPE_UPLOAD;
+    D3D12_RESOURCE_DESC buf{};
+    buf.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    buf.Width = total;
+    buf.Height = 1;
+    buf.DepthOrArraySize = 1;
+    buf.MipLevels = 1;
+    buf.SampleDesc.Count = 1;
+    buf.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    hr = g.device->CreateCommittedResource(&upload, D3D12_HEAP_FLAG_NONE, &buf, D3D12_RESOURCE_STATE_GENERIC_READ,
+                                           nullptr, IID_PPV_ARGS(&g.cursorUpload));
+    uint8_t* mapped = nullptr;
+    D3D12_RANGE noRead{0, 0};
+    if (FAILED(hr) || FAILED(g.cursorUpload->Map(0, &noRead, reinterpret_cast<void**>(&mapped))))
+    {
+        Log("Overlay: no upload buffer for the arrow (0x%08lX); the shader draws it", static_cast<unsigned long>(hr));
+        g.cursorTex.Reset();
+        g.cursorUpload.Reset();
+        return;
+    }
+    const std::vector<uint8_t> pixels = cursor::Pixels();
+    for (int row = 0; row < cursor::TexHeight; ++row)
+    {
+        std::memcpy(mapped + g.cursorFootprint.Offset + row * g.cursorFootprint.Footprint.RowPitch,
+                    pixels.data() + size_t(row) * cursor::TexWidth * 4, size_t(cursor::TexWidth) * 4);
+    }
+    g.cursorUpload->Unmap(0, nullptr);
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
+    srv.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srv.Texture2D.MipLevels = 1;
+    g.device->CreateShaderResourceView(g.cursorTex.Get(), &srv, SrvCpu(MaxWindows));
+    Log("Overlay: the arrow is drawn from a %d x %d texture, like a window", cursor::TexWidth, cursor::TexHeight);
+}
+
+// Copies the arrow into its texture, once.
+void RecordCursorUpload()
+{
+    if (!g.cursorTex || g.cursorUploaded)
+        return;
+    D3D12_TEXTURE_COPY_LOCATION dst{};
+    dst.pResource = g.cursorTex.Get();
+    dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    D3D12_TEXTURE_COPY_LOCATION src{};
+    src.pResource = g.cursorUpload.Get();
+    src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    src.PlacedFootprint = g.cursorFootprint;
+    g.list->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+    auto b = Transition(g.cursorTex.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    g.list->ResourceBarrier(1, &b);
+    g.cursorUploaded = true;
+}
+
 bool CreateBaseResources()
 {
     D3D12_DESCRIPTOR_HEAP_DESC rtv{};
@@ -451,6 +543,7 @@ bool CreateBaseResources()
     g.srvSize = g.device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     for (UINT i = 0; i <= MaxWindows; ++i)
         WriteNullSrv(i);
+    CreateCursorTexture();
 
     for (auto& a : g.allocators)
     {
@@ -1231,6 +1324,7 @@ void RenderFrame(IDXGISwapChain* aSwapChain)
     rtv.ptr += SIZE_T(index) * g.rtvSize;
     g.device->CreateRenderTargetView(backBuffer.Get(), nullptr, rtv);
 
+    RecordCursorUpload(); // once; here, as this frame's list is sure to run
     RecordCapture(backBuffer.Get(), D3D12_RESOURCE_STATE_PRESENT, false); // the game alone, if asked for
     auto toTarget = Transition(backBuffer.Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
     g.list->ResourceBarrier(1, &toTarget);
@@ -1268,7 +1362,7 @@ void RenderFrame(IDXGISwapChain* aSwapChain)
         float cx, cy;
         GetCursor(cx, cy);
         ToNdc(cx, cy, CursorWidth, CursorHeight, scale, c.rect);
-        c.kind = 1;
+        c.kind = g.cursorUploaded ? 0.0f : 1.0f; // from its texture, like a window; else the shader's own
         g.list->SetGraphicsRoot32BitConstants(0, sizeof(Constants) / 4, &c, 0);
         g.list->SetGraphicsRootDescriptorTable(1, SrvGpu(MaxWindows));
         g.list->DrawInstanced(4, 1, 0, 0);

@@ -4,6 +4,7 @@
 //   .\tools\build-native.ps1 builds and runs it.
 
 #include "../src/overlay/capture.hpp"
+#include "../src/overlay/cursor.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -107,6 +108,27 @@ int main()
         Check(Near(out[1], 124, 2), "scRGB 40 nits is a fifth of paper white, sRGB encoded");
         Check(out[0] == 0, "scRGB zero is black");
         Check(HalfToFloat(0x3C00) == 1.0f && HalfToFloat(0xC000) == -2.0f, "half floats decode");
+    }
+
+    // The arrow's texture (cursor.hpp), drawn like a window since 0.26.7.
+    {
+        namespace c = rednode::overlay::detail::cursor;
+        const auto px = c::Pixels();
+        const auto at = [&](float aX, float aY) {
+            const int x = static_cast<int>(aX * c::Scale), y = static_cast<int>(aY * c::Scale);
+            return &px[(static_cast<size_t>(y) * c::TexWidth + x) * 4];
+        };
+        Check(px.size() == static_cast<size_t>(c::TexWidth) * c::TexHeight * 4, "the arrow is TexWidth x TexHeight BGRA");
+        const uint8_t* fill = at(4, 10);
+        Check(fill[3] == 255 && fill[2] > 240 && fill[1] > 220 && fill[0] < 20, "inside the arrow is opaque yellow");
+        const uint8_t* edge = at(0.2f, 9);
+        Check(edge[3] == 255 && edge[2] < 20 && edge[1] < 20, "its left edge is the dark outline");
+        const uint8_t* outside = at(16, 4);
+        Check(outside[0] == 0 && outside[1] == 0 && outside[2] == 0 && outside[3] == 0, "outside it is transparent");
+        bool premultiplied = true;
+        for (size_t i = 0; i < px.size(); i += 4)
+            premultiplied = premultiplied && px[i] <= px[i + 3] && px[i + 1] <= px[i + 3] && px[i + 2] <= px[i + 3];
+        Check(premultiplied, "every texel is premultiplied, like a window's frame");
     }
 
     std::printf("\n%s: %d failure(s)\n", g_failures ? "FAILED" : "PASSED", g_failures);
