@@ -91,6 +91,16 @@ Agreed with the user on 2026-10-19, after sound archives could be hot-swapped (H
 | **Sound Search** | Search by event name, event hash or sound id; the results are events with their variations. **Play** an event or one variation, and save results to a **Scratch** tab, kept across starts, to play later. Names come from WolvenKit's list through REDbridge (`sound.events`, game 1.6, so newer events show as hashes); ids and variations come from the game's live index, so they follow hot swaps |
 | **Hot swap** | The Hot swap test app, made ready for players |
 
+How the pack is made and shipped, decided with the user on 2026-10-20:
+
+| Question | Decision |
+|---|---|
+| Where its source lives | In this repo, in its own folder, `packs/sound-tools/`, outside the REDnode build: `npm run overlay:package` and the player zip do not take it in. The apps move there from `packages/overlay/apps` (Sound Tracer, Hot swap test); Sound Search starts there |
+| How it ships | Its own zip and its own Nexus page, with its own version and changelog section. The zip lays the apps out as `red4ext/plugins/REDnode/apps/<app>/`, so it installs into an existing REDnode (by hand, Vortex or Mod Organizer 2) without touching REDnode's own files |
+| Requirements on its page | REDnode (the first release with SP2's and SP3's APIs), RED Hot Tools (for Hot swap), REDbridge (optional, for event names) |
+| A too-old REDnode | Each app's manifest asks for `"requires": { "rednode": ">=<version>" }`, so the Mod Manager names the problem. Unverified: whether `requires` finds REDnode's own DLL version; checked in SP4 |
+| Release gate | The same rule as REDnode's: no pack release until its apps' in-game tests have passed and a REDnode release carries the APIs they use |
+
 Two kinds of id play differently:
 
 | Kind | Played through |
@@ -103,7 +113,7 @@ Two kinds of id play differently:
 | **SP1 Spike** | Find where events are posted with their names, and confirm the sound lookup (`0x279890` in 2.31) for loads; check `GameAudioSystem.Play` by name; read one variation's bytes and play them (does the archive keep the paks uncompressed, or does REDbridge extract them) | An in-game check |
 | **SP2 Sound Tracer** | The hooks and `audio.trace` came with SP1. SP2 adds event names in the host (REDbridge's list, loaded when a trace starts, so no package needs the bridge permission for them), every post and load written to `rednode-sound-trace.log`, and the app: a window that never scrolls, two scrolling columns of the newest 2,000 rows, filter, pause, clear, copy, **Play** on each row and a paste box. What posted an event and its distance from V wait for a way from a Wwise game object to an entity (SP1 found they differ) | An in-game test |
 | **SP3 Sound Search** | Search, play, the Scratch tab | An in-game test |
-| **SP4 The pack** | Hot swap made ready for players; the pack's zip; a **Sound Tools** docs page (install, each app, workflows such as Tracer to Search to an EDGEwave override to a hot swap) with screenshots rendered from the apps, and placeholders for in-game shots until the user takes them; example app pages; a note on #14 | The user's release |
+| **SP4 The pack** | Hot swap made ready for players; the pack's own zip and Nexus page source; a **Sound Tools** docs page (install, each app, workflows such as Tracer to Search to an EDGEwave override to a hot swap) with screenshots rendered from the apps, and placeholders for in-game shots until the user takes them; example app pages; a note on #14 | The user's release |
 
 ### SP1 spike: what the exe showed
 
