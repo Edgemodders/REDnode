@@ -204,9 +204,11 @@ On 2026-10-20 on the laptop, before the full steps (no logs sent). The user's ea
 
 Also found while checking: the new Stop code clashed with an existing name in the page, which would have stopped the whole app from loading; caught by the preview, fixed before the build.
 
-### SP2 retest (REDnode 0.26.11)
+### SP2 retest (REDnode 0.26.12)
 
-REDnode 0.26.11 on the laptop (the plugin log's first line says "REDnode 0.26.11 loading"). Steps 1 to 4 and 6 are the SP2 test's; 5 is new.
+REDnode 0.26.12 adds what the user asked next: the Tracer had no close button (its window lacked the kit's `closable` attribute, copied from the UI kit app). Sound Tracer 0.2.1 has one. Closing it switches the app off, which stops the trace and its sounds; and since an event posted on V plays in the game, the host now stops every event a package posted (through `AudioSystem.Stop`) when the package stops, for any package. Checked in the mock game: a mod that posted an ambience and crashed had it stopped.
+
+REDnode 0.26.12 on the laptop (the plugin log's first line says "REDnode 0.26.12 loading"). Steps 1 to 4 and 6 are the SP2 test's; 5 and 7 are new.
 
 0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
 1. Load a save. In the Mod Manager switch on **Sound Tracer**. Is the whole window visible, with no sideways scroll bar? **Mark**.
@@ -215,7 +217,8 @@ REDnode 0.26.11 on the laptop (the plugin log's first line says "REDnode 0.26.11
 4. Press **Pause**, wait about 5 seconds, press **Resume**: the rows from the pause appear. **Mark**.
 5. Press **Play** on three named rows in Played: a footstep or foley one, a katana one, an ambience one. Which could you hear? Press **Stop** on any that keeps playing. Then press **Play** on a long row in Loaded and **Stop** it, and try **Stop all**. **Mark**.
 6. Press **Copy** on a row in Loaded, paste it into the box at the bottom (Ctrl+V) and press Enter: the same sound plays. **Mark**.
-7. Press **Stop trace** and quit the game. Send `rednode-sound-trace.log`, `rednode-mods.log`, the plugin log (`rednode-*.log` of this session) and `rednode-overlay.log`.
+7. Press **Play** on an ambience row in Played and leave it playing. Close the Tracer with the **✕** in its title bar: the trace stops and the ambience stops with it. **Mark**.
+8. Quit the game. Send `rednode-sound-trace.log`, `rednode-mods.log`, the plugin log (`rednode-*.log` of this session) and `rednode-overlay.log`.
 
 **Requested of EDGEwave** ([EDGEwave #2](https://github.com/Edgemodders/EDGEwave/issues/2)): a fifth Into the Game route, **As a REDnode sound**, writing the render into a REDnode package's folder with a `sounds` entry in its manifest. S1 already plays it; nothing to pack.
 

@@ -1,7 +1,7 @@
 {
   "id": "welcome",
   "name": "Welcome",
-  "version": "0.26.11",
+  "version": "0.26.12",
   "author": "Edgemodders",
   "description": "Shown once, at the first start: what REDnode is and what F10 does. Switch it on to read it again.",
   "entry": "index.html",
