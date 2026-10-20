@@ -14,6 +14,7 @@ How to keep it:
 **New**
 
 - `audio.playGame({ event })` plays one of a game sound event's own recordings (its variations, in turn or by `variation`) through REDnode's engine, heard wherever the sound is in the game; `audio.eventSounds(event)` lists them. Experimental.
+- `audio.searchSounds(query)` searches the game's sound events by words of their name or tags, by event id, or by sound id (the events that play it). Experimental.
 - `ui.list()` in the UI builder: a list of lines that scrolls on its own, for a log or a live feed in a Node mod's window. It keeps its newest lines, follows the newest one unless the player scrolls up, and fills the window's free height, so the window itself never scrolls. See the new **Live log mod** sample.
 - Swapping sound into the running game: `archives.reload` and the MCP tool `archives_reload` now swap archives that change the game's sound paks (`.opuspak`, `.opusinfo`, such as EDGEwave's sound overrides) instead of refusing them. The swap runs with the game paused and its audio held, then REDnode loads the game's sound index again, so the new sounds play without a restart. A sound that played just before the swap may keep its old version until the game loads it again (for a weapon, equip it again). The answer's `sound` field says how it went.
 - `ui.copy(text)` in the `rednode` package puts text on the Windows clipboard, from a Node mod or an overlay app.

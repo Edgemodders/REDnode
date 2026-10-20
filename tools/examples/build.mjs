@@ -15,9 +15,18 @@ import hljs from 'highlight.js';
 import { GROUPS, NOTES } from './notes.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const appsDir = join(repo, 'packages', 'overlay', 'apps');
+// REDnode's own apps, then the optional app packs' (packs/<pack>/apps), each with its
+// folder in the repo for the GitHub links.
+const APP_ROOTS = [
+  { dir: join(repo, 'packages', 'overlay', 'apps'), path: 'packages/overlay/apps' },
+  ...(existsSync(join(repo, 'packs'))
+    ? readdirSync(join(repo, 'packs'))
+        .filter((p) => existsSync(join(repo, 'packs', p, 'apps')))
+        .map((p) => ({ dir: join(repo, 'packs', p, 'apps'), path: `packs/${p}/apps`, pack: p }))
+    : []),
+];
 const out = join(repo, 'docs', 'examples');
-const GITHUB = 'https://github.com/Edgemodders/REDnode/blob/main/packages/overlay/apps';
+const GITHUB = 'https://github.com/Edgemodders/REDnode/blob/main';
 const SIM = '../../../assets/examples/sim'; // from docs/examples/run/<id>/
 const KIT = '../../kit/rednode-ui.js';
 const FONTS =
@@ -59,12 +68,13 @@ function order(f) {
   return 4;
 }
 
-function readApp(id) {
-  const dir = join(appsDir, id);
+function readApp({ id, root }) {
+  const dir = join(root.dir, id);
   const manifest = JSON.parse(readFileSync(join(dir, 'rednode-app.json'), 'utf8'));
   const kind = manifest.main ? 'mod' : manifest.kind === 'hud' ? 'hud' : 'window';
   const files = filesOf(dir).map((f) => ({ path: f, text: TEXT.has(extname(f)) ? readFileSync(join(dir, f), 'utf8').replace(/\r\n/g, '\n') : null }));
-  return { id, dir, manifest, kind, files, note: NOTES[id] ?? { group: 'tests', summary: manifest.description ?? '' } };
+  const github = `${GITHUB}/${root.path}/${id}`;
+  return { id, dir, github, pack: root.pack, manifest, kind, files, note: NOTES[id] ?? { group: 'tests', summary: manifest.description ?? '' } };
 }
 
 // ---------- the preview's copy of an app ----------
@@ -145,7 +155,7 @@ function codeBlock(app, name, text, { caption, lang } = {}) {
   const html = hljs.highlight(text, { language, ignoreIllegals: true }).value;
   const label = caption ?? name;
   return `<figure class="ex-file">
-  <figcaption><span class="ex-file-name">${esc(label)}</span><a class="ex-gh" href="${GITHUB}/${app.id}/${esc(name)}">GitHub</a><button class="ex-copy" type="button" title="Copy ${esc(label)}" aria-label="Copy ${esc(label)}">${COPY_ICON}<span>Copy</span></button></figcaption>
+  <figcaption><span class="ex-file-name">${esc(label)}</span><a class="ex-gh" href="${app.github}/${esc(name)}">GitHub</a><button class="ex-copy" type="button" title="Copy ${esc(label)}" aria-label="Copy ${esc(label)}">${COPY_ICON}<span>Copy</span></button></figcaption>
   <pre><code class="hljs language-${language}">${html}</code></pre>
 </figure>`;
 }
@@ -215,7 +225,7 @@ ${n.preview ? `<p class="ex-note">${inline(n.preview)}</p>` : ''}`,
     manifest:
       codeBlock(app, 'rednode-app.json', manifestFile.text) +
       `\n<p class="ex-note">The manifest names the package and says how REDnode runs it. Its fields are in <a href="../overlay-apps.html">Overlay apps</a>.</p>` +
-      (others.length ? `\n<p class="ex-note">Other files: ${others.map((f) => `<a href="${GITHUB}/${app.id}/${esc(f.path)}"><code>${esc(f.path)}</code></a>`).join(', ')}.</p>` : ''),
+      (others.length ? `\n<p class="ex-note">Other files: ${others.map((f) => `<a href="${app.github}/${esc(f.path)}"><code>${esc(f.path)}</code></a>`).join(', ')}.</p>` : ''),
   };
 
   const body = `<h1>${esc(app.manifest.name)}</h1>
@@ -231,7 +241,7 @@ ${n.how?.length ? `<h2>How it works</h2>\n${n.how.map((p) => `<p>${inline(p)}</p
 ${n.teaches?.length ? `<h2>What it uses</h2>\n<p class="ex-chips">${n.teaches.map(apiChip).join(' ')}</p>` : ''}
 ${n.tryThis?.length ? `<h2>Try this</h2>\n<ul>${n.tryThis.map((t) => `<li>${inline(t)}</li>`).join('')}</ul>` : ''}
 <h2>Use it</h2>
-<p>Copy the files into <code>red4ext/plugins/REDnode/apps/${esc(app.id)}/</code> in the game folder, or start your own package from them: change <code>id</code> and <code>name</code> in the manifest first. The whole folder is on <a href="${GITHUB}/${app.id}">GitHub</a>.</p>
+<p>Copy the files into <code>red4ext/plugins/REDnode/apps/${esc(app.id)}/</code> in the game folder, or start your own package from them: change <code>id</code> and <code>name</code> in the manifest first. The whole folder is on <a href="${app.github}">GitHub</a>.</p>
 <nav class="ex-pager">${prev ? `<a href="${prev.id}.html">&larr; ${esc(prev.manifest.name)}</a>` : '<span></span>'}<a href="./">All examples</a>${next ? `<a href="${next.id}.html">${esc(next.manifest.name)} &rarr;</a>` : '<span></span>'}</nav>
 </div>`;
   return page(`${app.manifest.name} · Example apps`, body);
@@ -278,8 +288,12 @@ rmSync(out, { recursive: true, force: true });
 mkdirSync(join(out, 'kit'), { recursive: true });
 cpSync(join(repo, 'packages', 'ui', 'src', 'rednode-ui.js'), join(out, 'kit', 'rednode-ui.js'));
 
-const ids = readdirSync(appsDir).filter((d) => existsSync(join(appsDir, d, 'rednode-app.json')));
-const apps = ids.map(readApp);
+const found = APP_ROOTS.flatMap((root) =>
+  readdirSync(root.dir)
+    .filter((d) => existsSync(join(root.dir, d, 'rednode-app.json')))
+    .map((id) => ({ id, root })),
+);
+const apps = found.map(readApp);
 // Pages in the index's order: by group, then as listed in notes.mjs.
 const noteOrder = Object.keys(NOTES);
 const rank = (a) => GROUPS.findIndex(([k]) => k === a.note.group) * 1000 + (noteOrder.includes(a.id) ? noteOrder.indexOf(a.id) : 999);

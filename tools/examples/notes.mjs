@@ -259,6 +259,20 @@ export const NOTES = {
     ],
     preview: 'The sounds on this page are made up and play as a tone: in the game the plugin hooks its audio engine and plays the real recordings.',
   },
+  'sound-search': {
+    group: 'game',
+    summary: 'Search the game\'s sound events by name, tag, event id or sound id, play any of their recordings, and keep what you find in a Scratch tab.',
+    teaches: ['audio.searchSounds', 'audio.playGame', 'audio.event', 'ui.copy', 'localStorage in an app'],
+    how: [
+      'audio.searchSounds asks the host, which keeps a catalogue of every event the game\'s sound index has recordings for and every event REDbridge\'s list names. All the words you type must appear in an event\'s name or tags; a number finds an event by its id, or the events that play that sound id.',
+      'Names arrive a few seconds after the first search while REDbridge starts: the window searches again until they are in.',
+      '▶ on an event plays its recordings in turn through REDnode\'s engine; ▸ lists them, each playable on its own. G posts the event through the game on V.',
+      '☆ saves an event or a recording to Scratch. Scratch lives in the window\'s local storage, so it is still there in the next game session.',
+      'Part of REDnode Sound Tools.',
+    ],
+    tryThis: ['Type katana.', 'Open w_melee_katana_equip with ▸ and play its recordings one by one.', 'Save one with ☆, then open the Scratch tab.', 'Search 746693166: the event that plays that sound opens with it marked.'],
+    preview: 'The catalogue on this page is made up and plays a tone: in the game it holds over 23,000 events and plays the real recordings.',
+  },
   vitals: {
     group: 'hud',
     summary: 'A HUD widget with V\'s health, level and money, read through the generic game API from a web page.',
