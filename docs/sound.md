@@ -81,6 +81,30 @@ Where the phases meet:
 | S3 voice lines | No route: voice lines are `.wem` files, which need Wwise. EDGEwave's research list names "REDnode's Sound API" as a way around it | EDGEwave edits the line; a REDnode package plays it as WAV or OGG with subtitles |
 | S4 game events | A3's REDmod routes replace an event (dropping its Wwise logic) or silence it (`mod_skip`), for the whole game | S4 does it live and per package, with Tier 1 hooks on the game's audio calls |
 
+## Sound Tools: SP1 to SP4
+
+Agreed with the user on 2026-10-19, after sound archives could be hot-swapped (H1d, [World API](world.md#h1d-test-results)): **REDnode Sound Tools**, an optional app pack for modders with three apps. It also answers EDGEwave's request for a Sound Tracer ([REDnode #14](https://github.com/Edgemodders/REDnode/issues/14)), the listening half of S4. The hooks and play calls go into REDnode itself, so any package can use them; the apps ship as the pack.
+
+| App | What it does |
+|---|---|
+| **Sound Tracer** | Lists the game's sounds live, in two columns kept apart. **Played** shows the event name and hash, what posted it, its distance from V and the time. **Loaded** shows the sound id the game looked up. It has filter, pause, clear and copy a row, a **Play** button on each row, and a box where a pasted event name or sound id plays again. It only listens. Played without Loaded after a swap means the sound came from a reference kept from before; this tests the user's theory in the H1d results |
+| **Sound Search** | Search by event name, event hash or sound id; the results are events with their variations. **Play** an event or one variation, and save results to a **Scratch** tab, kept across starts, to play later. Names come from WolvenKit's list through REDbridge (`sound.events`, game 1.6, so newer events show as hashes); ids and variations come from the game's live index, so they follow hot swaps |
+| **Hot swap** | The Hot swap test app, made ready for players |
+
+Two kinds of id play differently:
+
+| Kind | Played through |
+|---|---|
+| An **event** (a name, and its Wwise hash) | The game's `GameAudioSystem.Play(eventName, entityID?, emitterName?)`: the game's own mix and Wwise logic. It needs the name |
+| A **sound** (one variation, such as 746693166) | Its bytes from the `.opuspak` (pak, offset and size from the live index), decoded from Opus and played by REDnode's engine: the raw recording, without the game's effects |
+
+| Phase | Builds | Stops for |
+|---|---|---|
+| **SP1 Spike** | Find where events are posted with their names, and confirm the sound lookup (`0x279890` in 2.31) for loads; check `GameAudioSystem.Play` by name; read one variation's bytes and play them (does the archive keep the paks uncompressed, or does REDbridge extract them) | An in-game check |
+| **SP2 Sound Tracer** | The hooks in the plugin, on only while tracing; an `audio.trace` stream in the `rednode` package; the app | An in-game test |
+| **SP3 Sound Search** | Search, play, the Scratch tab | An in-game test |
+| **SP4 The pack** | Hot swap made ready for players; the pack's zip; a **Sound Tools** docs page (install, each app, workflows such as Tracer to Search to an EDGEwave override to a hot swap) with screenshots rendered from the apps, and placeholders for in-game shots until the user takes them; example app pages; a note on #14 | The user's release |
+
 **Requested of EDGEwave** ([EDGEwave #2](https://github.com/Edgemodders/EDGEwave/issues/2)): a fifth Into the Game route, **As a REDnode sound**, writing the render into a REDnode package's folder with a `sounds` entry in its manifest. S1 already plays it; nothing to pack.
 
 ## Research before S1
