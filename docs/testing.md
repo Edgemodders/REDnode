@@ -44,7 +44,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H1c-3 held sounds](#h1c-3-held-sounds) | In the game | #12 H1c-3 | 2026-10-19 | 0.26.7 | **Pass** (laptop): four swaps with the audio thread held, no crash; EDGEwave's sound plays after a swap, except a sound that just played, which switches once the weapon is equipped again (not the held-sounds table: a cache not yet found). 0.26.7's arrow shows and stays ([results](world.md#h1c-3-test-results)). The Welcome window's F9 note not checked yet |
 | [H1d sound swaps](#h1d-sound-swaps) | In the game | #12 H1d | 2026-10-19 | 0.26.8 | **Pass** (laptop): two sound swaps with the defaults, the old index freed each time (3270 KB), no faults; EDGEwave's katana sound played; no missing sounds or stutter; the Welcome window's F9 note shows ([results](world.md#h1d-test-results)) |
 | [SP1 sound spike](#sp1-sound-spike) | In the game | Sound Tools SP1, #14 | 2026-10-20 | 0.26.9 | **Pass** (laptop): the hooks attached at runtime, no cost seen, none dropped; an event and a raw sound played ([results](sound.md#sp1-test-results)) |
-| [SP2 Sound Tracer](#sp2-sound-tracer) | In the game | Sound Tools SP2, #14 | 2026-10-20 | 0.26.14 | 0.26.13 retest **pass** (laptop) except Play on Played rows, still silent; 0.26.14 plays an event's own recordings instead (SP2b), awaiting its test |
+| [SP2 Sound Tracer](#sp2-sound-tracer) | In the game | Sound Tools SP2, #14 | 2026-10-20 | 0.26.14 | **Pass** (laptop): the 0.26.13 retest passed but for Play on Played rows; 0.26.14 plays an event's own recordings, passed ([results](sound.md#sp2b-test-results)) |
 | [UI builder list](#ui-builder-list) | In the game | `ui.list` | 2026-10-20 | 0.26.13 | **Pass** (laptop): the list scrolls, the window does not, follow and Clear work |
 | [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | 2026-10-19 | 0.26.1 | **Fixed** by an NVIDIA driver update: the arrow blinked in the game with DLSS on (laptop) and not with DLSS off; drawn on every frame, no jumps. Not a REDnode bug |
 
@@ -431,7 +431,7 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 |---|---|---|
 | 2026-10-20, laptop | 0.26.10 | First look, no logs ([what was seen](sound.md#sp2-first-run-what-the-user-saw-02610)): a sideways scroll bar; Played rows silent (posted with no entity); no way to stop a long sound. Names work (seen in the spike) |
 | | 0.26.13 | **Pass** except Play on Played rows: still silent ([results](sound.md#sp2-retest-results-02613)) |
-| | 0.26.14 | SP2b: an event's recordings through REDnode's engine; awaiting its test ([steps](sound.md#sp2b-test-rednode-02614)) |
+| 2026-10-20, laptop | 0.26.14 | **Pass**: SP2b, an event's recordings through REDnode's engine ([steps](sound.md#sp2b-test-rednode-02614), [results](sound.md#sp2b-test-results)) |
 
 1. Load a save; switch on Sound Tracer (no permission asked); timer.
 2. Trace about 30 s: walk, katana, inventory. The window stays put, the columns scroll, events get names.

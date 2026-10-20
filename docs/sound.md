@@ -111,7 +111,7 @@ Two kinds of id play differently:
 | Phase | Builds | Stops for |
 |---|---|---|
 | **SP1 Spike** | Find where events are posted with their names, and confirm the sound lookup (`0x279890` in 2.31) for loads; check `GameAudioSystem.Play` by name; read one variation's bytes and play them (does the archive keep the paks uncompressed, or does REDbridge extract them) | An in-game check |
-| **SP2 Sound Tracer** | The hooks and `audio.trace` came with SP1. SP2 adds event names in the host (REDbridge's list, loaded when a trace starts, so no package needs the bridge permission for them), every post and load written to `rednode-sound-trace.log`, and the app: a window that never scrolls, two scrolling columns of the newest 2,000 rows, filter, pause, clear, copy, **Play** on each row and a paste box. What posted an event and its distance from V wait for a way from a Wwise game object to an entity (SP1 found they differ) | An in-game test |
+| **SP2 Sound Tracer** (done, 2026-10-20) | The hooks and `audio.trace` came with SP1. SP2 adds event names in the host (REDbridge's list, loaded when a trace starts, so no package needs the bridge permission for them), every post and load written to `rednode-sound-trace.log`, and the app: a window that never scrolls, two scrolling columns of the newest 2,000 rows, filter, pause, clear, copy, **Play** on each row and a paste box. What posted an event and its distance from V wait for a way from a Wwise game object to an entity (SP1 found they differ) | An in-game test |
 | **SP3 Sound Search** | Search, play, the Scratch tab. An event's variations come from the index's event groups (found in SP2b) | An in-game test |
 | **SP4 The pack** | Hot swap made ready for players; the pack's own zip and Nexus page source; a **Sound Tools** docs page (install, each app, workflows such as Tracer to Search to an EDGEwave override to a hot swap) with screenshots rendered from the apps, and placeholders for in-game shots until the user takes them; example app pages; a note on #14 | The user's release |
 
@@ -262,6 +262,17 @@ Checked in the mock game against the dev PC's real game index (`lcm_fs_bare_feet
 3. Find a greyed **▶** (a `…_stop` row, or `vo_global_tv`): hover it for the reason. Press **G** on a named row to compare with the game's own post. **Mark**.
 4. Type `lcm_fs_bare_feet_concrete_walk` in the box at the bottom and press Enter a few times: footsteps, a different one each time. **Mark**.
 5. Quit the game. Send `rednode-mods.log`, the plugin log and `rednode-overlay.log`.
+
+### SP2b test: results
+
+Run on 2026-10-20 on the laptop, REDnode 0.26.14. **Passed**: ▶ on Played rows played the events' recordings, the greyed ▶ gave its reason, **G** posted through the game, and the box played `lcm_fs_bare_feet_concrete_walk`'s footsteps. The user first noted "same recording each press" on step 2, then saw different sound ids each press on the line at the bottom: an event's variations can sound alike (footsteps, foley). No errors in the logs. **SP2 is done**, and with it EDGEwave's request #14.
+
+Seen in the logs, for later:
+
+| Seen | Note |
+|---|---|
+| The **Live log mod** (left on from the last test) cost the game thread 2 to 6 ms every 2 s | Its `game.player.position` call. The bridge's `player.position` looks up `GetPlayer` and `GetWorldPosition` by name on every call; caching them is a likely fix (unverified) |
+| The first **Start trace** of a session: the 266 ms pattern search on the game thread again | As in the SP2 retest; move it off the game thread |
 
 **Requested of EDGEwave** ([EDGEwave #2](https://github.com/Edgemodders/EDGEwave/issues/2)): a fifth Into the Game route, **As a REDnode sound**, writing the render into a REDnode package's folder with a `sounds` entry in its manifest. S1 already plays it; nothing to pack.
 
