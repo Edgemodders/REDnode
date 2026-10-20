@@ -647,14 +647,29 @@ export const audio = {
     await Promise.all([...sounds.values()].map((e) => stopSound(e, o.fadeOut)));
   },
   // The game's own sounds live in the game's archives: this page plays a tone instead.
-  async playGame(sound) {
+  async playGame(which) {
+    let sound = which;
+    let picked = {};
+    if (which && typeof which === 'object') {
+      const { event, sounds } = await audio.eventSounds(which.event);
+      if (!sounds.length) throw new Error(`Event ${which.event} has no recordings in the game's sound index: a stop event, or one whose sound lives in a Wwise bank`);
+      const at = Number.isInteger(which.variation) ? which.variation : (simTurn.get(event) ?? 0);
+      simTurn.set(event, (at + 1) % sounds.length);
+      sound = sounds[at];
+      picked = { event, variation: at, variations: sounds.length };
+    }
     if (!Number.isInteger(sound) || sound < 0) throw new Error('A sound id is a whole number from 0 to 4294967295');
     if (!SIM_SOUNDS.has(sound)) throw new Error(`Sound ${sound} is not in the game's sound index (audio_2_soundbanks.archive)`);
     blip();
     log('info', `audio.playGame(${sound}): the game's sounds play only in the game; this page plays a tone`, 'sim');
     const seconds = SIM_SOUNDS.get(sound);
     const ended = new Promise((r) => setTimeout(() => r({ why: 'ended' }), seconds * 1000));
-    return new Remote('Sound', { async stop() {}, async set() {} }, { persistent: true, fields: { id: nextSound++, ended, seconds } });
+    return new Remote('Sound', { async stop() {}, async set() {} }, { persistent: true, fields: { id: nextSound++, ended, seconds, sound, ...picked } });
+  },
+  // Which made-up sounds each made-up event plays; the game reads this from its sound index.
+  async eventSounds(event) {
+    const id = typeof event === 'number' || /^\d+$/.test(String(event).trim()) ? Number(event) >>> 0 : wwiseHash(String(event).trim());
+    return { event: id, sounds: SIM_RECORDINGS.get(id) ?? [] };
   },
   async event(name, options = {}) {
     blip();
@@ -672,7 +687,7 @@ export const audio = {
       const loads = [];
       // The host names events from REDbridge's list, which knows the first four of these.
       SIM_EVENTS.forEach(([name, every], i) => {
-        if (Math.random() < every) posts.push({ ms, event: wwiseHash(name), name: i < 4 ? name : undefined, object: String(950 + Math.floor(Math.random() * 300)), playing: 1000 + Math.floor(ms / 10) });
+        if (Math.random() < every) posts.push({ ms, event: wwiseHash(name), name: i < 4 ? name : undefined, recordings: SIM_RECORDINGS.get(wwiseHash(name))?.length ?? 0, object: String(950 + Math.floor(Math.random() * 300)), playing: 1000 + Math.floor(ms / 10) });
       });
       if (Math.random() < 0.3) loads.push({ ms, sound: [...SIM_SOUNDS.keys()][Math.floor(Math.random() * SIM_SOUNDS.size)], found: true });
       if (Math.random() < 0.05) loads.push({ ms, sound: 300000000 + Math.floor(Math.random() * 1e8), found: false });
@@ -689,6 +704,14 @@ function wwiseHash(name) {
 }
 const SIM_EVENTS = [['amb_int_custom_megabuilding_01_ventilation', 0.2], ['w_melee_katana_draw', 0.05], ['v_foley_walk_concrete', 0.6], ['ui_menu_onpress', 0.05], ['dev_vending_machine_can_falls', 0.02]];
 const SIM_SOUNDS = new Map([[746693166, 1.87], [123456789, 0.5], [99887766, 2.4]]);
+// The ventilation loop has none here (its sound lives in a bank, as some do in the game).
+const SIM_RECORDINGS = new Map([
+  [wwiseHash('w_melee_katana_draw'), [746693166]],
+  [wwiseHash('v_foley_walk_concrete'), [123456789, 99887766]],
+  [wwiseHash('ui_menu_onpress'), [123456789]],
+  [wwiseHash('dev_vending_machine_can_falls'), [99887766]],
+]);
+const simTurn = new Map();
 async function stopSound(entry, fadeOut = 0) {
   if (!entry.src || entry.done) return;
   entry.stopped = true;

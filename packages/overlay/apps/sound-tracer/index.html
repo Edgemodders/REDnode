@@ -58,7 +58,7 @@
     </section>
   </div>
   <div class="bar">
-    <rn-input id="paste" placeholder="Paste an event name, an event id or a sound id, then Enter"></rn-input>
+    <rn-input id="paste" placeholder="Paste an event name or id, or a sound id, then Enter"></rn-input>
     <rn-button id="play">Play</rn-button>
     <rn-button id="stopAll" variant="ghost" disabled title="Stop every sound and event the Tracer started">Stop all</rn-button>
   </div>
@@ -161,13 +161,23 @@
     row.dataset.key = p.name ?? String(p.event);
     row.dataset.kind = 'event';
     row.dataset.text = `${label} ${p.event} ${p.object}`.toLowerCase();
-    row.dataset.pk = `event:${row.dataset.key}`;
-    const playTip = p.name ? `Play ${p.name} on V through the game` : 'No name for this event: the game plays events by name';
+    row.dataset.event = String(p.event);
+    row.dataset.pk = `event:${p.event}`;
+    // recordings is undefined when the host could not read the game's sound index: let Play try.
+    const rec = p.recordings;
+    const playTip =
+      rec === 0
+        ? 'No recordings in the game\'s sound index: a stop event, or its sound lives in a Wwise bank'
+        : `Play ${label}'s recordings${rec ? ` (${rec})` : ''} in turn, as recorded: only you hear them, wherever the sound is in the game`;
+    const gameTip = p.name
+      ? `Post ${p.name} through the game, on V: the game's own mix, but a positional sound may be silent away from its source`
+      : 'No name for this event: the game posts events by name';
     row.innerHTML =
       `<span class="t">${clock(started + p.ms)}</span>` +
-      `<span class="n" title="Event ${p.event} on game object ${esc(p.object)}">${esc(label)}${p.name ? `<small>${p.event}</small>` : ''}</span>` +
+      `<span class="n" title="Event ${p.event} on game object ${esc(p.object)}${rec !== undefined ? `; ${rec} recordings` : ''}">${esc(label)}${p.name ? `<small>${p.event}</small>` : ''}</span>` +
       `<span class="tag">${p.playing ? esc(p.object) : 'failed'}</span>` +
-      `<button data-act="play" title="${esc(playTip)}"${p.name ? '' : ' disabled'}>&#9654;</button>` +
+      `<button data-act="play" title="${esc(playTip)}"${rec === 0 ? ' disabled' : ''}>&#9654;</button>` +
+      `<button data-act="game" title="${esc(gameTip)}"${p.name ? '' : ' disabled'}>G</button>` +
       stopButton(row.dataset.pk) +
       `<button data-act="copy" title="Copy ${esc(row.dataset.key)}">&#10697;</button>`;
     return row;
@@ -249,7 +259,8 @@
       const row = button.closest('.row');
       if (button.dataset.act === 'copy') copy(row.dataset.key);
       else if (button.dataset.act === 'stop') stopRow(row.dataset.pk);
-      else if (row.dataset.kind === 'event') playEvent(row.dataset.key);
+      else if (button.dataset.act === 'game') postEvent(row.dataset.key, row.dataset.pk);
+      else if (row.dataset.kind === 'event') playRecordings(Number(row.dataset.event), names.get(Number(row.dataset.event)) ?? `#${row.dataset.event}`);
       else playSound(Number(row.dataset.key));
     });
   }
@@ -265,61 +276,94 @@
     }
   }
 
-  // What the Tracer has playing, by row key ('event:<name>' or 'sound:<id>'), with how to
-  // stop it. A row's Stop is on while its key is here. Events have no end the Tracer can
-  // see, so they stay stoppable until stopped; a sound leaves when it ends.
-  const active = new Map();
+  // What the Tracer has playing, by row key ('event:<id>' or 'sound:<id>'), each with how to
+  // stop it. A row's Stop is on while its key has something here. A sound leaves when it
+  // ends; an event posted through the game has no end the Tracer can see, so it stays
+  // stoppable until stopped.
+  const active = new Map(); // row key -> Set of stop functions
 
   function stopButton(pk) {
     return `<button data-act="stop" title="Stop"${active.has(pk) ? '' : ' disabled'}>&#9632;</button>`;
   }
 
-  function setActive(pk, stopFn) {
-    if (stopFn) active.set(pk, stopFn);
-    else active.delete(pk);
-    for (const b of document.querySelectorAll(`.row[data-pk="${CSS.escape(pk)}"] button[data-act=stop]`)) b.disabled = !stopFn;
+  function refresh(pk) {
+    for (const b of document.querySelectorAll(`.row[data-pk="${CSS.escape(pk)}"] button[data-act=stop]`)) b.disabled = !active.has(pk);
     if (active.size) $('stopAll').removeAttribute('disabled');
     else $('stopAll').setAttribute('disabled', '');
   }
 
-  async function stopRow(pk) {
-    const fn = active.get(pk);
-    if (!fn) return;
-    setActive(pk, null);
-    try {
-      await fn();
-      say(`Stopped ${pk.slice(pk.indexOf(':') + 1)}`);
-    } catch (err) {
-      say(`Could not stop: ${err.message}`, 'bad');
+  function addActive(pk, fn) {
+    if (!active.has(pk)) active.set(pk, new Set());
+    active.get(pk).add(fn);
+    refresh(pk);
+  }
+
+  function dropActive(pk, fn) {
+    const set = active.get(pk);
+    if (!set) return;
+    set.delete(fn);
+    if (!set.size) active.delete(pk);
+    refresh(pk);
+  }
+
+  async function stopRow(pk, quiet = false) {
+    const set = active.get(pk);
+    if (!set) return;
+    active.delete(pk);
+    refresh(pk);
+    const results = await Promise.allSettled([...set].map((fn) => fn()));
+    const failed = results.find((r) => r.status === 'rejected');
+    if (failed) say(`Could not stop: ${failed.reason?.message ?? failed.reason}`, 'bad');
+    else if (!quiet) {
+      const id = pk.slice(pk.indexOf(':') + 1);
+      say(`Stopped ${pk.startsWith('event:') ? names.get(Number(id)) ?? `#${id}` : id}`);
     }
   }
 
   $('stopAll').addEventListener('click', async () => {
     const keys = [...active.keys()];
-    await Promise.all(keys.map((pk) => stopRow(pk)));
-    say(`Stopped ${keys.length === 1 ? 'one sound' : `${keys.length} sounds`}`);
+    await Promise.all(keys.map((pk) => stopRow(pk, true)));
+    say(`Stopped ${keys.length === 1 ? 'one row' : `${keys.length} rows`}`);
   });
 
-  async function playEvent(name) {
+  // A sound playing through REDnode's engine stays stoppable until it ends.
+  function track(pk, s) {
+    const stopFn = () => s.stop();
+    addActive(pk, stopFn);
+    s.ended.then(() => dropActive(pk, stopFn));
+  }
+
+  // An event's recordings through REDnode's engine, the next one each press: heard wherever
+  // the sound is in the game. Pressing again stops the one still playing.
+  async function playRecordings(event, label) {
+    const pk = `event:${event}`;
+    try {
+      await stopRow(pk, true);
+      const s = await audio.playGame({ event });
+      track(pk, s);
+      say(`Playing ${label}: recording ${s.variation + 1} of ${s.variations} (sound ${s.sound}, ${s.seconds.toFixed(2)} s), as recorded`, 'good');
+    } catch (err) {
+      say(`${label}: ${err.message}`, 'bad');
+    }
+  }
+
+  // An event posted through the game, on V: the game's own mix and logic.
+  async function postEvent(name, pk = `event:${name}`) {
     try {
       const e = await audio.event(name);
-      setActive(`event:${name}`, () => e.stop());
-      say(`Played ${name} ${e.on === 'player' ? 'on V' : 'with no entity (no player yet)'}, through the game`, 'good');
+      addActive(pk, () => e.stop());
+      say(`Posted ${name} ${e.on === 'player' ? 'on V' : 'with no entity (no player yet)'}, through the game`, 'good');
     } catch (err) {
       say(`${name}: ${err.message}`, 'bad');
     }
   }
 
-  // Plays one sound by id; playing it again first stops the copy already playing.
+  // One sound by id; playing it again first stops the copy already playing.
   async function startSound(id) {
     const pk = `sound:${id}`;
-    if (active.has(pk)) await active.get(pk)().catch(() => {});
+    await stopRow(pk, true);
     const s = await audio.playGame(id);
-    const stopFn = () => s.stop();
-    setActive(pk, stopFn);
-    s.ended.then(() => {
-      if (active.get(pk) === stopFn) setActive(pk, null);
-    });
+    track(pk, s);
     say(`Playing sound ${id} (${s.seconds.toFixed(2)} s), as recorded`, 'good');
   }
 
@@ -331,17 +375,19 @@
     }
   }
 
-  // A pasted number is an event id when the trace has seen it with a name, else a sound id.
+  // The box: an event (a name, or an id with recordings) plays its recordings; a number
+  // that is no event's is a sound id; an event with no recordings is posted through the game.
   async function playPasted() {
     const text = $('paste').value.trim().replace(/^#/, '');
     if (!text) return;
-    if (!/^\d+$/.test(text)) return playEvent(text);
-    const id = Number(text);
-    if (names.has(id)) return playEvent(names.get(id));
     try {
-      await startSound(id);
+      const { event, sounds } = await audio.eventSounds(text);
+      const label = /^\d+$/.test(text) ? names.get(event) ?? `#${event}` : text;
+      if (sounds.length) return playRecordings(event, label);
+      if (/^\d+$/.test(text)) return playSound(Number(text));
+      return postEvent(text, `event:${event}`);
     } catch (err) {
-      say(`${id}: ${err.message}. An event id plays only once the trace has shown its name.`, 'bad');
+      say(`${text}: ${err.message}`, 'bad');
     }
   }
 
