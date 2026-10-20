@@ -11,15 +11,19 @@ How to keep it:
 
 ## Unreleased
 
+## 0.26.15 (2026-10-20)
+
+Folds in 0.26.2, which was not released on its own.
+
 **New**
 
-- `audio.playGame({ event })` plays one of a game sound event's own recordings (its variations, in turn or by `variation`) through REDnode's engine, heard wherever the sound is in the game; `audio.eventSounds(event)` lists them. Experimental.
-- `audio.searchSounds(query)` searches the game's sound events by words of their name or tags, by event id, or by sound id (the events that play it). Experimental.
+- Swapping sound into the running game: `archives.reload` and the MCP tool `archives_reload` now swap archives that change the game's sound paks (`.opuspak`, `.opusinfo`, such as EDGEwave's sound overrides). The swap runs with the game paused and its audio held, then REDnode loads the game's sound index again, so the new sounds play without a restart. A sound that played just before the swap may keep its old version until the game loads it again (for a weapon, equip it again). The answer's `sound` field says how it went.
 - `ui.list()` in the UI builder: a list of lines that scrolls on its own, for a log or a live feed in a Node mod's window. It keeps its newest lines, follows the newest one unless the player scrolls up, and fills the window's free height, so the window itself never scrolls. See the new **Live log mod** sample.
-- Swapping sound into the running game: `archives.reload` and the MCP tool `archives_reload` now swap archives that change the game's sound paks (`.opuspak`, `.opusinfo`, such as EDGEwave's sound overrides) instead of refusing them. The swap runs with the game paused and its audio held, then REDnode loads the game's sound index again, so the new sounds play without a restart. A sound that played just before the swap may keep its old version until the game loads it again (for a weapon, equip it again). The answer's `sound` field says how it went.
 - `ui.copy(text)` in the `rednode` package puts text on the Windows clipboard, from a Node mod or an overlay app.
-- `audio.trace` names the events it lists where REDnode knows the name (REDbridge's list of events), and REDnode writes every traced event and sound to `red4ext/logs/rednode-sound-trace.log`.
-- Experimental, for the coming Sound Tools: `audio.playGame(id)` plays one of the game's own sound effects by its sound id through REDnode's engine; `audio.event(name)` posts a game sound event by name on V, so positional sounds are heard (`{ on: "none" }` for none), and returns `stop()`; when a package stops, REDnode stops the events it posted; `audio.trace(onTrace)` lists the events the game posts to its audio engine and the sounds it loads, as they happen.
+- Experimental, for the coming REDnode Sound Tools: `audio.trace(onTrace)` lists the events the game posts to its audio engine, named where REDnode knows the name, and the sounds it loads, as they happen; every one is also written to `red4ext/logs/rednode-sound-trace.log`.
+- Experimental: `audio.playGame(id)` plays one of the game's own recordings by its sound id through REDnode's engine; `audio.playGame({ event })` plays an event's recordings in turn, heard wherever the sound is in the game; `audio.eventSounds(event)` lists them.
+- Experimental: `audio.searchSounds(query)` searches the game's sound events by words of their name or tags, by event id, or by sound id (the events that play it).
+- Experimental: `audio.event(name)` posts a game sound event through the game, on V so positional sounds are heard (`{ on: "none" }` for none), and returns `stop()`. When a package stops, REDnode stops the events it posted.
 
 **Fixed**
 
@@ -31,19 +35,9 @@ How to keep it:
 
 **Other**
 
-- The fault watch around an archive swap also records breakpoints (a failed assert in the game) in `red4ext/logs/rednode-faults.log`.
-- `archives.soundState()` in the `rednode` package reads the game's sound pak index, the paks it has open and the sounds it holds loaded, without changing them (a sound's fields are `offset`, `headerSize`, `length` and `decodedBytes`): an experimental diagnostic for the research into swapping sound into a running game. See [swapping archives](https://edgemodders.github.io/REDnode/overlay-apps.html#swapping-archives-in-the-running-game).
-
-## 0.26.2 (2026-10-19)
-
-**Changed**
-
-- `archives.reload` and the MCP tool `archives_reload` refuse an archive that changes the game's sound paks (`.opuspak`, `.opusinfo`), since swapping sound into a running game crashes it. Install such an archive and restart the game.
-
-**Other**
-
-- The plugin watches for faults around each archive swap and writes what it finds to `red4ext/logs/rednode-faults.log`, for bug reports.
+- The plugin watches for faults, and breakpoints (a failed assert in the game), around each archive swap and writes what it finds to `red4ext/logs/rednode-faults.log`, for bug reports.
 - The host log of the last game session is kept as `red4ext/logs/rednode-overlay.prev.log`, so a crash's log survives the next start.
+- `archives.soundState()` in the `rednode` package reads the game's sound pak index, the paks it has open and the sounds it holds loaded, without changing them (a sound's fields are `offset`, `headerSize`, `length` and `decodedBytes`): an experimental diagnostic. See [swapping archives](https://edgemodders.github.io/REDnode/overlay-apps.html#swapping-archives-in-the-running-game).
 
 ## 0.26.1 (2026-10-19)
 
