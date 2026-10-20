@@ -112,7 +112,7 @@ Two kinds of id play differently:
 |---|---|---|
 | **SP1 Spike** | Find where events are posted with their names, and confirm the sound lookup (`0x279890` in 2.31) for loads; check `GameAudioSystem.Play` by name; read one variation's bytes and play them (does the archive keep the paks uncompressed, or does REDbridge extract them) | An in-game check |
 | **SP2 Sound Tracer** | The hooks and `audio.trace` came with SP1. SP2 adds event names in the host (REDbridge's list, loaded when a trace starts, so no package needs the bridge permission for them), every post and load written to `rednode-sound-trace.log`, and the app: a window that never scrolls, two scrolling columns of the newest 2,000 rows, filter, pause, clear, copy, **Play** on each row and a paste box. What posted an event and its distance from V wait for a way from a Wwise game object to an entity (SP1 found they differ) | An in-game test |
-| **SP3 Sound Search** | Search, play, the Scratch tab | An in-game test |
+| **SP3 Sound Search** | Search, play, the Scratch tab. An event's variations come from the index's event groups (found in SP2b) | An in-game test |
 | **SP4 The pack** | Hot swap made ready for players; the pack's own zip and Nexus page source; a **Sound Tools** docs page (install, each app, workflows such as Tracer to Search to an EDGEwave override to a hot swap) with screenshots rendered from the apps, and placeholders for in-game shots until the user takes them; example app pages; a note on #14 | The user's release |
 
 ### SP1 spike: what the exe showed
@@ -231,6 +231,37 @@ REDnode 0.26.12 on the laptop (the plugin log's first line says "REDnode 0.26.12
 6. Press **Copy** on a row in Loaded, paste it into the box at the bottom (Ctrl+V) and press Enter: the same sound plays. **Mark**.
 7. Press **Play** on an ambience row in Played and leave it playing. Close the Tracer with the **✕** in its title bar: the trace stops and the ambience stops with it. **Mark**.
 8. Quit the game. Send `rednode-sound-trace.log`, `rednode-mods.log`, the plugin log (`rednode-*.log` of this session) and `rednode-overlay.log`.
+
+### SP2 retest: results (0.26.13)
+
+Run on 2026-10-20 on the laptop. **Passed except one point**: the window fits, the columns scroll and follow, names show (17,586 from REDbridge, which took 25 s to start cold, so the first rows of the first trace had ids only), the filter, Pause and Resume, Play and Stop on Loaded rows, Stop all, Copy and paste, and the close button, which ended the trace. The **Live log mod** passed too (`ui.list`). The plugin and host logs show no errors.
+
+| Seen | Cause | Next |
+|---|---|---|
+| **Play** on Played rows still silent, posted on V | Many traced events cannot sound on their own. Read from the game's own sound index (`sfx_container.opusinfo`, whose end lists each event's Wwise id with the sound ids it plays): of the 116 events in the trace, 80 have recordings there; most of the rest are `…_stop` events, which play nothing, and `vo_global_tv` (SP1's most posted) has none, its voice coming from elsewhere. The others likely need the emitter's own state (a surface, a movement) that V does not have (unverified) | 0.26.14 plays an event's own recordings through REDnode's engine (below) |
+| A 372 ms hitch when the first trace started | The first `trace.start` finds the sound pak tables by byte pattern on the game thread (266 ms) before attaching the hooks | Later: run that search off the game thread. Once per session |
+
+The user asked for a way to hear an event without being near where the game plays it. The index's event groups give exactly that, with no name needed: every one of its 73,139 sounds belongs to some event's group (20,569 groups; footsteps and NPC foley have 10 to 15 recordings each).
+
+### SP2b: an event's recordings (REDnode 0.26.14)
+
+| Part | What |
+|---|---|
+| `game-sounds.js` | Reads the index's event groups with the sounds; `eventSounds(gameDir, event)` by name or Wwise id |
+| Host | `sound.playGame` takes `event` (and an optional `variation`); without one, an event's recordings come in turn per package. `sound.eventSounds`. Each trace batch carries `recordings`, how many recordings each posted event has |
+| `rednode` package | `audio.playGame({ event, variation? })`, answering with `sound`, `variation` and `variations`; `audio.eventSounds(event)`; trace posts' `recordings` |
+| Sound Tracer 0.3.0 | **▶** on a Played row plays the event's recordings in turn, raw, heard only by the player, wherever the sound is in the game; greyed when it has none. **G** keeps the old way, posted through the game on V. The paste box takes an event name or id first, then a sound id |
+
+Checked in the mock game against the dev PC's real game index (`lcm_fs_bare_feet_concrete_walk`: 14 recordings, played in turn; the katana sound 746693166 is the first of event 1337780739's three; `vo_global_tv` refused with the reason) and in the docs simulation. This settles SP3's question of how an event finds its variations.
+
+### SP2b test (REDnode 0.26.14)
+
+0. Switch on **Test timer**, press **Start**, and press **Mark** after each step.
+1. Load a save. Open the **Sound Tracer** and press **Start trace**. Walk around people for about 20 seconds. **Mark**.
+2. On three Played rows with a name, a footstep or foley one (`lcm_…`), a car or metro one (`v_…`) and any other, press **▶** a few times each: do you hear a recording each press, a different one in turn? The line at the bottom says which recording. **Mark**.
+3. Find a greyed **▶** (a `…_stop` row, or `vo_global_tv`): hover it for the reason. Press **G** on a named row to compare with the game's own post. **Mark**.
+4. Type `lcm_fs_bare_feet_concrete_walk` in the box at the bottom and press Enter a few times: footsteps, a different one each time. **Mark**.
+5. Quit the game. Send `rednode-mods.log`, the plugin log and `rednode-overlay.log`.
 
 **Requested of EDGEwave** ([EDGEwave #2](https://github.com/Edgemodders/EDGEwave/issues/2)): a fifth Into the Game route, **As a REDnode sound**, writing the render into a REDnode package's folder with a `sounds` entry in its manifest. S1 already plays it; nothing to pack.
 
