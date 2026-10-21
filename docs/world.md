@@ -802,3 +802,37 @@ On the laptop with REDnode 0.26.15, RED Hot Tools, Codeware, the Test timer and 
 6. Swap **A**, press **Off and on**. A? Did the trousers vanish for a moment? **Mark**.
 7. Open the inventory: are the trousers still equipped, and does the preview show A? Close it. **Mark**.
 8. Quit the game. Send `rednode-mods.log`, the plugin log of this session, `rednode-overlay.log` and the RED Hot Tools log. Put A back in `archive\pc\mod` before the next session.
+
+### Refresh test 0.2.1
+
+Step 1 of the 0.2.0 test (2026-10-21, laptop): **Scan** found items in Feet, Torso, Chest, Head and Eyes only, nothing in Legs, while V showed the trousers and the inventory could take them off and put them back. So the trousers V shows are not an item attached in any slot TweakDB lists (unverified why: the wardrobe, or V's underwear area, are candidates).
+
+0.2.1 (app only) goes through the inventory's own system instead:
+
+| Button | Game calls |
+|---|---|
+| **Equipment** | `EquipmentSystem.GetPlayerData(V)`, then for each clothing area (Head, Face, OuterChest, InnerChest, Legs, Feet, Outfit, UnderwearTop, UnderwearBottom) `GetActiveItem` and the wardrobe's `GetVisualItemInSlot`, with each item's `FriendlyName` and appearance, and whether a wardrobe set is active |
+| **Inventory off and on** | For each area typed in (such as `Legs`), or every clothing area with an item: an `UnequipRequest`, 500 ms, then a `gameEquipRequest` with the same item, queued on the EquipmentSystem as the inventory does; then checks the area holds the item again |
+
+Checked in the mock game. The window is taller (860), for the log.
+
+### Refresh test 0.2.1: test
+
+On the laptop with REDnode 0.26.15, RED Hot Tools, Codeware, the Test timer and the Refresh test 0.2.1 zip. Each step tries one button, then **Inventory off and on** if it did not work, so V always shows the swapped version before the next swap.
+
+**Before you start, with the game closed:**
+
+- Extract the Refresh test 0.2.1 zip into the game folder (it replaces 0.2.0).
+- Put A (`EDGEmat_M3.archive`, the base look) in `archive\pc\mod`. Nothing of it in `mods\`, and `archive\pc\hot` empty. The Fia leggings mod stays out.
+- Keep A and B in their own folders, for their full paths.
+
+**Steps:**
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
+1. Load a save wearing the trousers (A), no menu open. **F10**, then switch on **Refresh test** and press **Equipment**. Which area lists the trousers, and does it say a wardrobe item is shown? Type that area (such as `Legs`) into the slots field. **Mark**.
+2. Look down at V's legs. Swap **B**. Do the trousers change by themselves? **Mark**.
+3. Press **Re-attach**, then **Reset look**. B after either? **Mark**.
+4. Press **Inventory off and on**. B? Did the trousers vanish for a moment? **Mark**.
+5. Swap **A**, press **Inventory off and on**. A? **Mark**.
+6. Open the inventory: are the trousers still equipped, and does the preview show A? Close it. **Mark**.
+7. Quit the game. Send `rednode-mods.log`, the plugin log of this session, `rednode-overlay.log` and the RED Hot Tools log. Put A back in `archive\pc\mod` before the next session.

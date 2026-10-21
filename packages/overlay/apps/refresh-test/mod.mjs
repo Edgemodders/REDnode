@@ -179,6 +179,72 @@ const putBack = () =>
     return items.map((w, i) => `${short(w.slot)} ${w.appearance || '(no appearance)'} off ${off[i]}, on ${on[i]}`).join('; ') + `; ${OFF_MS} ms between`;
   });
 
+// The inventory's own way: the equipment system, by equipment area. Lists what each
+// clothing area holds (the item equipped and the wardrobe's visual item), and takes an
+// area's item off and puts it back through the requests the inventory sends.
+const AREAS = ['Head', 'Face', 'OuterChest', 'InnerChest', 'Legs', 'Feet', 'Outfit', 'UnderwearTop', 'UnderwearBottom'];
+const NO_ITEM = /^0x0+$/;
+
+async function equipmentSystem() {
+  const container = await api.GameInstance.GetScriptableSystemsContainer(game.instance);
+  const es = await container.Get('EquipmentSystem');
+  if (!es) throw new Error('no EquipmentSystem');
+  return es;
+}
+
+async function itemName(itemID) {
+  const id = String(itemID?.id ?? '');
+  if (!id || NO_ITEM.test(id)) return '';
+  const record = await tweakdb.record(id).catch(() => null);
+  return (record && (await record.FriendlyName().catch(() => ''))) || id;
+}
+
+// The areas typed in (Legs, OuterChest), or every clothing area.
+function areas() {
+  const typed = slotText.split(/[\s,]+/).filter((t) => AREAS.some((a) => a.toLowerCase() === t.toLowerCase()));
+  return typed.length ? typed.map((t) => AREAS.find((a) => a.toLowerCase() === t.toLowerCase())) : AREAS;
+}
+
+const listEquipment = () =>
+  step('Equipment', async () => {
+    const v = await player();
+    const ts = await shop();
+    const data = await (await equipmentSystem()).GetPlayerData(v);
+    const lines = [];
+    for (const area of AREAS) {
+      const item = await data.GetActiveItem(area);
+      const visual = await data.GetVisualItemInSlot(area).catch(() => null);
+      const name = await itemName(item);
+      const look = name ? await ts.GetItemAppearance(v, item) : '';
+      const shown = await itemName(visual);
+      lines.push(`  ${area}: ${name || '(none)'}${look ? `, ${look}` : ''}${shown && shown !== name ? `; wardrobe shows ${shown}` : ''}`);
+    }
+    lines.forEach(say);
+    return `wardrobe set active: ${await data.IsVisualSetActive().catch(() => '?')}`;
+  });
+
+const inventoryOffOn = () =>
+  step('Inventory off and on', async () => {
+    const v = await player();
+    const es = await equipmentSystem();
+    const data = await es.GetPlayerData(v);
+    const items = [];
+    for (const area of areas()) {
+      const item = await data.GetActiveItem(area);
+      if (await itemName(item)) items.push({ area, item });
+    }
+    if (!items.length) throw new Error(`nothing equipped in ${areas().join(', ')}`);
+    for (const { area } of items) await es.QueueRequest(await api.$new('UnequipRequest', { owner: v, areaType: area, slotIndex: 0 }));
+    await sleep(OFF_MS);
+    for (const { item } of items) await es.QueueRequest(await api.$new('gameEquipRequest', { owner: v, itemID: item, slotIndex: 0 }));
+    const notes = [];
+    for (const { area, item } of items) {
+      const now = await data.GetActiveItem(area);
+      notes.push(`${area} ${await itemName(item)} equipped again: ${String(now?.id) === String(item.id)}`);
+    }
+    return `${notes.join('; ')}; ${OFF_MS} ms between`;
+  });
+
 async function lookedAt() {
   const v = await player();
   const targeting = await api.GameInstance.GetTargetingSystem(game.instance);
@@ -280,7 +346,7 @@ ui.window({
   x: 40,
   y: 60,
   width: 640,
-  height: 720,
+  height: 860,
   closable: true,
   children: [
     requires,
@@ -306,6 +372,10 @@ ui.window({
       ui.button('Reset look', resetAppearance, { variant: 'ghost' }),
       ui.button('Same look', sameAppearance, { variant: 'ghost' }),
       ui.button('Off and on', putBack, { variant: 'ghost' }),
+    ),
+    ui.row(
+      ui.button('Equipment', listEquipment, { variant: 'ghost' }),
+      ui.button('Inventory off and on', inventoryOffOn, { variant: 'ghost' }),
     ),
     ui.heading('3. What V looks at'),
     ui.row(
