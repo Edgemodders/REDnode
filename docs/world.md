@@ -740,3 +740,14 @@ The crash is inside RED Hot Tools' load of the new archive, with a menu open tha
 | Crashes after a few swaps | After a few swaps, every swap crashed the game. Cause unknown: the player suspects something kept in the save |
 
 Reading (unverified): what V wears holds the loaded mesh, material and textures, so they keep the old archive's data until the game lets them go, the same pattern as the held sounds of H1c-2. Unequipping drops the last reference, and the next equip loads from the new archive. The first two crashes may have come from the leggings mod being installed at the same time (unverified). So H2b's first candidate is the release and reload done by a call (the Refresh test's **Off and on**), not rewriting the live objects in place.
+
+### H2a test: third session (loose, no crash)
+
+2026-10-21 on the laptop, the player's own order, no timer; no crash in this round.
+
+| Finding | Detail |
+|---|---|
+| **Reset look** redrew once | V's trousers changed to the swapped version while watched, after **Reset look**; not reproduced after |
+| The world and the inventory disagree | After swapping A back, V in the world kept B, even after taking the trousers off and on in the inventory, while the inventory's preview showed A |
+
+Reading (unverified): RED Hot Tools drops the resource cache entries of a swapped archive, so a fresh load (the inventory's preview, a new entity) reads the new file. V's own garment keeps objects it already holds, and taking it off in the inventory may not destroy the item's entity. Leads: **Off and on** (`RemoveItemFromSlot` with the entity destroyed), time or distance before equipping again, a save load. A plugin diagnostic could settle it: the SDK's `ResourceLoader::FindToken` tells whether a path's resource is still loaded, and the game's garment data (`entGarmentParameter`, compiled per component) may be a second place V keeps it.
