@@ -47,7 +47,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [SP2 Sound Tracer](#sp2-sound-tracer) | In the game | Sound Tools SP2, #14 | 2026-10-20 | 0.26.14 | **Pass** (laptop): the 0.26.13 retest passed but for Play on Played rows; 0.26.14 plays an event's own recordings, passed ([results](sound.md#sp2b-test-results)) |
 | [SP3 Sound Search](#sp3-sound-search) | In the game | Sound Tools SP3 | 2026-10-20 | 0.26.15 | **Pass** (laptop): every step, Scratch kept across a game restart ([results](sound.md#sp3-test-results)) |
 | [SP4 The pack](#sp4-the-pack) | In the game | Sound Tools SP4 | 2026-10-20 | 0.26.15 + pack 0.1.0 | **Pass** (laptop): installed fresh from the 0.26.15 release and the pack zip; plain and sound swaps, ↻, a trace, a search, Recent kept across a restart ([results](sound.md#sp4-test-results)) |
-| [H2a Refresh test](#h2a-refresh-test) | In the game | H2a | Not run | 0.26.15 + Refresh test 0.1.0 | Built; awaiting its first run (laptop) |
+| [H2a Refresh test](#h2a-refresh-test) | In the game | H2a | Failed | 0.26.15 + Refresh test 0.1.0 | First run 2026-10-21 (laptop): the game closed at step 2, a swap with the inventory open (world.md, "H2a test: first run"); retest in gameplay |
 | [UI builder list](#ui-builder-list) | In the game | `ui.list` | 2026-10-20 | 0.26.13 | **Pass** (laptop): the list scrolls, the window does not, follow and Clear work |
 | [Cursor flicker](#cursor-flicker) | In the game | Laptop cursor | 2026-10-19 | 0.26.1 | **Fixed** by an NVIDIA driver update: the arrow blinked in the game with DLSS on (laptop) and not with DLSS off; drawn on every frame, no jumps. Not a REDnode bug |
 
@@ -539,7 +539,7 @@ Showed: a RED4ext plugin counts as installed only with a DLL in its folder (0.17
 
 ### H2a Refresh test
 
-[Source](world.md#h2a-test). Built 2026-10-21: the spike of `world.refresh`, the **Refresh test** app over the released REDnode 0.26.15. Needs RED Hot Tools, Codeware, and two versions (A and B) of a clothing archive with the same name. Not run yet.
+[Source](world.md#h2a-test). Built 2026-10-21: the spike of `world.refresh`, the **Refresh test** app over the released REDnode 0.26.15. Needs RED Hot Tools, Codeware, and two versions (A and B) of a clothing archive with the same name. First run 2026-10-21: the game closed at step 2, swapped with the inventory open; retest with menus closed.
 
 1. Load a save wearing the item (A); Refresh test on and allowed; timer.
 2. Swap B: no change by itself expected.

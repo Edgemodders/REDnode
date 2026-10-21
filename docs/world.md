@@ -715,3 +715,16 @@ REDnode 0.26.15 on the laptop, with RED Hot Tools, Codeware, the Test timer and 
 9. Type the item's `.mesh` depot path into **4. A spawned object** and press **Spawn**: the item stands about 3 m ahead (if nothing shows, the mesh may have no `default` appearance: say so). Swap the other version, then press **Mesh off and on**. Did it change? **Mark**.
 10. Swap the first version back, then press **Respawn**. Did it change? Press **Remove**. **Mark**.
 11. Quit the game. Send `rednode-mods.log`, the plugin log (`rednode-*.log` of this session) and `rednode-overlay.log`. RED Hot Tools leaves the swapped archive in `archive\pc\mod`: put A back there, or remove it, before the next session.
+
+### H2a test: first run (crash in the inventory)
+
+2026-10-21 on the laptop, REDnode 0.26.15 with Refresh test 0.1.0. Step 1 passed (Mark at 00:00; the app started and was granted `archives`). At step 2, the player swapped B (`EDGEmat_M3.archive`) **with the inventory open**, watching V's trousers on the inventory's preview of V. The game closed during the swap:
+
+| Log | Last lines |
+|---|---|
+| Plugin | 13:50:18.411 the fault watch starts for the swap; nothing after |
+| Host | 13:50:18 the swap goes to RED Hot Tools 1.3.0, then "The game has exited" |
+| RED Hot Tools | "Unloading game archives", "Moving updated archives", "Loading updated archives", then nothing |
+| `rednode-faults.log` | only the watch line, no fault (as with the sound pak crashes of H1) |
+
+The crash is inside RED Hot Tools' load of the new archive, with a menu open that shows V and wears the item from the swapped archive. Earlier swaps of plain archives in gameplay passed (H1, SP4), and the H0 crash also came after a swap outside gameplay (the main menu). Unverified whether the inventory is the cause or this archive is: the retest swaps the same archive in gameplay, menus closed. If the inventory is the cause, REDnode should hold a swap until the menus close (the swap queue already exists), not only document it.
