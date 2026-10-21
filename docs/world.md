@@ -728,3 +728,15 @@ REDnode 0.26.15 on the laptop, with RED Hot Tools, Codeware, the Test timer and 
 | `rednode-faults.log` | only the watch line, no fault (as with the sound pak crashes of H1) |
 
 The crash is inside RED Hot Tools' load of the new archive, with a menu open that shows V and wears the item from the swapped archive. Earlier swaps of plain archives in gameplay passed (H1, SP4), and the H0 crash also came after a swap outside gameplay (the main menu). Unverified whether the inventory is the cause or this archive is: the retest swaps the same archive in gameplay, menus closed. If the inventory is the cause, REDnode should hold a swap until the menus close (the swap queue already exists), not only document it.
+
+### H2a test: second session (the player's findings)
+
+2026-10-21 on the laptop, the Fia leggings mod removed from the game first. Reported by the player; logs not read yet.
+
+| Finding | Detail |
+|---|---|
+| The swap works | `EDGEmat_M3.archive` swapped from the base trousers to the leather version, with Hot swap and with Refresh test alike |
+| Worn items keep the old look | While V wears the trousers, the new material does not show. Taking them off and putting them back on in the inventory shows it, and so does a restart (a fresh save load not checked) |
+| Crashes after a few swaps | After a few swaps, every swap crashed the game. Cause unknown: the player suspects something kept in the save |
+
+Reading (unverified): what V wears holds the loaded mesh, material and textures, so they keep the old archive's data until the game lets them go, the same pattern as the held sounds of H1c-2. Unequipping drops the last reference, and the next equip loads from the new archive. The first two crashes may have come from the leggings mod being installed at the same time (unverified). So H2b's first candidate is the release and reload done by a call (the Refresh test's **Off and on**), not rewriting the live objects in place.
