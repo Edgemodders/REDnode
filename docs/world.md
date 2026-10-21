@@ -836,3 +836,38 @@ On the laptop with REDnode 0.26.15, RED Hot Tools, Codeware, the Test timer and 
 5. Swap **A**, press **Inventory off and on**. A? **Mark**.
 6. Open the inventory: are the trousers still equipped, and does the preview show A? Close it. **Mark**.
 7. Quit the game. Send `rednode-mods.log`, the plugin log of this session, `rednode-overlay.log` and the RED Hot Tools log. Put A back in `archive\pc\mod` before the next session.
+
+### Refresh test 0.2.2
+
+The player then said (2026-10-21) that V wears the trousers in a slot an outfit mod adds, **Legs Middle** (there is also Legs Outer): Equipment-EX, which almost every player uses. The base game has one Legs slot. So a refresh must reach mod slots too.
+
+Why 0.2.0's Scan missed it (a reading, unverified): every slot it found had a name the app had learned; every other id came back empty. `tweakdb.records` lists ids with TweakDB's flat-table offset in the high bits, and an id passed back that way does not match the slot. 0.2.2 (app only):
+
+| Change | Why |
+|---|---|
+| Scan passes each id with only its low 40 bits (the name's length and CRC32) | The id as the game hashes a name |
+| Scan learns Equipment-EX's layered slot names (`OutfitSlots.LegsInner`, `LegsMiddle`, `LegsOuter`, and the same for Torso and Feet; names unverified) | So they show by name |
+| Scan counts the slots it could not read, instead of taking them as empty | 0.2.0 hid errors |
+
+Checked in the mock game (an `OutfitSlots.LegsMiddle` item found by name). If REDnode's own `tweakdb.records` should return plain ids, that is a REDnode fix for H2b (open).
+
+### Refresh test 0.2.2: test
+
+On the laptop with REDnode 0.26.15, RED Hot Tools, Codeware, Equipment-EX, the Test timer and the Refresh test 0.2.2 zip. Each step tries one button, then **Off and on** if it did not work, so V always shows the swapped version before the next swap.
+
+**Before you start, with the game closed:**
+
+- Extract the Refresh test 0.2.2 zip into the game folder (it replaces 0.2.1).
+- Put A (`EDGEmat_M3.archive`, the base look) in `archive\pc\mod`. Nothing of it in `mods\`, and `archive\pc\hot` empty. The Fia leggings mod stays out.
+- Keep A and B in their own folders, for their full paths.
+
+**Steps:**
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
+1. Load a save wearing the trousers (A) in Legs Middle, no menu open. **F10**, then switch on **Refresh test** and press **Scan**. Is there a line marked `*` for the trousers, and with which slot name? Type that name into the slots field; if Scan did not find them, type `OutfitSlots.LegsMiddle`. Press **Equipment** too, for the log. **Mark**.
+2. Look down at V's legs. Swap **B**. Do the trousers change by themselves? **Mark**.
+3. Press **Re-attach**. B? If not, press **Off and on**: B? **Mark**.
+4. Swap **A**, press **Reset look**. A? If not, press **Off and on**: A? **Mark**.
+5. Swap **B**, press **Off and on**. B? Did the trousers vanish for a moment? **Mark**.
+6. Open the inventory: are the trousers still worn in Legs Middle, and does the preview show B? Close it. **Mark**.
+7. Quit the game. Send `rednode-mods.log`, the plugin log of this session, `rednode-overlay.log` and the RED Hot Tools log. Put A back in `archive\pc\mod` before the next session.

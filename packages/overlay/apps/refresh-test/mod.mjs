@@ -31,6 +31,15 @@ let busy = ''; // the step running, so a second press waits its turn
 
 // The base game's clothing slots, named so a scan shows them by name.
 tweakdb.learn(['Head', 'Face', 'Eyes', 'Chest', 'Torso', 'Legs', 'Feet', 'Outfit'].map((n) => `AttachmentSlots.${n}`));
+// And some an outfit mod adds (Equipment-EX's layered slots; names unverified).
+tweakdb.learn(
+  ['Inner', 'Middle', 'Outer'].flatMap((l) => ['Legs', 'Feet', 'Torso'].map((p) => `OutfitSlots.${p}${l}`)).concat(['OutfitSlots.TorsoUnder', 'OutfitSlots.TorsoAux']),
+);
+
+// A record id as the game hashes its name: the low 40 bits (length and CRC32). An id
+// TweakDB lists also carries its place in TweakDB's flat table in the high bits, which
+// a slot comparison does not expect (unverified: 0.2.0's Scan found only named slots).
+const plainId = (id) => (id.startsWith('0x') ? `0x${(BigInt(id) & 0xffffffffffn).toString(16).toUpperCase().padStart(16, '0')}` : id);
 
 const requires = ui.text('Checking requirements...', { tone: 'dim' });
 const log = ui.list({ keep: 400 });
@@ -72,13 +81,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function scan() {
   const v = await player();
   const ts = await shop();
-  const ids = await tweakdb.records('AttachmentSlot');
+  const ids = (await tweakdb.records('AttachmentSlot')).map(plainId);
   const held = [];
+  let failed = 0;
   // A few calls at a time: each waits for the game thread.
   for (let i = 0; i < ids.length; i += 16) {
     const part = ids.slice(i, i + 16);
-    const empty = await Promise.all(part.map((slot) => ts.IsSlotEmpty(v, slot).catch(() => true)));
-    part.forEach((slot, n) => !empty[n] && held.push(slot));
+    const empty = await Promise.all(part.map((slot) => ts.IsSlotEmpty(v, slot).catch(() => null)));
+    part.forEach((slot, n) => (empty[n] === null ? failed++ : !empty[n] && held.push(slot)));
   }
   const found = [];
   for (const slot of held) {
@@ -100,7 +110,7 @@ async function scan() {
   labels.clear();
   for (const f of found) labels.set(f.slot, f.label);
   for (const f of found) say(`  ${f.clothing ? '*' : ' '} ${short(f.label)}: ${f.name || '(no name)'}, ${f.type}, ${f.appearance || '(no appearance)'}`);
-  return `${ids.length} slots, ${found.length} hold an item, ${scanned.length} clothing (marked *): the buttons use those`;
+  return `${ids.length} slots${failed ? ` (${failed} could not be read)` : ''}, ${found.length} hold an item, ${scanned.length} clothing (marked *): the buttons use those`;
 }
 
 // The slots typed in (names such as Legs, or full records such as OutfitSlots.LegsMiddle),
