@@ -757,3 +757,13 @@ The logs of that session (16:40 to 16:56, nine swaps of `EDGEmat_M3.archive`, al
 - **The buttons never reached the trousers.** Every press found items only in Head, Eyes, Chest, Torso and Feet; **Legs** held nothing. So **Re-attach** and **Reset look** ran on the helmet, glasses, t-shirt, vest and boots, never on the swapped item.
 - **The equipped items were hidden.** Until 16:43:46 every one read `empty_appearance_default`; the first **Reset look** gave them their own appearances (`h1_helmet_10_old_02_&Female&FPP` and so on), and they kept them after. That is likely the one redraw the player saw, and why it did not come again. Hidden equipped items point to an outfit system (the game's wardrobe or Equipment-EX) drawing what V shows, through other slots (unverified).
 - **Crashes by session** (from `rednode-faults.log`, one game thread per session): the sessions starting at 13:50, 13:58, 15:52, 15:54, 15:57, 15:59 and 16:29 each ended at their first swap with no result logged; the sessions of 15:43 (six swaps), 16:01 (two) and 16:40 (nine) did not crash. What differed is not in the logs.
+
+Follow-up leads, run by the player the same day after a swap:
+
+| Lead | Result |
+|---|---|
+| Take the trousers off and put them back on in the inventory | The new look shows at once; no wait or distance needed |
+| Load a save | V shows the current version |
+| **Off and on** | Not run: the Refresh test does not find the trousers' slot |
+
+So the release and reload that the game does when an item is equipped is enough. H2b's refresh for V is that done by a call, on the items the swap touched; the Refresh test first needs to find the slot that holds the visible trousers (0.2.0, proposed).
