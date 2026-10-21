@@ -913,3 +913,5 @@ On the laptop with REDnode 0.26.15, RED Hot Tools, Codeware, Equipment-EX, the T
 8. Quit the game. Send `rednode-mods.log`, the plugin log of this session and the RED Hot Tools log. Put A back in `archive\pc\mod` before the next session.
 
 Also useful, with the game closed: the file list of A and of B (WolvenKit, or send both archives), to see whether B holds files A does not.
+
+The player adds (2026-10-21) that taking the trousers off in the inventory **before** a swap and putting them on after already worked in an earlier manual try; 0.2.3's steps 5 and 6 repeat it with the app's buttons. If it holds both ways, H2b's refresh for V wraps the swap: take off what V wears from the swapped archive, swap, put it back (`archives.reload` with a refresh option), rather than refreshing after the swap.
