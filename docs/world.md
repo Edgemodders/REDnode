@@ -649,3 +649,30 @@ Run on 2026-10-19 on the laptop with REDnode 0.26.1 (after its NVIDIA driver upd
 | 09:30:43 | "Game thread pump stopped after 41029 frames": a clean quit |
 
 The Mod log line repeats the path as typed, quotes included; the host and RED Hot Tools see it without them. RED Hot Tools' watcher fired its harmless second reload again, about 430 ms after each swap. The cursor lines from the same run show the arrow drawn on every frame, about 44 fps in the game, with no jumps.
+
+## H2 `world.refresh`: plan
+
+Agreed with the user on 2026-10-21: H2 next, then the ink API (I1), then the Sound API's S2.
+
+**The problem.** A swap replaces the archive, and RED Hot Tools drops the resources the loader has cached, but what is already in the world keeps what it loaded: the clothes V wears, a weapon in hand, an NPC or a placed object nearby. The new mesh or material shows only when the game loads that thing again (equip it again, load a save). H2 is a call that makes it load again, right after the swap.
+
+**What the game offers** (from `gameapi/2.31/rtti.json`; none of it tried for this yet, so all **unverified**):
+
+| Target | Game call | Expected |
+|---|---|---|
+| V's clothing and held items | `TransactionSystem.RefreshAttachment(owner, slot, keepWorldTransform)` on each slot (`AttachmentSlots.Head`, `Face`, `Chest`, `Torso`, `Legs`, `Feet`, `Outfit`, `WeaponRight`...) | Re-attaches the item in the slot, loading its meshes again |
+| An item's appearance | `TransactionSystem.ResetItemAppearance(owner, item)`, `ChangeItemAppearanceByName(owner, item, name)` | Applies the appearance again; a stronger fallback: remove the item from its slot and add it back (`RemoveItemFromSlot`, `AddItemToSlot`) |
+| An NPC, device or object | `entEntity.ScheduleAppearanceChange(name)` with its current appearance (`GetCurrentAppearanceName()`), or through another appearance and back if the same name does nothing | Rebuilds its appearance's components |
+| What REDnode spawned | Delete and spawn again through the DynamicEntitySystem (W1's `api.spawn`), same spec and transform | A full respawn |
+| What V looks at | `TargetingSystem.GetLookAtObject(player, ...)` | Picks the target for the two rows above |
+
+The open question behind every row: whether a refreshed thing reads the new file or a copy the engine still holds. The resource loader's cache is dropped by RED Hot Tools, but a mesh or material held by another live object may stay alive. The spike answers it.
+
+**Finding what uses an asset** (the swapped archive's meshes and materials) is the hard part in general: the game has no "who uses this file" lookup. So H2 targets by place, not by asset, and lets the modder say what: V, what V looks at, what REDnode spawned, or everything near V. Reading which entities near V use the swapped files (their components' resource paths) is a later step, if the spike shows it is needed.
+
+| Step | Builds | Answers |
+|---|---|---|
+| **H2a Spike** | A test app, `apps/refresh-test`, calling the game through `api` only (no plugin change): buttons for V's clothing (each slot, `RefreshAttachment`), V's clothing the stronger way (remove and add back), what V looks at (appearance again), a spawned box (respawn) | Which calls pick up a swapped mesh or material, what each costs (a hitch, a flicker, an animation), and whether anything breaks (a quest item, a weapon in hand, an NPC's state) |
+| **H2b `world.refresh`** | The call in the `rednode` package and the MCP tool: `world.refresh({ player, lookAt, spawned, near })` with what the spike found works; Hot swap gains a **Refresh** switch after each swap, on by default for V | One call after a swap shows the change |
+
+The spike's test needs a clothing archive the user can change and swap (a texture or material change that is easy to see on V), a world prop mod with a visible change, and an NPC appearance mod if one is at hand.
