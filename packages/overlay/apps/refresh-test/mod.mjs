@@ -33,7 +33,7 @@ let busy = ''; // the step running, so a second press waits its turn
 tweakdb.learn(['Head', 'Face', 'Eyes', 'Chest', 'Torso', 'Legs', 'Feet', 'Outfit'].map((n) => `AttachmentSlots.${n}`));
 // And some an outfit mod adds (Equipment-EX's layered slots; names unverified).
 tweakdb.learn(
-  ['Inner', 'Middle', 'Outer'].flatMap((l) => ['Legs', 'Feet', 'Torso'].map((p) => `OutfitSlots.${p}${l}`)).concat(['OutfitSlots.TorsoUnder', 'OutfitSlots.TorsoAux']),
+  ['Inner', 'Middle', 'Outer'].flatMap((l) => ['Legs', 'Feet', 'Torso'].map((p) => `OutfitSlots.${p}${l}`)).concat(['TorsoUnder', 'TorsoAux', 'Head', 'Feet', 'Glasses', 'Mask', 'Balaclava', 'Wreath', 'Neckwear', 'Waist', 'Back', 'BodyUnder', 'BodyInner', 'BodyMiddle', 'BodyOuter'].map((n) => `OutfitSlots.${n}`)),
 );
 
 // A record id as the game hashes its name: the low 40 bits (length and CRC32). An id
@@ -104,7 +104,10 @@ async function scan() {
       const record = await tweakdb.record(slot).catch(() => null);
       label = (record && (await record.EntitySlotName().catch(() => ''))) || slot;
     }
-    found.push({ slot, label, type, name, appearance, clothing: type.startsWith('Clo_') });
+    // Equipment-EX's items read as type Invalid, with the appearance V shows; the base
+    // items it hides read empty_appearance_default.
+    const shown = appearance && appearance !== 'default' && !appearance.startsWith('empty_appearance');
+    found.push({ slot, label, type, name, appearance, clothing: type.startsWith('Clo_') || (type === 'Invalid' && shown) });
   }
   scanned = found.filter((f) => f.clothing).map((f) => f.slot);
   labels.clear();
@@ -187,6 +190,36 @@ const putBack = () =>
     const on = [];
     for (const w of items) on.push(await ts.AddItemToSlot(v, w.slot, w.itemID));
     return items.map((w, i) => `${short(w.slot)} ${w.appearance || '(no appearance)'} off ${off[i]}, on ${on[i]}`).join('; ') + `; ${OFF_MS} ms between`;
+  });
+
+// The same in two presses, so the player chooses the gap, and can swap while the items
+// are off: then nothing V wears holds the old version during the swap.
+let takenOff = []; // { slot, itemID, appearance }
+
+const takeOff = () =>
+  step('Take off', async () => {
+    if (takenOff.length) throw new Error(`${takenOff.map((w) => short(w.slot)).join(', ')} already off: press Put back first`);
+    const v = await player();
+    const ts = await shop();
+    const items = await worn(v, ts);
+    const off = [];
+    for (const w of items) off.push(await ts.RemoveItemFromSlot(v, w.slot, true, false, true));
+    takenOff = items;
+    return items.map((w, i) => `${short(w.slot)} ${w.appearance || '(no appearance)'} off ${off[i]}`).join('; ');
+  });
+
+const putOn = () =>
+  step('Put back', async () => {
+    if (!takenOff.length) throw new Error('nothing taken off: press Take off first');
+    const v = await player();
+    const ts = await shop();
+    const on = [];
+    for (const w of takenOff) on.push(await ts.AddItemToSlot(v, w.slot, w.itemID));
+    const items = takenOff;
+    takenOff = [];
+    const now = [];
+    for (const w of items) now.push(await ts.GetItemAppearance(v, w.itemID).catch(() => '?'));
+    return items.map((w, i) => `${short(w.slot)} on ${on[i]}, appearance ${now[i] || '(none)'}`).join('; ');
   });
 
 // The inventory's own way: the equipment system, by equipment area. Lists what each
@@ -382,6 +415,8 @@ ui.window({
       ui.button('Reset look', resetAppearance, { variant: 'ghost' }),
       ui.button('Same look', sameAppearance, { variant: 'ghost' }),
       ui.button('Off and on', putBack, { variant: 'ghost' }),
+      ui.button('Take off', takeOff, { variant: 'ghost' }),
+      ui.button('Put back', putOn, { variant: 'ghost' }),
     ),
     ui.row(
       ui.button('Equipment', listEquipment, { variant: 'ghost' }),
@@ -421,5 +456,6 @@ requires.set({
 game.on('PlayerPuppet.OnGameAttached', () => {
   spawned = null; // a load removes what was spawned
   scanned = null; // and may change what V wears
+  takenOff = []; // and puts back what V wore
 });
 say('Refresh test ready');

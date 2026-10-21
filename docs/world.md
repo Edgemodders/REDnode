@@ -871,3 +871,45 @@ On the laptop with REDnode 0.26.15, RED Hot Tools, Codeware, Equipment-EX, the T
 5. Swap **B**, press **Off and on**. B? Did the trousers vanish for a moment? **Mark**.
 6. Open the inventory: are the trousers still worn in Legs Middle, and does the preview show B? Close it. **Mark**.
 7. Quit the game. Send `rednode-mods.log`, the plugin log of this session, `rednode-overlay.log` and the RED Hot Tools log. Put A back in `archive\pc\mod` before the next session.
+
+### Refresh test 0.2.2: results
+
+2026-10-21, 18:12 to 18:23, on the laptop (REDnode 0.26.15, Refresh test 0.2.2, Equipment-EX). `EDGEmat_M3` is B (the leather look) and `EDGEmat_M3b` is A (the base look); A was installed at the start. No crash, no faults.
+
+| What | Result |
+|---|---|
+| **Scan** | 354 attachment slots, 13 or 14 holding an item, in 8 to 9 s (each slot one call on the game thread). Found `OutfitSlots.LegsMiddle` (`l1_pants_01_basic_01_&Female`, the trousers) and `OutfitSlots.LegsOuter`, `OutfitSlots.TorsoInner` and three unnamed outfit slots. Equipment-EX's items read as type `Invalid`, with the look V shows; the base items it hides read `empty_appearance_default`, so 0.2.2 marked only those as clothing. The fix of the ids worked: unnamed slots are read now |
+| Swap B (18:19:20) | The trousers did not change by themselves |
+| **Re-attach** on Legs Middle | No change |
+| **Off and on** on Legs Middle (500 ms between) | **B showed**: the player's note "off and on works" |
+| Swap A (18:21:09), **Reset look**, then **Off and on** | **V kept B**; the inventory's preview showed A |
+
+So the release and reload worked from A to B and failed from B back to A, the same as the player's manual re-equip earlier in the day (H2a, third session). Unverified why: A's archive may hold fewer files than B's (B adds files A does not have), or B's copies stay loaded somewhere a re-equip finds them, while a fresh entity (the preview) loads from the archive.
+
+### Refresh test 0.2.3
+
+App only: **Take off** and **Put back** as two presses, so the gap is the player's and a swap can happen while the item is off (nothing V wears holds the old version during the swap). Scan also marks Equipment-EX's items (type `Invalid` with a look V shows) as clothing, and learns more of its slot names (unverified). Checked in the mock game.
+
+### Refresh test 0.2.3: test
+
+On the laptop with REDnode 0.26.15, RED Hot Tools, Codeware, Equipment-EX, the Test timer and the Refresh test 0.2.3 zip.
+
+**Before you start, with the game closed:**
+
+- Extract the Refresh test 0.2.3 zip into the game folder (it replaces 0.2.2).
+- Put A (`EDGEmat_M3b`'s `EDGEmat_M3.archive`, the base look) in `archive\pc\mod`. Nothing of it in `mods\`, and `archive\pc\hot` empty.
+- Keep A and B in their own folders, for their full paths.
+
+**Steps:**
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
+1. Load a save wearing the trousers (A) in Legs Middle, no menu open. **F10**, switch on **Refresh test**, and type `LegsMiddle` into the slots field. **Mark**.
+2. Look down at V's legs. Swap **B**, then press **Off and on**. B? **Mark**.
+3. Swap **A**, then press **Off and on**. A, or still B? **Mark**.
+4. Press **Take off**, wait about 10 seconds, press **Put back**. A? **Mark**.
+5. Press **Take off**. With the trousers off, swap **B**. Press **Put back**. B? **Mark**.
+6. Press **Take off**. Swap **A**. Press **Put back**. A? **Mark**.
+7. Open the inventory: does the preview show the same version as V? Close it. **Mark**.
+8. Quit the game. Send `rednode-mods.log`, the plugin log of this session and the RED Hot Tools log. Put A back in `archive\pc\mod` before the next session.
+
+Also useful, with the game closed: the file list of A and of B (WolvenKit, or send both archives), to see whether B holds files A does not.
