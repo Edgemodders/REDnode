@@ -917,3 +917,29 @@ Also useful, with the game closed: the file list of A and of B (WolvenKit, or se
 The player adds (2026-10-21) that taking the trousers off in the inventory **before** a swap and putting them on after already worked in an earlier manual try; 0.2.3's steps 5 and 6 repeat it with the app's buttons. If it holds both ways, H2b's refresh for V wraps the swap: take off what V wears from the swapped archive, swap, put it back (`archives.reload` with a refresh option), rather than refreshing after the swap.
 
 **Likely cause of the one-way result** (the player, 2026-10-21): A is B with the trousers' meshes removed, so the base game's meshes come through; those mesh paths are in B and not in A. RED Hot Tools drops the cached resources of the files in the archive it loads (read from its source, "Hot-loading archives (#12)" above). Swapping A back loads an archive without those paths, so their cache entries, which hold B's meshes, are not dropped, and a re-equip finds them; the inventory preview may load them another way (unverified). Taking the item off before the swap lets B's meshes go before the swap, so the next load reads the base game's. If this holds, H2b must also drop the cache entries of paths the old archive had and the new one lacks: REDnode can find them by comparing the two archives' file tables (`archive-index.js`, hashes), and drop them through RED Hot Tools' `ReloadResources` or the SDK's `ResourceLoader` (to be checked). A test: an A that keeps the meshes, copies of the base game's, so both archives hold the same paths.
+
+### H2a: clean test archives and the crash matrix
+
+Agreed with the player on 2026-10-21. The EDGEmat test archives came from a larger project, so their contents could cause problems of their own. The player is making new trouser mods only for these tests. Every version keeps the same archive name, so a swap replaces the archive.
+
+| Version | Contents | Tests |
+|---|---|---|
+| **V1** | One base-game garment, with only its texture overridden (look 1) | Baseline |
+| **V2** | The same file list as V1, with a different texture (look 2) | New content at paths the game already loaded |
+| **V3** | V2 plus files V1 and V2 lack, such as a mesh override | Paths only the old archive has (V3 to V1): the one-way case |
+
+No `.xl` file, TweakXL, ArchiveXL or sound in any of them.
+
+Some H2a sessions crashed at their first swap, and the cause is still open. To learn what contents and conditions lead to a crash, each run changes **one thing** from a run that worked. When a run crashes, `rednode-faults.log` has the first faults of the 15 s watch around the swap. It may be empty: the sound pak crashes left nothing there either.
+
+| Run | Changes from the baseline | Answers |
+|---|---|---|
+| 1 | Baseline: V1 to V2 to V1, worn, in gameplay | Do same-list texture swaps hold? |
+| 2 | V2 to V3 to V1 | Paths that leave with the old archive (cache entries kept) |
+| 3 | Inventory open during the swap | The first H2a crash was in the inventory |
+| 4 | Ten or more swaps in a row | Earlier crashes came after a few swaps |
+| 5 | The item not worn at the swap | Whether a worn item's held resources matter |
+| 6 | A mesh change at the same paths (V2 with a different mesh) | Mesh content against texture content |
+| 7 | Another garment mod installed (like the Fia leggings) | Conflicts with another mod |
+
+Not every run needs its own session. Runs 1 and 2 go together, and the others are added once those hold. On a crash, send `rednode-faults.log`, `rednode-overlay.log` (or `rednode-overlay.prev.log` if the game was started again), the crashed session's plugin log and RED Hot Tools' log.
