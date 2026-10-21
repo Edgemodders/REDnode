@@ -243,11 +243,36 @@ const systems = {
         sim.money += Number(n) || 0;
         return true;
       },
+      // V's clothes, by slot, for the Refresh test: a jacket, trousers and boots.
+      IsSlotEmpty: (_who, slot) => !WORN[slot],
+      GetItemInSlot: (_who, slot) =>
+        WORN[slot] ? new Remote('gameItemObject', { GetItemID: () => ({ id: WORN[slot].id, rngSeed: 1 }) }) : null,
+      GetItemAppearance: (_who, item) => Object.values(WORN).find((w) => w.id === item?.id)?.appearance ?? '',
+      RefreshAttachment: () => null,
+      ResetItemAppearance: () => null,
+      ChangeItemAppearanceByName: () => null,
+      RemoveItemFromSlot: () => true,
+      AddItemToSlot: () => true,
+    }),
+  GetTargetingSystem: () =>
+    new Remote('gametargetingTargetingSystem', {
+      GetLookAtObject: () =>
+        new Remote('NPCPuppet', {
+          GetDisplayName: () => 'Vendor',
+          GetCurrentAppearanceName: () => 'vendor_default',
+          ScheduleAppearanceChange: () => null,
+        }),
     }),
   GetTimeSystem: () =>
     new Remote('gameTimeSystem', {
       GetActiveTimeDilation: () => (sim.menu ? 0 : 1),
     }),
+};
+
+const WORN = {
+  'AttachmentSlots.Torso': { id: 'Items.Jacket_01_basic_01', appearance: 'jacket_01_basic_01' },
+  'AttachmentSlots.Legs': { id: 'Items.Pants_02_basic_01', appearance: 'pants_02_basic_01' },
+  'AttachmentSlots.Feet': { id: 'Items.Boots_01_basic_01', appearance: 'boots_01_basic_01' },
 };
 
 const notSimulated = (name) =>
@@ -513,8 +538,20 @@ export const world = {
   async watch() {
     return true;
   },
-  async entity() {
-    return null;
+  async entity(id) {
+    const hash = typeof id === 'string' ? id : id?.hash;
+    const e = entities.get(hash);
+    if (!e) return null;
+    let enabled = true;
+    const component = (name) =>
+      new Remote('entMeshComponent', {
+        Toggle: (on) => void (enabled = !!on),
+        IsEnabled: () => enabled,
+        GetName: () => name,
+      });
+    return new Remote('entEntity', {
+      FindComponentByName: (name) => ((e.components ?? []).some((c) => c?.$fields?.name === name || c?.name === name) ? component(name) : null),
+    });
   },
   on(name, fn) {
     if (!worldListeners.has(name)) worldListeners.set(name, new Set());

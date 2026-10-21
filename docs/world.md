@@ -676,3 +676,42 @@ The open question behind every row: whether a refreshed thing reads the new file
 | **H2b `world.refresh`** | The call in the `rednode` package and the MCP tool: `world.refresh({ player, lookAt, spawned, near })` with what the spike found works; Hot swap gains a **Refresh** switch after each swap, on by default for V | One call after a swap shows the change |
 
 The spike's test needs a clothing archive the user can change and swap (a texture or material change that is easy to see on V), a world prop mod with a visible change, and an NPC appearance mod if one is at hand.
+
+### H2a: built
+
+Built on 2026-10-21: **Refresh test** 0.1.0 (`packages/overlay/apps/refresh-test`, a Node mod, closed at start), calling the game through `api` only. No part of REDnode changed, so it runs on the released REDnode 0.26.15 and VERSION stays. It asks for the `archives` permission and requires RED Hot Tools, for its own **Swap** field. Every press goes to its log and the Mod log with what it called and how long it took.
+
+| Section | Buttons | Game calls |
+|---|---|---|
+| 1. Swap | **Swap** | `archives.reload` (as Hot swap) |
+| 2. V's clothes | **Re-attach**, **Reset look**, **Same look**, **Off and on**, on each clothing slot that holds an item (Head, Eyes, Chest, Torso, Legs, Feet, Outfit), or the slots typed in (`Legs`, or a full record such as `OutfitSlots.Torso`) | `RefreshAttachment(V, slot, false)`; `ResetItemAppearance(V, item)`; `ChangeItemAppearanceByName(V, item, its current appearance)`; `RemoveItemFromSlot(V, slot, true, false, true)` then `AddItemToSlot(V, slot, item)` |
+| 3. What V looks at | **Same appearance**, **Through a missing one** | `TargetingSystem.GetLookAtObject(V, false, false)`, then `ScheduleAppearanceChange` with its current appearance, or with a name it does not have and back after 0.5 s |
+| 4. A spawned object | **Spawn** (the cardboard box, or a `.mesh` depot path typed in), **Respawn**, **Mesh off and on**, **Remove** | `world.spawn` and `world.remove` in the same place; `FindComponentByName` then `Toggle(false)`, `Toggle(true)` |
+
+Checked in the mock game: every button of sections 2 and 3 made the calls above with the right arguments (a jacket and trousers worn, a vendor looked at), and section 4 said what was missing. The docs example page runs it against the simulation. **Unverified** in the game, which is the point of the test.
+
+### H2a test
+
+REDnode 0.26.15 on the laptop, with RED Hot Tools, Codeware, the Test timer and the **Refresh test zip** extracted into the game folder. The test swaps between two versions of the same clothing archive, so each button starts from a V who still shows the other version.
+
+**Before you start, with the game closed:**
+
+- Make two versions of a clothing mod with the **same file name**: **A** as it is, **B** with a change that is easy to see, such as another colour. Something on the legs or feet is easiest to see in first person (the Fia leggings from SP4 would do).
+- Put A in `archive\pc\mod`. Keep a copy of each in its own folder, for example `Desktop\A\` and `Desktop\B\`: the swaps use their full paths (Shift+right-click, Copy as path, works).
+- Note the item's `.mesh` depot path from WolvenKit, for step 9.
+- Optional, for step 8: an NPC or prop appearance mod, in two versions the same way.
+
+**Steps:**
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**: the note goes to the log with it. Step 1 comes before it can be reached.
+1. Start the game, load a save, and put on the item (version A). **F10**, Mod Manager: switch on **Refresh test** and allow it to swap archives. Its first lines say RedHotTools OK and the world API OK. Switch on the Test timer, **Start**, **Mark**.
+2. Paste B's full path into **1. Swap** and press **Swap**. Does V's item change by itself? (Expected: no.) **Mark**.
+3. The baseline: in the inventory, take the item off and put it on again. Does it show B now? Close the inventory. **Mark**.
+4. Swap **A**, then press **Re-attach**. Does it show A? Any flicker, animation or hitch? **Mark**.
+5. Swap **B**, then press **Reset look**. B? **Mark**.
+6. Swap **A**, then press **Same look**. A? **Mark**.
+7. Swap **B**, then press **Off and on**. B? Is the item still equipped in the inventory? **Mark**.
+8. Face an NPC (with your appearance mod: swap its other version first) and press **Same appearance**, then **Through a missing one**. What did it show each time: no change, a flicker, a different look, nothing for a moment? **Mark**.
+9. Type the item's `.mesh` depot path into **4. A spawned object** and press **Spawn**: the item stands about 3 m ahead (if nothing shows, the mesh may have no `default` appearance: say so). Swap the other version, then press **Mesh off and on**. Did it change? **Mark**.
+10. Swap the first version back, then press **Respawn**. Did it change? Press **Remove**. **Mark**.
+11. Quit the game. Send `rednode-mods.log`, the plugin log (`rednode-*.log` of this session) and `rednode-overlay.log`. RED Hot Tools leaves the swapped archive in `archive\pc\mod`: put A back there, or remove it, before the next session.

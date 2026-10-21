@@ -229,6 +229,19 @@ export const NOTES = {
     ],
     preview: 'Nothing is swapped on this page: it checks what the host checks and pretends. Its mod folder holds Plain.archive and MyJacket.archive.',
   },
+  'refresh-test': {
+    group: 'tests',
+    summary: 'Swap an archive, then try each way the game offers to load again what is already in the world: V\'s clothes, what V looks at, a spawned object.',
+    teaches: ['archives.reload', 'api.GameInstance', 'TransactionSystem', 'TargetingSystem', 'world.spawn', 'world.entity', 'ui.list'],
+    how: [
+      'A swap replaces an archive, but what is already in the world keeps what it loaded. This is the spike of `world.refresh` (H2): each button calls the game through `api` and logs how long it took.',
+      'V\'s clothes: `RefreshAttachment` on each slot that holds an item, the item\'s appearance applied again, or the item taken off and put back. Type slot names to try one at a time.',
+      'What V looks at: `TargetingSystem.GetLookAtObject` finds it, then `ScheduleAppearanceChange` applies its appearance again.',
+      'A spawned object: spawned again in the same place, or its mesh component switched off and on.',
+    ],
+    tryThis: ['Press Re-attach, then type Torso in the slots field and press Off and on.', 'Press Spawn, then Mesh off and on.'],
+    preview: 'Nothing changes on screen here: the preview\'s V wears a jacket, trousers and boots, and looks at a vendor, so the log shows the calls each button makes.',
+  },
   'list-mod': {
     group: 'mods',
     summary: 'A Node mod window built around a scrolling list: a live log that keeps its newest lines.',
