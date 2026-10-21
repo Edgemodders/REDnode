@@ -5,16 +5,18 @@
 // player to say: the point is which ways pick up the swapped mesh or material.
 //
 //   V's clothes   RefreshAttachment, ResetItemAppearance, or take off and put back,
-//                 on each slot that holds an item (or the slots typed in)
+//                 on each slot that holds clothing (found by Scan, outfit slots such
+//                 as Equipment-EX's included), or on the slots typed in
 //   Looked at     the target's appearance scheduled again, the same one or through
 //                 a missing one and back
 //   Spawned       a box (or any mesh typed in) spawned, then spawned again, or its
 //                 mesh component switched off and on (needs Codeware)
 
-import { api, archives, game, kernel, ui, world } from 'rednode';
+import { api, archives, game, kernel, tweakdb, ui, world } from 'rednode';
 
-// V's clothing slots. A slot the game does not know is simply empty.
-const CLOTHING = ['Head', 'Eyes', 'Chest', 'Torso', 'Legs', 'Feet', 'Outfit'];
+// How long Off and on waits between taking an item off and putting it back, so the
+// game can let go of what the item held before it loads it again.
+const OFF_MS = 500;
 const TEMPLATE = 'base\\gameplay\\loot\\containers\\common_suitcases\\appearances\\suitcase_small_placeholder.ent';
 const BOX = 'base\\environment\\decoration\\containers\\packaging\\cardboard_box\\cardboard_box_a_closed.mesh';
 const MESH_NAME = 'rednode_refresh_mesh';
@@ -23,6 +25,12 @@ let file = '';
 let slotText = '';
 let meshPath = BOX;
 let spawned = null; // { id, at, mesh }
+let scanned = null; // the slots holding clothing at the last Scan
+const labels = new Map(); // a slot's id -> its name, from the last Scan
+let busy = ''; // the step running, so a second press waits its turn
+
+// The base game's clothing slots, named so a scan shows them by name.
+tweakdb.learn(['Head', 'Face', 'Eyes', 'Chest', 'Torso', 'Legs', 'Feet', 'Outfit'].map((n) => `AttachmentSlots.${n}`));
 
 const requires = ui.text('Checking requirements...', { tone: 'dim' });
 const log = ui.list({ keep: 400 });
@@ -32,14 +40,19 @@ function say(text) {
   console.log(text);
 }
 
-// Runs one step, timed, and logs its failure instead of throwing.
+// Runs one step, timed, and logs its failure instead of throwing. One at a time: a
+// press while another step runs is refused, so their game calls never interleave.
 async function step(label, fn) {
+  if (busy) return say(`${label}: not run, ${busy} is still running`);
+  busy = label;
   const started = performance.now();
   try {
     const note = await fn();
     say(`${label}: ${note ?? 'done'} (${(performance.now() - started).toFixed(0)} ms)`);
   } catch (err) {
     say(`${label} failed: ${err.message}`);
+  } finally {
+    busy = '';
   }
 }
 
@@ -51,17 +64,61 @@ async function player() {
 
 const shop = () => api.GameInstance.GetTransactionSystem(game.instance);
 
-// The slots typed in (names such as Torso, or full records such as OutfitSlots.Torso),
-// or every clothing slot.
-function slots() {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Every attachment slot V has, from TweakDB: the base game's AttachmentSlots and any a
+// mod adds (Equipment-EX's OutfitSlots). Lists each one that holds an item, and keeps
+// those holding clothing (an item type starting with Clo_) for the buttons.
+async function scan() {
+  const v = await player();
+  const ts = await shop();
+  const ids = await tweakdb.records('AttachmentSlot');
+  const held = [];
+  // A few calls at a time: each waits for the game thread.
+  for (let i = 0; i < ids.length; i += 16) {
+    const part = ids.slice(i, i + 16);
+    const empty = await Promise.all(part.map((slot) => ts.IsSlotEmpty(v, slot).catch(() => true)));
+    part.forEach((slot, n) => !empty[n] && held.push(slot));
+  }
+  const found = [];
+  for (const slot of held) {
+    const item = await ts.GetItemInSlot(v, slot);
+    if (!item) continue;
+    const itemID = await item.GetItemID();
+    const data = await item.GetItemData().catch(() => null);
+    const type = String((data && (await data.GetItemType())) ?? '?');
+    const name = (await item.GetDisplayName().catch(() => '')) || '';
+    const appearance = await ts.GetItemAppearance(v, itemID);
+    let label = slot;
+    if (slot.startsWith('0x')) {
+      const record = await tweakdb.record(slot).catch(() => null);
+      label = (record && (await record.EntitySlotName().catch(() => ''))) || slot;
+    }
+    found.push({ slot, label, type, name, appearance, clothing: type.startsWith('Clo_') });
+  }
+  scanned = found.filter((f) => f.clothing).map((f) => f.slot);
+  labels.clear();
+  for (const f of found) labels.set(f.slot, f.label);
+  for (const f of found) say(`  ${f.clothing ? '*' : ' '} ${short(f.label)}: ${f.name || '(no name)'}, ${f.type}, ${f.appearance || '(no appearance)'}`);
+  return `${ids.length} slots, ${found.length} hold an item, ${scanned.length} clothing (marked *): the buttons use those`;
+}
+
+// The slots typed in (names such as Legs, or full records such as OutfitSlots.LegsMiddle),
+// or the clothing found by the last Scan (scanning first if there was none).
+async function slots() {
   const typed = slotText.split(/[\s,]+/).filter(Boolean);
-  return (typed.length ? typed : CLOTHING).map((s) => (s.includes('.') ? s : `AttachmentSlots.${s}`));
+  // A name as Scan showed it (LegsMiddle), a record (OutfitSlots.LegsMiddle), or a base slot (Legs).
+  const byLabel = (t) => [...labels].find(([, l]) => l.toLowerCase() === t.toLowerCase() || short(l).toLowerCase() === t.toLowerCase())?.[0];
+  if (typed.length) return typed.map((t) => byLabel(t) ?? (t.includes('.') || t.startsWith('0x') ? t : `AttachmentSlots.${t}`));
+  if (!scanned) say(`Scan: ${await scan()}`);
+  return scanned;
 }
 
 // The slots that hold an item, with the item's ID and appearance.
 async function worn(v, ts) {
   const found = [];
-  for (const slot of slots()) {
+  const list = await slots();
+  for (const slot of list) {
     if (await ts.IsSlotEmpty(v, slot)) continue;
     const item = await ts.GetItemInSlot(v, slot);
     if (!item) continue;
@@ -69,11 +126,11 @@ async function worn(v, ts) {
     const appearance = await ts.GetItemAppearance(v, itemID);
     found.push({ slot, itemID, appearance });
   }
-  if (!found.length) throw new Error(`nothing in ${slots().join(', ')}`);
+  if (!found.length) throw new Error(`nothing in ${list.map(short).join(', ') || 'any clothing slot'}`);
   return found;
 }
 
-const short = (slot) => slot.replace(/^AttachmentSlots\./, '');
+const short = (slot) => (labels.get(slot) ?? slot).replace(/^AttachmentSlots\./, '');
 
 async function clothes(label, each) {
   await step(label, async () => {
@@ -105,13 +162,21 @@ const sameAppearance = () =>
     await ts.ChangeItemAppearanceByName(v, w.itemID, w.appearance);
   });
 
-// The strongest of the three: the item's entity goes and comes back. The item stays in
-// the inventory and equipped; a garment's partial look (sleeves, tucked) may be lost.
+// The strongest of the three: the item's entity goes and comes back, as taking it off
+// and putting it on in the inventory does. It waits between the two, so the game lets go
+// of what the item held. The item stays in the inventory and equipped; a garment's
+// partial look (sleeves, tucked) may be lost.
 const putBack = () =>
-  clothes('Take off and put back', async (v, ts, w) => {
-    const off = await ts.RemoveItemFromSlot(v, w.slot, true, false, true);
-    const on = await ts.AddItemToSlot(v, w.slot, w.itemID);
-    return `off ${off}, on ${on}, `;
+  step('Take off and put back', async () => {
+    const v = await player();
+    const ts = await shop();
+    const items = await worn(v, ts);
+    const off = [];
+    for (const w of items) off.push(await ts.RemoveItemFromSlot(v, w.slot, true, false, true));
+    await sleep(OFF_MS);
+    const on = [];
+    for (const w of items) on.push(await ts.AddItemToSlot(v, w.slot, w.itemID));
+    return items.map((w, i) => `${short(w.slot)} ${w.appearance || '(no appearance)'} off ${off[i]}, on ${on[i]}`).join('; ') + `; ${OFF_MS} ms between`;
   });
 
 async function lookedAt() {
@@ -231,11 +296,12 @@ ui.window({
     ui.button('Swap', swap),
     ui.heading("2. V's clothes"),
     ui.input({
-      placeholder: `Slots, blank for all: ${CLOTHING.join(' ')}`,
+      placeholder: 'Slots, blank for what Scan found',
       onChange: (v) => (slotText = v),
       onSubmit: (v) => (slotText = v),
     }),
     ui.row(
+      ui.button('Scan', () => step('Scan', scan), { variant: 'ghost' }),
       ui.button('Re-attach', reattach),
       ui.button('Reset look', resetAppearance, { variant: 'ghost' }),
       ui.button('Same look', sameAppearance, { variant: 'ghost' }),
@@ -274,5 +340,6 @@ requires.set({
 });
 game.on('PlayerPuppet.OnGameAttached', () => {
   spawned = null; // a load removes what was spawned
+  scanned = null; // and may change what V wears
 });
 say('Refresh test ready');

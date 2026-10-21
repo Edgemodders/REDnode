@@ -767,3 +767,38 @@ Follow-up leads, run by the player the same day after a swap:
 | **Off and on** | Not run: the Refresh test does not find the trousers' slot |
 
 So the release and reload that the game does when an item is equipped is enough. H2b's refresh for V is that done by a call, on the items the swap touched; the Refresh test first needs to find the slot that holds the visible trousers (0.2.0, proposed).
+
+### Refresh test 0.2.0
+
+Built on 2026-10-21 from the sessions above (app only, REDnode stays 0.26.15):
+
+| Change | Why |
+|---|---|
+| **Scan** lists every attachment slot in TweakDB (`tweakdb.records("AttachmentSlot")`) that holds an item, with the item's name, type and appearance, and marks clothing (`Clo_` types) with `*` | 0.1.0's fixed list missed the slot of the trousers V showed; a mod's slots (Equipment-EX's `OutfitSlots`) are records too |
+| The buttons act on the clothing Scan found, or on the slots typed in, by the name Scan shows | So one item can be tried alone |
+| **Off and on** takes every item off, waits 500 ms, then puts them back | The player's own re-equip worked; the wait gives the game time to let go of the old copy |
+| One step at a time: a press while a step runs is refused and logged | 0.1.0 let calls of two buttons interleave |
+
+Checked in the mock game (Scan, Off and on, a press refused while busy, Re-attach). Unverified in the game: the number of slots (each Scan asks every one) and how Off and on behaves with an outfit system.
+
+### Refresh test 0.2.0: test
+
+On the laptop with REDnode 0.26.15, RED Hot Tools, Codeware, the Test timer and the Refresh test 0.2.0 zip. Each step tries one button, then **Off and on** if it did not work, so V always shows the swapped version before the next swap.
+
+**Before you start, with the game closed:**
+
+- Extract the Refresh test 0.2.0 zip into the game folder (it replaces 0.1.0).
+- Put A (`EDGEmat_M3.archive`, the base look) in `archive\pc\mod`. Nothing of it in `mods\`, and `archive\pc\hot` empty. The Fia leggings mod stays out.
+- Keep A and B in their own folders, for their full paths.
+
+**Steps:**
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
+1. Load a save wearing the trousers (A), no menu open. **F10**, then switch on **Refresh test** and press **Scan**. Find the trousers' line (marked `*`) and type its slot name, as the line shows it, into the slots field. Note the name in the timer. **Mark**.
+2. Look down at V's legs. Swap **B**. Do the trousers change by themselves? **Mark**.
+3. Press **Re-attach**. B? If not, press **Off and on**: B? **Mark**.
+4. Swap **A**, press **Reset look**. A? If not, press **Off and on**: A? **Mark**.
+5. Swap **B**, press **Same look**. B? If not, press **Off and on**: B? **Mark**.
+6. Swap **A**, press **Off and on**. A? Did the trousers vanish for a moment? **Mark**.
+7. Open the inventory: are the trousers still equipped, and does the preview show A? Close it. **Mark**.
+8. Quit the game. Send `rednode-mods.log`, the plugin log of this session, `rednode-overlay.log` and the RED Hot Tools log. Put A back in `archive\pc\mod` before the next session.

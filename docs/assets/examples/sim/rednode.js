@@ -246,7 +246,13 @@ const systems = {
       // V's clothes, by slot, for the Refresh test: a jacket, trousers and boots.
       IsSlotEmpty: (_who, slot) => !WORN[slot],
       GetItemInSlot: (_who, slot) =>
-        WORN[slot] ? new Remote('gameItemObject', { GetItemID: () => ({ id: WORN[slot].id, rngSeed: 1 }) }) : null,
+        WORN[slot]
+          ? new Remote('gameItemObject', {
+              GetItemID: () => ({ id: WORN[slot].id, rngSeed: 1 }),
+              GetDisplayName: () => WORN[slot].name,
+              GetItemData: () => new Remote('gameItemData', { GetItemType: () => WORN[slot].type }),
+            })
+          : null,
       GetItemAppearance: (_who, item) => Object.values(WORN).find((w) => w.id === item?.id)?.appearance ?? '',
       RefreshAttachment: () => null,
       ResetItemAppearance: () => null,
@@ -270,9 +276,10 @@ const systems = {
 };
 
 const WORN = {
-  'AttachmentSlots.Torso': { id: 'Items.Jacket_01_basic_01', appearance: 'jacket_01_basic_01' },
-  'AttachmentSlots.Legs': { id: 'Items.Pants_02_basic_01', appearance: 'pants_02_basic_01' },
-  'AttachmentSlots.Feet': { id: 'Items.Boots_01_basic_01', appearance: 'boots_01_basic_01' },
+  'AttachmentSlots.Torso': { id: 'Items.Jacket_01_basic_01', appearance: 'jacket_01_basic_01', name: 'Jacket', type: 'Clo_OuterChest' },
+  'AttachmentSlots.Legs': { id: 'Items.Pants_02_basic_01', appearance: 'pants_02_basic_01', name: 'Trousers', type: 'Clo_Legs' },
+  'AttachmentSlots.Feet': { id: 'Items.Boots_01_basic_01', appearance: 'boots_01_basic_01', name: 'Boots', type: 'Clo_Feet' },
+  'AttachmentSlots.WeaponRight': { id: 'Items.Preset_Lexington_Default', appearance: '', name: 'Lexington', type: 'Wea_Handgun' },
 };
 
 const notSimulated = (name) =>
@@ -395,6 +402,10 @@ const records = new Map(
         tags: { type: 'array:CName', value: ['Currency'] },
       },
     },
+    // Some of V's attachment slots, for the Refresh test's Scan.
+    ...Object.fromEntries(
+      ['Head', 'Eyes', 'Torso', 'Legs', 'Feet', 'WeaponRight'].map((n) => [`AttachmentSlots.${n}`, { type: 'gamedataAttachmentSlot_Record', flats: {} }]),
+    ),
     ...Object.fromEntries(
       [
         'v_sport2_quadra_type66_player',
@@ -439,6 +450,7 @@ export const tweakdb = {
       FriendlyName: () => val('friendlyName'),
       DisplayName: () => (path.startsWith('Items.Preset_Lexington') ? 'Lexington' : path.split('.').pop()),
       Quality: () => new Remote('gamedataQuality_Record', {}, { persistent: true }),
+      EntitySlotName: () => path.split('.').pop(),
     }, { persistent: true });
   },
   async records(type) {
