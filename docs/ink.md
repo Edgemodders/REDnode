@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a is built in REDnode 0.28.0** and awaits its in-game test ([I2a test](#i2a-test)). The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). Next: I2b. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -266,4 +266,25 @@ On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.28.0 (update zip over 0.27.2),
 3. Load the same save again. Wait a few seconds after the load: are the coordinates back without doing anything? **Mark**.
 4. Open the overlay, switch **Ink Coords** off in the launcher: do they go? Switch it on again: do they come back, once (not twice)? **Mark**.
 5. Quit the game from the menu. Send `rednode-mods.log` and this run's `red4ext/logs/rednode-*.log` (the `Ink:` lines). Did the game quit without a crash report?
+
+## I2a test: results
+
+2026-10-22 at 17:53 to 17:59, on the laptop, REDnode 0.28.0, with Codeware. **Passed**: every step, and the game quit with no crash report.
+
+| Step | Result | The plugin log |
+|---|---|---|
+| 1, Ink Coords on | The two lines showed at the top right and followed V. Not entirely below the minimap: the position is in the layer's units, and the laptop's HUD layer is 2560x1440 | "mount m1 on hud: 0 of 0 widgets built (build 1)": the mount is built before its widgets arrive, which are then added one by one |
+| 2, menus and photo mode | Hid with the HUD in the pause menu, the hub and photo mode, and came back | |
+| 3, a save load | Back with no action | "3 of 3 widgets built (build 2)", 2 s after the load |
+| 4, off and on | Gone when switched off, back once when switched on | The mod stopped, a new mount m1 was built |
+| 5, quit | No crash | |
+
+Found, to fix with I2b:
+
+| What | Why | Fix |
+|---|---|---|
+| After quitting to the main menu, the driver tried once to rebuild there and logged "Codeware has no layer inkHUDLayer" | Its check for a loaded save is `GetPlayer`, and the game makes a player at the main menu too (as the Vitals widget found on the boot loading screen) | Also wait for the plugin's own main-menu state to be off |
+| At quit, the mod's last update got "The game did not answer within 5 seconds" in the Mod log | The game had stopped running the pump | The package stays quiet about `ink.apply` timeouts while the game is closing |
+
+**Open, raised by the owner:** placement that holds across screen resolutions and aspect ratios, and placement relative to the game's own HUD pieces (below the minimap, beside the health bar). To discuss with the owner as part of I2b's layout words.
 
