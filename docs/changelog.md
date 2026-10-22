@@ -25,6 +25,7 @@ How to keep it:
 
 **Fixed**
 
+- `api.$new` with properties on a class written in redscript no longer breaks the object it makes (and crashes the game at its next use): script fields are now set where the game keeps them, as `$get` and `$set` already did.
 - `archives.reload` and the MCP tool `archives_reload` refuse, with a message, a swap that the official RED Hot Tools would get wrong and end the game with: replacing an archive in a mod folder with both upper- and lowercase names. The [Edgemodders build of RED Hot Tools](https://github.com/CyberbuildsAI/cp2077-red-hot-tools/releases) fixes it, and with it REDnode swaps as before.
 
 **Other**

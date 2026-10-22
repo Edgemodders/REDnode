@@ -1051,7 +1051,12 @@ bool SetProps(const CClass* aClass, void* aInstance, const Value& aProps, std::s
             aError = Str(aClass->GetName()) + " has no property \"" + key + "\"";
             return false;
         }
-        if (!FromJson(p->type, static_cast<uint8_t*>(aInstance) + p->valueOffset, v, aError, 0))
+        // A script class keeps its own fields in a value holder beside the object, not
+        // at their offset in it: GetValuePtr finds them, as rtti.get and rtti.set do.
+        // Written at the raw offset, a script field overwrote the object's vtable (0.27.0).
+        void* field = IsScriptable(aClass) ? p->GetValuePtr<void>(aInstance)
+                                           : static_cast<uint8_t*>(aInstance) + p->valueOffset;
+        if (!FromJson(p->type, field, v, aError, 0))
         {
             aError = key + " (" + TypeName(p->type) + "): " + aError;
             return false;

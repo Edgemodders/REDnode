@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 spike built on 2026-10-22 in REDnode 0.27.0**, awaiting its in-game test ([I1 test](#i1-test)). The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 spike built on 2026-10-22**. Its first run (0.27.0) crashed at step 5 ([results](#i1-test-first-run-0270)); REDnode 0.27.1 fixes the cause and awaits the retest ([I1 test](#i1-test)). The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -84,7 +84,7 @@ Checked: the scripts compile with redscript-cli (v1.0.0-preview.22) against the 
 
 ## I1 test
 
-On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.27.0 (update zip over 0.26.21), with Codeware. Each button writes its answer to the Ink test's window and the Mod log.
+On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.27.1 (update zip over 0.27.0 or 0.26.21), with Codeware. Each button writes its answer to the Ink test's window and the Mod log.
 
 0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
 1. Switch on **Ink test** in the launcher (it asks for the bridge permission: allow it). Load a save. **F10**, press **Roots**. **Mark**.
@@ -98,3 +98,20 @@ On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.27.0 (update zip over 0.26.21)
 9. Press **Menu entries**. **Mark**.
 10. Leave the perks screen. Load the same save again (a save load), then open the overlay and press **Check**, then **Roots**. **Mark**.
 11. Press **Clean up**. Quit. Send `rednode-mods.log`, and the dump file Read screen named (in the app's data folder; it stays on your PC, it is game data).
+
+## I1 test: first run (0.27.0)
+
+2026-10-22 at about 16:37, on the laptop, with Codeware. Steps 1 to 4 ran. The player's notes:
+
+| Step | Seen |
+|---|---|
+| 2, HUD text on `hud.healthbar` | Nothing on screen |
+| 3, HUD text on `cw.inkHUDLayer` (Codeware's HUD layer) | "REDnode ink" showed |
+| 5, Menu button | **The game crashed** at the press |
+
+The crash report: an access violation in `REDnode.dll+0x2fd30`, reading `0x7FF70000000D`. Read from the dump: the plugin was converting `RegisterToCallback`'s `object` argument (a `handle:IScriptable`), the `REDnodeInkListener` the app had just made with `api.$new("REDnodeInkListener", { id })`. The object was alive (its reference counter held 2 strong references, and its `ref` field pointed at itself), but the low half of its vtable pointer read `5`: the listener's `id`, which was 5 at that point in the test. The plugin's `rtti.new` wrote the properties it was given at each property's offset in the object. A script class (one written in redscript) keeps its own fields in a value holder beside the object, so `id` went over the vtable, and the next virtual call on the object crashed. `rtti.get` and `rtti.set` already found script fields correctly (the SDK's `GetValuePtr`); only `rtti.new`'s properties did not. W1's `$new` calls built native classes, which keep their fields in the object, so this never showed before.
+
+Fixed in REDnode 0.27.1: `rtti.new` finds each property through `GetValuePtr`, as `rtti.get` and `rtti.set` do, for every class; structs keep their plain offsets.
+
+Step 2's empty screen is unverified. A likely reason: the health bar's root fades out of combat with the rest of the health bar, and widgets added into it fade with it. The retest's Roots line shows each root's size and visibility.
+
