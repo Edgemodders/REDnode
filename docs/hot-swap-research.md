@@ -103,3 +103,7 @@ On the laptop, game 2.31. No swap in this test: it rules out the archive's own c
 4. Quit. If the game crashed, send the crash report folder (`%LOCALAPPDATA%\REDEngine\ReportQueue\`).
 
 A crash here, with no swap, points at the archive's content. No crash points back at the swap.
+
+### HP0 test: results
+
+2026-10-22, on the laptop. The player loaded a save with each of the two new trouser versions installed normally, one at a time, with no swap. **Both worked**, with no crash. So the archives' content is fine, and a crash with them would come from the swap. Next in HP0: swap runs with only one copy of the game open (the clean archives test in [World API](world.md), "H2a clean archives: test (runs 1 and 2)").
