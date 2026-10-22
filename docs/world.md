@@ -978,3 +978,21 @@ Runs 1 and 2 of the crash matrix above, in one session. On the laptop with REDno
 The player ran swaps of two new trouser versions on the laptop (2026-10-22, 10:06 to 10:21, REDnode 0.26.15 with Refresh test 0.2.3). Several sessions crashed. In the first, a swap of `EDGEmatB.archive` took 671 ms, and the next **Re-attach** got no answer from the game within 5 seconds before the session ended. The app also still had trouble finding the trousers' slot. Equipment-EX and an instant wardrobe switcher mod were both installed, and either may play a part (unverified). No fault log was sent.
 
 Parked by the player the same day, to think about the approach before going on. One idea the player raised: go deeper into the game's data structures and build a patch that can stop the game and bring its loaded resources and the GPU's buffers back in step during a swap. Plain archive swaps through `archives.reload` (H1) are not affected. Pick H2 up again from the crash matrix and the clean archives test above. The owner then asked for a research effort toward a hot swap patch: [Hot swap research](hot-swap-research.md), which also reads the crash reports of that day (every crash came with a second copy of the game running, or without a swap).
+
+### H2 resumed: test with the fixed RED Hot Tools
+
+Agreed with the player on 2026-10-22, after the swap crashes were traced to RED Hot Tools and fixed (docs/hot-swap-research.md): the goal is a seamless appearance swap on what V wears, with taking the item off and putting it back as the acceptable fallback. On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.19, RED Hot Tools 1.3.0+edgemodders.1, Refresh test 0.2.3, Equipment-EX. Versions 1 and 2 are the player's `EDGEmatA.archive` pair, which share only 2 of their 9 paths (the case that went one way on 2026-10-21).
+
+The fault watch runs for 15 seconds after each swap, so the Re-attach in step 2 comes within that time: the crash at 12:24 came after a Re-attach outside it.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
+1. With the game closed: version 1 in `archive\pc\mod` as `EDGEmatA.archive`, `archive\pc\hot` empty. Start the game once, load the save wearing the trousers (version 1) in Legs Middle. **F10**, **Refresh test**, type `OutfitSlots.LegsMiddle` into the slots field. **Mark**.
+2. Swap **version 2**. Watch V's legs for about 5 seconds: did they change by themselves? Then press **Re-attach** at once (within 15 seconds of the swap). Changed? Crash? **Mark**.
+3. Press **Reset look**. Changed? **Mark**.
+4. Press **Off and on**. Version 2? **Mark**.
+5. Swap **version 1**, then press **Off and on**. Version 1, or still version 2? **Mark**.
+6. Press **Take off**. Swap **version 2**. Press **Put back**. Version 2? **Mark**.
+7. Press **Take off**. Swap **version 1**. Press **Put back**. Version 1? **Mark**.
+8. Open the inventory: does the preview match V? Close it. **Mark**.
+9. Quit. Send `rednode-mods.log`, the plugin log, `rednode-overlay.log`, the RED Hot Tools log and `rednode-faults.log`, and after a crash the newest folder in `%LOCALAPPDATA%\REDEngine\ReportQueue\`.
+
