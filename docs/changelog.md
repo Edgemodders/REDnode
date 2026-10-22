@@ -13,7 +13,7 @@ How to keep it:
 
 **New**
 
-- Swapping an archive now shows the new version on the clothing V wears at once, without taking it off: `archives.reload` applies the worn items' appearance again after the swap, in the base game's slots and Equipment-EX's (items Equipment-EX hides stay hidden). `{ refresh: false }` skips it; the answer's `refreshed` lists what was refreshed. The MCP tool `archives_reload` takes `refresh` too.
+- Swapping an archive now shows the new version on the clothing V wears at once, without taking it off: `archives.reload` applies the worn items' appearance again after the swap, in the base game's slots and Equipment-EX's (with Equipment-EX in use only its slots, so items it hides stay hidden). `{ refresh: false }` skips it; the answer's `refreshed` lists what was refreshed. The MCP tool `archives_reload` takes `refresh` too.
 - A package's `requires` can name `rednode` with a version, for app packs that need a REDnode new enough. The overlay host answers with its own version.
 - Each release on GitHub also carries the app packs' zips, such as REDnode Sound Tools, each as its own file.
 - The MCP tool `api_read` reads from the game without asking: it runs functions named like reads (`Get`, `Is`, `Has`, `Can`, `Find`) and a TweakDB record's methods, and refuses the rest. See [the MCP server](https://edgemodders.github.io/REDnode/mcp.html).

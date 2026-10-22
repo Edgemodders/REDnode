@@ -1070,3 +1070,19 @@ On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.20 (update zip over 0.26.19
 
 Found: before the first refresh, the base items Equipment-EX hides wore `empty_appearance_default`, so they were skipped; afterwards they read their own appearances, so the next refreshes reset them too. Nothing hidden showed up (the player's step 5), but resetting items Equipment-EX hides is a risk (the H2a run of 2026-10-21 saw a Reset look give hidden items back their looks). A refinement to decide: when V wears anything in Equipment-EX's slots, leave the base clothing slots out of the refresh. The refresh takes about 340 ms in the game against 12 to 21 ms in the mock game: four steps, each waiting for the game thread's next frames.
 
+### H2b refinement: Equipment-EX's hidden items left alone (REDnode 0.26.21)
+
+Agreed with the owner on 2026-10-22. When V wears anything in Equipment-EX's slots (`OutfitSlots.*`), the refresh leaves the base clothing slots out: Equipment-EX shows what V wears through its own slots and hides the base items, and applying a hidden item's appearance again could show it. Without Equipment-EX, or with nothing in its slots, the base slots are refreshed as before. In the mock game: with a trousers item in `OutfitSlots.LegsMiddle` and a jacket in the base `Torso` slot, only the trousers were refreshed; with no `OutfitSlots` item, the base `Torso` and `Legs` items were.
+
+Decided the same day: H2 stops here for now. **H2c** (things in the world: NPCs, props) comes after the ink API, and synchronizes with EDGEbuilder, so scenes built in EDGEbuilder (NPCs, props and the rest) and stored there can be loaded into the game from EDGEbuilder.
+
+### H2b refinement: test
+
+On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.21 (update zip over 0.26.20), RED Hot Tools 1.3.0+edgemodders.1, Equipment-EX, V wearing the trousers and other clothing.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
+1. Version 1 installed, load the save. **F10**, **Refresh test**. **Mark**.
+2. Swap **version 2**, then **version 1**, then **version 2**, with no other button. Each time: the new version shows? **Mark**.
+3. Look at V's clothing: anything Equipment-EX hides showing, or anything else changed? **Mark**.
+4. Quit. Send `rednode-mods.log`: each "refreshed what V wears (...)" line should list only `OutfitSlots.*` slots.
+

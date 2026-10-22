@@ -1508,8 +1508,9 @@ let hotQueue = Promise.resolve();
 // (TransactionSystem.ResetItemAppearance, which keeps the item worn; docs/world.md, "H2
 // resumed"). The clothing slots: the base game's, and Equipment-EX's extra slots (its
 // OutfitConfig, MIT, by psiberx). A slot the game does not have holds nothing, so the list
-// costs nothing without Equipment-EX. Items Equipment-EX hides wear an empty_appearance_*
-// and are left alone, so the refresh never shows them.
+// costs nothing without Equipment-EX. Items Equipment-EX hides are left alone, so the refresh
+// never shows them: with its slots in use the base slots are skipped, and any item wearing an
+// empty_appearance_* is skipped.
 const BASE_CLOTHING_SLOTS = ['Head', 'Eyes', 'Chest', 'Torso', 'Legs', 'Feet', 'Outfit', 'UnderwearTop', 'UnderwearBottom'];
 const EQUIPMENT_EX_SLOTS = [
   'Head', 'Balaclava', 'Mask', 'Glasses', 'Eyes', 'EyeLeft', 'EyeRight', 'Wreath', 'EarLeft', 'EarRight',
@@ -1546,8 +1547,12 @@ async function refreshWorn() {
     )).filter(Boolean);
     const ids = await Promise.all(held.map((w) => quiet(call({ self: { $ref: w.item.$ref }, fn: 'GetItemID', args: [] }))));
     const looks = await Promise.all(held.map((w, i) => (ids[i] ? quiet(call({ self, fn: 'GetItemAppearance', args: [v, ids[i]] })) : null)));
+    // With Equipment-EX in use, its slots carry what V shows and the base slots hold items it
+    // hides: those are left out, since applying their appearance again could show them (H2b).
+    const outfit = held.some((w) => w.slot.startsWith('OutfitSlots.'));
     const shown = held
       .map((w, i) => ({ slot: w.slot, itemID: ids[i], appearance: String(looks[i] ?? '') }))
+      .filter((w) => !(outfit && w.slot.startsWith('AttachmentSlots.')))
       .filter((w) => w.itemID && w.appearance && w.appearance !== 'None' && !w.appearance.startsWith('empty_appearance'));
     await Promise.all(shown.map((w) => quiet(call({ self, fn: 'ResetItemAppearance', args: [v, w.itemID] }))));
     return { items: shown.map((w) => ({ slot: w.slot, appearance: w.appearance })), ms: Date.now() - started };
