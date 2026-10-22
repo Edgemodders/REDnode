@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 spike built on 2026-10-22**. Its first run (0.27.0) crashed at step 5 ([results](#i1-test-first-run-0270)); the second (0.27.1) answered most questions and crashed at quit ([results](#i1-test-second-run-0271)). REDnode 0.27.2 fixes what they found and awaits the third run ([I1 test](#i1-test)). The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). I2's plan is next, to agree with the owner. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -139,4 +139,33 @@ Step 2's empty screen is unverified. A likely reason: the health bar's root fade
 | The bridge keeps up to 4096 waiting calls and runs 256 a frame, carrying the rest to the next frames; past 4096 a call is refused at once with a message. Before, calls past 256 were dropped and each timed out after 5 s | `native/src/overlay/bridge.cpp` |
 | The references Node mods hold are let go when the game's Running state ends, and the table is never destroyed at DLL unload | `native/src/main.cpp`, `native/src/overlay/reflect.cpp` |
 | Ink test 0.1.1: Check counts only what exists (it said "6 of 6 exist" when none did); Speed logs each line as it goes and adds 2000 at once; Read screen fetches a whole level at once | `packages/overlay/apps/ink-test` |
+
+## I1 test: third run (0.27.2)
+
+2026-10-22 at 17:07 to 17:14, on the laptop, REDnode 0.27.2, Ink test 0.1.1, with Codeware. **Passed**: every step, and the game quit with no crash report (the plugin log ends with the pump stopping and the host disconnecting).
+
+| Step | Result |
+|---|---|
+| 1, Roots | As in the second run. The owner's note: the health bar is switched off in their HUD settings, which matches `hud.healthbar`'s root reading hidden |
+| 2, HUD text on `cw.inkHUDLayer` | Showed |
+| 3, Speed | 1 change 22.5 ms; 50 in a row 1235 ms (24.7 ms each, about one frame each at the game's 40 fps); 200 at once 38 ms; 600 at once 78 ms; **2000 at once 239 ms**, none failed. The 256-a-frame queue works |
+| 4 and 5, Menu button | Showed in the pause menu. Hover and click reached Node: `hoverOver`, `hoverOut`, `press`, `release`. **Each click arrived 12 to 14 times** as press and as release: one per input action bound to the mouse button, likely (unverified). Hover arrived once |
+| 6, Check | The HUD widgets existed; the pause menu's widgets had gone with the menu |
+| 7, Open screen | `new_perks` opened the perks screen |
+| 8, Read screen | `cw.inkMenuLayer`: **4138 widgets in 1994 ms**: the perks screen (its own root, with the perk tooltips, `hitToOpenPerksScreen`, `attributes_canvas` and the attribute buttons) and the hub's frame beside it. `menu.hub`: **958 widgets in 564 ms**, none unreadable (the second run's unreadable widgets were the calls the plugin dropped past 256) |
+| 9, Quit | No crash |
+
+## I1: what it decides
+
+The decisions the plan left to I1, with what the runs showed. The recommendations are for the owner to agree before I2.
+
+| Decision | What I1 showed | Recommendation for I2 |
+|---|---|---|
+| The HUD root | REDnode's own hooks work but give no full-screen HUD root: the health bar's is 8x8 and hidden when the bar is off or out of combat, the minimap's and quest tracker's are their own corners. Codeware's `inkHUDLayer` window is full-screen (2560x1440 on the laptop) and worked every time | Use Codeware's layers for `ink.mount("hud")`, so the `ink` API `requires` Codeware (EDGEbuilder's world features already do). Keep REDnode's menu hooks; look for a full-screen base-game HUD root later only if a modder needs `ink` without Codeware |
+| Batching | One call after another costs about one frame each (25 ms at 40 fps): a 40-widget panel at about 8 calls a widget would take 8 s. Calls sent together run 256 a frame: 2000 took 239 ms | The driver in the plugin, as the design says: a tree or a batch of changes goes in **one** bridge call and is applied natively on the game thread. Never one bridge call per property |
+| Rebuild | A save load rebuilds the HUD and drops every added widget. A menu's widgets die when the menu closes | The driver keeps each package's tree and builds it again after each load (`OnGameAttached`) and each time its menu opens |
+| Events | Hover and click reach Node through a listener class in REDnode's scripts. One click fires press and release 12 to 14 times | I3: the listener passes on only the `click` action (`inkPointerEvent.IsAction`), and the event carries the widget's id and the action name. The cursor: interactive ink in menus first, where the game's cursor works |
+| Screens | `StartHubMenuEvent` opens a game screen by its menu name. The game's menu list (`menu.inkmenu`, 57 entries, 22 scenarios) is readable through REDbridge and Codeware | `ink.screens.open(name)` with the 57 names; adding `rednode_screen` stays for I5 |
+| Dump source | A whole open screen reads in about 2 s (4138 widgets), with names, classes, sizes, visibility, controller counts and texts | Feasible. A first version with I2's tags; the read itself moves into the plugin's driver (one call for a whole tree) |
+| Class names | `AddChild` takes the script names (`inkText`, `inkRectangle`) | The tags map to them in one table |
 
