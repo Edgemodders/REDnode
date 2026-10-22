@@ -239,3 +239,16 @@ Error 1 with a file that passes every check on disk, and an identical file at th
 
 Next, a test with no new build: the same file under a name that sorts the same both ways, such as `zzz_rednode_test.archive` (after every other name, case-sensitive or not).
 
+### HP0: the name test
+
+2026-10-22 at 12:21, on the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.18. `EDGEmatA.archive` version 1 renamed `zzz_rednode_test.archive`, alone in `archive\pc\mod`:
+
+| Time | Swap | Result |
+|---|---|---|
+| 12:21:57 | The identical file | **Passed**, 0 faults |
+| 12:23:55 | Version 2 under the same name (another size) | **Passed**, 0 faults |
+
+The same swaps under the names `EDGEmat_M3.archive` and `EDGEmatA.archive` ended the game every time in this setup. Only the name changed, which supports the lookup lead: RED Hot Tools' `FindArchivePosition` (`lower_bound` with `strcmp`) misses an archive whose name sorts differently case-sensitively and case-insensitively among the other mod archives, so its closed handle is never reopened and the engine's load fails with error 1. Still unverified: the engine's own order of the mod archives (to be checked against the folder's file names).
+
+After that, the player pressed **Reset look** (nothing changed) and then **Re-attach** (`RefreshAttachment`), which crashed the game with a crash report at 12:24:34: an access violation reading address `0x1EC` (a null pointer plus an offset), at `0x7ff7734a0ac4`, about 128 KB below the game exe's start, where hooking libraries put their trampolines, so inside some mod's hook. The dump holds too little of that thread's stack to say whose. A separate crash, on H2's side: refreshing a worn item after a swap. Kept for H2.
+
