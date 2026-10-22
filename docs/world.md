@@ -903,7 +903,7 @@ On the laptop with REDnode 0.26.15, RED Hot Tools, Codeware, Equipment-EX, the T
 **Steps:**
 
 0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
-1. Load a save wearing the trousers (A) in Legs Middle, no menu open. **F10**, switch on **Refresh test**, and type `LegsMiddle` into the slots field. **Mark**.
+1. Load a save wearing the trousers (A) in Legs Middle, no menu open. **F10**, switch on **Refresh test**, and type `OutfitSlots.LegsMiddle` into the slots field (a short name like `LegsMiddle` works only after a **Scan**). **Mark**.
 2. Look down at V's legs. Swap **B**, then press **Off and on**. B? **Mark**.
 3. Swap **A**, then press **Off and on**. A, or still B? **Mark**.
 4. Press **Take off**, wait about 10 seconds, press **Put back**. A? **Mark**.
@@ -943,3 +943,32 @@ Some H2a sessions crashed at their first swap, and the cause is still open. To l
 | 7 | Another garment mod installed (like the Fia leggings) | Conflicts with another mod |
 
 Not every run needs its own session. Runs 1 and 2 go together, and the others are added once those hold. On a crash, send `rednode-faults.log`, `rednode-overlay.log` (or `rednode-overlay.prev.log` if the game was started again), the crashed session's plugin log and RED Hot Tools' log.
+
+### H2a clean archives: test (runs 1 and 2)
+
+Runs 1 and 2 of the crash matrix above, in one session. On the laptop with REDnode 0.26.15 (or 0.26.16), RED Hot Tools, Codeware, Equipment-EX, the Test timer and Refresh test 0.2.3. Game 2.31.
+
+**Before you start, with the game closed:**
+
+- Put **V1** in `archive\pc\mod`. Take out every older test archive of the same garment, including the `EDGEmat_M3` ones RED Hot Tools moved into `archive\pc\mod` in earlier sessions. `archive\pc\hot` empty.
+- Keep V1, V2 and V3 in their own folders, for their full paths.
+- Optional: send the file lists of V1, V2 and V3 first, to check that V1 and V2 match and V3 only adds.
+
+**Steps:**
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
+1. Load a save wearing the garment (V1), no menu open. **F10**, switch on **Refresh test**, and type the slot's **full** name into the slots field: `OutfitSlots.LegsMiddle` for Equipment-EX's Legs Middle (a short name like `LegsMiddle` works only after a **Scan**). **Mark**.
+2. Look at V's legs. Swap **V2**, then press **Off and on**. V2? **Mark**.
+3. Swap **V1**, then press **Off and on**. V1, or still V2? **Mark**.
+4. Swap **V2**, then press **Off and on**. V2? **Mark**.
+5. Swap **V3**, then press **Off and on**. V3? **Mark**.
+6. Swap **V1**, then press **Off and on**. V1, or anything of V3 left? **Mark**.
+7. Only if step 6 kept anything of V3: press **Take off**, wait about 10 seconds, press **Put back**. V1? **Mark**.
+8. Open the inventory: does the preview show the same version as V? Close it. **Mark**.
+9. Quit the game. Send `rednode-mods.log`, the plugin log of this session and the RED Hot Tools log. After a crash, also `rednode-faults.log` and `rednode-overlay.log` (or `rednode-overlay.prev.log` if the game was started again). Take the swapped archive out of `archive\pc\mod` before the next session.
+
+| Step | Answers |
+|---|---|
+| 2, 3 | Same file list both ways. If step 3 shows V1, the one-way result of 0.2.2 came from paths A lacked |
+| 5, 6 | Paths only the old archive has (V3's extra files). Expected to keep something of V3 if the cause holds |
+| Any crash | Which swap, and what it changed |
