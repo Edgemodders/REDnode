@@ -972,3 +972,9 @@ Runs 1 and 2 of the crash matrix above, in one session. On the laptop with REDno
 | 2, 3 | Same file list both ways. If step 3 shows V1, the one-way result of 0.2.2 came from paths A lacked |
 | 5, 6 | Paths only the old archive has (V3's extra files). Expected to keep something of V3 if the cause holds |
 | Any crash | Which swap, and what it changed |
+
+### H2 parked (2026-10-22)
+
+The player ran swaps of two new trouser versions on the laptop (2026-10-22, 10:06 to 10:21, REDnode 0.26.15 with Refresh test 0.2.3). Several sessions crashed. In the first, a swap of `EDGEmatB.archive` took 671 ms, and the next **Re-attach** got no answer from the game within 5 seconds before the session ended. The app also still had trouble finding the trousers' slot. Equipment-EX and an instant wardrobe switcher mod were both installed, and either may play a part (unverified). No fault log was sent.
+
+Parked by the player the same day, to think about the approach before going on. One idea the player raised: go deeper into the game's data structures and build a patch that can stop the game and bring its loaded resources and the GPU's buffers back in step during a swap. Plain archive swaps through `archives.reload` (H1) are not affected. Pick H2 up again from the crash matrix and the clean archives test above.
