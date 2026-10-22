@@ -288,6 +288,19 @@ bool IsTraceMethod(const std::string& aMethod);
 std::string Trace(const std::string& aMethod, const json::Value& aParams, std::string& aError);
 void UpdateTrace(); // game thread, each frame: sends what was recorded, about 10 times a second
 void StopTrace();
+// reflect.cpp, for REDnode's own native code (the ink driver), on the game thread: calls a
+// method on aSelf, or a static function of aClass (a global when aClass is null) when aSelf
+// is empty, converting JSON arguments as rtti.call does. aObject receives a returned object.
+bool CallNative(RED4ext::Handle<RED4ext::IScriptable>& aSelf, const char* aClass, const std::string& aFn,
+                const json::Value& aArgs, RED4ext::Handle<RED4ext::IScriptable>* aObject, std::string& aError);
+json::Value RefArg(const RED4ext::Handle<RED4ext::IScriptable>& aObject); // an object as a call argument
+void DropRefArg(const json::Value& aRef);                                  // and let go of it after
+// ink.cpp: the ink driver (I2a): ink.apply, ink.clear and ink.state, on the game thread.
+bool IsInkMethod(const std::string& aMethod);
+std::string Ink(const std::string& aMethod, const json::Value& aParams, std::string& aError);
+void UpdateInk(uint64_t aFrame); // game thread, each frame: builds again what the game removed
+void InkHostGone();             // any thread: the host left, and its packages' widgets go with it
+void ClearInk();                // game thread: forget every mount (the game is stopping)
 // overlay.cpp
 const RED4ext::v1::Sdk* GetSdk();
 RED4ext::v1::PluginHandle GetHandle();

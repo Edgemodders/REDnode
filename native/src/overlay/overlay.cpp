@@ -95,6 +95,7 @@ void Update(uint64_t aFrame)
     detail::UpdateAudio();
     detail::UpdateFaults();
     detail::UpdateTrace();
+    detail::UpdateInk(aFrame);
 }
 
 uint64_t detail::NowMs()

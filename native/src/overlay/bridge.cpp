@@ -210,7 +210,7 @@ std::string Handle(const std::string& aJson, uint64_t aFrame)
     if (method == "audio.stopEvent")
         return AudioEvent(id, aJson, true);
     if (IsReflectMethod(method) || IsAudioMethod(method) || IsFaultsMethod(method) || IsOpusMethod(method) ||
-        IsTraceMethod(method))
+        IsTraceMethod(method) || IsInkMethod(method))
     {
         json::Value request;
         std::string error;
@@ -223,6 +223,7 @@ std::string Handle(const std::string& aJson, uint64_t aFrame)
                              : IsFaultsMethod(method) ? Faults(method, given, error)
                              : IsOpusMethod(method)   ? Opus(method, given, error)
                              : IsTraceMethod(method)  ? Trace(method, given, error)
+                             : IsInkMethod(method)    ? Ink(method, given, error)
                                                       : Reflect(method, given, error);
         if (!error.empty())
             return Error(id, error.c_str());

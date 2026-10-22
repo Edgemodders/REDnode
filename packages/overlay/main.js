@@ -740,6 +740,7 @@ function endSolo(why) {
 function checkSolo() {
   checkTweaks();
   checkSounds();
+  checkInk();
   if (!soloOwner) return;
   if (!packageRunning(soloOwner)) endSolo('the package stopped');
 }
@@ -1423,6 +1424,12 @@ async function packageCall(id, method, params) {
     return true;
   }
   if (method === 'archives.reload') return reloadArchives({ id }, params);
+  // ink (I2a): a package touches only its own trees; the plugin keeps them per package.
+  if (method === 'ink.apply' || method === 'ink.clear') {
+    if (!id) throw new Error('ink is for packages');
+    if (method === 'ink.apply') inkUsers.add(id);
+    return bridgeCall(method, { ...params, package: id });
+  }
   if (method === 'archives.soundState') return bridgeCall('opus.state', { sounds: Array.isArray(params?.sounds) ? params.sounds : [] });
   if (method === 'tweakdb.set' && id && params?.path) {
     const path = String(params.path);
@@ -2203,6 +2210,22 @@ function stopSounds(id, fadeOut = 300) {
     bridgeCall('audio.stopEvent', { name, on }).catch(() => {});
   }
   if ([...soundOwners.values()].includes(id)) bridgeCall('sound.stop', { owner: id, fadeOut }).catch(() => {});
+}
+
+// ---------- ink (I2a) ----------
+//
+// The plugin keeps each package's ink trees and builds them again after a save load; the
+// host removes them when the package stops (switched off, restarted, hot reloaded, crashed).
+
+const inkUsers = new Set(); // package ids that mounted ink
+
+function clearInk(id) {
+  if (!inkUsers.delete(id) || !connected) return;
+  bridgeCall('ink.clear', { package: id }).catch(() => {});
+}
+
+function checkInk() {
+  for (const id of [...inkUsers]) if (!packageRunning(id)) clearInk(id);
 }
 
 function checkSounds() {
@@ -3478,6 +3501,7 @@ app.whenReady().then(() => {
     stopped: (id) => {
       undoTweaks(id, 'the mod stopped');
       stopSounds(id);
+      clearInk(id);
       if (tracers.delete(id) && !tracers.size) Promise.resolve(stopTrace(`${id} stopped`)).catch(() => {});
     },
     onLog: onModLog,

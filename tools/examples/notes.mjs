@@ -37,6 +37,18 @@ export const NOTES = {
     tryThis: ['Switch on "Game theme" to see the game\'s own look.', 'Add an `rn-tab` of your own with a few controls.'],
     preview: 'The Sound tab plays a tone instead of the game\'s sound events, which only exist in the game.',
   },
+  'ink-coords': {
+    group: 'hud',
+    summary: 'V\'s position on the HUD, drawn by the game itself with the ink API instead of in the overlay. Needs Codeware.',
+    teaches: ['ink.mount', 'ink.column', 'ink.text', 'node.set', 'game.player.position'],
+    how: [
+      '`ink.mount("hud", ...)` puts a tree of the game\'s own widgets on its HUD layer, through Codeware. The game draws it, so it sits under the overlay and hides with the HUD.',
+      'The tree is built once. Each update calls `set` on one text, and only a real change goes to the game: changes made in the same tick go in one call.',
+      'REDnode keeps the tree in the plugin and builds it again after a save load, and removes it when the mod stops, so the mod has nothing to clean up.',
+    ],
+    tryThis: ['Move it to the bottom left: `anchor: "bottom-left", x: 60, y: -200`.', 'Add a dark box behind it with `ink.canvas` and `ink.rect`.'],
+    preview: 'The box stands for the game\'s screen. In the game, Codeware\'s HUD layer is the screen, and the text uses the game\'s Rajdhani font.',
+  },
   coords: {
     group: 'start',
     summary: 'A HUD widget: V\'s coordinates in a strip at the top of the screen, read from a web page with the rednode package.',

@@ -60,6 +60,7 @@ function stop(quiet) {
   for (const w of windows.values()) w.remove();
   windows.clear();
   elements.clear();
+  clearInk(); // the host removes a stopped mod's ink
   host.undoTweaks();
   host.audio.stopAll({ fadeOut: 0 });
   placeholder();
@@ -247,6 +248,10 @@ function onMessage(m) {
     case 'ui-open':
       openWindow(m.win, m.spec);
       break;
+    case 'ink':
+      for (const op of m.ops ?? []) inkOp(op);
+      placeholder();
+      break;
     case 'ui-update': {
       const found = elements.get(m.node);
       if (found) apply(found.type, found.el, m.props ?? {});
@@ -413,10 +418,126 @@ function openWindow(id, spec) {
   placeholder();
 }
 
+// ---------- ink ----------
+// The game draws a mod's ink tree on its own HUD. Here a 16:9 box stands for the screen,
+// in the HUD layer's units scaled to the box (1920 across: unverified against the game's).
+
+const INK_UNITS = 1920;
+const INK_PALETTE = { white: '#ffffff', black: '#000000', red: '#ff6158', cyan: '#5ef6ff', yellow: '#fcee0a', green: '#1fd17a', blue: '#408cff', grey: '#a0a0a0' };
+const INK_ANCHORS = {
+  'top-left': [0, 0], top: [0.5, 0], 'top-right': [1, 0], left: [0, 0.5], center: [0.5, 0.5], right: [1, 0.5],
+  'bottom-left': [0, 1], bottom: [0.5, 1], 'bottom-right': [1, 1], fill: [0, 0],
+};
+const inkMounts = new Map(); // mount key -> { options, el }
+const inkNodes = new Map(); // "mount/key" -> { el, tag, props, parent, mount }
+let inkHud = null;
+
+function inkColor(c) {
+  if (Array.isArray(c)) return `rgba(${c[0]},${c[1]},${c[2]},${(c[3] ?? 255) / 255})`;
+  return INK_PALETTE[String(c).toLowerCase()] ?? String(c);
+}
+
+function inkScale() {
+  return (inkHud?.clientWidth || 640) / INK_UNITS;
+}
+
+function inkStyle(n) {
+  const k = inkScale();
+  const p = n.props;
+  const el = n.el;
+  const parentTag = n.parent ? inkNodes.get(`${n.mount}/${n.parent}`)?.tag : 'canvas';
+  const inPanel = parentTag === 'column' || parentTag === 'row';
+  if (n.tag === 'column' || n.tag === 'row') {
+    el.style.display = 'flex';
+    el.style.flexDirection = n.tag === 'column' ? 'column' : 'row';
+    el.style.alignItems = 'flex-start';
+    el.style.gap = `${(p.gap ?? 0) * k}px`;
+  }
+  if (!inPanel) {
+    const opts = n.parent ? {} : inkMounts.get(n.mount)?.options ?? {};
+    const anchor = p.anchor ?? opts.anchor ?? 'top-left';
+    const [ax, ay] = INK_ANCHORS[anchor] ?? [0, 0];
+    el.style.position = 'absolute';
+    if (anchor === 'fill') Object.assign(el.style, { inset: '0' });
+    else {
+      el.style.left = `${ax * 100}%`;
+      el.style.top = `${ay * 100}%`;
+      el.style.transform = `translate(${-ax * 100}%, ${-ay * 100}%) translate(${(p.x ?? opts.x ?? 0) * k}px, ${(p.y ?? opts.y ?? 0) * k}px)`;
+    }
+  }
+  if (p.width !== undefined) el.style.width = `${p.width * k}px`;
+  if (p.height !== undefined) el.style.height = `${p.height * k}px`;
+  if (p.margin !== undefined) el.style.margin = (Array.isArray(p.margin) ? [p.margin[1], p.margin[2], p.margin[3], p.margin[0]] : [p.margin]).map((v) => `${v * k}px`).join(' ');
+  el.style.opacity = p.opacity ?? 1;
+  el.style.visibility = p.visible === false ? 'hidden' : '';
+  const color = p.color !== undefined ? inkColor(p.color) : n.tag === 'text' ? '#ffffff' : '';
+  if (n.tag === 'text') {
+    el.textContent = p.text ?? '';
+    el.style.color = color;
+    el.style.fontSize = `${(p.size ?? 32) * k}px`;
+    el.style.whiteSpace = 'pre';
+  } else if (n.tag === 'rect' || n.tag === 'circle') {
+    el.style.background = color || '#ffffff';
+    el.style.borderRadius = n.tag === 'circle' ? '50%' : '';
+  } else if (n.tag === 'image') {
+    el.style.border = `1px dashed ${color || '#888'}`;
+    el.title = `${p.atlas ?? ''} ${p.part ?? ''}: atlas images show only in the game`;
+  }
+}
+
+function inkOp(op) {
+  if (op.op === 'mount') {
+    if (!inkHud) {
+      inkHud = document.createElement('div');
+      inkHud.className = 'ink-hud';
+      Object.assign(inkHud.style, {
+        position: 'relative', width: '640px', maxWidth: '100%', aspectRatio: '16 / 9', overflow: 'hidden',
+        background: 'linear-gradient(160deg, #1b2330, #0c0f14)', border: '1px solid #333', fontFamily: 'Rajdhani, sans-serif',
+      });
+      stage.append(inkHud);
+    }
+    const el = document.createElement('div');
+    Object.assign(el.style, { position: 'absolute', inset: '0' });
+    inkHud.append(el);
+    inkMounts.set(op.mount, { options: op.options ?? {}, el });
+    hostLog('info', 'ink: a tree is on the HUD (in the game, Codeware draws it on the HUD layer)');
+    return;
+  }
+  const mount = inkMounts.get(op.mount);
+  if (!mount) return;
+  if (op.op === 'unmount') {
+    mount.el.remove();
+    inkMounts.delete(op.mount);
+    for (const k of [...inkNodes.keys()]) if (k.startsWith(`${op.mount}/`)) inkNodes.delete(k);
+    return;
+  }
+  const id = `${op.mount}/${op.key}`;
+  if (op.op === 'add') {
+    const parent = op.parent ? inkNodes.get(`${op.mount}/${op.parent}`)?.el : mount.el;
+    const el = document.createElement(op.tag === 'text' ? 'span' : 'div');
+    const n = { el, tag: op.tag, props: { ...op.props }, parent: op.parent, mount: op.mount };
+    inkNodes.set(id, n);
+    parent?.append(el);
+    inkStyle(n);
+  } else if (op.op === 'set') {
+    const n = inkNodes.get(id);
+    if (!n) return;
+    Object.assign(n.props, op.props);
+    inkStyle(n);
+  }
+}
+
+function clearInk() {
+  inkHud?.remove();
+  inkHud = null;
+  inkMounts.clear();
+  inkNodes.clear();
+}
+
 // A mod with no window shows where its output goes.
 function placeholder() {
   const empty = document.getElementById('empty');
-  empty.hidden = windows.size > 0;
+  empty.hidden = windows.size > 0 || inkMounts.size > 0;
   const text = !worker
     ? status === 'crashed'
       ? 'The mod stopped after too many crashes. Press Restart.'

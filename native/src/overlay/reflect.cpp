@@ -928,18 +928,20 @@ std::string Call(const Value& aParams, std::string& aError)
     return Invoke(fn, self, *args, aError);
 }
 
-// Converts the arguments, runs the function on the game thread and converts its answer.
-std::string Invoke(CBaseFunction* fn, Handle<IScriptable>& self, const Value& aArgs, std::string& aError)
+// Converts the arguments and runs the function on the game thread. The arguments stay
+// in aSlots (for out parameters) and the answer in aRet. rtti.call and REDnode's own
+// native callers (the ink driver, through CallNative) share it.
+bool Run(CBaseFunction* fn, Handle<IScriptable>& self, const Value& aArgs, std::vector<std::unique_ptr<Slot>>& slots,
+         std::vector<bool>& wanted, std::unique_ptr<Slot>& ret, std::string& aError)
 {
     const Value* args = &aArgs;
     if (!fn->flags.isStatic && !self)
     {
         aError = Str(fn->fullName) + " is a method: call it on an object";
-        return {};
+        return false;
     }
 
-    std::vector<std::unique_ptr<Slot>> slots;
-    std::vector<bool> wanted(fn->params.Size(), false); // parameters asked for with {"$out":true}
+    wanted.assign(fn->params.Size(), false); // parameters asked for with {"$out":true}
     StackArgs_t stack;
     for (uint32_t k = 0; k < fn->params.Size(); ++k)
     {
@@ -956,19 +958,18 @@ std::string Invoke(CBaseFunction* fn, Handle<IScriptable>& self, const Value& aA
             {
                 aError = "argument " + std::to_string(k + 1) + " (" + Str(p->name) + ", " + TypeName(p->type) +
                          "): " + aError;
-                return {};
+                return false;
             }
         }
         else if (p->type->GetType() == Kind::ScriptReference)
         {
             aError = "argument " + std::to_string(k + 1) + " (" + Str(p->name) + ") is a script_ref, not supported yet";
-            return {};
+            return false;
         }
         stack.emplace_back(p->type, slot->mem);
         slots.push_back(std::move(slot));
     }
 
-    std::unique_ptr<Slot> ret;
     if (fn->returnType)
         ret = std::make_unique<Slot>(fn->returnType->type);
 
@@ -987,8 +988,19 @@ std::string Invoke(CBaseFunction* fn, Handle<IScriptable>& self, const Value& aA
         {
             aError = Str(fn->fullName) + " failed";
         }
-        return {};
+        return false;
     }
+    return true;
+}
+
+// Converts the arguments, runs the function on the game thread and converts its answer.
+std::string Invoke(CBaseFunction* fn, Handle<IScriptable>& self, const Value& aArgs, std::string& aError)
+{
+    std::vector<std::unique_ptr<Slot>> slots;
+    std::vector<bool> wanted;
+    std::unique_ptr<Slot> ret;
+    if (!Run(fn, self, aArgs, slots, wanted, ret, aError))
+        return {};
 
     g_keepFresh = true;
     std::string result;
@@ -1409,6 +1421,79 @@ std::string TweakUpdate(const Value& aParams, std::string& aError)
     return RunTweakXL("UpdateRecord", {*path}, aError);
 }
 } // namespace
+
+bool CallNative(Handle<IScriptable>& aSelf, const char* aClass, const std::string& aFn, const json::Value& aArgs,
+                Handle<IScriptable>* aObject, std::string& aError)
+{
+    CBaseFunction* fn = nullptr;
+    if (aSelf)
+    {
+        // The most derived class that has the name wins, as in rtti.call.
+        std::vector<CBaseFunction*> candidates;
+        for (const CClass* c = aSelf->GetType(); c && candidates.empty(); c = c->parent)
+        {
+            for (auto* f : c->funcs)
+            {
+                if (Matches(f, aFn))
+                    candidates.push_back(f);
+            }
+        }
+        if (candidates.empty())
+        {
+            aError = Str(aSelf->GetType()->GetName()) + " has no method \"" + aFn + "\"";
+            return false;
+        }
+        fn = Pick(candidates, aArgs.items.size(), aFn, aError);
+    }
+    else
+    {
+        Value params;
+        params.kind = Value::Kind::Object;
+        if (aClass)
+            params.fields.emplace_back("class", Text(aClass));
+        params.fields.emplace_back("fn", Text(aFn));
+        Handle<IScriptable> none;
+        fn = Resolve(params, none, aArgs.items.size(), aError);
+    }
+    if (!fn)
+        return false;
+
+    std::vector<std::unique_ptr<Slot>> slots;
+    std::vector<bool> wanted;
+    std::unique_ptr<Slot> ret;
+    if (!Run(fn, aSelf, aArgs, slots, wanted, ret, aError))
+        return false;
+    if (aObject)
+    {
+        *aObject = {};
+        if (ret && ret->type->GetType() == Kind::Handle)
+            *aObject = *static_cast<Handle<IScriptable>*>(ret->mem);
+        else if (ret && ret->type->GetType() == Kind::WeakHandle)
+            *aObject = static_cast<WeakHandle<IScriptable>*>(ret->mem)->Lock();
+    }
+    return true;
+}
+
+json::Value RefArg(const Handle<IScriptable>& aObject)
+{
+    Value ref;
+    ref.kind = Value::Kind::Object;
+    Value id;
+    id.kind = Value::Kind::Number;
+    id.number = double(RefFor(aObject));
+    ref.fields.emplace_back("$ref", std::move(id));
+    return ref;
+}
+
+void DropRefArg(const json::Value& aRef)
+{
+    const Value* id = aRef.Get("$ref");
+    if (!id)
+        return;
+    auto it = g_refs.find(uint32_t(id->number));
+    if (it != g_refs.end() && --it->second.count == 0)
+        g_refs.erase(it); // g_refIds is pruned with the rest
+}
 
 bool IsReflectMethod(const std::string& aMethod)
 {

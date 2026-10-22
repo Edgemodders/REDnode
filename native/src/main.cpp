@@ -234,6 +234,7 @@ bool OnRunningExit(RED4ext::CGameApplication* aApp)
     // Let go of the objects Node mods hold while the game and the other plugins are still
     // loaded; at DLL unload some of them are not (0.27.1 crashed at quit).
     rednode::overlay::ClearGameRefs();
+    rednode::overlay::detail::ClearInk();
     return true;
 }
 } // namespace

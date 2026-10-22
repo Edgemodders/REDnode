@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2's plan** ([I2: plan](#i2-plan)) awaits the owner's agreement. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a is built in REDnode 0.28.0** and awaits its in-game test ([I2a test](#i2a-test)). The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -241,7 +241,29 @@ board.unmount(); // or let REDnode clean up when the mod stops
 
 **Not in I2a:** menus as mounts and events (I3), library items and the game's styles (I4), screens (I5), bindings and localization (I2c).
 
-### I2a test (draft)
+### I2a build (REDnode 0.28.0)
 
-Ink Coords on, a save loaded: the coordinates show top right and follow V; a save load brings them back with no action; F10's launcher switching Ink Coords off removes them and on brings them back; a hot reload (editing its file) leaves one copy, not two; photo mode and the pause menu hide them with the HUD (unverified); the plugin's perf line shows the driver's cost per frame.
+Built on 2026-10-22, as planned:
+
+| Part | Where |
+|---|---|
+| The driver: `ink.apply`, `ink.clear`, `ink.state`; the kept trees; a check every 30 frames that each mount is on screen, and a rebuild when it is not and a save is loaded; a mount per package as its own full-size canvas on Codeware's `inkHUDLayer`; every package's mounts removed when the host leaves | `native/src/overlay/ink.cpp` |
+| `CallNative`: the same argument conversion as `rtti.call`, for REDnode's own native code, with the answer kept as a game object rather than a reference (`Invoke` now shares `Run` with it) | `native/src/overlay/reflect.cpp` |
+| `ink` in the package: `mount`, `canvas`, `column`, `row`, `text`, `rect`, `circle`, `image`, `widget`; `set` batches every change of a tick into one `ink.apply`; anchors and `x`/`y` become an anchor, a pivot and a translation; `gap` becomes the children's margins; colors by name, hex or numbers; columns, rows and texts fit their content | `packages/rednode/src/ink.ts` |
+| The host: `ink.apply` and `ink.clear` carry the sender's package; a package's ink is cleared when it stops | `packages/overlay/main.js` |
+| Ink Coords 0.1.0, the sample | `packages/overlay/apps/ink-coords` |
+| The docs simulation draws ink trees in a small HUD box | `docs/assets/examples/sim/worker.js`, `runner.js` |
+
+Checked: the plugin builds and its tests pass; the package builds; Ink Coords' docs preview draws its two lines at the top right of the box and updates them. Not checked anywhere yet: the driver in the game.
+
+### I2a test
+
+On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.28.0 (update zip over 0.27.2), with Codeware.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
+1. Switch off **Ink test**, switch on **Ink Coords** in the launcher. Load a save. Close the overlay: is "REDNODE // WHERE" in red with V's position in cyan under it, at the top right, below the minimap? Walk a few steps: does the position follow? **Mark**.
+2. Open the pause menu, then the hub (inventory), then photo mode, and come back each time: does Ink Coords hide with the HUD in each, and come back? **Mark**.
+3. Load the same save again. Wait a few seconds after the load: are the coordinates back without doing anything? **Mark**.
+4. Open the overlay, switch **Ink Coords** off in the launcher: do they go? Switch it on again: do they come back, once (not twice)? **Mark**.
+5. Quit the game from the menu. Send `rednode-mods.log` and this run's `red4ext/logs/rednode-*.log` (the `Ink:` lines). Did the game quit without a crash report?
 

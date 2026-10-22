@@ -297,6 +297,87 @@ self.addEventListener('message', (e) => {
 
 const instance = Object.freeze({});
 
+// ---------- ink ----------
+// Like the package's ink (I2a): tags make nodes, mount sends the tree, set sends changes,
+// batched per tick. Here the page (runner.js) draws the tree as HTML in a small HUD.
+
+const INK = Symbol('ink');
+let inkKey = 1;
+let inkMountKey = 1;
+let inkOps = [];
+let inkQueued = false;
+function inkSend(op) {
+  inkOps.push(op);
+  if (inkQueued) return;
+  inkQueued = true;
+  queueMicrotask(() => {
+    inkQueued = false;
+    send({ t: 'ink', ops: inkOps.splice(0) });
+  });
+}
+function inkNode(tag, props, children = []) {
+  const s = { key: `k${inkKey++}`, tag, props: { ...props }, children: [], parent: null, mount: null };
+  for (const c of children) {
+    const cs = c?.[INK];
+    if (!cs) throw new Error(`ink: a child of ${tag} is not an ink node`);
+    cs.parent = s;
+    s.children.push(cs);
+  }
+  const node = {
+    key: s.key,
+    tag,
+    get props() {
+      return s.props;
+    },
+    set(next) {
+      Object.assign(s.props, next);
+      if (s.mount?.open) inkSend({ op: 'set', mount: s.mount.key, key: s.key, props: { ...next } });
+    },
+  };
+  Object.defineProperty(node, INK, { value: s });
+  s.node = node;
+  return node;
+}
+function inkAdd(s, m) {
+  s.mount = m;
+  inkSend({ op: 'add', mount: m.key, key: s.key, parent: s.parent?.key ?? '', tag: s.tag, props: { ...s.props } });
+  for (const c of s.children) inkAdd(c, m);
+}
+const inkContainer = (tag, args) =>
+  args.length && !args[0]?.[INK] ? inkNode(tag, args[0], args.slice(1)) : inkNode(tag, {}, args);
+const inkFind = (list, id) => {
+  for (const s of list) {
+    if (s.props.id === id) return s;
+    const f = inkFind(s.children, id);
+    if (f) return f;
+  }
+};
+export const ink = {
+  mount(layer, options = {}, ...children) {
+    if (layer !== 'hud') throw new Error(`ink: no layer "${layer}" yet: use "hud"`);
+    const m = { key: `m${inkMountKey++}`, open: true, roots: children.map((c) => c[INK]) };
+    inkSend({ op: 'mount', mount: m.key, layer, options });
+    for (const s of m.roots) inkAdd(s, m);
+    return {
+      key: m.key,
+      get: (id) => inkFind(m.roots, id)?.node,
+      unmount() {
+        if (!m.open) return;
+        m.open = false;
+        inkSend({ op: 'unmount', mount: m.key });
+      },
+    };
+  },
+  canvas: (...a) => inkContainer('canvas', a),
+  column: (...a) => inkContainer('column', a),
+  row: (...a) => inkContainer('row', a),
+  text: (text, props = {}) => inkNode('text', { ...props, text }),
+  rect: (props = {}) => inkNode('rect', props),
+  circle: (props = {}) => inkNode('circle', props),
+  image: (props = {}) => inkNode('image', props),
+  widget: (cls, props = {}, ...children) => inkNode(cls, props, children),
+};
+
 export const game = {
   instance,
   player: path(['game', 'player']),

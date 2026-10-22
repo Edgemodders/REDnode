@@ -281,6 +281,7 @@ void ReaderLoop()
             CloseAllWindows();
             if (GetMode() == Mode::Interactive)
                 SetMode(Mode::Passive); // give input back to the game
+            InkHostGone(); // the host's packages are gone: so are their ink widgets
             Log("Overlay: host disconnected");
         }
 
