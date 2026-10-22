@@ -1504,6 +1504,58 @@ const HOT_TIMEOUT = 60000;
 const HOT_LOG = 'its log in red4ext/plugins/RedHotTools';
 let hotQueue = Promise.resolve();
 
+// H2b: what V wears shows a swapped archive's version once its appearance is applied again
+// (TransactionSystem.ResetItemAppearance, which keeps the item worn; docs/world.md, "H2
+// resumed"). The clothing slots: the base game's, and Equipment-EX's extra slots (its
+// OutfitConfig, MIT, by psiberx). A slot the game does not have holds nothing, so the list
+// costs nothing without Equipment-EX. Items Equipment-EX hides wear an empty_appearance_*
+// and are left alone, so the refresh never shows them.
+const BASE_CLOTHING_SLOTS = ['Head', 'Eyes', 'Chest', 'Torso', 'Legs', 'Feet', 'Outfit', 'UnderwearTop', 'UnderwearBottom'];
+const EQUIPMENT_EX_SLOTS = [
+  'Head', 'Balaclava', 'Mask', 'Glasses', 'Eyes', 'EyeLeft', 'EyeRight', 'Wreath', 'EarLeft', 'EarRight',
+  'Neckwear', 'NecklaceTight', 'NecklaceShort', 'NecklaceLong', 'TorsoUnder', 'TorsoInner', 'TorsoMiddle',
+  'TorsoOuter', 'TorsoAux', 'Back', 'Waist', 'ShoulderLeft', 'ShoulderRight', 'ElbowLeft', 'ElbowRight',
+  'WristLeft', 'WristRight', 'Hands', 'HandLeft', 'HandRight', 'HandPropLeft', 'HandPropRight', 'FingersLeft',
+  'FingersRight', 'FingernailsLeft', 'FingernailsRight', 'LegsInner', 'LegsMiddle', 'LegsOuter', 'ThighLeft',
+  'ThighRight', 'KneeLeft', 'KneeRight', 'AnkleLeft', 'AnkleRight', 'Feet', 'ToesLeft', 'ToesRight',
+  'ToenailsLeft', 'ToenailsRight', 'BodyUnder', 'BodyInner', 'BodyMiddle', 'BodyOuter',
+];
+const CLOTHING_SLOTS = [
+  ...BASE_CLOTHING_SLOTS.map((n) => `AttachmentSlots.${n}`),
+  ...EQUIPMENT_EX_SLOTS.map((n) => `OutfitSlots.${n}`),
+];
+
+// Applies the appearance of every piece of clothing V wears again. Every game call of a
+// step goes out at once, so the plugin runs them in the same frame: four steps, a few frames.
+async function refreshWorn() {
+  const started = Date.now();
+  const refs = [];
+  const call = async (params) => {
+    const r = await bridgeCall('rtti.call', params);
+    if (r && typeof r.$ref === 'number') refs.push(r.$ref);
+    return r;
+  };
+  const quiet = (p) => p.catch(() => null);
+  try {
+    const v = await call({ fn: 'GetPlayer', args: [{}] });
+    if (!v?.$ref) return { items: [], ms: Date.now() - started };
+    const ts = await call({ class: 'GameInstance', fn: 'GetTransactionSystem', args: [{}] });
+    const self = { $ref: ts.$ref };
+    const held = (await Promise.all(
+      CLOTHING_SLOTS.map((slot) => quiet(call({ self, fn: 'GetItemInSlot', args: [v, slot] })).then((item) => (item?.$ref ? { slot, item } : null))),
+    )).filter(Boolean);
+    const ids = await Promise.all(held.map((w) => quiet(call({ self: { $ref: w.item.$ref }, fn: 'GetItemID', args: [] }))));
+    const looks = await Promise.all(held.map((w, i) => (ids[i] ? quiet(call({ self, fn: 'GetItemAppearance', args: [v, ids[i]] })) : null)));
+    const shown = held
+      .map((w, i) => ({ slot: w.slot, itemID: ids[i], appearance: String(looks[i] ?? '') }))
+      .filter((w) => w.itemID && w.appearance && w.appearance !== 'None' && !w.appearance.startsWith('empty_appearance'));
+    await Promise.all(shown.map((w) => quiet(call({ self, fn: 'ResetItemAppearance', args: [v, w.itemID] }))));
+    return { items: shown.map((w) => ({ slot: w.slot, appearance: w.appearance })), ms: Date.now() - started };
+  } finally {
+    if (refs.length) bridgeCall('rtti.release', { refs }).catch(() => {});
+  }
+}
+
 function reloadArchives(caller, params) {
   const run = hotQueue.then(() => swapArchives(caller, params));
   hotQueue = run.catch(() => {});
@@ -1703,6 +1755,17 @@ async function swapArchives(caller, params) {
     if (soundIndex === 'reloaded') mods?.log(caller.id, 'info', `Archives: ${SOUND_SWAP_NOTE}`);
   }
   const answer = { reloaded, failed, via: 'red-hot-tools', ms };
+  if (reloaded.length && params?.refresh !== false) {
+    try {
+      const r = await refreshWorn();
+      answer.refreshed = r.items;
+      log(`Archives: refreshed ${r.items.length} worn item${r.items.length === 1 ? '' : 's'} in ${r.ms} ms${r.items.length ? `: ${r.items.map((w) => w.slot).join(', ')}` : ''}`);
+      if (caller.id && r.items.length) mods?.log(caller.id, 'info', `Archives: refreshed what V wears (${r.items.map((w) => w.slot).join(', ')})`);
+    } catch (err) {
+      answer.refreshed = [];
+      log(`Archives: no refresh of what V wears (${err.message})`);
+    }
+  }
   if (sound && reloaded.length) {
     answer.sound = soundIndex === 'reloaded'
       ? { index: 'reloaded', note: SOUND_SWAP_NOTE }
@@ -2985,7 +3048,7 @@ function mcpHost() {
     },
     consoleOf: (id) => windowOfApp(id)?.console ?? null,
     call: bridgeCall,
-    reloadArchives: (files) => reloadArchives({ mcp: true }, { files }),
+    reloadArchives: (files, refresh) => reloadArchives({ mcp: true }, { files, refresh }),
   };
 }
 

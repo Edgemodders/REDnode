@@ -1031,3 +1031,31 @@ Same setup as above.
 5. Look at the trousers closely, and from the side: any part that kept the old version (another mesh, a seam, the waistband)? **Mark**.
 6. Quit. Send `rednode-mods.log`, the plugin log and `rednode-faults.log`.
 
+### H2b-0: results
+
+2026-10-22 at 13:41, on the laptop, same setup. **Passed**: six swaps (versions 2, 1, 2, 1, 2, 1), each followed by **Reset look** (`ResetItemAppearance`, 16 to 17 ms in the game), and each time the player's note says the new version showed, with the trousers worn throughout. No crash, 0 faults.
+
+### H2b: what V wears refreshes after a swap (REDnode 0.26.20)
+
+Built on 2026-10-22. After a swap that took, `archives.reload` applies the appearance of every piece of clothing V wears again, so it shows the new version without being taken off.
+
+| Part | What |
+|---|---|
+| Slots | The base game's clothing slots (`AttachmentSlots.Head`, `Eyes`, `Chest`, `Torso`, `Legs`, `Feet`, `Outfit`, `UnderwearTop`, `UnderwearBottom`) and Equipment-EX's 54 extra slots (`OutfitSlots.*`, the names from its `OutfitConfig.OutfitSlots()`, MIT). Equipment-EX is not needed: a slot the game does not have holds nothing |
+| Calls | `GetItemInSlot` for every slot, then `GetItemID`, `GetItemAppearance`, and `ResetItemAppearance` for each item found, each step sent at once so the plugin runs it in one frame. Items wearing an `empty_appearance_*` (the base items Equipment-EX hides) are left alone, so the refresh never shows them |
+| API | `archives.reload(files, { refresh })`, default `true`; the answer's `refreshed` lists each item's slot and appearance. The MCP tool `archives_reload` takes `refresh` too. The host log and the Mod log say what was refreshed |
+| Mock game | A probe package swapped an archive with V wearing a jacket (`AttachmentSlots.Torso`), trousers in `OutfitSlots.LegsMiddle` and a hidden base `Legs` item: the jacket and trousers were reset, the hidden item was not, in 12 to 21 ms; with `{ refresh: false }` nothing was reset |
+
+### H2b: test
+
+On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.20 (update zip over 0.26.19), RED Hot Tools 1.3.0+edgemodders.1, Equipment-EX. V wearing the trousers and some other clothing.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
+1. Version 1 installed, load the save. **F10**, **Refresh test**. **Mark**.
+2. Swap **version 2**, and press **nothing else**. Do the trousers show version 2 by themselves now? **Mark**.
+3. Swap **version 1**. Version 1? **Mark**.
+4. Swap version 2, then version 1 once more. **Mark**.
+5. Look at V's other clothing: did anything else change, flicker, or did an item Equipment-EX hides show up? **Mark**.
+6. Open the inventory: does the preview match V? Close it. **Mark**.
+7. Quit. Send `rednode-mods.log` (it lists "refreshed what V wears (...)" after each swap), `rednode-overlay.log` and `rednode-faults.log`.
+

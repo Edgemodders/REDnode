@@ -888,8 +888,8 @@ export const kernel = {
 const MOD_ARCHIVES = ['Plain.archive', 'MyJacket.archive'];
 let swapping = Promise.resolve();
 export const archives = {
-  reload(files) {
-    const run = swapping.then(() => swapArchives(files));
+  reload(files, options = {}) {
+    const run = swapping.then(() => swapArchives(files, options));
     swapping = run.catch(() => {});
     return run;
   },
@@ -902,7 +902,7 @@ export const archives = {
     return { infoHash: '0x0', infoPathOk: true, indexes: [{ sounds: 41000, second: 900, bytes: 823600, at: '0x7f000000', checksum: '0x9e3779b97f4a7c15' }], paks, held: 57, sounds: found, summary };
   },
 };
-async function swapArchives(files) {
+async function swapArchives(files, options = {}) {
   const list = typeof files === 'string' ? [files] : files;
   if (!Array.isArray(list) || !list.length) throw new Error('archives.reload needs a file, or a list of files');
   await pageManifest();
@@ -918,7 +918,9 @@ async function swapArchives(files) {
   const ms = 280 + Math.round(Math.random() * 60);
   await new Promise((resolve) => setTimeout(resolve, ms));
   log('info', `archives.reload: the docs page pretends to swap ${list.join(', ')}; in the game RED Hot Tools swaps them in. The page's archive/pc/mod holds ${MOD_ARCHIVES.join(' and ')}`, 'sim');
-  return { reloaded: list.map(String), failed: [], via: 'red-hot-tools', ms };
+  const answer = { reloaded: list.map(String), failed: [], via: 'red-hot-tools', ms };
+  if (options.refresh !== false) answer.refreshed = [{ slot: 'AttachmentSlots.Torso', appearance: 'default' }];
+  return answer;
 }
 
 export const pkg = {

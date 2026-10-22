@@ -40,6 +40,22 @@ export interface ReloadResult {
    * it again (for a weapon, equip it again).
    */
   sound?: { index: "reloaded" | "failed" | "not reloaded"; note: string };
+  /**
+   * The clothing V wears whose appearance was applied again after the swap, so it shows the
+   * new version: each item's attachment slot (such as `"AttachmentSlots.Legs"`, or
+   * Equipment-EX's `"OutfitSlots.LegsMiddle"`) and appearance. Absent with `refresh: false`.
+   */
+  refreshed?: { slot: string; appearance: string }[];
+}
+
+/** Options for {@link archives.reload}. */
+export interface ReloadOptions {
+  /**
+   * After the swap, apply the appearance of the clothing V wears again, so it shows the
+   * swapped version without being taken off (REDnode 0.26.20 or later). Base-game slots and
+   * Equipment-EX's slots; items Equipment-EX hides stay hidden. Default `true`.
+   */
+  refresh?: boolean;
 }
 
 /**
@@ -127,6 +143,10 @@ export const archives = {
    * answer says how it went. A sound that played just before the swap may keep its old
    * version until the game loads it again (for a weapon, equip it again).
    *
+   * Then the clothing V wears applies its appearance again, so it shows the new version
+   * while staying worn (`refreshed` in the answer lists it; `{ refresh: false }` skips it).
+   * Other things already in the world keep the old version until they load it again.
+   *
    * Throws when the package lacks the `archives` permission, at the main menu, when
    * RED Hot Tools is not loaded, or when a file is missing; also for a sound archive on a
    * game version whose sound tables REDnode does not know (install it and restart
@@ -137,12 +157,12 @@ export const archives = {
    * import { archives } from "rednode";
    *
    * const r = await archives.reload(["C:/Projects/MyJacket/packed/archive/pc/mod/MyJacket.archive"]);
-   * console.log(`${r.reloaded.length} swapped in ${r.ms} ms`, r.failed);
+   * console.log(`${r.reloaded.length} swapped in ${r.ms} ms`, r.failed, r.refreshed);
    * ```
    */
-  async reload(files: string | string[]): Promise<ReloadResult> {
+  async reload(files: string | string[], options: ReloadOptions = {}): Promise<ReloadResult> {
     try {
-      return (await transport().call("archives.reload", { files })) as ReloadResult;
+      return (await transport().call("archives.reload", { files, refresh: options.refresh })) as ReloadResult;
     } catch (err) {
       throw cleanError(err);
     }

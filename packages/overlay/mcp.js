@@ -408,20 +408,22 @@ function createMcp(host) {
           'Swaps archives into the running game, so a changed mesh, material or texture is used without a restart. ' +
           'Each file is a full path to an .archive (or an ArchiveXL .xl or .yaml), which replaces the mounted archive ' +
           'of the same name or is added to archive/pc/mod, or the name of an archive already in archive/pc/mod, ' +
-          'reloaded as it is. Needs RED Hot Tools in the game and a loaded save. Objects already in the world keep ' +
+          'reloaded as it is. Needs RED Hot Tools in the game and a loaded save. Afterwards the clothing V wears applies its ' +
+          'appearance again, so it shows the new version (refresh: false skips it). Other objects already in the world keep ' +
           'the old asset until they load it again (respawn, or re-apply the appearance). An archive with the game\'s sound paks ' +
           '(.opuspak, .opusinfo) is swapped with the game paused and its sound index loaded again; a sound that just played ' +
           'may keep its old version until the game loads it again (for a weapon, equip it again). A broken archive can crash the game. ' +
           'The player is asked before every call.',
         inputSchema: {
           files: z.array(z.string()).min(1).describe('Full paths, or names of archives in archive/pc/mod'),
+          refresh: z.boolean().optional().describe('Apply the appearance of what V wears again after the swap. Default true'),
         },
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
         _meta: ASK_FIRST,
       },
-      async ({ files }) => {
+      async ({ files, refresh }) => {
         try {
-          return text(await host.reloadArchives(files));
+          return text(await host.reloadArchives(files, refresh));
         } catch (err) {
           return fail(err.message);
         }
