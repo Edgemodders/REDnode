@@ -1059,3 +1059,14 @@ On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.20 (update zip over 0.26.19
 6. Open the inventory: does the preview match V? Close it. **Mark**.
 7. Quit. Send `rednode-mods.log` (it lists "refreshed what V wears (...)" after each swap), `rednode-overlay.log` and `rednode-faults.log`.
 
+### H2b: results
+
+2026-10-22 at 13:56, on the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.20, RED Hot Tools 1.3.0+edgemodders.1, Equipment-EX. **Passed**: four swaps (versions 2, 1, 2, 1) with **no button pressed after them**, and each time the player's note says the trousers showed the new version. Step 5: "Everything looks normal"; step 6: the inventory matches. No crash, 0 faults.
+
+| Swap | Refreshed | Time |
+|---|---|---|
+| 13:58:11 | 5 items, all in Equipment-EX's slots: `OutfitSlots.Head`, `Wreath`, `TorsoInner`, `LegsMiddle`, `Feet` | 348 ms |
+| 13:58:41, 13:59:11, 13:59:31 | 9 items: the same 5, and the base `AttachmentSlots.Head`, `Eyes`, `Chest`, `Feet` | 335 to 338 ms |
+
+Found: before the first refresh, the base items Equipment-EX hides wore `empty_appearance_default`, so they were skipped; afterwards they read their own appearances, so the next refreshes reset them too. Nothing hidden showed up (the player's step 5), but resetting items Equipment-EX hides is a risk (the H2a run of 2026-10-21 saw a Reset look give hidden items back their looks). A refinement to decide: when V wears anything in Equipment-EX's slots, leave the base clothing slots out of the refresh. The refresh takes about 340 ms in the game against 12 to 21 ms in the mock game: four steps, each waiting for the game thread's next frames.
+
