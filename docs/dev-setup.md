@@ -229,3 +229,17 @@ With the packaged host deployed, the plugin starts it with the game, so `npm run
 The host clears `ELECTRON_RUN_AS_NODE` before starting Electron, because VS Code sets it for processes it starts and it turns Electron into plain Node.
 
 CI skips the Electron download with `ELECTRON_SKIP_BINARY_DOWNLOAD=1`, because the docs build does not need it.
+
+## 11. RED Hot Tools, built locally
+
+Set up on 2026-10-22 to test a fix in RED Hot Tools (MIT) before reporting it (docs/hot-swap-research.md, "HP0: a fix in RED Hot Tools"). Not needed for REDnode's own build.
+
+| Step | How |
+|---|---|
+| xmake | `scoop install xmake` (3.1.2) |
+| Source | `git -c url."https://github.com/".insteadOf="git@github.com:" clone --recurse-submodules https://github.com/psiberx/cp2077-red-hot-tools.git` beside the other repos (`E:\Modding\Cyberpunk 2077\cp2077-red-hot-tools`); the submodules use SSH URLs, hence the rewrite. Branch `fix/archive-lookup` holds the local commits |
+| PATH | On the dev PC, the user PATH has a stray `"` (after `gs10.03.1`), which breaks `vcvarsall.bat`, so xmake finds no Visual Studio. In the PowerShell that builds: `$env:PATH = ($env:PATH -replace '"', '')`. REDnode's CMake build does not use `vcvarsall.bat` and is not affected |
+| Packages | xmake's own `curl` (and Windows' `curl.exe`) cannot reach GitHub from this machine's sessions, while Git's `curl` can. Download the sources with Git Bash's `curl` into a folder and point xmake at it: `xmake g --pkg_searchdirs=<folder> --policies=package.precompiled:n`. Files: `fmt-12.2.0.zip`, `spdlog-v1.17.0.zip`, `hopscotch-map-v2.4.0.zip`, `minhook-v1.3.4.tar.gz`, `mimalloc-v2.2.4.zip`, `tiltedcore-v0.2.9.zip` (URLs in each package's `xmake.lua` under `%LOCALAPPDATA%\.xmake\repositories\xmake-repo\packages`) |
+| Build fixes | `v1.3.0-rc.3` does not build as published: `src/Red/Addresses/Library.hpp` lacks `EngineConfig_GetInstance` (3182170505) and `EngineConfigStore_GetVar` (3758823966), taken from psiberx's PhotoModeEx; and TiltedCore needs mimalloc 2.x (`add_requireconfs("tiltedcore.mimalloc", {version = "v2.2.4", override = true})` in `xmake.lua`) |
+| Build | `xmake f -c -p windows -a x64 -m release -y`, then `xmake -y`. Output: `build\windows\x64\release\RedHotTools.dll` |
+

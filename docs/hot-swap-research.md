@@ -268,3 +268,25 @@ Still open: why the `EDGEmat_M3` swaps of 2026-10-21 passed in the main folder (
 
 RED Hot Tools' current source (1.3.0-rc.3, 2026-10-20) still uses this lookup, and its issues have no report of it (checked 2026-10-22). The fix there is small: find the archive by comparing paths one by one (or case-insensitively, as the engine orders them), for both the reopen and the insert.
 
+### HP0: a fix in RED Hot Tools
+
+Agreed with the player on 2026-10-22: fix RED Hot Tools locally and test the fix in the game before reporting it upstream. Built from `v1.3.0-rc.3` (the current release) with xmake, as in [dev setup](dev-setup.md), section 11, in a clone beside the other repos, branch `fix/archive-lookup`:
+
+| Commit | What |
+|---|---|
+| Build fixes | Two missing address entries, and mimalloc 2.x for TiltedCore: the published source does not build without them |
+| The fix | `FindArchivePosition` first looks for the archive's exact path in the group, then falls back to the binary search (only used for where a new archive goes). So the mounted archive is found whatever the game's order, its handle is reopened, and a replace writes over its entry instead of inserting a second one |
+
+The unchanged rc.3 build is kept in the scratchpad as a control. The fixed DLL went to the laptop as `RedHotTools-1.3.0-rc.3-lookupfix.zip`.
+
+### HP0: the fix's test
+
+On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.18, the fixed `RedHotTools.dll` in place of the installed one (backed up first).
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. With the game closed: back up `red4ext\plugins\RedHotTools\RedHotTools.dll`, then put the fixed one in its place. Put `EDGEmatA.archive` version 1 in `archive\pc\mod` (the uppercase name that failed), take out `zzz_rednode_test.archive`, empty `archive\pc\hot`. Start the game once, load the save. **Mark**.
+2. In **Refresh test**, swap `EDGEmatA.archive` version 1 itself (the identical file). **Mark** if the game is still running.
+3. Swap `EDGEmatA.archive` version 2. **Mark**.
+4. Swap version 1 again. **Mark**.
+5. Quit. Send `rednode-faults.log`, the plugin log and the RED Hot Tools log.
+
