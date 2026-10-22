@@ -252,3 +252,19 @@ The same swaps under the names `EDGEmat_M3.archive` and `EDGEmatA.archive` ended
 
 After that, the player pressed **Reset look** (nothing changed) and then **Re-attach** (`RefreshAttachment`), which crashed the game with a crash report at 12:24:34: an access violation reading address `0x1EC` (a null pointer plus an offset), at `0x7ff7734a0ac4`, about 128 KB below the game exe's start, where hooking libraries put their trampolines, so inside some mod's hook. The dump holds too little of that thread's stack to say whose. A separate crash, on H2's side: refreshing a worn item after a swap. Kept for H2.
 
+### HP0: the lookup, simulated
+
+The laptop's `archive\pc\mod` in `Cyberpunk 2077 - Copy` (2026-10-22): `###_nim_material_override`, `basegame_hud_minimap_scanner_tweak`, `clothing_Fia_00Leggings`, `EquipmentEx`, `instant_wardrobe`, `LimitedHUD`, `SkippySkippy` (`.archive`), plus `.xl` files and `modlist.txt`. RED Hot Tools' `FindArchivePosition` simulated over that list with each test archive added (a scratchpad script):
+
+| Archive | Engine keeps the list case-insensitively | Engine keeps it case-sensitively |
+|---|---|---|
+| `EDGEmat_M3.archive` | **missed** (lands on `basegame_hud_...`) | found |
+| `EDGEmatA.archive` | **missed** (lands on `basegame_hud_...`) | found |
+| `zzz_rednode_test.archive` | found | found |
+
+With a case-insensitive order (Windows' own), the simulation matches every result of the day: both `EDGEmat` names fail, `zzz_rednode_test` passes. In `strcmp`, every uppercase letter sorts before every lowercase one, so `EDGEmat...` belongs before `basegame...`; in Windows' order it sits after `clothing_...`. `lower_bound` therefore stops on the wrong entry, RED Hot Tools does not reopen the closed handle, and the engine's load fails with error 1.
+
+Still open: why the `EDGEmat_M3` swaps of 2026-10-21 passed in the main folder (the folder's other archives, or `modlist.txt`, may have differed then), and the engine's exact order rule (case-insensitive is inferred, not read from the exe).
+
+RED Hot Tools' current source (1.3.0-rc.3, 2026-10-20) still uses this lookup, and its issues have no report of it (checked 2026-10-22). The fix there is small: find the archive by comparing paths one by one (or case-insensitively, as the engine orders them), for both the reopen and the insert.
+
