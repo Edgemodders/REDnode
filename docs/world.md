@@ -1086,3 +1086,17 @@ On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.21 (update zip over 0.26.20
 3. Look at V's clothing: anything Equipment-EX hides showing, or anything else changed? **Mark**.
 4. Quit. Send `rednode-mods.log`: each "refreshed what V wears (...)" line should list only `OutfitSlots.*` slots.
 
+### H2b refinement: results
+
+2026-10-22 at 15:31, on the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.21, RED Hot Tools 1.3.0+edgemodders.1, Equipment-EX. **Passed.** Before the run the player also put a pair of shorts in the base game's Legs slot, under Equipment-EX's trousers, as a visible check.
+
+| Swap | Refreshed | Whole swap |
+|---|---|---|
+| 15:33:52, version 2 | 5 items, all in Equipment-EX's slots: `OutfitSlots.Head`, `Wreath`, `TorsoInner`, `LegsMiddle`, `Feet` | 893 ms |
+| 15:34:24, version 1 | the same 5 | 459 ms |
+| 15:34:37, version 2 | the same 5 | 460 ms |
+
+No base `AttachmentSlots.*` item was refreshed in any swap (0.26.20 reset `Head`, `Eyes`, `Chest` and `Feet` from its second swap on). The player: each version showed, the shorts in the base Legs slot never showed through, and everything looked normal. No crash. The first swap of a session takes longer (893 ms against about 460 ms after it).
+
+H2 stops here, as decided with the owner on 2026-10-22: H2c (things in the world: NPCs, props, synchronized with EDGEbuilder) comes after the ink API.
+
