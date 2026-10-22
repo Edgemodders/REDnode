@@ -167,3 +167,25 @@ On the laptop, in the `Cyberpunk 2077 - Copy` folder, one copy of the game, REDn
 2. In **Refresh test**, swap the base look `EDGEmat_M3.archive`. **Mark** if the game is still running.
 3. Send `rednode-faults.log`, the plugin log of the session (its line "Faults: exit hooks attached" matters), the RED Hot Tools log, and any new dump in `%LOCALAPPDATA%\CrashDumps`.
 
+### HP0: the game ends itself (0.26.17 run)
+
+2026-10-22 at 11:42, on the laptop, the `Cyberpunk 2077 - Copy` folder, one copy of the game, REDnode 0.26.17, the control swap (`EDGEmat_M3.archive`, the leather look installed at start, the base look swapped in). The exit hooks attached, and the fault log has the answer:
+
+```
+11:42:27.636 watch for 15 s: swap of EDGEmat_M3.archive (the game thread is 29036)
+11:42:27.681 the game is being ended by TerminateProcess, status 0x00000001, on thread 29036 (the game thread)
+  stack: REDnode.dll (the hook) <- KERNELBASE.dll <- Cyberpunk2077.exe+0x29cea69 <- Cyberpunk2077.exe+0x7bbc29
+         <- RedHotTools.dll+0x50e5a <- +0x552d0 <- +0x64ec9 <- Cyberpunk2077.exe (the script call) <- ... <- REDnode.dll (the swap call)
+```
+
+A static reading of the 2.31 exe (the helpers stay in the scratchpad):
+
+| Address | What it is |
+|---|---|
+| `+0x29cea50` | The engine's fatal quit: a 30-byte function that calls through a function pointer, here `TerminateProcess(1)`. No crash report, no exit handlers |
+| `+0x7bba48` | The resource depot's archive load (`resourceGameDepot.cpp`), called by RED Hot Tools' `LoadModArchives` through `ResourceDepot::LoadArchives`. Each failure is a fatal assert: "Could not open archive %hs for async reading of contents", "Failed to create the archive %hs", "Could not open archive %hs for reading", "Failed to load archive %hs, error %u, try regenerating archives!", "LoadEntireArchiveIntoMemory failed: %hs" |
+| `+0x7bbc24` | The call that ended the game sits in the branch of **"Failed to load archive %hs, error %u, try regenerating archives!"** (assert `result == archive::LoadingResult::SUCCESSFUL`, line 0x26C) |
+| `+0x7bcf9c` | The check that returned the error. It reads the first 4 KB through the archive's reader and fails when: the reader's size is under 4 KB; the magic is not `RDAR`; the version is not 11 or 12 (20 takes another path); **the header's file size (+0x20) differs from the reader's size**; the index runs past the file's end; the index offset or the file size is not a multiple of 4 KB; then checks on the index itself |
+
+So the swapped archive failed the engine's own checks at the moment of the swap, and the engine quits on purpose. The same files load fine at start (HP0 test), so the engine read something at the swap that does not match the file on disk. A lead to test (unverified): the size check compares the archive's header with the size its reader reports; if the reader is a reopened handle (RED Hot Tools reopens the old archive's handle before the load) that still reports the old file's size, two versions of different sizes fail and two of the same size pass.
+
