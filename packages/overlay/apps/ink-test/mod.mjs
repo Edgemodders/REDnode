@@ -181,21 +181,30 @@ async function menuButton() {
 async function speed() {
   const target = added.find((a) => a.label.startsWith('text'))?.widget;
   if (!target) throw new Error('Press HUD text first: Speed changes that text');
+  // Each line is logged as it is measured, so a failure later keeps the earlier numbers.
   const lines = [];
+  const note = (line) => {
+    lines.push(line);
+    say(`  ${line}`);
+  };
   let t = performance.now();
   await target.SetText('speed 1', null);
-  lines.push(`1 change: ${(performance.now() - t).toFixed(1)} ms`);
+  note(`1 change: ${(performance.now() - t).toFixed(1)} ms`);
   t = performance.now();
   for (let i = 0; i < 50; i++) await target.SetText(`in a row ${i}`, null);
   const row = performance.now() - t;
-  lines.push(`50 in a row: ${row.toFixed(0)} ms, ${(row / 50).toFixed(1)} ms each`);
-  for (const n of [200, 600]) {
+  note(`50 in a row: ${row.toFixed(0)} ms, ${(row / 50).toFixed(1)} ms each`);
+  // The plugin runs up to 256 calls a frame and carries the rest to the next frames.
+  for (const n of [200, 600, 2000]) {
     t = performance.now();
-    await Promise.all(Array.from({ length: n }, (_, i) => target.SetText(`at once ${i}`, null)));
-    lines.push(`${n} at once: ${(performance.now() - t).toFixed(0)} ms`);
+    const answers = await Promise.allSettled(Array.from({ length: n }, (_, i) => target.SetText(`at once ${i}`, null)));
+    const failed = answers.filter((a) => a.status === 'rejected');
+    note(
+      `${n} at once: ${(performance.now() - t).toFixed(0)} ms` +
+        (failed.length ? `, ${failed.length} failed (${failed[0].reason?.message})` : ''),
+    );
   }
   await target.SetText('REDnode ink', null);
-  for (const l of lines) say(`  ${l}`);
   return lines.join('; ');
 }
 
@@ -211,7 +220,7 @@ async function check() {
     }),
   );
   for (const l of lines) say(`  ${l}`);
-  return `${lines.filter((l) => l.includes('exists')).length} of ${added.length} exist`;
+  return `${lines.filter((l) => l.includes(': exists')).length} of ${added.length} exist`;
 }
 
 async function openScreen() {
@@ -284,16 +293,20 @@ async function readScreen() {
         return { n, children };
       }),
     );
-    for (const { n, children } of read) {
-      count++;
-      if (!children) continue;
-      const kids = await Promise.all(Array.from({ length: children }, (_, i) => n.w.GetWidgetByIndex(i).catch(() => null)));
-      for (const k of kids.filter(Boolean)) {
+    count += read.length;
+    // Every child of the level at once: one widget at a time took 16.6 s for 359 (0.1.0).
+    const kids = await Promise.all(
+      read.map(({ n, children }) =>
+        Promise.all(Array.from({ length: children ?? 0 }, (_, i) => n.w.GetWidgetByIndex(i).catch(() => null))),
+      ),
+    );
+    read.forEach(({ n }, i) => {
+      for (const k of kids[i].filter(Boolean)) {
         const kid = { w: k, depth: n.depth + 1, kids: [] };
         n.kids.push(kid);
         next.push(kid);
       }
-    }
+    });
     level = next;
   }
   const ms = performance.now() - started;

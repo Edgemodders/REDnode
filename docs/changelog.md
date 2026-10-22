@@ -25,6 +25,8 @@ How to keep it:
 
 **Fixed**
 
+- Sending many game calls at once (more than 256 in one frame) no longer leaves the extra ones unanswered until they time out after 5 seconds: the plugin runs 256 a frame and carries the rest to the next frames, and refuses past 4096 waiting with a message.
+- The game no longer crashes when quitting after a Node mod held objects made by another plugin, such as Codeware's: REDnode lets go of every object it holds when the game stops, while the other plugins are still loaded.
 - `api.$new` with properties on a class written in redscript no longer breaks the object it makes (and crashes the game at its next use): script fields are now set where the game keeps them, as `$get` and `$set` already did.
 - `archives.reload` and the MCP tool `archives_reload` refuse, with a message, a swap that the official RED Hot Tools would get wrong and end the game with: replacing an archive in a mod folder with both upper- and lowercase names. The [Edgemodders build of RED Hot Tools](https://github.com/CyberbuildsAI/cp2077-red-hot-tools/releases) fixes it, and with it REDnode swaps as before.
 

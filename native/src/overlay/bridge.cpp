@@ -27,9 +27,12 @@
 #include <RED4ext/Scripting/Natives/ScriptGameInstance.hpp>
 #include <RED4ext/Scripting/Natives/Vector4.hpp>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
+#include <iterator>
 #include <mutex>
 
 namespace rednode::overlay::detail
@@ -37,7 +40,14 @@ namespace rednode::overlay::detail
 namespace
 {
 std::mutex g_requestMutex;
-std::vector<std::string> g_requests;
+std::deque<std::string> g_requests;
+
+// Calls waiting for the game thread. A frame runs at most PerFrame of them, so a burst (a
+// mod sending hundreds at once) spreads over a few frames; past MaxWaiting a call is
+// refused at once. Until 0.27.2 calls past 256 were dropped, and each timed out after
+// 5 s (I1's Speed test).
+constexpr size_t PerFrame = 256;
+constexpr size_t MaxWaiting = 4096;
 
 // Minimal field readers. Requests come from our own host, one flat object each.
 bool ReadInt(const std::string& aJson, const char* aKey, long long& aOut)
@@ -224,9 +234,17 @@ std::string Handle(const std::string& aJson, uint64_t aFrame)
 
 void QueueRequest(std::string aJson)
 {
-    std::scoped_lock lock(g_requestMutex);
-    if (g_requests.size() < 256)
-        g_requests.push_back(std::move(aJson));
+    {
+        std::scoped_lock lock(g_requestMutex);
+        if (g_requests.size() < MaxWaiting)
+        {
+            g_requests.push_back(std::move(aJson));
+            return;
+        }
+    }
+    long long id = 0;
+    if (ReadInt(aJson, "id", id))
+        SendJson(Error(id, "the game has 4096 calls waiting: send fewer at once"));
 }
 
 void RunRequests(uint64_t aFrame)
@@ -234,7 +252,9 @@ void RunRequests(uint64_t aFrame)
     std::vector<std::string> requests;
     {
         std::scoped_lock lock(g_requestMutex);
-        requests.swap(g_requests);
+        const auto last = g_requests.begin() + std::ptrdiff_t(std::min(PerFrame, g_requests.size()));
+        requests.assign(std::make_move_iterator(g_requests.begin()), std::make_move_iterator(last));
+        g_requests.erase(g_requests.begin(), last);
     }
     if (requests.empty())
         return;

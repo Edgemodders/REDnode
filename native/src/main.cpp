@@ -231,6 +231,9 @@ bool OnRunningExit(RED4ext::CGameApplication* aApp)
     RED4EXT_UNUSED_PARAMETER(aApp);
 
     g_sdk->logger->InfoF(g_handle, "Game thread pump stopped after %llu frames", g_frames);
+    // Let go of the objects Node mods hold while the game and the other plugins are still
+    // loaded; at DLL unload some of them are not (0.27.1 crashed at quit).
+    rednode::overlay::ClearGameRefs();
     return true;
 }
 } // namespace

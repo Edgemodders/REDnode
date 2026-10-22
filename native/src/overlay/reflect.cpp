@@ -104,7 +104,11 @@ struct Ref
     uint32_t count = 0;
     Handle<IScriptable> owned; // set for objects made by rtti.new: nothing else holds them yet
 };
-std::unordered_map<uint32_t, Ref> g_refs;
+// Never destroyed: the DLL's static destructors run at quit, after the game and other
+// plugins (Codeware, whose objects Node mods hold too) have gone, and dropping a handle
+// then called into unloaded code (0.27.1, at quit). The game's Running state clears it
+// while everything is still loaded (ClearGameRefs in OnRunningExit).
+std::unordered_map<uint32_t, Ref>& g_refs = *new std::unordered_map<uint32_t, Ref>();
 std::unordered_map<IScriptable*, uint32_t> g_refIds;
 uint32_t g_nextRef = 1;
 // Set while a call's answer is converted: objects nothing else holds are kept (see Invoke).

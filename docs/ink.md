@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 spike built on 2026-10-22**. Its first run (0.27.0) crashed at step 5 ([results](#i1-test-first-run-0270)); REDnode 0.27.1 fixes the cause and awaits the retest ([I1 test](#i1-test)). The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 spike built on 2026-10-22**. Its first run (0.27.0) crashed at step 5 ([results](#i1-test-first-run-0270)); the second (0.27.1) answered most questions and crashed at quit ([results](#i1-test-second-run-0271)). REDnode 0.27.2 fixes what they found and awaits the third run ([I1 test](#i1-test)). The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -84,20 +84,18 @@ Checked: the scripts compile with redscript-cli (v1.0.0-preview.22) against the 
 
 ## I1 test
 
-On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.27.1 (update zip over 0.27.0 or 0.26.21), with Codeware. Each button writes its answer to the Ink test's window and the Mod log.
+On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.27.2 (update zip over 0.27.1), Ink test 0.1.1, with Codeware. Each button writes its answer to the Ink test's window and the Mod log.
 
 0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
-1. Switch on **Ink test** in the launcher (it asks for the bridge permission: allow it). Load a save. **F10**, press **Roots**. **Mark**.
-2. Press **HUD text**. Close the overlay (**F10**): is a dark box with "REDnode ink" on screen, and where? **Mark**.
-3. Open the overlay, type `cw.inkHUDLayer` in the root field, press **HUD text** again. Close the overlay: where is the second one? **Mark**.
-4. Open the overlay, press **Speed**, then **Check**. **Mark**.
-5. Press **Esc** for the pause menu. Open the overlay, type `menu.pause` in the root field, press **Roots**, then **Menu button**. Close the overlay: is a red "Ink button" in the pause menu? Hover it and click it with the game's cursor. **Mark**.
-6. Leave the pause menu. Open the overlay, press **Check**: what still exists? **Mark**.
+1. Make sure **Ink test** is switched on in the launcher. Load a save. **F10**, press **Roots**. **Mark**.
+2. Type `cw.inkHUDLayer` in the root field and press **HUD text**. Close the overlay (**F10**): is a dark box with "REDnode ink" in the upper left? **Mark**.
+3. Open the overlay, press **Speed** and wait for its line in the log (a few seconds), then press **Check**. **Mark**.
+4. Press **Esc** for the pause menu. Open the overlay, type `menu.pause` in the root field, press **Roots**, then **Menu button** (not HUD text). Close the overlay: is a red "Ink button 3" in the pause menu? Hover it, then click it with the game's cursor. **Mark**.
+5. Open the overlay: does the log show "ink hoverOver", "ink press" and "ink release" lines? **Mark**.
+6. Leave the pause menu. Open the overlay, press **Check**. **Mark**.
 7. Type `new_perks` in the screen field and press **Open screen**: does the perks screen open? **Mark**.
-8. With the perks screen open, open the overlay, type `menu.hub` in the root field and press **Read screen**. **Mark**.
-9. Press **Menu entries**. **Mark**.
-10. Leave the perks screen. Load the same save again (a save load), then open the overlay and press **Check**, then **Roots**. **Mark**.
-11. Press **Clean up**. Quit. Send `rednode-mods.log`, and the dump file Read screen named (in the app's data folder; it stays on your PC, it is game data).
+8. With the perks screen open, open the overlay, type `cw.inkMenuLayer` in the root field and press **Read screen**. Wait for its line, then type `menu.hub` and press **Read screen** again. **Mark**.
+9. Leave the perks screen and close the hub. Quit the game from the menu. Send `rednode-mods.log`, `red4ext/logs/rednode-*.log` of this run, and the two dump files Read screen named (they stay on your PC otherwise: they are game data). Does the game quit without a crash report?
 
 ## I1 test: first run (0.27.0)
 
@@ -114,4 +112,31 @@ The crash report: an access violation in `REDnode.dll+0x2fd30`, reading `0x7FF70
 Fixed in REDnode 0.27.1: `rtti.new` finds each property through `GetValuePtr`, as `rtti.get` and `rtti.set` do, for every class; structs keep their plain offsets.
 
 Step 2's empty screen is unverified. A likely reason: the health bar's root fades out of combat with the rest of the health bar, and widgets added into it fade with it. The retest's Roots line shows each root's size and visibility.
+
+## I1 test: second run (0.27.1)
+
+2026-10-22 at 16:48 to 16:55, on the laptop, REDnode 0.27.1, Ink test 0.1.0, with Codeware. Steps 1 to 10 ran; at step 5 **HUD text** was pressed rather than **Menu button**, so clicks are still untested. The game crashed when the player quit.
+
+| # | Question | Answer |
+|---|---|---|
+| 1 | HUD root without Codeware | The script's hooks work: `hud.healthbar`, `hud.minimap` and `hud.quests` were kept at every load. None suits a mod. `hud.healthbar`'s root is an 8x8 `inkVerticalPanelWidget`, **hidden** out of combat, which is why step 2 showed nothing in both runs. `hud.minimap` (450x450) and `hud.quests` (680x210) are visible but are their own corners of the screen. A full-screen HUD root without Codeware needs another hook (open) |
+| 2 | HUD root with Codeware | Works. `cw.inkHUDLayer` is an `inkVirtualWindow` of 2560x1440; the text and box showed in its upper left. Codeware lists 13 layers |
+| 3 | Root in a menu | `menu.pause` is a full-screen canvas (3840x2160, 17 children). The text and box showed in the pause menu's upper left. `menu.hub` was kept while the hub was open |
+| 4 | Building | `AddChild` takes the script names `inkText` and `inkRectangle`. A rectangle and a text, about 12 calls one after another, took 290 to 400 ms: about one frame per call |
+| 5 | Events | Not tested (Menu button not pressed) |
+| 6 | Speed | Failed: "The game did not answer within 5 seconds". The plugin dropped every call past 256 waiting in one frame, so the 600 at once never got answers. Fixed in 0.27.2 (below) |
+| 7 | Lifetime | Widgets on a menu's root die with the menu (gone once the pause menu closed). A save load rebuilds the HUD: `cw.inkHUDLayer` went from 3 children back to 1, so the driver must build its trees again after each load |
+| 8 | Opening a game screen | Works: `StartHubMenuEvent` with `new_perks` opened the perks screen |
+| 9 | Menu entries | Read through REDbridge and Codeware. `base\gameplay\gui\fullscreen\menu.inkmenu`: 57 entries (`pause_menu`, `hub_menu`, `inventory_screen`, `new_perks`, `world_map`, `wardrobe` and the rest) and 22 scenarios (`MenuScenario_HubMenu`, `MenuScenario_PauseMenu` and the rest). `main_menu\pregame_menu.inkmenu`: 30 entries, 17 scenarios. `ui_game.inklayers` names the menu layer's resource by hash. Adding an entry stays for I5 |
+| 10 | Reading a live screen | `menu.hub`: 359 widgets in 16.6 s. The hub's root holds the hub's own frame (the tab buttons, level, street cred, weight, money, the time panel), not the perks screen, which is a menu of its own. 0.1.0 fetched each widget's children one widget at a time; 0.1.1 fetches a whole level at once. About 60 widgets read nothing (empty name, no size), unverified why. Names, sizes, visibility, controller counts and texts read well, including localized text and a format string (`{VALUE,time,short}`) |
+
+**The crash at quit.** The crash report: an access violation in `REDnode.dll+0x243cc`, a handle's destructor calling the object's `CanBeDestructed` through its vtable, which pointed into memory no longer loaded. REDnode's table of the objects Node mods hold is a global, so its destructor ran when the DLL unloaded, after the other plugins had gone. The objects held then included Codeware's (the resource token and layer objects from Menu entries and Roots), whose code was already unloaded. Fixed in 0.27.2: the table is cleared when the game's Running state ends, while everything is loaded, and is never destroyed at unload.
+
+**Fixed in REDnode 0.27.2:**
+
+| Fix | Where |
+|---|---|
+| The bridge keeps up to 4096 waiting calls and runs 256 a frame, carrying the rest to the next frames; past 4096 a call is refused at once with a message. Before, calls past 256 were dropped and each timed out after 5 s | `native/src/overlay/bridge.cpp` |
+| The references Node mods hold are let go when the game's Running state ends, and the table is never destroyed at DLL unload | `native/src/main.cpp`, `native/src/overlay/reflect.cpp` |
+| Ink test 0.1.1: Check counts only what exists (it said "6 of 6 exist" when none did); Speed logs each line as it goes and adds 2000 at once; Read screen fetches a whole level at once | `packages/overlay/apps/ink-test` |
 
