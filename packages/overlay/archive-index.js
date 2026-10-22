@@ -83,4 +83,32 @@ function soundPaksIn(file) {
   return found.sort();
 }
 
-module.exports = { pathHash, archiveHashes, soundPaksIn };
+// RED Hot Tools' archive lookup (docs/hot-swap-research.md, "HP0"). Before it loads a
+// replaced archive, RED Hot Tools reopens the old one's file handle, but only if
+// FindArchivePosition finds it, with std::lower_bound and strcmp. The game keeps the mod
+// archives in a case-insensitive order, so in a folder with both upper- and lowercase names
+// the search can miss an archive (EDGEmatA.archive among basegame_*.archive): the handle stays
+// closed and the game quits ("Failed to load archive ..., error 1"). Fixed in the Edgemodders
+// build. Whether the game folds case up or down is not known, so both orders are tried: true
+// when either would make the search miss. Only for an archive replacing one in the folder.
+function hotToolsLookupMisses(names, name) {
+  const archives = names.filter((n) => n.toLowerCase().endsWith('.archive'));
+  if (!archives.includes(name)) return false; // a new archive: nothing to reopen
+  const byte = (a, b) => (a < b ? -1 : a > b ? 1 : 0); // strcmp on ASCII names
+  for (const fold of [(s) => s.toLowerCase(), (s) => s.toUpperCase()]) {
+    const order = [...archives].sort((a, b) => byte(fold(a), fold(b)) || byte(a, b));
+    let first = 0;
+    let count = order.length;
+    while (count > 0) {
+      const step = count >> 1;
+      if (byte(order[first + step], name) < 0) {
+        first += step + 1;
+        count -= step + 1;
+      } else count = step;
+    }
+    if (order[first] !== name) return true;
+  }
+  return false;
+}
+
+module.exports = { pathHash, archiveHashes, soundPaksIn, hotToolsLookupMisses };

@@ -30,7 +30,7 @@ const { scanGame, checkRequires, validRange } = require('./gamefiles');
 const { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED } = require('./redbridge');
 const bridgeInstall = require('./bridge-install');
 const { createLookup } = require('./gameapi-lookup');
-const { soundPaksIn } = require('./archive-index');
+const { soundPaksIn, hotToolsLookupMisses } = require('./archive-index');
 const { gameSoundWav, eventSounds, soundIndex: gameSoundIndex } = require('./game-sounds');
 const crypto = require('node:crypto');
 
@@ -1560,6 +1560,27 @@ async function swapArchives(caller, params) {
       'RED Hot Tools is not loaded in the game, and it does the swap: install it from ' +
         `https://github.com/psiberx/cp2077-red-hot-tools/releases and restart the game (${err.message})`,
     );
+  }
+
+  // RED Hot Tools before the Edgemodders build can miss a replaced archive and end the game.
+  if (!String(version).includes('+edgemodders') && settings.hotToolsLookupCheck !== 'off') {
+    const modDir = path.join(GAME_DIR, 'archive', 'pc', 'mod');
+    let names = [];
+    try {
+      names = fs.readdirSync(modDir);
+    } catch {
+      // no mod folder: every archive is new
+    }
+    for (const f of files) {
+      if (path.extname(f.name).toLowerCase() !== '.archive' || !hotToolsLookupMisses(names, f.name)) continue;
+      log(`Archives: refused ${f.name}: RED Hot Tools ${version} would miss it among the mod archives`);
+      throw new Error(
+        `${f.name} was not swapped: RED Hot Tools ${version} cannot find it among the other archives in archive/pc/mod ` +
+          '(a known bug: it searches names case-sensitively, the game sorts them case-insensitively), and the swap would end the game. ' +
+          'Install the Edgemodders build of RED Hot Tools, which fixes it: ' +
+          'https://github.com/CyberbuildsAI/cp2077-red-hot-tools/releases',
+      );
+    }
   }
 
   const soundMode = ['refuse', 'try', 'reload'].includes(settings.soundPakSwap) ? settings.soundPakSwap : 'reload';

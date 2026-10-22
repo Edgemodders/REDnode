@@ -22,6 +22,10 @@ How to keep it:
 
 - Claude Code now asks you before every call of the MCP tools `api_call` and `archives_reload`, in every permission mode, auto mode included. Reads go through the new `api_read`, which never asks.
 
+**Fixed**
+
+- `archives.reload` and the MCP tool `archives_reload` refuse, with a message, a swap that the official RED Hot Tools would get wrong and end the game with: replacing an archive in a mod folder with both upper- and lowercase names. The [Edgemodders build of RED Hot Tools](https://github.com/CyberbuildsAI/cp2077-red-hot-tools/releases) fixes it, and with it REDnode swaps as before.
+
 **Other**
 
 - During an archive swap, `red4ext/logs/rednode-faults.log` now also names whatever ends the game (TerminateProcess, ExitProcess or a fail-fast), with its status, its stack and the game engine's last error message, for crashes that leave no crash report.

@@ -309,3 +309,25 @@ So the swap crashes of 2026-10-22 came from RED Hot Tools' archive lookup, and f
 | REDnode | Until a fixed RED Hot Tools is released, players with an archive named like this will lose their game on a swap. REDnode can run the same lookup before each swap and refuse with a clear message when it would miss (proposed) |
 | H2 | Swaps of uppercase-named archives work with the fix, so H2's refresh tests can go on with the fixed DLL on the laptop |
 
+### The Edgemodders build of RED Hot Tools, and REDnode's guard
+
+Agreed with the owner on 2026-10-22: fork RED Hot Tools to the owner's account, ship the fixed build to players for now (further fixes and changes are expected), and offer the fix upstream.
+
+| Part | What |
+|---|---|
+| Fork | [CyberbuildsAI/cp2077-red-hot-tools](https://github.com/CyberbuildsAI/cp2077-red-hot-tools), default branch `edgemodders`: upstream `v1.3.0-rc.3`, the build fixes, the lookup fix, the version `1.3.0+edgemodders.1` (`RedHotTools.Version()` and the CET overlay; a `BUILD_TAG` config value appended to the version), `EDGEMODDERS.md` and `tools/dist/package-edgemodders.ps1`. Local clone: `../cp2077-red-hot-tools` (remote `fork`; pushes go through `gh auth git-credential`, since the credential manager waits for a login window) |
+| Player zip | `RedHotTools-1.3.0+edgemodders.1.zip`: the same 22 files and paths as psiberx's official zip, so extracting it over an existing RED Hot Tools replaces it (never a second copy), plus `LICENSE.txt` (MIT) and `EDGEMODDERS.md` in `red4ext/plugins/RedHotTools`. Released on the fork once it passes in game |
+| Upstream | [psiberx/cp2077-red-hot-tools#20](https://github.com/psiberx/cp2077-red-hot-tools/pull/20), the lookup fix alone, from branch `pr/archive-lookup` |
+| REDnode 0.26.19 | Before a swap, unless RED Hot Tools reports `+edgemodders`, the host runs RED Hot Tools' lookup over `archive/pc/mod` (`hotToolsLookupMisses` in `archive-index.js`, in both case-folding orders, since the game's exact rule is inferred) and refuses a replace it would miss, with a link to the Edgemodders build. One folder listing per swap, about 8 microseconds of work, no new files. `"hotToolsLookupCheck": "off"` in the host's settings turns it off. In the laptop's folder it flags `EDGEmatA`, `EDGEmat_M3`, and also `EquipmentEx` and `basegame_hud_...`: any archive can be missed in a folder with mixed case |
+
+### The Edgemodders build and the guard: test
+
+On the laptop, `Cyberpunk 2077 - Copy`, game 2.31, REDnode 0.26.19 (update zip over 0.26.18).
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. With the game closed: put the **official** `RedHotTools.dll` back (the backup). `EDGEmatA.archive` version 1 in `archive\pc\mod`. Start the game once, load the save. **Mark**.
+2. In **Refresh test**, swap `EDGEmatA.archive` version 1. It should be **refused** with a message naming RED Hot Tools, and the game should keep running. **Mark**.
+3. Quit. Extract `RedHotTools-1.3.0+edgemodders.1.zip` into the game folder (it replaces the official files). Start the game, load the save. In CET's overlay, RED Hot Tools should show **Plugin Version: 1.3.0+edgemodders.1**. **Mark**.
+4. Swap `EDGEmatA.archive` version 2, then version 1. Both should swap. **Mark**.
+5. Quit. Send `rednode-mods.log`, `rednode-overlay.log`, the plugin log and the RED Hot Tools log.
+
