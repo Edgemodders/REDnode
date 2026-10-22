@@ -550,7 +550,7 @@ bounties.<span class="t">on</span>(<span class="s">"back"</span>, () =&gt; bount
 
   <h3>Open questions</h3>
   <ul>
-    <li>Root: REDnode's own script hook on a HUD or menu controller (base game only), or Codeware's ink system (a <code>requires</code> for <code>ink</code>)? I1 decides.</li>
+    <li>Root: decided on 2026-10-22 after I1: Codeware's ink layers, so the <code>ink</code> API requires Codeware. REDnode's own hooks gave no full-screen HUD root (<a href="ink.html#i1-what-it-decides">I1 results</a>).</li>
     <li>Cursor in gameplay: the HUD layer has no cursor. Options: interactive ink only in menus; the game's cursor shown during <b>Using</b> mode; or REDnode hit-testing its own ink widgets with its cursor.</li>
     <li>Game library paths can change with a patch. Keep them in one table behind the tags, and check them against the game's files with REDbridge.</li>
     <li>Should redscript mods be able to find REDnode's ink widgets by name, to place themselves beside them?</li>

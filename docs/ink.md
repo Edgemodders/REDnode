@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). I2's plan is next, to agree with the owner. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2's plan** ([I2: plan](#i2-plan)) awaits the owner's agreement. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -168,4 +168,65 @@ The decisions the plan left to I1, with what the runs showed. The recommendation
 | Screens | `StartHubMenuEvent` opens a game screen by its menu name. The game's menu list (`menu.inkmenu`, 57 entries, 22 scenarios) is readable through REDbridge and Codeware | `ink.screens.open(name)` with the 57 names; adding `rednode_screen` stays for I5 |
 | Dump source | A whole open screen reads in about 2 s (4138 widgets), with names, classes, sizes, visibility, controller counts and texts | Feasible. A first version with I2's tags; the read itself moves into the plugin's driver (one call for a whole tree) |
 | Class names | `AddChild` takes the script names (`inkText`, `inkRectangle`) | The tags map to them in one table |
+
+## I2: plan
+
+Decided by the owner on 2026-10-22, after I1: **the `ink` API requires Codeware** ("a foundational mod that most people have already"). A package that uses `ink` lists it in `requires`, and `ink` calls fail with a message naming Codeware when it is missing.
+
+The design's I2 row is large: the driver, the primitives, layout and theme words, bindings, data-driven trees and localization. Proposed: three steps, each with its own in-game test, so the driver is proven before anything is built on it.
+
+| Step | What | Sample |
+|---|---|---|
+| **I2a Driver** | The ink driver in the plugin and the first `ink` API: mount a tree on the HUD, change it, remove it, rebuilt after a save load, cleaned up when the package stops | **Ink Coords**, an ink version of Coords HUD |
+| **I2b Layout and look** | The layout words (`row`, `column`, `gap`, `pad`, `align`, sizes such as `fill`), theme words (`style`, `tone`, the game's palette by name), images (atlas parts, TweakDB icons), fonts | A small HUD panel in the game's style |
+| **I2c Data** | `bind` (game values the plugin reads each frame, no round trip), trees from data (`update(tree)` diffs and sends only what changed), `LocKey#` text and `t()` with package locale files (L1 of [Localization](localization.md)) | A list built from data, in two languages |
+
+### I2a Driver
+
+**In the plugin** (`native/src/overlay/ink.cpp`):
+
+| Part | What it does |
+|---|---|
+| One bridge call for a batch | `ink.apply {package, ops}`: each op creates a widget (`{op:"add", id, parent, tag, props}`), changes one (`set`), or removes one (`remove`). The whole batch runs on the game thread in the frame it arrives, with no round trip per property. I1 measured one call per change at a frame each |
+| The kept tree | Per package and mount: each widget's id, tag, parent and current properties, and a weak handle to the live widget |
+| Mounts | `hud` only in I2a: a full-size canvas of REDnode's own (`rednode:<package>:<mount>`) under Codeware's `inkHUDLayer` window, so a package's widgets live in one place and leave together |
+| Rebuild | Each frame, a cheap check that each mount's canvas is alive. When it is not (a save load, a HUD rebuild) and the HUD layer is back, the driver builds the kept tree again. No help from Node |
+| Cleanup | `ink.clear {package}` removes its mounts; the host sends it when a package stops or reloads |
+| Tags to ink | One table: `canvas` to `inkCanvas`, `column` to `inkVerticalPanel`, `row` to `inkHorizontalPanel`, `text` to `inkText`, `rect` to `inkRectangle`, `image` to `inkImage`, `circle` to `inkCircle`, `border` to `inkBorder`; a property to its setter (`text` to `SetText`, `color` to `SetTintColor` and so on), through the plugin's existing call machinery |
+| Limits | A cap on widgets per package (proposed 2000) and on ops per frame, with a message past them |
+
+**In the `rednode` package** (`packages/rednode/src/ink.ts`), the same style as the `ui` builder, so modders learn one way:
+
+```js
+import { game, ink } from 'rednode';
+
+const where = ink.text('', { size: 28, color: 'cyan' });
+const board = ink.mount('hud', { anchor: 'top-right', x: -40, y: 120 },
+  ink.column({ gap: 4 }, ink.text('REDnode', { size: 20 }), where));
+
+setInterval(async () => {
+  const p = await game.player.position();
+  where.set({ text: `${p.x.toFixed(1)}  ${p.y.toFixed(1)}  ${p.z.toFixed(1)}` });
+}, 250);
+
+board.unmount(); // or let REDnode clean up when the mod stops
+```
+
+| Piece | What it is |
+|---|---|
+| Tags | `ink.canvas`, `ink.column`, `ink.row`, `ink.text`, `ink.rect`, `ink.image` (an atlas path and part), `ink.circle`, `ink.border`, and `ink.widget(className, props)` as the escape hatch |
+| Props in I2a | `id`, `x`, `y`, `width`, `height`, `anchor` (`top-left` to `bottom-right`, `center`, `fill`), `margin`, `color` (`#rrggbb`, `[r, g, b]` or a palette name), `opacity`, `visible`, and per tag `text`, `size`, `font`. More in I2b |
+| Nodes | Each tag returns a node; `node.set(props)` sends only the props given, batched with every other change in the same tick into one `ink.apply` |
+| Mounts | `ink.mount(layer, options, ...children)` returns a mount with `unmount()` and `get(id)` |
+| Hot reload | A package that reloads starts clean: the host clears its old mounts first |
+
+**In the host**: `ink.apply` passes through with the sender's package id (a package can only touch its own widgets); `ink.clear` when a package stops; a missing Codeware answers with a message.
+
+**The docs simulation** draws ink trees as plain HTML in the examples, so Ink Coords gets a live preview like the other samples.
+
+**Not in I2a:** menus as mounts and events (I3), library items and the game's styles (I4), screens (I5), bindings and localization (I2c).
+
+### I2a test (draft)
+
+Ink Coords on, a save loaded: the coordinates show top right and follow V; a save load brings them back with no action; F10's launcher switching Ink Coords off removes them and on brings them back; a hot reload (editing its file) leaves one copy, not two; photo mode and the pause menu hide them with the HUD (unverified); the plugin's perf line shows the driver's cost per frame.
 
