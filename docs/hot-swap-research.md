@@ -327,7 +327,7 @@ On the laptop, `Cyberpunk 2077 - Copy`, game 2.31, REDnode 0.26.19 (update zip o
 0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
 1. With the game closed: put the **official** `RedHotTools.dll` back (the backup). `EDGEmatA.archive` version 1 in `archive\pc\mod`. Start the game once, load the save. **Mark**.
 2. In **Refresh test**, swap `EDGEmatA.archive` version 1. It should be **refused** with a message naming RED Hot Tools, and the game should keep running. **Mark**.
-3. Quit. Extract `RedHotTools-1.3.0+edgemodders.1.zip` into the game folder (it replaces the official files). Start the game, load the save. In CET's overlay, RED Hot Tools should show **Plugin Version: 1.3.0+edgemodders.1**. **Mark**.
+3. Quit. Extract `RedHotTools-1.3.0+edgemodders.1.zip` into the game folder (it replaces the official files). Start the game, load the save. Optional: in CET's overlay, a RED Hot Tools window (Hot Reload, World Inspector or Ink Inspector) has a **⋯** button at its top right; **About** there shows **Plugin Version: 1.3.0+edgemodders.1**. The host log also names the version at each swap ("RED Hot Tools 1.3.0+edgemodders.1"). **Mark**.
 4. Swap `EDGEmatA.archive` version 2, then version 1. Both should swap. **Mark**.
 5. Quit. Send `rednode-mods.log`, `rednode-overlay.log`, the plugin log and the RED Hot Tools log.
 
