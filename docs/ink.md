@@ -181,6 +181,21 @@ The design's I2 row is large: the driver, the primitives, layout and theme words
 | **I2b Layout and look** | The layout words (`row`, `column`, `gap`, `pad`, `align`, sizes such as `fill`), theme words (`style`, `tone`, the game's palette by name), images (atlas parts, TweakDB icons), fonts | A small HUD panel in the game's style |
 | **I2c Data** | `bind` (game values the plugin reads each frame, no round trip), trees from data (`update(tree)` diffs and sends only what changed), `LocKey#` text and `t()` with package locale files (L1 of [Localization](localization.md)) | A list built from data, in two languages |
 
+Agreed by the owner on 2026-10-22: build I2a.
+
+### The game look (owner, 2026-10-22)
+
+Proposed by the owner with I2a's go-ahead: modders can build any ink they like (a button with a border or without, any font and size), but they should not have to work out how to make a button look like the game's own (the red ones with angular borders, their hover glow and sounds). REDnode gives a clear marker that means "look like the game", and the piece then looks and behaves like the game's.
+
+| Kind of tag | Default | The marker |
+|---|---|---|
+| Ready pieces: `button`, `toggle`, `slider`, `panel`, `tabs`, `dialog`, `tooltip`, `progress`, `keyhint`, `list` | **The game's look**: the game's own library items where one exists (spawned from its `.inkwidget` libraries, with their controllers, states, animations and sounds), otherwise a REDnode composite drawn to match | `look: "plain"` gives a bare one to style by hand |
+| Primitives: `text`, `rect`, `image`, `border`, the containers | Plain | `look: "game"` applies the game's font, colors and sizes for that tag; `style` picks one of the game's text styles (`title`, `label`, `value`, `small`) and `tone` one of its palette roles (`normal`, `accent`, `danger`, `dim`) |
+
+So `ink.button("Track", onClick)` is a game button with no styling written, and `ink.button("Track", onClick, { look: "plain", color: "#ffffff" })` is the modder's own. The same names work in overlay windows: the UI kit (`packages/ui`) gets a matching game look for its HTML elements (`rn-button` and the rest, through a `look="game"` attribute and a `game` theme), so an HTML app and an ink screen can look the same. Which library items the game has, and their paths, come from I1's Read screen and REDbridge, kept in one table behind the tags (the design's open question about paths changing with a patch).
+
+When: the theme words and `look: "game"` on primitives in I2b; the game's library items and the ready pieces in I4 (the design's "Game look" phase); the UI kit's game look beside I4. Unverified until then: whether every piece has a library item that spawns cleanly outside its own screen.
+
 ### I2a Driver
 
 **In the plugin** (`native/src/overlay/ink.cpp`):
