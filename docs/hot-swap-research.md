@@ -331,3 +331,14 @@ On the laptop, `Cyberpunk 2077 - Copy`, game 2.31, REDnode 0.26.19 (update zip o
 4. Swap `EDGEmatA.archive` version 2, then version 1. Both should swap. **Mark**.
 5. Quit. Send `rednode-mods.log`, `rednode-overlay.log`, the plugin log and the RED Hot Tools log.
 
+### The Edgemodders build and the guard: results
+
+2026-10-22, on the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.19. **Passed.**
+
+| Session | RED Hot Tools | Result |
+|---|---|---|
+| 13:09 | Official 1.3.0 | The swap of `EDGEmatA.archive` was **refused**: "EDGEmatA.archive was not swapped: RED Hot Tools 1.3.0 cannot find it among the other archives in archive/pc/mod (...), and the swap would end the game. Install the Edgemodders build ...". The game kept running (Mark 2 at 13:11:19) |
+| 13:12 | `1.3.0+edgemodders.1`, the player zip extracted over the official files | The host log names it ("RED Hot Tools 1.3.0+edgemodders.1"), so the guard did not run; the swap of version 2 completed in 74 ms, 0 faults, clean quit. One swap rather than two; the same fix had passed four at 12:49 |
+
+The release followed the same day: [RED Hot Tools 1.3.0+edgemodders.1](https://github.com/CyberbuildsAI/cp2077-red-hot-tools/releases/tag/v1.3.0%2Bedgemodders.1) on the fork, with the player zip.
+
