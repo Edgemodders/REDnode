@@ -107,3 +107,30 @@ A crash here, with no swap, points at the archive's content. No crash points bac
 ### HP0 test: results
 
 2026-10-22, on the laptop. The player loaded a save with each of the two new trouser versions installed normally, one at a time, with no swap. **Both worked**, with no crash. So the archives' content is fine, and a crash with them would come from the swap. Next in HP0: swap runs with only one copy of the game open (the clean archives test in [World API](world.md), "H2a clean archives: test (runs 1 and 2)").
+
+### HP0: a swap crash with one copy of the game
+
+2026-10-22 at 11:02, on the laptop after a reboot, one copy of the game (a copy of the 2.31 install, `Cyberpunk 2077 - Copy`), REDnode 0.26.16, Refresh test 0.2.3. The clean archives test, step 2: the first swap, of `EDGEmatA.archive`, in gameplay. An earlier try at 10:23 crashed at the same step, and its fault watch line is the same.
+
+| Time | Log | What happened |
+|---|---|---|
+| 11:02:55.240 | Plugin | The press on **Swap** |
+| 11:02:55.528 | Plugin, `rednode-faults.log` | The fault watch starts for the swap (the game thread is 44124) |
+| 11:02:55.567 | RED Hot Tools, thread 44124 | `Archives reload requested...`, `Found archives: EDGEmatA.archive` |
+| 11:02:55.569 | RED Hot Tools | `Unloading game archives...`, `Moving updated archives...` |
+| 11:02:55.571 | RED Hot Tools | `Loading updated archives...`, its **last line** |
+| 11:02:55 | Host | `The game has exited.` |
+
+What it shows:
+
+- The game died **inside RED Hot Tools' load of the new archive**, the step that calls the game's own `ResourceDepot::LoadArchives` on the game thread. It is the same place as the H0 crash (2026-10-18), the first H2a crash (2026-10-21) and H1c-2's first run.
+- **Nothing caught it**: no fault reached REDnode's handler, the game's crash reporter wrote nothing, and the game did not call its own exit. That is the mark of a fail-fast (Windows ends the process at once on heap corruption or a failed security check, code `0xC0000409` or `0xC0000374`) or of a process ended from outside. Unverified which.
+- It is not memory: the game ran at 43 fps for a minute before, and a lack of memory fails through the game's own reporter.
+
+Open, to settle next:
+
+| Question | How |
+|---|---|
+| Was the swap an **add** or a **replace**? The two versions may have different archive names (`EDGEmatA.archive`, `EDGEmatB.archive`). RED Hot Tools replaces an archive of the same name in place, and **inserts** a new one into the depot's list. Earlier passing swaps (H1, SP4) replaced an archive of the same name | The player checks the names of both versions and which was installed |
+| What the fail-fast is and where | Windows error reporting's own dumps (`LocalDumps` for `Cyberpunk2077.exe`, set by the player), which catch a fail-fast; Event Viewer's Application log (events 1000 and 1001) for the exception code and module |
+
