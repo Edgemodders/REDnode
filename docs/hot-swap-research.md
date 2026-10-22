@@ -134,3 +134,17 @@ Open, to settle next:
 | Was the swap an **add** or a **replace**? RED Hot Tools replaces an archive of the same name in place, and **inserts** a new one into the depot's list | The player (2026-10-22): the first crash that morning was an add (the versions were named `EDGEmatA.archive` and `EDGEmatB.archive`, both in `archive/pc/mod`); for the 11:02 run both were renamed `EDGEmatA.archive`, so it was a **replace**. `EDGEmatB.archive` was no longer in `archive/pc/mod` at 11:02 (the player), so it was a clean replace. Nine replaces of the older `EDGEmat_M3.archive` passed on 2026-10-21. Next: one session in today's setup that replaces `EDGEmat_M3` first, then the new archive, to tell the setup from the archive |
 | What the fail-fast is and where | Windows error reporting's own dumps (`LocalDumps` for `Cyberpunk2077.exe`, set by the player), which catch a fail-fast; Event Viewer's Application log (events 1000 and 1001) for the exception code and module |
 
+### HP0: the control run
+
+2026-10-22 at 11:23, on the laptop, one copy of the game, REDagent off. Yesterday's `EDGEmat_M3.archive` (the leather look installed, the base look swapped in), which passed nine replaces on 2026-10-21, **crashed at the first swap**, the same way: the fault watch started at 11:23:34.710, and the plugin log ends there. So the new archives are not the cause; something in the setup changed.
+
+| | 2026-10-21, 18:38 (passed) | 2026-10-22, 11:23 (crashed) |
+|---|---|---|
+| Game folder | `...\steamapps\common\Cyberpunk 2077` | `...\steamapps\common\Cyberpunk 2077 - Copy` |
+| REDnode | 0.26.15 | 0.26.16 (no change on the swap path) |
+| Archive | `EDGEmat_M3.archive` | the same |
+
+The game folder is the clear difference: every crash of the morning ran in the copy. How a copied folder could make the archive load die is not known (another mix of mods or plugin versions in the copy, or something in it that was not copied, are guesses). Next: the same swap in the main folder, and the two sessions' RED4ext logs compared.
+
+A Windows dump of the 10:09 GPU crash (`Cyberpunk2077.exe.42248.dmp`, from Windows error reporting) has a real stack: only the game's own code, the render side's check that found the device removed. No mod's module is on it.
+
