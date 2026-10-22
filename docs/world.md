@@ -1100,3 +1100,20 @@ No base `AttachmentSlots.*` item was refreshed in any swap (0.26.20 reset `Head`
 
 H2 stops here, as decided with the owner on 2026-10-22: H2c (things in the world: NPCs, props, synchronized with EDGEbuilder) comes after the ink API.
 
+### H2b limit: the inventory preview keeps the old look (parked)
+
+Found by the player on 2026-10-22 with REDnode 0.26.21: a swap made **while the inventory screen was open** did not crash and V showed the new trousers, but the inventory's preview of V kept the old ones, also after leaving the inventory and opening it again. Unequipping and equipping them again in the inventory showed the new version. Parked with the owner the same day, to come back to with H2c.
+
+Why (from the game API dump; the persistence is unverified): the preview is a second character, not V. `gameuiInventoryPuppetPreviewGameController` (script name `inkInventoryPuppetPreviewGameController`) holds it, `GetGamePuppet()` returns it (a whandle), and the game gives it copies of V's items through `TransactionSystem.GivePreviewItemByItemID`. The refresh resets only V's items. The preview seems to stay alive once the inventory has been opened, which would explain why the H2b run's step 6 matched: that session opened the inventory only after its swaps. A check: load a save, swap without opening the inventory, then open it; the new version should show.
+
+No game system hands out the inventory preview's controller (the character creation one has `GetPuppetPreviewGameController`, the inventory one has none), so the host cannot reach it through `api` alone.
+
+The fix plan:
+
+1. A small redscript hook (`@wrapMethod` on the inventory preview controller's `OnPreviewInitialized` and `OnUninitialize`) that records the controller in a weak handle a REDnode script system returns.
+2. In `refreshWorn`, when that controller is alive, `GetGamePuppet()`, read the preview character's items in the same slots and call `ResetItemAppearance` on them too (unverified that it works on the preview as it does on V).
+3. Check the script with redscript-cli against a copy of `r6/cache/final.redscripts`, with and without Codeware's scripts.
+4. An in-game test: swap with the inventory open, then with it closed after opening it once.
+
+Photo mode and the wardrobe preview (`gameuiWardrobeSetPreviewGameController`) have their own copies of V and likely need the same step. Until then: swap outside the inventory, or unequip and equip the item again in the inventory.
+
