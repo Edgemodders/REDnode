@@ -996,3 +996,38 @@ The fault watch runs for 15 seconds after each swap, so the Re-attach in step 2 
 8. Open the inventory: does the preview match V? Close it. **Mark**.
 9. Quit. Send `rednode-mods.log`, the plugin log, `rednode-overlay.log`, the RED Hot Tools log and `rednode-faults.log`, and after a crash the newest folder in `%LOCALAPPDATA%\REDEngine\ReportQueue\`.
 
+### H2 resumed: results
+
+2026-10-22 at 13:31, on the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.19, RED Hot Tools 1.3.0+edgemodders.1, Refresh test 0.2.3, the `EDGEmatA.archive` pair (2 of 9 paths shared). Five swaps, each 72 to 82 ms, **no crash**, 0 faults. The player's notes and the Mod log:
+
+| Step | Action | Result |
+|---|---|---|
+| 2 | Swap version 2 (13:33:01), wait | No change by itself |
+| 2 | **Re-attach** (`RefreshAttachment`, 13:33:22, 21 s after the swap, outside the fault watch) | No change, **no crash** |
+| 3 | **Reset look** (`ResetItemAppearance`, 13:34:12) | **Changed to version 2, with the item still worn** |
+| 4 | Swap version 2 again, **Off and on** | Version 2 |
+| 5 | Swap version 1, **Off and on** | **Version 1**: both directions work now |
+| 6 | **Take off**, swap version 2, **Put back** | Version 2 |
+| 7 | **Take off**, swap version 1, **Put back** | Version 1 |
+| 8 | Inventory preview | Matches V |
+
+What it means:
+
+- **`ResetItemAppearance` on the worn item shows a swapped archive's version without taking the item off**: the seamless swap the owner asked for, seen once (version 1 to 2). On 2026-10-21 it did nothing; the RED Hot Tools lookup bug, which can leave a replaced archive half loaded, is the likely reason (unverified).
+- The one-way result of 2026-10-21 is gone: **Off and on** worked both ways with a pair that shares only 2 of 9 paths.
+- Re-attach did not crash this time, but ran outside the fault watch and changed nothing; it is not needed.
+
+Next: confirm **Reset look** both ways and repeatedly ("H2b-0: Reset look both ways"), then build it into `archives.reload`.
+
+### H2b-0: Reset look both ways: test
+
+Same setup as above.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
+1. Version 1 installed, load the save wearing the trousers. **F10**, **Refresh test**, type `OutfitSlots.LegsMiddle`. **Mark**.
+2. Swap **version 2**, then press **Reset look**. Version 2, still worn? **Mark**.
+3. Swap **version 1**, then press **Reset look**. Version 1? **Mark**.
+4. Repeat steps 2 and 3 twice more (version 2, 1, 2, 1), each swap followed by **Reset look**. Any time it did not change? **Mark**.
+5. Look at the trousers closely, and from the side: any part that kept the old version (another mesh, a seam, the waistband)? **Mark**.
+6. Quit. Send `rednode-mods.log`, the plugin log and `rednode-faults.log`.
+
