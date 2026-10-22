@@ -24,6 +24,7 @@ I1 answers the questions the design leaves open, so I2 builds the driver on fact
 | 7 | **Lifetime** | What happens to the widgets when the HUD hides, when a menu closes and when a save loads. **Clean up** removes everything the app added |
 | 8 | **Opening a game screen** | `StartHubMenuEvent.SetStartMenu(n"inventory_screen")` queued with `UISystem.QueueEvent`; then the other hub menus by name |
 | 9 | **A menu entry for new screens** | Read only first: find the loaded menu resource (`inkMenuResource`) and list its entries. Adding the `rednode_screen` entry is tried only if reading works; otherwise it moves to the start of I5 |
+| 10 | **Reading a live screen** (for Dump source, below) | Walk the open screen's tree from its root: each widget's class, name, children and main properties (size, anchor, margin, tint, text, image part), and which controllers it carries. Count the widgets and time the walk on a big screen, such as the perks screen. Find whether a widget records the library item it was spawned from (unverified) |
 
 The script is checked with redscript-cli against a copy of `r6/cache/final.redscripts`, with and without Codeware's scripts, before it reaches the game: one compile error stops every script in the game.
 
@@ -39,7 +40,24 @@ One window, a button per step, each answer written to the window and the Mod log
 | Speed | 1, 50 and 200 `SetText` calls, timed |
 | Open inventory | The `StartHubMenuEvent` |
 | Menu entries | Lists the loaded menu resource's entries, if found |
+| Read screen | Walks the open screen's tree and writes it, with the count and the time, to `red4ext/logs/rednode-ink-dump.log` (local only: it is game data) |
 | Clean up | Removes every widget the app added |
+
+### Dump source (idea, 2026-10-22)
+
+Proposed by the owner: a **Dump source** button. A modder opens a game screen, such as the perks screen, presses it, and gets that screen written as REDnode's ink tags, or as code that builds it, to start their own screen from. RED Hot Tools' Ink Inspector shows such a tree is readable at run time; I1's item 10 checks REDnode can read it too, and how fast.
+
+| Part of the screen | What the dump gives |
+|---|---|
+| Containers, text, images, shapes | The matching tags (`vbox`, `text`, `image` and the rest) with their properties, in REDnode's layout words where they fit |
+| A widget no tag covers | The `widget` escape hatch with its class and raw properties |
+| A game library item (a button, a perk tile) | A `library` tag with its resource and item, if the widget records where it came from (unverified); otherwise its widgets spelled out |
+| Controllers | Named in a comment. Their behavior is game script and is not translated |
+| Text and data | As shown at that moment: names and numbers the game's scripts filled in become plain strings, or `LocKey#` keys where the widget holds one |
+
+The dump is a snapshot of the look, not the screen's logic. It is game data: the modder keeps it locally, and REDnode never ships or commits one.
+
+When: I1 tests the reading. The generator needs the tags, so a first version that writes primitives can come with I2, and the full one, with library items and composites, with I4. Where the button lives (the O9 window debugger, the MCP server for REDagent, or its own tool window) is decided then.
 
 ### After I1
 
