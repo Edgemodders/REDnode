@@ -202,3 +202,5 @@ Every file passes on disk, and the two versions of each pair differ in size, whi
 
 The check's error numbers (2.31): **1**, the header is wrong for the file (under 4 KB, not `RDAR`, the header's size differs from the reader's, the index past the end, not 4 KB aligned); **2**, an unsupported version; **4**, the header or the index could not be read; any other number comes from the index's own parse (`+0x7bd31c`). The number in the engine's message would tell a size mismatch (1) from a dead file handle (4).
 
+The player adds (2026-10-22): the `EDGEmat_M3` archives were rebuilt for other EDGEmat tests after 2026-10-21, so today's two versions are not the files that passed nine swaps that day. Yesterday's passes therefore do not count against the size lead. Next, a test with no new build: install `EDGEmatA.archive` version 1, swap the identical file (same size), then version 2 (a different size). If the identical swap passes and version 2 ends the game, the size lead holds.
+
