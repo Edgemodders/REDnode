@@ -1,0 +1,10 @@
+{
+  "id": "ink-test",
+  "name": "Ink test",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "The spike of the ink API (I1): finds roots in the game's own UI (REDnode's script hooks, and Codeware's layers), adds a text, a rectangle and a clickable button through the api, times changes, opens a game screen, lists the game's menu entries and writes an open screen's widget tree to a file. Asks for the bridge permission (to find the menu resources).",
+  "main": "mod.mjs",
+  "open": false,
+  "permissions": ["bridge"]
+}

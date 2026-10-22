@@ -229,6 +229,18 @@ export const NOTES = {
     ],
     preview: 'Nothing is swapped on this page: it checks what the host checks and pretends. Its mod folder holds Plain.archive and MyJacket.archive.',
   },
+  'ink-test': {
+    group: 'tests',
+    summary: 'The spike of the ink API: reach the game\'s own UI, add widgets to it, hear clicks, time changes, open a game screen and read a screen\'s widget tree.',
+    teaches: ['api.$static', 'api.$new', 'inkCompoundWidget.AddChild', 'RegisterToCallback', 'StartHubMenuEvent', 'kernel.bridge', 'pkg.dataDir', 'game.on'],
+    how: [
+      'The game draws its own UI with ink, a tree of widgets. REDnode\'s script `REDnodeInk.reds` keeps the roots of a few HUD and menu controllers, and the app reaches them with `api.$static("REDnodeInk", "Root", name)`. With Codeware, its layers work too (`cw.inkHUDLayer`).',
+      'HUD text and Menu button add widgets with `AddChild`, then set their font, text, size, margin and tint one call at a time. The button registers `REDnodeInkListener`, a script class whose handlers send game events the app hears with `game.on`.',
+      'Speed times one change, 50 in a row, and 200 and 600 at once. Open screen queues a `StartHubMenuEvent`. Menu entries finds the game\'s menu resources through REDbridge and reads them through Codeware. Read screen walks a root\'s tree level by level and writes it to a file in the app\'s data folder.',
+    ],
+    tryThis: ['Load a save and press Roots, then HUD text.', 'Open the pause menu, close the overlay, and click the Ink button.'],
+    preview: 'The preview has no game UI: the buttons log the calls they would make, and most of them fail with the simulated game\'s answer.',
+  },
   'refresh-test': {
     group: 'tests',
     summary: 'Swap an archive, then try each way the game offers to load again what is already in the world: V\'s clothes, what V looks at, a spawned object.',

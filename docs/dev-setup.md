@@ -23,6 +23,17 @@ gh auth login   # interactive: GitHub.com, HTTPS, sign in in the browser as Cybe
 
 Open a new terminal after installing so `gh` is on PATH.
 
+redscript-cli v1.0.0-preview.22 checks REDnode's `.reds` files before they reach the game, since one compile error stops every script in the game. One file from redscript's GitHub release, kept outside the repo (on the dev PC at `E:\Modding\Tools\redscript-cli`):
+
+```powershell
+gh release download v1.0.0-preview.22 -R jac3km4/redscript -p "redscript-cli.exe" -D E:\Modding\Tools\redscript-cli
+# against a copy of the game's base bundle, never the game's own file:
+Copy-Item '<game folder>\r6\cache\final.redscripts' $env:TEMP\base.redscripts
+E:\Modding\Tools\redscript-cli\redscript-cli.exe compile -s native\scripts -b $env:TEMP\base.redscripts -o $env:TEMP\out.redscripts
+```
+
+Run it twice: as above, and with Codeware's `Scripts` folder (from `red4ext\plugins\Codeware`) copied next to REDnode's scripts in one source folder. redscript-cli is stricter than the game's compiler, so it reports errors in Codeware's own files; only errors in REDnode's files matter.
+
 ## 2. C++ toolchain for the native plugin
 
 The RED4ext SDK needs CMake 3.21 or later and C++20.

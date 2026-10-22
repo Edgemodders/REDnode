@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 spike planned on 2026-10-22**, awaiting the owner's agreement. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 spike built on 2026-10-22 in REDnode 0.27.0**, awaiting its in-game test ([I1 test](#i1-test)). The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -23,7 +23,7 @@ I1 answers the questions the design leaves open, so I2 builds the driver on fact
 | 6 | **Speed** | Time a round trip of one `SetText`, and how many changes fit in one frame (the bridge runs every queued call each frame, up to 256). This decides how I2's driver batches |
 | 7 | **Lifetime** | What happens to the widgets when the HUD hides, when a menu closes and when a save loads. **Clean up** removes everything the app added |
 | 8 | **Opening a game screen** | `StartHubMenuEvent.SetStartMenu(n"inventory_screen")` queued with `UISystem.QueueEvent`; then the other hub menus by name |
-| 9 | **A menu entry for new screens** | Read only first: find the loaded menu resource (`inkMenuResource`) and list its entries. Adding the `rednode_screen` entry is tried only if reading works; otherwise it moves to the start of I5 |
+| 9 | **A menu entry for new screens** | Read only: find the menu resources by name through REDbridge (`archive.search` for `.inkmenu` and `.inklayers`), load them through Codeware's `ResourceDepot` and list their entries and scenarios. Adding the `rednode_screen` entry needs a widget library for it, so it moves to the start of I5 |
 | 10 | **Reading a live screen** (for Dump source, below) | Walk the open screen's tree from its root: each widget's class, name, children and main properties (size, anchor, margin, tint, text, image part), and which controllers it carries. Count the widgets and time the walk on a big screen, such as the perks screen. Find whether a widget records the library item it was spawned from (unverified) |
 
 The script is checked with redscript-cli against a copy of `r6/cache/final.redscripts`, with and without Codeware's scripts, before it reaches the game: one compile error stops every script in the game.
@@ -40,7 +40,7 @@ One window, a button per step, each answer written to the window and the Mod log
 | Speed | 1, 50 and 200 `SetText` calls, timed |
 | Open inventory | The `StartHubMenuEvent` |
 | Menu entries | Lists the loaded menu resource's entries, if found |
-| Read screen | Walks the open screen's tree and writes it, with the count and the time, to `red4ext/logs/rednode-ink-dump.log` (local only: it is game data) |
+| Read screen | Walks a root's tree (the open screen's, with a `menu.` root) and writes it, with the count and the time, to a file in the app's data folder, named in the log (local only: it is game data) |
 | Clean up | Removes every widget the app added |
 
 ### Dump source (idea, 2026-10-22)
@@ -71,4 +71,30 @@ The results decide, for I2:
 | Cursor | Interactive ink only in menus for I3, or more (the open question in the design) |
 | Screens | Whether the menu entry can be added in memory, or needs an archive |
 
-The in-game test steps are written when the build is ready.
+## I1 build (REDnode 0.27.0)
+
+Built on 2026-10-22, as planned:
+
+| Part | What it is |
+|---|---|
+| `native/scripts/REDnodeInk.reds` | A script system, `REDnodeInk`, keeping the roots of five controllers: `hud.healthbar` (healthbarWidgetGameController), `hud.minimap` (MinimapContainerController), `hud.quests` (QuestTrackerGameController), `menu.hub` (MenuHubGameController) and `menu.pause` (PauseMenuGameController). `REDnodeInk.Names()` and `REDnodeInk.Root(name)` for the `api`. `REDnodeInkListener` sends `REDnodeInk.press`, `.release`, `.hoverOver` and `.hoverOut` with its id. No Codeware needed |
+| `packages/overlay/apps/ink-test` | The Ink test app (0.1.0), through `api` only. Not in the player zip |
+
+Checked: the scripts compile with redscript-cli (v1.0.0-preview.22) against the game's `final.redscripts`, without Codeware (no errors) and with Codeware's scripts (errors only in Codeware's own files, which redscript-cli is stricter about, as before). The app's buttons ran against a stand-in for the `rednode` package with a fake widget tree, without and with Codeware, with script and native class names. Nothing ran in the game yet: which root suits a mod, which class names `AddChild` takes, whether clicks arrive and the speeds are all unverified.
+
+## I1 test
+
+On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.27.0 (update zip over 0.26.21), with Codeware. Each button writes its answer to the Ink test's window and the Mod log.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
+1. Switch on **Ink test** in the launcher (it asks for the bridge permission: allow it). Load a save. **F10**, press **Roots**. **Mark**.
+2. Press **HUD text**. Close the overlay (**F10**): is a dark box with "REDnode ink" on screen, and where? **Mark**.
+3. Open the overlay, type `cw.inkHUDLayer` in the root field, press **HUD text** again. Close the overlay: where is the second one? **Mark**.
+4. Open the overlay, press **Speed**, then **Check**. **Mark**.
+5. Press **Esc** for the pause menu. Open the overlay, type `menu.pause` in the root field, press **Roots**, then **Menu button**. Close the overlay: is a red "Ink button" in the pause menu? Hover it and click it with the game's cursor. **Mark**.
+6. Leave the pause menu. Open the overlay, press **Check**: what still exists? **Mark**.
+7. Type `new_perks` in the screen field and press **Open screen**: does the perks screen open? **Mark**.
+8. With the perks screen open, open the overlay, type `menu.hub` in the root field and press **Read screen**. **Mark**.
+9. Press **Menu entries**. **Mark**.
+10. Leave the perks screen. Load the same save again (a save load), then open the overlay and press **Check**, then **Roots**. **Mark**.
+11. Press **Clean up**. Quit. Send `rednode-mods.log`, and the dump file Read screen named (in the app's data folder; it stays on your PC, it is game data).
