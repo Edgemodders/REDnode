@@ -10,7 +10,7 @@ const TONES = ['normal', 'accent', 'highlight', 'success', 'warning', 'danger', 
 const ALIGNS = ['left', 'center', 'right'];
 const ICONS = [
   'UIIcon.AssaultRiflesPerkWeaponGroup',
-  'UIIcon.Assault_Area_01_Perk_1',
+  'UIIcon.Assault_Area_01_Perk_2', // _Perk_1's part is missing from the game's atlas (I2b test)
   'UIIcon.Ability.CanUseFragGrenades',
   'UIIcon.Ability.HasICELevelBooster',
 ];

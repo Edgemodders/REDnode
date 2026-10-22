@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b is built in REDnode 0.29.0** and awaits its in-game test ([I2b test](#i2b-test)); placement across resolutions is left for later, as agreed. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b passed in game on 2026-10-22** (REDnode 0.29.0, [results](#i2b-test-results)); placement across resolutions is left for later, as agreed. Next: I2c, data. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -327,4 +327,22 @@ On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.29.0 (update zip over 0.28.0),
 6. Type `UIIcon.Assault_Area_02_Perk_1` in the field and press **Show this icon**: does the last icon change? **Mark**.
 7. Load the same save again and wait a few seconds: are Ink Coords and the gallery back, in the same colors? Then quit to the main menu and wait a few seconds there, and quit the game. **Mark** before quitting if you can.
 8. Send `rednode-mods.log` and this run's `red4ext/logs/rednode-*.log`. Was there an "Ink:" line at the main menu (there should be none now), and did the game quit with no crash report?
+
+## I2b test: results
+
+2026-10-22 at 19:09 to 19:19, on the laptop, REDnode 0.29.0, with Codeware. **Passed**: every step, and the game quit with no crash report.
+
+| Step | Result |
+|---|---|
+| 1, Ink Coords | Red upper-case label over cyan numbers, right-aligned: the game look from the game's own style sheet works on widgets REDnode made |
+| 2, text styles and tones | Each style smaller than the one before, fluff faded; the eight tones in their colors |
+| 3, looks, colors, layout, icons | Plain white, game red, a game color yellow, magenta; the column, the grow bar and the small boxes; **four of the five icons**. The second, `UIIcon.Assault_Area_01_Perk_1`, showed nothing |
+| 4, tones live | Each tone change showed, white over a tone, then back to tones |
+| 5, align and gap live | Left, center, right; the small boxes spread and padded |
+| 6, an icon typed in | `UIIcon.Assault_Area_02_Perk_1` showed |
+| 7, a save load, the main menu, quit | Both mounts rebuilt ("3 of 3", "43 of 43 widgets built (build 2)"); no `Ink:` line at the main menu (the I2a fix holds); no crash |
+
+**The missing icon is the game's data, not REDnode.** Read with REDbridge: `UIIcon.Assault_Area_01_Perk_1` names the part `assault_area_01_perk1` in `perks_icons.inkatlas`, and that atlas (376 parts) has no such part, while `assault_area_01_perk2` and `assault_area_02_perk1` are there: a record left from the perks before 2.0, likely. So some `UIIcon` records point at parts that no longer exist, and an image shows nothing for them. Ink styles 0.1.1 uses `UIIcon.Assault_Area_01_Perk_2` instead. A later build could warn about a missing part (unverified how to ask the atlas at run time).
+
+The I2a fix for timeouts showed twice in the Mod log as one quiet line ("the game did not answer (closing or loading?)"), at the first start before a save and at quit, instead of errors.
 
