@@ -39,6 +39,8 @@ nav:
     url: /mcp.html
   - title: World API
     url: /world.html
+  - title: Hot swap research
+    url: /hot-swap-research.html
   - title: TweakDB API
     url: /tweakdb.html
   - title: Sound API

@@ -25,6 +25,7 @@ REDnode is a Node.js API for scripting Cyberpunk 2077 (PC, single-player). These
 | [Overlay apps](overlay-apps.md) | Guide with tested examples: your first app, UI kit windows, a native-looking button, and playing game sounds |
 | [World API](world.md) | The plan for building and placing objects in the game from a package: `$new`, `$set`, resource references, entity events, `api.spawn`, `requires` and `kernel.bridge()` |
 | [TweakDB API](tweakdb.md) | The plan for reading and changing TweakDB, the game's tuning database, from a package |
+| [Hot swap research](hot-swap-research.md) | Research toward a swap that every user of an archive's files picks up at once, worn clothing included: what a swap does today, the crashes of 2026-10-22, the engine's pieces, phases HP0 to HP5 |
 | [Sound API](sound.md) | The plan for REDnode's own audio engine: a package's audio files in the game, following its volume and pause, on entities |
 | [HTML overlay](overlay.md) | Design of the overlay: how it works, in-game test results, and the plan for phases O1 to O9 |
 | [P0 findings](p0-findings.md) | How RED4ext loads plugins, the plugin entry points, and what that means for the bridge |
