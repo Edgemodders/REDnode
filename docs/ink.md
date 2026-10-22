@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b passed in game on 2026-10-22** (REDnode 0.29.0, [results](#i2b-test-results)); placement across resolutions is left for later, as agreed. Next: I2c, data. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b passed in game on 2026-10-22** (REDnode 0.29.0, [results](#i2b-test-results)); placement across resolutions is left for later, as agreed. **I2c's plan** ([I2c: plan](#i2c-plan)) awaits the owner's agreement. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -345,4 +345,62 @@ On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.29.0 (update zip over 0.28.0),
 **The missing icon is the game's data, not REDnode.** Read with REDbridge: `UIIcon.Assault_Area_01_Perk_1` names the part `assault_area_01_perk1` in `perks_icons.inkatlas`, and that atlas (376 parts) has no such part, while `assault_area_01_perk2` and `assault_area_02_perk1` are there: a record left from the perks before 2.0, likely. So some `UIIcon` records point at parts that no longer exist, and an image shows nothing for them. Ink styles 0.1.1 uses `UIIcon.Assault_Area_01_Perk_2` instead. A later build could warn about a missing part (unverified how to ask the atlas at run time).
 
 The I2a fix for timeouts showed twice in the Mod log as one quiet line ("the game did not answer (closing or loading?)"), at the first start before a save and at quit, instead of errors.
+
+## I2c: plan
+
+The I2 plan gave I2c three things: bindings (game values the plugin reads each frame), trees from data, and text in the player's language. Proposed: **I2c is the data, and the language becomes I2d.** The language is most of the [Localization](localization.md) plan's L1 (the game's language in the plugin, `t()` with package locale files, plurals, V's gender forms), which serves the whole of REDnode, not only ink, and has its own unknowns (how the plugin reads the game's language). Kept apart, each test stays small.
+
+### Bindings: game values with no round trip
+
+A node names a game value; the plugin reads it each frame and changes the widget only when the shown result changes. Node is not involved, so a health bar follows every hit.
+
+```js
+ink.text('', { style: 'value', bind: 'player.health', format: '{value} HP' });
+ink.bar({ bind: 'player.health', of: 'player.healthMax', width: 300, height: 8, tone: 'normal' });
+```
+
+| Source | What | How the plugin reads it (as the Vitals sample does through `api`) |
+|---|---|---|
+| `player.health`, `player.healthMax` | Health points now and at most | `StatPoolsSystem.GetStatPoolValue(V's stats id, Health, false)`, and its max (unverified which call) |
+| `player.stamina`, `player.memory` | Stamina and RAM, from 0 to 100 | `GetStatPoolValue(…, Stamina / Memory, true)` |
+| `player.money` | Eddies | `TransactionSystem.GetItemQuantity(V, MarketSystem.Money())` |
+| `player.level`, `player.streetCred` | Levels | `StatsSystem.GetStatValue(V's stats id, Level / StreetCred)` |
+| `player.x`, `player.y`, `player.z` | V's position | The plugin's own `player.position` |
+| `game.hour`, `game.minute` | The game's clock | `TimeSystem.GetGameTime` (unverified which getter) |
+
+| Target | Prop | What the plugin does |
+|---|---|---|
+| A text | `bind`, with `format` (`{value}`) and `decimals` (0 by default) | Sets the text when the formatted string changes |
+| A bar | `ink.bar({ bind, of })`: a new tag, a track and a fill | Scales the fill from 0 to 1 (`value / of`; `of` a number or a source), from its left edge, so the layout does not move |
+
+Each source is read at most once a frame, and only while a node binds it. The cost per source is a few game calls on the game thread (measured in the test; the perf line shows it). A mod can still `set` a text at its own rate, as Ink Coords does; bindings are for values that change often.
+
+### Trees from data
+
+```js
+const board = ink.list({ gap: 6 }, contracts, (c) => ink.row({ gap: 12 },
+  ink.text(c.name, { style: 'body' }), ink.text(`${c.reward} €$`, { style: 'value' })), (c) => c.id);
+board.set({ items: nextContracts }); // only what changed goes to the game
+```
+
+| Piece | What |
+|---|---|
+| `ink.list(props, items, render, key)` | A column (or `direction: "row"`) of one rendered node per item, keyed by `key(item)` |
+| `list.set({ items })` | A keyed diff: new keys are added at their place, gone keys removed, moved keys moved, and kept keys rendered again and **patched**: the new node is compared with the old one, same tag and shape, and only changed props are sent; a different shape is replaced |
+| `mount.update(...children)` | The same patch for a whole mount's tree, for a mod that rebuilds its tree from data each time |
+
+In the plugin: `add` takes an `index` (ink's `ReorderChild` after `AddChild`), a new `move` op, and each node keeps its children in order, so a rebuild after a load puts them back in the same order.
+
+### Samples and test
+
+| Sample | What it shows |
+|---|---|
+| **Ink vitals** | Health, RAM and money on the HUD, bound: a health bar and numbers that follow every hit with no update code in the mod |
+| **Ink list** (a test app) | A list of contracts from data, with buttons to add, remove, move and rename them, and to rebuild it whole with `mount.update` |
+
+The test: take damage and watch the bar and the numbers; spend money; let the RAM refill after a quickhack; add, remove, move and rename list items, and check that only those change (the plugin log counts the ops); a save load puts both back in order; the plugin's perf line with several bindings on.
+
+### I2d: language (after I2c)
+
+The game's language in the plugin and a change event; `LocKey#` and secondary keys in ink texts (`SetLocalizedText`, so the engine follows a language change by itself) and in the `ui` builder; `t()` with a package's `locales/<language>.json`, `{name}` parameters, plurals (`Intl.PluralRules`) and V's gender forms; missing keys logged once. That is L1's core and L3 of the Localization plan; the UI kit's `data-t`, manifest names, `fmt` and REDnode's own text (L1's rest and L2) stay in the Localization plan's order.
 
