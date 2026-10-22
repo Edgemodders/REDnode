@@ -290,3 +290,22 @@ On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.18, the fixed `RedHotTools.
 4. Swap version 1 again. **Mark**.
 5. Quit. Send `rednode-faults.log`, the plugin log and the RED Hot Tools log.
 
+### HP0: the fix's test: results
+
+2026-10-22 at 12:47, on the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.18, the fixed `RedHotTools.dll`, `EDGEmatA.archive` (the name that ended the game every time before). **Passed**: four swaps, each logged by RED Hot Tools through "Archives reload completed." and each with 0 faults, then a clean quit.
+
+| Time | Swap | RED Hot Tools | Faults |
+|---|---|---|---|
+| 12:49:11 | Version 1, the identical file | completed in 66 ms | 0 |
+| 12:49:33 | Version 2 | completed in 63 ms | 0 |
+| 12:50:01 | Version 1 | completed in 65 ms | 0 |
+| 12:50:05 | Version 2 | completed in 70 ms | 0 |
+
+So the swap crashes of 2026-10-22 came from RED Hot Tools' archive lookup, and finding the archive by its exact path fixes them. What it means:
+
+| For | What |
+|---|---|
+| RED Hot Tools | A report upstream with this evidence and the tested change (with the owner's OK, since it is posted under their account) |
+| REDnode | Until a fixed RED Hot Tools is released, players with an archive named like this will lose their game on a swap. REDnode can run the same lookup before each swap and refuse with a clear message when it would miss (proposed) |
+| H2 | Swaps of uppercase-named archives work with the fix, so H2's refresh tests can go on with the fixed DLL on the laptop |
+
