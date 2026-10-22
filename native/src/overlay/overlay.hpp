@@ -158,6 +158,7 @@ enum : uint32_t
     StateMainMenu = 8,  // no player: main menu or loading screen
 };
 void PollGameState(uint64_t aFrame); // game thread
+bool InMainMenu();                     // the last poll's main-menu state (no player, or IsPreGame)
 uint32_t GetUiState();               // any thread
 void ResendGameState();              // send the state again, e.g. to a new host
 

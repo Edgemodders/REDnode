@@ -1,9 +1,9 @@
 {
   "id": "ink-coords",
   "name": "Ink Coords",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Edgemodders",
-  "description": "V's position at the top right of the HUD, drawn by the game itself with the ink API rather than in the overlay. The sample of phase I2a. Needs Codeware.",
+  "description": "V's position at the top right of the HUD, drawn by the game itself with the ink API rather than in the overlay. In the game's own look: its text styles and colors. The sample of phases I2a and I2b. Needs Codeware.",
   "main": "mod.mjs",
   "open": false,
   "requires": {

@@ -136,6 +136,11 @@ int SceneTier(const rtti::Handle& aPlayer)
 }
 } // namespace
 
+bool InMainMenu()
+{
+    return (g_state.load() & StateMainMenu) != 0;
+}
+
 void PollGameState(uint64_t aFrame)
 {
     if (aFrame % PollEveryFrames != 0 && !g_resend)

@@ -23,6 +23,11 @@
 //   text "s"  fontSize n  font ["path","style"]  tint [r,g,b,a]  opacity n  visible b
 //   size [w,h]  anchor "TopLeft"  anchorPoint [x,y]  translation [x,y]  margin [l,t,r,b]
 //   name "n"  fitToContent b  atlas "path"  part "name"
+//   padding [l,t,r,b]  hAlign "Left"  vAlign "Top"  sizeRule "Stretch"  sizeCoefficient n
+//   letterCase "UpperCase"  textAlign "Center"
+//   styleSheet "path.inkstyle"  bind {"tintColor":"MainColors.Red"} (null unties one): the game
+//   look (I2b) ties a widget to the game's own style names. The sheet is applied first and the
+//   bindings last, whatever their order.
 // A name starting with a capital letter is a method of the widget, called with the value as
 // its arguments (an array, or one value): the escape hatch for what the props do not cover.
 
@@ -130,9 +135,13 @@ const char* LayerName(const std::string& aLayer)
     return aLayer == "hud" ? "inkHUDLayer" : nullptr;
 }
 
-// A player exists: a save is loaded, and the HUD is the game's, not the main menu's.
+// A save is loaded and the HUD is the game's: the plugin's main-menu state is off (the game
+// makes a player at the main menu too, so GetPlayer alone let a rebuild try there, I2a) and a
+// player exists.
 bool InGame()
 {
+    if (InMainMenu())
+        return false;
     Obj none;
     Obj player;
     std::string error;
@@ -209,10 +218,47 @@ constexpr Setter Setters[] = {
     {"fitToContent", "SetFitToContent", false, false},
     {"atlas", "SetAtlasResource", false, false},
     {"part", "SetTexturePart", false, false},
+    {"padding", "SetPadding;FloatFloatFloatFloat", true, false},
+    {"hAlign", "SetHAlign", false, false},
+    {"vAlign", "SetVAlign", false, false},
+    {"sizeRule", "SetSizeRule", false, false},
+    {"sizeCoefficient", "SetSizeCoefficient", false, false},
+    {"letterCase", "SetLetterCase", false, false},
+    {"textAlign", "SetHorizontalAlignment", false, false},
+    {"styleSheet", "SetStyle", false, false},
 };
+
+// bind {"tintColor": "MainColors.Red", "opacity": null}: ties a widget property to a name in
+// its style sheet (the game look, I2b), or unties it with null.
+// aWhich: 1 unties (the nulls), 2 ties (the names), 0 both.
+bool ApplyBinds(Obj& aWidget, const Value& aBinds, std::string& aError, int aWhich = 0)
+{
+    if (aBinds.kind != Value::Kind::Object)
+    {
+        aError = "bind takes an object of property names and style names";
+        return false;
+    }
+    bool ok = true;
+    for (const auto& [prop, name] : aBinds.fields)
+    {
+        if ((aWhich == 1 && !name.IsNull()) || (aWhich == 2 && name.IsNull()))
+            continue;
+        std::string e;
+        const bool done = name.IsNull() ? Call(aWidget, "UnbindProperty", Args({Text(prop)}), e)
+                                        : Call(aWidget, "BindProperty", Args({Text(prop), name}), e);
+        if (!done)
+        {
+            aError += (aError.empty() ? "" : "; ") + prop + ": " + e;
+            ok = false;
+        }
+    }
+    return ok;
+}
 
 bool ApplyProp(Obj& aWidget, const std::string& aKey, const Value& aValue, std::string& aError)
 {
+    if (aKey == "bind")
+        return ApplyBinds(aWidget, aValue, aError);
     for (const auto& s : Setters)
     {
         if (aKey != s.prop)
@@ -232,6 +278,26 @@ void Note(std::vector<std::string>& aErrors, std::string aError)
 {
     if (aErrors.size() < MaxErrors)
         aErrors.push_back(std::move(aError));
+}
+
+// Applies props in the order ink needs: the style sheet first, then the bindings dropped, then
+// the other props (a color set after its tone was untied stays), then the new bindings.
+void ApplyAll(Obj& aWidget, const std::string& aKey, const Value& aProps, std::vector<std::string>& aErrors)
+{
+    for (int pass = 0; pass < 4; ++pass)
+    {
+        for (const auto& [k, v] : aProps.fields)
+        {
+            const bool bind = k == "bind";
+            const int wants = k == "styleSheet" ? 0 : bind ? 1 : 2;
+            if (!(wants == pass || (bind && pass == 3)))
+                continue;
+            std::string e;
+            const bool ok = bind ? ApplyBinds(aWidget, v, e, pass == 1 ? 1 : 2) : ApplyProp(aWidget, k, v, e);
+            if (!ok)
+                Note(aErrors, aKey + "." + k + ": " + e);
+        }
+    }
 }
 
 Obj ParentOf(Mount& aMount, const Node& aNode)
@@ -259,12 +325,7 @@ bool BuildNode(Mount& aMount, const std::string& aKey, std::vector<std::string>&
         return false;
     }
     node.widget = widget;
-    for (const auto& [k, v] : node.props.fields)
-    {
-        std::string e;
-        if (!ApplyProp(widget, k, v, e))
-            Note(aErrors, aKey + "." + k + ": " + e);
-    }
+    ApplyAll(widget, aKey, node.props, aErrors);
     return true;
 }
 
@@ -335,13 +396,24 @@ void Merge(Value& aInto, const Value& aProps)
         {
             if (ik == k)
             {
-                iv = v;
+                if (k == "bind" && iv.kind == Value::Kind::Object && v.kind == Value::Kind::Object)
+                    Merge(iv, v); // bindings add up; a null unties one
+                else
+                    iv = v;
                 found = true;
                 break;
             }
         }
         if (!found)
             aInto.fields.emplace_back(k, v);
+    }
+    if (const Value* binds = aInto.Get("bind"); binds && binds->kind == Value::Kind::Object)
+    {
+        for (auto& [ik, iv] : aInto.fields)
+        {
+            if (ik == "bind")
+                std::erase_if(iv.fields, [](const auto& f) { return f.second.IsNull(); });
+        }
     }
 }
 
@@ -444,12 +516,7 @@ void RunOp(const std::string& aPackage, const Value& aOp, std::vector<std::strin
         Obj widget = n->second.widget.Lock();
         if (!widget)
             return; // applied when the mount is built again
-        for (const auto& [k, v] : props->fields)
-        {
-            std::string e;
-            if (!ApplyProp(widget, k, v, e))
-                Note(aErrors, key + "." + k + ": " + e);
-        }
+        ApplyAll(widget, key, *props, aErrors);
         return;
     }
 

@@ -428,12 +428,25 @@ const INK_ANCHORS = {
   'top-left': [0, 0], top: [0.5, 0], 'top-right': [1, 0], left: [0, 0.5], center: [0.5, 0.5], right: [1, 0.5],
   'bottom-left': [0, 1], bottom: [0.5, 1], 'bottom-right': [1, 1], fill: [0, 0],
 };
+// The game look (I2b): the game's MainColors as sRGB (its HDR values clipped), and its text styles.
+const INK_TONES = {
+  normal: '#ff6159', accent: '#5ef6ff', highlight: '#ffd741', success: '#1ded83', warning: '#f86a32',
+  danger: '#ff7167', dim: '#a09a96', white: '#ffffff', background: 'rgba(13, 14, 23, 0.9)',
+};
+const INK_GAME_COLORS = { 'MainColors.Red': '#ff6159', 'MainColors.Blue': '#5ef6ff', 'MainColors.Yellow': '#ffd741', 'MainColors.Green': '#1ded83', 'MainColors.White': '#ffffff', 'MainColors.Grey': '#a09a96' };
+const INK_TEXT = {
+  title: [70, 600, true, 'normal'], subtitle: [60, 600, true, 'normal'], heading: [50, 600, true, 'normal'], body: [42, 500, false, 'normal'],
+  label: [38, 500, true, 'normal'], value: [42, 600, false, 'accent'], small: [30, 500, false, 'normal'], fluff: [25, 500, true, 'normal'],
+};
+const INK_ALIGN = { left: 'flex-start', top: 'flex-start', center: 'center', right: 'flex-end', bottom: 'flex-end', fill: 'stretch' };
 const inkMounts = new Map(); // mount key -> { options, el }
 const inkNodes = new Map(); // "mount/key" -> { el, tag, props, parent, mount }
 let inkHud = null;
 
 function inkColor(c) {
   if (Array.isArray(c)) return `rgba(${c[0]},${c[1]},${c[2]},${(c[3] ?? 255) / 255})`;
+  if (INK_GAME_COLORS[c]) return INK_GAME_COLORS[c];
+  if (/^[A-Za-z]+\.[A-Za-z0-9_.]+$/.test(String(c))) return '#ff6159'; // another game color: shown red here
   return INK_PALETTE[String(c).toLowerCase()] ?? String(c);
 }
 
@@ -450,8 +463,13 @@ function inkStyle(n) {
   if (n.tag === 'column' || n.tag === 'row') {
     el.style.display = 'flex';
     el.style.flexDirection = n.tag === 'column' ? 'column' : 'row';
-    el.style.alignItems = 'flex-start';
+    el.style.alignItems = INK_ALIGN[p.align] ?? 'flex-start';
     el.style.gap = `${(p.gap ?? 0) * k}px`;
+  }
+  if (p.pad !== undefined) el.style.padding = (Array.isArray(p.pad) ? [p.pad[1], p.pad[2], p.pad[3], p.pad[0]] : [p.pad]).map((v) => `${v * k}px`).join(' ');
+  if (inPanel) {
+    el.style.alignSelf = INK_ALIGN[p.align] ?? '';
+    el.style.flexGrow = p.grow ?? '';
   }
   if (!inPanel) {
     const opts = n.parent ? {} : inkMounts.get(n.mount)?.options ?? {};
@@ -470,18 +488,25 @@ function inkStyle(n) {
   if (p.margin !== undefined) el.style.margin = (Array.isArray(p.margin) ? [p.margin[1], p.margin[2], p.margin[3], p.margin[0]] : [p.margin]).map((v) => `${v * k}px`).join(' ');
   el.style.opacity = p.opacity ?? 1;
   el.style.visibility = p.visible === false ? 'hidden' : '';
-  const color = p.color !== undefined ? inkColor(p.color) : n.tag === 'text' ? '#ffffff' : '';
+  const style = n.tag === 'text' ? INK_TEXT[p.style] : undefined;
+  const game = p.look === 'game' || (p.look !== 'plain' && (p.tone !== undefined || style !== undefined));
+  const tone = p.tone ?? style?.[3] ?? (n.tag === 'rect' || n.tag === 'circle' ? 'background' : 'normal');
+  const color = p.color !== undefined ? inkColor(p.color) : game ? INK_TONES[tone] : n.tag === 'text' ? '#ffffff' : '';
   if (n.tag === 'text') {
     el.textContent = p.text ?? '';
     el.style.color = color;
-    el.style.fontSize = `${(p.size ?? 32) * k}px`;
+    el.style.fontSize = `${(p.size ?? style?.[0] ?? 32) * k}px`;
+    el.style.fontWeight = p.weight === 'Semi-Bold' || p.weight === 'Bold' ? 600 : style?.[1] ?? 500;
+    el.style.textTransform = (p.case ?? (style?.[2] ? 'upper' : '')) === 'upper' ? 'uppercase' : p.case === 'lower' ? 'lowercase' : '';
+    el.style.textAlign = p.textAlign ?? '';
+    if (p.style === 'fluff' && p.opacity === undefined) el.style.opacity = 0.4;
     el.style.whiteSpace = 'pre';
   } else if (n.tag === 'rect' || n.tag === 'circle') {
     el.style.background = color || '#ffffff';
     el.style.borderRadius = n.tag === 'circle' ? '50%' : '';
   } else if (n.tag === 'image') {
     el.style.border = `1px dashed ${color || '#888'}`;
-    el.title = `${p.atlas ?? ''} ${p.part ?? ''}: atlas images show only in the game`;
+    el.title = `${p.icon ?? `${p.atlas ?? ''} ${p.part ?? ''}`}: atlas images show only in the game`;
   }
 }
 

@@ -1,0 +1,12 @@
+{
+  "id": "ink-styles",
+  "name": "Ink styles",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "The test of the ink API's phase I2b: a gallery on the HUD, drawn by the game, of every text style, every tone, the plain and the game look, a column's align, a row's grow, gap and pad, and icons from TweakDB, with buttons that change them while they show. Needs Codeware.",
+  "main": "mod.mjs",
+  "open": false,
+  "requires": {
+    "codeware": ">=1.16"
+  }
+}

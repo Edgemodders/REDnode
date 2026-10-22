@@ -34,16 +34,65 @@ export type InkAnchor =
   | "fill";
 
 /**
- * A color: `"#rrggbb"` or `"#rrggbbaa"`, `[r, g, b]` or `[r, g, b, a]` from 0 to 255, or a
- * name: `white`, `black`, `red`, `cyan`, `yellow`, `green`, `blue`, `grey` (close to the
- * game's own; unverified against its styles).
+ * A color: `"#rrggbb"` or `"#rrggbbaa"`, `[r, g, b]` or `[r, g, b, a]` from 0 to 255, a name
+ * (`white`, `black`, `red`, `cyan`, `yellow`, `green`, `blue`, `grey`), or one of the game's
+ * own color names, such as `"MainColors.Yellow"`, which the game keeps exact (HDR and the
+ * colorblind themes included). For the usual ones, {@link InkProps.tone} is shorter.
  */
 export type InkColor = string | readonly [number, number, number] | readonly [number, number, number, number];
+
+/**
+ * A color role of the game's UI, from its own style sheet (`main_colors.inkstyle`):
+ *
+ * | Tone | The game's color |
+ * |---|---|
+ * | `normal` | `MainColors.Red`, the game's red UI text |
+ * | `accent` | `MainColors.Blue`, its cyan |
+ * | `highlight` | `MainColors.Yellow` |
+ * | `success` | `MainColors.Green` |
+ * | `warning` | `MainColors.Warning` |
+ * | `danger` | `MainColors.ActiveRed` |
+ * | `dim` | `MainColors.Grey` |
+ * | `white` | `MainColors.White` |
+ * | `background` | `MainColors.Fullscreen_PrimaryBackgroundDarkest`, for boxes behind text |
+ */
+export type InkTone = "normal" | "accent" | "highlight" | "success" | "warning" | "danger" | "dim" | "white" | "background";
+
+/**
+ * A text style of the game's UI. Sizes and weights come from its style sheet:
+ *
+ * | Style | Size | Weight | Case | Tone |
+ * |---|---|---|---|---|
+ * | `title` | 70 | Semi-Bold | upper | normal |
+ * | `subtitle` | 60 | Semi-Bold | upper | normal |
+ * | `heading` | 50 | Semi-Bold | upper | normal |
+ * | `body` | 42 | Medium | as written | normal |
+ * | `label` | 38 | Medium | upper | normal |
+ * | `value` | 42 | Semi-Bold | as written | accent |
+ * | `small` | 30 | Medium | as written | normal |
+ * | `fluff` | 25 | Medium | upper | normal, faded as the game's HUD decoration |
+ */
+export type InkTextStyle = "title" | "subtitle" | "heading" | "body" | "label" | "value" | "small" | "fluff";
 
 /** What every tag takes. */
 export interface InkProps {
   /** A name to find the node by with {@link InkMount.get}. */
   id?: string;
+  /**
+   * `"game"` takes the game's look: its style sheet, its colors and, for text, its fonts and
+   * sizes. Giving a `tone` or a text `style` means `"game"` too. `"plain"` (the default for
+   * these basic tags) is styled by its own props only.
+   */
+  look?: "game" | "plain";
+  /** One of the game's color roles; see {@link InkTone}. A `color` given wins over it. */
+  tone?: InkTone;
+  /**
+   * In a `column`: `"left"`, `"center"`, `"right"` or `"fill"` (the column's width). In a
+   * `row`: `"top"`, `"center"`, `"bottom"` or `"fill"`. Wins over the container's `align`.
+   */
+  align?: InkAlign;
+  /** In a `column` or `row` with a size of its own: takes this share of the space left. */
+  grow?: number;
   /** Where the node sits in a canvas. Children of `column` and `row` are placed by them instead. */
   anchor?: InkAnchor;
   /** Moves the node from its anchor, in the layer's units, to the right. */
@@ -63,21 +112,34 @@ export interface InkProps {
   visible?: boolean;
 }
 
+/** How a child lines up across a `column` (left to right) or a `row` (top to bottom). */
+export type InkAlign = "left" | "center" | "right" | "top" | "bottom" | "fill";
+
 /** Properties of {@link ink.text}. */
 export interface InkTextProps extends InkProps {
   text?: string;
-  /** The font size, 32 if not given. */
+  /** One of the game's text styles; see {@link InkTextStyle}. Its props win over the style's. */
+  style?: InkTextStyle;
+  /** The font size: the style's, or 32. */
   size?: number;
   /** A font family's depot path; the game's Rajdhani if not given. */
   font?: string;
-  /** The font's style, such as `"Medium"` (the default), `"Semi-Bold"` or `"Bold"`. */
-  style?: string;
+  /** The font's weight, such as `"Medium"` (the default), `"Semi-Bold"` or `"Bold"`. */
+  weight?: string;
+  /** `"upper"`, `"lower"` or `"original"`. */
+  case?: "upper" | "lower" | "original";
+  /** Within the text's own width: `"left"`, `"center"` or `"right"`. */
+  textAlign?: "left" | "center" | "right";
 }
 
-/** Properties of {@link ink.column} and {@link ink.row}. */
+/** Properties of {@link ink.column}, {@link ink.row} and {@link ink.canvas}. */
 export interface InkContainerProps extends InkProps {
-  /** Space between the children. */
+  /** Space between the children (`column` and `row`). */
   gap?: number;
+  /** Space inside, around the children: one number, or `[left, top, right, bottom]`. */
+  pad?: number | readonly [number, number, number, number];
+  /** How the children line up across the container, unless they say otherwise; see {@link InkAlign}. */
+  align?: InkAlign;
 }
 
 /** Properties of {@link ink.image}. */
@@ -86,6 +148,11 @@ export interface InkImageProps extends InkProps {
   atlas?: string;
   /** The part of the atlas to show. */
   part?: string;
+  /**
+   * One of the game's icons, by its TweakDB record, such as a `UIIcon.*` record: REDnode
+   * reads its atlas and part (`atlasResourcePath`, `atlasPartName`). Wins over `atlas` and `part`.
+   */
+  icon?: string;
 }
 
 /** One widget of a tree. */
@@ -157,9 +224,59 @@ export function inkColor(c: InkColor): [number, number, number, number] {
   const s = String(c).trim().toLowerCase();
   if (PALETTE[s]) return [...PALETTE[s], 255];
   const hex = /^#([0-9a-f]{6})([0-9a-f]{2})?$/.exec(s);
-  if (!hex) throw new Error(`ink: "${c}" is not a color: use "#rrggbb", [r, g, b] or a name such as "cyan"`);
+  if (!hex) throw new Error(`ink: "${c}" is not a color: use "#rrggbb", [r, g, b], a name such as "cyan", or a game color such as "MainColors.Yellow"`);
   const n = parseInt(hex[1], 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255, hex[2] ? parseInt(hex[2], 16) : 255];
+}
+
+// The game look (I2b): the game's own style sheet, read from its archives with REDbridge
+// (main_colors.inkstyle: the MainColors.* names, its text sizes and weights).
+const STYLE_SHEET = "base\\gameplay\\gui\\common\\main_colors.inkstyle";
+
+const TONES: Record<InkTone, string> = {
+  normal: "MainColors.Red",
+  accent: "MainColors.Blue",
+  highlight: "MainColors.Yellow",
+  success: "MainColors.Green",
+  warning: "MainColors.Warning",
+  danger: "MainColors.ActiveRed",
+  dim: "MainColors.Grey",
+  white: "MainColors.White",
+  background: "MainColors.Fullscreen_PrimaryBackgroundDarkest",
+};
+
+const TEXT_STYLES: Record<InkTextStyle, { size: number; weight: string; upper: boolean; tone: InkTone; opacity?: string }> = {
+  title: { size: 70, weight: "Semi-Bold", upper: true, tone: "normal" },
+  subtitle: { size: 60, weight: "Semi-Bold", upper: true, tone: "normal" },
+  heading: { size: 50, weight: "Semi-Bold", upper: true, tone: "normal" },
+  body: { size: 42, weight: "Medium", upper: false, tone: "normal" },
+  label: { size: 38, weight: "Medium", upper: true, tone: "normal" },
+  value: { size: 42, weight: "Semi-Bold", upper: false, tone: "accent" },
+  small: { size: 30, weight: "Medium", upper: false, tone: "normal" },
+  fluff: { size: 25, weight: "Medium", upper: true, tone: "normal", opacity: "MainColors.hudFluffOpacity" },
+};
+
+const H_ALIGN: Record<string, string> = { left: "Left", center: "Center", right: "Right", fill: "Fill", top: "Left", bottom: "Right" };
+const V_ALIGN: Record<string, string> = { top: "Top", center: "Center", bottom: "Bottom", fill: "Fill", left: "Top", right: "Bottom" };
+const CASES: Record<string, string> = { upper: "UpperCase", lower: "LowerCase", original: "OriginalCase" };
+const TEXT_ALIGN: Record<string, string> = { left: "Left", center: "Center", right: "Right" };
+
+// Icons by TweakDB record: their atlas and part, read once per record.
+const icons = new Map<string, Promise<{ atlas: string; part: string } | null>>();
+
+function iconOf(record: string): Promise<{ atlas: string; part: string } | null> {
+  let found = icons.get(record);
+  if (!found) {
+    const flat = (name: string) =>
+      transport()
+        .call("tweakdb.get", { path: `${record}.${name}` })
+        .then((f) => (f as { value?: unknown } | null)?.value ?? null);
+    found = Promise.all([flat("atlasResourcePath"), flat("atlasPartName")])
+      .then(([atlas, part]) => (atlas && part ? { atlas: String(atlas), part: String(part) } : null))
+      .catch(() => null);
+    icons.set(record, found);
+  }
+  return found;
 }
 
 interface State {
@@ -171,6 +288,7 @@ interface State {
   mount: MountState | null;
   sent: Record<string, unknown>; // the wire props the game has
   node: InkNode;
+  icon?: { record: string; atlas: string; part: string } | null; // an icon once read from TweakDB
 }
 
 interface MountState {
@@ -203,8 +321,19 @@ function flush(): void {
       const errors = (r as { errors?: string[] } | null)?.errors ?? [];
       for (const e of errors) console.warn(`ink: ${e}`);
     })
-    .catch((err) => console.warn(`ink: ${cleanError(err).message}`));
+    .catch((err) => {
+      const message = cleanError(err).message;
+      // The game stops answering while it closes or loads (seen at quit in I2a): one quiet
+      // line, not an error. The driver builds the tree again once a save is loaded.
+      if (/did not answer/i.test(message)) {
+        if (!quietSince || Date.now() - quietSince > 60_000) console.info(`ink: the game did not answer (closing or loading?); changes made meanwhile may not show`);
+        quietSince = Date.now();
+        return;
+      }
+      console.warn(`ink: ${message}`);
+    });
 }
+let quietSince = 0;
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
@@ -212,43 +341,91 @@ function sides(m: number | readonly number[]): number[] {
   return typeof m === "number" ? [m, m, m, m] : [m[0], m[1], m[2], m[3]];
 }
 
-// The modder's props as the plugin's: anchors and offsets, colors as numbers, gaps as margins.
+// The modder's props as the plugin's: anchors and offsets, colors as numbers or the game's
+// color names, gaps and alignment as the children's margins and alignment, the game look as
+// its style sheet with bindings.
 function wire(s: State): Record<string, unknown> {
   const p = s.props as InkTextProps & InkContainerProps & InkImageProps;
   const out: Record<string, unknown> = {};
-  const parentTag = s.parent?.tag;
+  const parent = s.parent;
+  const parentTag = parent?.tag;
   const inPanel = parentTag === "column" || parentTag === "row";
   if (!inPanel) {
-    const opts = s.parent ? {} : (s.mount?.options ?? {});
+    const opts = parent ? {} : (s.mount?.options ?? {});
     const anchor = p.anchor ?? opts.anchor ?? "top-left";
     const a = ANCHORS[anchor];
     if (!a) throw new Error(`ink: "${anchor}" is not an anchor: use top-left, top, top-right, left, center, right, bottom-left, bottom, bottom-right or fill`);
     out.anchor = a[0];
     out.anchorPoint = [a[1], a[2]];
     out.translation = [p.x ?? opts.x ?? 0, p.y ?? opts.y ?? 0];
+  } else {
+    // In a column, a child lines up across it (left to right); in a row, top to bottom.
+    const pp = parent!.props as InkContainerProps;
+    const align = p.align ?? pp.align;
+    if (align !== undefined) {
+      const table = parentTag === "column" ? H_ALIGN : V_ALIGN;
+      if (!table[align]) throw new Error(`ink: "${align}" is not an align: use left, center, right, top, bottom or fill`);
+      out[parentTag === "column" ? "hAlign" : "vAlign"] = table[align];
+    }
+    if (p.grow !== undefined) {
+      out.sizeRule = p.grow > 0 ? "Stretch" : "Fixed";
+      out.sizeCoefficient = p.grow;
+    }
   }
   let margin = p.margin !== undefined ? sides(p.margin) : null;
-  if (inPanel && margin === null && s.parent && s.parent.children.indexOf(s) > 0) {
-    const gap = (s.parent.props as InkContainerProps).gap ?? 0;
+  if (inPanel && margin === null && parent && parent.children.indexOf(s) > 0) {
+    const gap = (parent.props as InkContainerProps).gap ?? 0;
     if (gap) margin = parentTag === "column" ? [0, gap, 0, 0] : [gap, 0, 0, 0];
   }
   if (margin) out.margin = margin;
+  if (p.pad !== undefined) out.padding = sides(p.pad);
   if (p.width !== undefined || p.height !== undefined) out.size = [p.width ?? 0, p.height ?? 0];
   // Panels and text with no size take their content's, so an anchor such as top-right
   // places them by their real size (a panel's own size reads 0x0 in the game).
   else if (s.tag === "column" || s.tag === "row" || s.tag === "text") out.fitToContent = true;
-  if (p.color !== undefined) out.tint = inkColor(p.color);
+
+  // The game look: asked for, or implied by a tone or a text style.
+  const textStyle = s.tag === "text" && p.style !== undefined ? TEXT_STYLES[p.style] : undefined;
+  if (s.tag === "text" && p.style !== undefined && !textStyle) {
+    throw new Error(`ink: "${p.style}" is not a text style: use ${Object.keys(TEXT_STYLES).join(", ")}`);
+  }
+  const game = p.look === "game" || (p.look !== "plain" && (p.tone !== undefined || textStyle !== undefined));
+  const bind: Record<string, string> = {};
+  if (game) out.styleSheet = STYLE_SHEET;
+  const gameColor = typeof p.color === "string" && /^[A-Za-z]+\.[A-Za-z0-9_.]+$/.test(p.color) ? p.color : undefined;
+  if (gameColor) {
+    out.styleSheet = STYLE_SHEET;
+    bind.tintColor = gameColor;
+  } else if (p.color !== undefined) {
+    out.tint = inkColor(p.color);
+  } else if (game) {
+    const tone = p.tone ?? textStyle?.tone ?? (s.tag === "rect" || s.tag === "circle" ? "background" : "normal");
+    if (!TONES[tone]) throw new Error(`ink: "${tone}" is not a tone: use ${Object.keys(TONES).join(", ")}`);
+    bind.tintColor = TONES[tone];
+  }
+  if (textStyle?.opacity && p.opacity === undefined) bind.opacity = textStyle.opacity;
+  if (Object.keys(bind).length) out.bind = bind;
   if (p.opacity !== undefined) out.opacity = p.opacity;
   if (p.visible !== undefined) out.visible = p.visible;
+
   if (s.tag === "text") {
-    out.font = [p.font ?? FONT, p.style ?? "Medium"];
-    out.fontSize = p.size ?? 32;
+    out.font = [p.font ?? FONT, p.weight ?? textStyle?.weight ?? "Medium"];
+    out.fontSize = p.size ?? textStyle?.size ?? 32;
     out.text = p.text ?? "";
-    if (p.color === undefined) out.tint = PALETTE.white.concat(255);
+    const letterCase = p.case ?? (textStyle?.upper ? "upper" : undefined);
+    if (letterCase !== undefined) out.letterCase = CASES[letterCase] ?? "OriginalCase";
+    if (p.textAlign !== undefined) out.textAlign = TEXT_ALIGN[p.textAlign] ?? "Left";
+    if (p.color === undefined && !game) out.tint = PALETTE.white.concat(255);
   }
   if (s.tag === "image") {
-    if (p.atlas !== undefined) out.atlas = p.atlas;
-    if (p.part !== undefined) out.part = p.part;
+    const icon = p.icon !== undefined && s.icon?.record === p.icon ? s.icon : null;
+    if (icon) {
+      out.atlas = icon.atlas;
+      out.part = icon.part;
+    } else {
+      if (p.atlas !== undefined) out.atlas = p.atlas;
+      if (p.part !== undefined) out.part = p.part;
+    }
   }
   // ink.widget: capitalized props are the widget's own methods, passed as they are.
   for (const [k, v] of Object.entries(p)) if (/^[A-Z]/.test(k)) out[k] = v;
@@ -256,11 +433,49 @@ function wire(s: State): Record<string, unknown> {
   return out;
 }
 
+// The props that changed since the game last had them. Bindings dropped since are sent as
+// null, which unties them.
+function changes(t: State, now: Record<string, unknown>): Record<string, unknown> {
+  const changed: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(now)) if (!same(t.sent[k], v)) changed[k] = v;
+  const before = (t.sent.bind ?? {}) as Record<string, string | null>;
+  const after = (now.bind ?? {}) as Record<string, string | null>;
+  const dropped = Object.keys(before).filter((k) => !(k in after));
+  if (dropped.length || "bind" in changed) {
+    changed.bind = { ...Object.fromEntries(dropped.map((k) => [k, null])), ...after };
+  }
+  return changed;
+}
+
+// Reads an image's icon from TweakDB, then sends its atlas and part.
+function resolveIcon(s: State): void {
+  const record = (s.props as InkImageProps).icon;
+  if (s.tag !== "image" || !record || s.icon?.record === record) return;
+  void iconOf(record).then((found) => {
+    if ((s.props as InkImageProps).icon !== record) return; // changed since
+    if (!found) {
+      console.warn(`ink: no icon "${record}" in TweakDB (its atlasResourcePath and atlasPartName)`);
+      return;
+    }
+    s.icon = { record, ...found };
+    send(s);
+  });
+}
+
+function send(t: State): void {
+  if (!t.mount?.open) return;
+  const now = wire(t);
+  const changed = changes(t, now);
+  t.sent = now;
+  if (Object.keys(changed).length) enqueue({ op: "set", mount: t.mount.key, key: t.key, props: changed });
+}
+
 function add(s: State, mount: MountState): void {
   if (s.mount) throw new Error(`ink: a node is in one mount at a time (${s.tag} ${s.key} is mounted already)`);
   s.mount = mount;
   s.sent = wire(s);
   enqueue({ op: "add", mount: mount.key, key: s.key, parent: s.parent?.key ?? "", tag: s.tag, props: s.sent });
+  resolveIcon(s);
   for (const c of s.children) add(c, mount);
 }
 
@@ -312,16 +527,10 @@ function make<P extends InkProps>(tag: string, props: P, children: Child[] = [])
     set(next: Partial<P>) {
       Object.assign(s.props, next);
       if (!s.mount?.open) return;
-      // The gap of a panel is its children's margins: they change with it.
-      const touched = [s, ...("gap" in next ? s.children : [])];
-      for (const t of touched) {
-        const now = wire(t);
-        const changed: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(now)) if (!same(t.sent[k], v)) changed[k] = v;
-        if (!Object.keys(changed).length) continue;
-        t.sent = now;
-        enqueue({ op: "set", mount: t.mount!.key, key: t.key, props: changed });
-      }
+      // A panel's gap and align are its children's margins and alignment: they change with it.
+      const touched = [s, ...("gap" in next || "align" in next ? s.children : [])];
+      for (const t of touched) send(t);
+      if ("icon" in next) resolveIcon(s);
     },
   };
   Object.defineProperty(node, NODE, { value: s });

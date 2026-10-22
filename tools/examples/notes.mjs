@@ -37,12 +37,25 @@ export const NOTES = {
     tryThis: ['Switch on "Game theme" to see the game\'s own look.', 'Add an `rn-tab` of your own with a few controls.'],
     preview: 'The Sound tab plays a tone instead of the game\'s sound events, which only exist in the game.',
   },
+  'ink-styles': {
+    group: 'tests',
+    summary: 'A gallery of the ink API\'s layout and look words on the HUD: every text style and tone, the plain and the game look, align, grow, gap, pad and icons, with buttons that change them live.',
+    teaches: ['ink.text style', 'tone', 'look', 'align', 'grow', 'gap', 'pad', 'ink.image icon', 'node.set'],
+    how: [
+      'A text `style` (`title`, `label`, `value` and the rest) and a `tone` (`normal`, `accent`, `danger` and the rest) give a widget the game\'s own look: its style sheet, its sizes and weights, and its colors by name, so the game keeps them exact.',
+      'In a `column` or `row`, `align` lines the children up across it, `grow` shares out the space left, and `gap` and `pad` space them. Changing a container\'s `gap` or `align` changes its children too.',
+      '`ink.image({ icon })` takes one of the game\'s icons by its TweakDB record: REDnode reads its atlas and part.',
+    ],
+    tryThis: ['Press Show, then Next tone and White over tone.', 'Type another UIIcon record and press Show this icon.'],
+    preview: 'The preview draws the colors and sizes close to the game\'s; icons show as dashed boxes, since their atlases are in the game\'s archives.',
+  },
   'ink-coords': {
     group: 'hud',
-    summary: 'V\'s position on the HUD, drawn by the game itself with the ink API instead of in the overlay. Needs Codeware.',
-    teaches: ['ink.mount', 'ink.column', 'ink.text', 'node.set', 'game.player.position'],
+    summary: 'V\'s position on the HUD, drawn by the game itself with the ink API instead of in the overlay, in the game\'s own look. Needs Codeware.',
+    teaches: ['ink.mount', 'ink.column', 'ink.text', 'style', 'node.set', 'game.player.position'],
     how: [
       '`ink.mount("hud", ...)` puts a tree of the game\'s own widgets on its HUD layer, through Codeware. The game draws it, so it sits under the overlay and hides with the HUD.',
+      'The `label` and `value` text styles take the game\'s own sizes, weights and colors from its style sheet: nothing is styled by hand.',
       'The tree is built once. Each update calls `set` on one text, and only a real change goes to the game: changes made in the same tick go in one call.',
       'REDnode keeps the tree in the plugin and builds it again after a save load, and removes it when the mod stops, so the mod has nothing to clean up.',
     ],

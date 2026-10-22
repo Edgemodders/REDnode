@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). Next: I2b. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b is built in REDnode 0.29.0** and awaits its in-game test ([I2b test](#i2b-test)); placement across resolutions is left for later, as agreed. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -287,4 +287,44 @@ Found, to fix with I2b:
 | At quit, the mod's last update got "The game did not answer within 5 seconds" in the Mod log | The game had stopped running the pump | The package stays quiet about `ink.apply` timeouts while the game is closing |
 
 **Open, raised by the owner:** placement that holds across screen resolutions and aspect ratios, and placement relative to the game's own HUD pieces (below the minimap, beside the health bar). To discuss with the owner as part of I2b's layout words.
+
+## I2b: build (REDnode 0.29.0)
+
+Agreed with the owner on 2026-10-22: I2b now, without the placement question (resolutions, and placement beside the game's HUD pieces), which comes when its time comes.
+
+**The game look, from the game's own style sheet.** Read from the game's archives with REDbridge on the dev PC (nothing from the game is committed): the game's widgets take their colors from `base\gameplay\gui\common\main_colors.inkstyle`, by binding a property to a name in it (`tintColor` to `MainColors.Red`; the quest tracker's widget file binds `tintColor`, `opacity` and `textureAtlas` this way). The sheet holds the game's colors (`MainColors.Red`, `Blue`, `Yellow`, `Green`, `Grey`, `White`, `Warning`, `ActiveRed`, the fullscreen backgrounds and about 140 more), its readable text sizes (`ReadableXSmall` 30, `ReadableSmall` 38, `ReadableMedium` 42, `ReadableFontSize` 50, `SubtitleHeader` 60, `TitleHeader` 70, `FluffFontSize` 25) and weights (`HeaderFontWeight` Semi-Bold, `BodyFontWeight` Medium). Bound colors stay exact: HDR values, and the colorblind themes the game swaps in (unverified in game). No font binding was found in the widget files read, so text sizes and weights are set from the sheet's values rather than bound.
+
+| Word | What it does | In the plugin |
+|---|---|---|
+| `tone` | `normal`, `accent`, `highlight`, `success`, `warning`, `danger`, `dim`, `white`, `background`: one of the game's colors by role | `styleSheet` the sheet, `bind {tintColor: "MainColors.…"}` |
+| `style` (text) | `title`, `subtitle`, `heading`, `body`, `label`, `value`, `small`, `fluff`: the sheet's size, weight, case and tone | font, size, `letterCase`, bound tint (and opacity for `fluff`) |
+| `look` | `"game"` takes the game look (a tone or a text style means it too); `"plain"` is styled by its props only | |
+| `color: "MainColors.Yellow"` | Any of the game's color names, bound | `bind` |
+| `align` | In a `column`, children left, center, right or fill; in a `row`, top, center, bottom or fill. On a child, for itself | `hAlign`, `vAlign` |
+| `grow` | A child's share of the space left in a sized `column` or `row` | `sizeRule Stretch`, `sizeCoefficient` |
+| `pad` | Space inside a container | `padding` |
+| `case`, `textAlign`, `weight` | A text's letter case, alignment within its width, and font weight (I2a's `style` for the weight is now `weight`) | `letterCase`, `textAlign`, `font` |
+| `icon` | `ink.image({ icon: "UIIcon.…" })`: the record's `atlasResourcePath` and `atlasPartName`, read from TweakDB (6225 `UIIcon` records in 2.31) | `atlas`, `part` |
+
+The driver applies a node's props in the order ink needs: the style sheet, then the bindings being untied, then the other props, then the new bindings, so a `color` set after a `tone` stays. Bindings add up across changes, and a rebuild after a save load applies the current ones.
+
+**The two fixes from I2a:** the driver waits for the plugin's main-menu state to be off before it builds (`InMainMenu` in gamestate.cpp); an `ink.apply` that times out (the game closing or loading) leaves one quiet line in the Mod log instead of an error.
+
+**Samples:** Ink Coords 0.2.0 uses the `label` and `value` styles; **Ink styles** 0.1.0 (`packages/overlay/apps/ink-styles`) is the test: a gallery on the HUD with buttons that change it while it shows.
+
+Checked: the plugin builds and its tests pass; the package builds; in the mock game Ink styles sent its gallery in one call, a tone change as one binding, and a color over a tone as the tint with the tint's binding untied; the docs preview of Ink Coords shows the label and value styles. Not checked in the game: whether the bindings take the game's colors, whether the sheet sets on a widget REDnode made, the icons, align and grow.
+
+## I2b test
+
+On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.29.0 (update zip over 0.28.0), with Codeware.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
+1. Keep **Ink Coords** on and switch on **Ink styles**. Load a save. Close the overlay: is Ink Coords now a red upper-case "REDNODE // WHERE" over cyan numbers, both right-aligned, like the game's own HUD text? **Mark**.
+2. Open the overlay, press **Show** in the Ink styles window, close the overlay. At the left: the title, then eight text styles, each smaller than the one before (fluff faded), then eight tone words in different colors? **Mark**.
+3. Under them: "plain look" white, "game look" red, "a game color" yellow, "#ff00ff" magenta? Then the changing line, the three lines in a 700-wide column, a bar of three boxes (blue, red twice as long, yellow 100 wide), three small boxes, and five icons? **Mark**.
+4. Open the overlay, press **Next tone** a few times, then **White over tone**, then **Next tone** again: does the line change color each time, and go white then back to a tone? **Mark**.
+5. Press **Next align** three times: do the column's three lines move left, center, right? Press **Next gap** twice: do the three small boxes spread apart? **Mark**.
+6. Type `UIIcon.Assault_Area_02_Perk_1` in the field and press **Show this icon**: does the last icon change? **Mark**.
+7. Load the same save again and wait a few seconds: are Ink Coords and the gallery back, in the same colors? Then quit to the main menu and wait a few seconds there, and quit the game. **Mark** before quitting if you can.
+8. Send `rednode-mods.log` and this run's `red4ext/logs/rednode-*.log`. Was there an "Ink:" line at the main menu (there should be none now), and did the game quit with no crash report?
 
