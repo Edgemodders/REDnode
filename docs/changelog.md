@@ -22,6 +22,10 @@ How to keep it:
 
 - Claude Code now asks you before every call of the MCP tools `api_call` and `archives_reload`, in every permission mode, auto mode included. Reads go through the new `api_read`, which never asks.
 
+**Other**
+
+- During an archive swap, `red4ext/logs/rednode-faults.log` now also names whatever ends the game (TerminateProcess, ExitProcess or a fail-fast), with its status and stack, for crashes that leave no crash report.
+
 ## 0.26.15 (2026-10-20)
 
 Folds in 0.26.2, which was not released on its own.

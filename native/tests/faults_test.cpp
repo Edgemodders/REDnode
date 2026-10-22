@@ -24,6 +24,15 @@ namespace detail
 void Log(const char*, ...)
 {
 }
+// No RED4ext here: the exit hooks are not attached, and FaultsOnEnd is called directly.
+const RED4ext::v1::Sdk* GetSdk()
+{
+    return nullptr;
+}
+RED4ext::v1::PluginHandle GetHandle()
+{
+    return nullptr;
+}
 } // namespace detail
 } // namespace rednode::overlay
 
@@ -122,9 +131,20 @@ int main()
     Fault();
     Check(Count(ReadAll(file), "fault 0x") == 9, "a new watch writes again");
 
+    FaultsOnEnd("TerminateProcess", 0xC0000409);
+    text = ReadAll(file);
+    Check(text.find("the game is being ended by TerminateProcess, status 0xC0000409") != std::string::npos,
+          "an end during the watch is written with its status");
+    Check(Count(text, "being ended by") == 1 && Count(text, "stack: ") == 10, "the end is written with a stack");
+    for (int i = 0; i < 6; i++)
+        FaultsOnEnd("TerminateProcess", 1);
+    Check(Count(ReadAll(file), "being ended by") == 4, "a watch writes at most 4 ends");
+
     StopFaults();
     Fault();
-    Check(Count(ReadAll(file), "fault 0x") == 9, "after stop, nothing more is written");
+    FaultsOnEnd("TerminateProcess", 1);
+    Check(Count(ReadAll(file), "fault 0x") == 9 && Count(ReadAll(file), "being ended by") == 4,
+          "after stop, nothing more is written");
 
     std::filesystem::remove_all(root);
     std::printf("\n%s: %d failure(s)\n", g_failures ? "FAILED" : "PASSED", g_failures);

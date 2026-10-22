@@ -148,3 +148,22 @@ The game folder is the clear difference: every crash of the morning ran in the c
 
 A Windows dump of the 10:09 GPU crash (`Cyberpunk2077.exe.42248.dmp`, from Windows error reporting) has a real stack: only the game's own code, the render side's check that found the device removed. No mod's module is on it.
 
+### HP0: who ends the game (REDnode 0.26.17)
+
+The crashes inside the archive load leave no fault, no crash report and no exit line. If Windows error reporting's dump setting was on and still no dump came, the game was most likely ended by a `TerminateProcess` call, which Windows does not report. REDnode 0.26.17 (asked for by the player on 2026-10-22) names it:
+
+| Part | What it does |
+|---|---|
+| `native/src/overlay/faults.cpp` | At the first fault watch, hooks ntdll's `NtTerminateProcess` (under `TerminateProcess`, `ExitProcess` and `abort`) and kernelbase's `RaiseFailFastException` through RED4ext's hooking. While a watch is on, a call that ends this process is written to `rednode-faults.log` as "the game is being ended by ..., status 0x..., on thread ..." with its stack, before it goes ahead. At most 4 per watch. The plugin log says whether the hooks attached |
+| Not covered | A `__fastfail` instruction skips both; Windows error reporting's own dumps catch it. A process ended from outside leaves nothing in the game |
+| Unit tests | `native/tests/faults_test.cpp`: an end during a watch is written with its status and stack, at most 4 a watch, nothing after the plugin stops |
+
+### HP0 run with 0.26.17: test
+
+On the laptop, in the `Cyberpunk 2077 - Copy` folder, one copy of the game, REDnode 0.26.17 (the update zip over 0.26.16), REDagent off.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. With the game closed: the leather `EDGEmat_M3.archive` in `archive\pc\mod`, no other version, `archive\pc\hot` empty. Start the game, load the save wearing the trousers. **Mark**.
+2. In **Refresh test**, swap the base look `EDGEmat_M3.archive`. **Mark** if the game is still running.
+3. Send `rednode-faults.log`, the plugin log of the session (its line "Faults: exit hooks attached" matters), the RED Hot Tools log, and any new dump in `%LOCALAPPDATA%\CrashDumps`.
+

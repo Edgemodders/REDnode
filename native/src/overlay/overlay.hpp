@@ -190,6 +190,7 @@ bool IsFaultsMethod(const std::string& aMethod);
 std::string Faults(const std::string& aMethod, const json::Value& aParams, std::string& aError);
 void UpdateFaults();  // game thread, each frame: logs the end of a watch
 void FaultsOnExit();  // DllMain's process detach: who called ExitProcess during a watch
+void FaultsOnEnd(const char* aHow, unsigned long aStatus); // the exit hooks: who ends the game during a watch
 // opus.cpp: a read-only look at the game's sound pak index and open paks (opus.state, H1c).
 struct OpusPlaces
 {

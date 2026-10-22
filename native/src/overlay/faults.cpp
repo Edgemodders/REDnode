@@ -7,7 +7,14 @@
 // first faults to red4ext/logs/rednode-faults.log: the code, the module and offset where
 // it happened, what an access violation touched, the thread and its name, and the stack.
 // If the game then exits through ExitProcess during the watch, DllMain's detach writes
-// who called it. With no exit line, the game was ended by TerminateProcess.
+// who called it.
+//
+// Some swaps end the game with no fault at all, no crash report and no exit line
+// (docs/hot-swap-research.md, HP0). To name what ends it, the first watch hooks ntdll's
+// NtTerminateProcess (under TerminateProcess, ExitProcess and abort) and kernelbase's
+// RaiseFailFastException through RED4ext's hooking. While a watch is on, a call that ends
+// this process is written with its status, thread and stack before it goes ahead. A
+// __fastfail instruction skips both; Windows error reporting's own dumps catch that one.
 //
 // The file is written with WriteFile and flushed at once, since the process may be gone a
 // moment later. Outside a watch the handler returns at its first check.
@@ -32,6 +39,7 @@ HANDLE g_out = INVALID_HANDLE_VALUE;
 SRWLOCK g_writeLock = SRWLOCK_INIT;
 std::atomic<uint64_t> g_until{0}; // GetTickCount64 at which the watch ends; 0 for none
 std::atomic<uint32_t> g_logged{0};
+std::atomic<uint32_t> g_endsLogged{0};
 std::atomic<DWORD> g_gameThread{0};
 bool g_reported = true; // game thread: the end of the last watch is in the plugin log
 char g_label[200] = "";
@@ -200,6 +208,73 @@ LONG CALLBACK OnException(EXCEPTION_POINTERS* aInfo)
     return EXCEPTION_CONTINUE_SEARCH; // the game's own handling goes on as before
 }
 
+// The exit hooks, attached at the first watch and kept until the plugin stops.
+using NtTerminateProcessFn = LONG(NTAPI*)(HANDLE, LONG);
+using RaiseFailFastFn = void(WINAPI*)(PEXCEPTION_RECORD, PCONTEXT, DWORD);
+void* g_terminateAt = nullptr;
+NtTerminateProcessFn g_terminateOriginal = nullptr;
+void* g_failFastAt = nullptr;
+RaiseFailFastFn g_failFastOriginal = nullptr;
+bool g_exitHooksTried = false;
+
+LONG NTAPI NtTerminateProcessDetour(HANDLE aProcess, LONG aStatus)
+{
+    // A null handle is ExitProcess ending the other threads first; the current-process
+    // pseudo handle, or a real handle to this process, is TerminateProcess on itself.
+    if (!aProcess)
+        FaultsOnEnd("NtTerminateProcess for the other threads (ExitProcess's first step)", static_cast<DWORD>(aStatus));
+    else if (aProcess == GetCurrentProcess() || GetProcessId(aProcess) == GetCurrentProcessId())
+        FaultsOnEnd("TerminateProcess", static_cast<DWORD>(aStatus));
+    return g_terminateOriginal(aProcess, aStatus);
+}
+
+void WINAPI RaiseFailFastDetour(PEXCEPTION_RECORD aRecord, PCONTEXT aContext, DWORD aFlags)
+{
+    FaultsOnEnd("RaiseFailFastException", aRecord ? aRecord->ExceptionCode : 0xC0000409);
+    g_failFastOriginal(aRecord, aContext, aFlags);
+}
+
+void AttachExitHooks()
+{
+    if (g_exitHooksTried)
+        return;
+    g_exitHooksTried = true;
+    const auto* sdk = GetSdk();
+    if (!sdk || !sdk->hooking)
+    {
+        Log("Faults: RED4ext's hooking is not available, so a TerminateProcess during a watch is not written");
+        return;
+    }
+    g_terminateAt = reinterpret_cast<void*>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "NtTerminateProcess"));
+    g_failFastAt = reinterpret_cast<void*>(GetProcAddress(GetModuleHandleW(L"kernelbase.dll"), "RaiseFailFastException"));
+    const bool terminate = g_terminateAt && sdk->hooking->Attach(GetHandle(), g_terminateAt,
+                                                                 reinterpret_cast<void*>(&NtTerminateProcessDetour),
+                                                                 reinterpret_cast<void**>(&g_terminateOriginal));
+    const bool failFast = g_failFastAt && sdk->hooking->Attach(GetHandle(), g_failFastAt,
+                                                               reinterpret_cast<void*>(&RaiseFailFastDetour),
+                                                               reinterpret_cast<void**>(&g_failFastOriginal));
+    if (!terminate)
+        g_terminateAt = nullptr;
+    if (!failFast)
+        g_failFastAt = nullptr;
+    Log("Faults: exit hooks %s (NtTerminateProcess), %s (RaiseFailFastException)", terminate ? "attached" : "NOT attached",
+        failFast ? "attached" : "NOT attached");
+}
+
+void DetachExitHooks()
+{
+    const auto* sdk = GetSdk();
+    if (sdk && sdk->hooking)
+    {
+        if (g_terminateAt)
+            sdk->hooking->Detach(GetHandle(), g_terminateAt);
+        if (g_failFastAt)
+            sdk->hooking->Detach(GetHandle(), g_failFastAt);
+    }
+    g_terminateAt = g_failFastAt = nullptr;
+    g_exitHooksTried = false;
+}
+
 bool OpenFile()
 {
     if (g_out != INVALID_HANDLE_VALUE)
@@ -220,6 +295,7 @@ void StartFaults(const std::filesystem::path& aPluginDir)
 void StopFaults()
 {
     g_until = 0;
+    DetachExitHooks();
     if (g_handler)
     {
         RemoveVectoredExceptionHandler(g_handler);
@@ -258,8 +334,10 @@ std::string Faults(const std::string& aMethod, const json::Value& aParams, std::
         return {};
     }
     std::snprintf(g_label, sizeof(g_label), "%s", label.c_str());
+    AttachExitHooks();
     g_gameThread = GetCurrentThreadId();
     g_logged = 0;
+    g_endsLogged = 0;
     char stamp[16], text[400];
     Stamp(stamp, sizeof(stamp));
     std::snprintf(text, sizeof(text), "%s watch for %.0f s: %s (the game thread is %lu)\r\n", stamp, seconds, g_label,
@@ -281,6 +359,26 @@ void UpdateFaults()
     g_reported = true;
     const uint32_t logged = g_logged.load();
     Log("Faults: watch ended (%s), %u fault%s", g_label, logged, logged == 1 ? "" : "s");
+}
+
+void FaultsOnEnd(const char* aHow, unsigned long aStatus)
+{
+    if (GetTickCount64() > g_until.load() || g_endsLogged.fetch_add(1) >= 4)
+        return;
+    char stamp[16], text[4096];
+    Stamp(stamp, sizeof(stamp));
+    std::snprintf(text, sizeof(text), "%s the game is being ended by %s, status 0x%08lX, on thread %lu%s\r\n", stamp, aHow,
+                  aStatus, static_cast<unsigned long>(GetCurrentThreadId()),
+                  GetCurrentThreadId() == g_gameThread.load() ? " (the game thread)" : "");
+    void* frames[MaxFrames];
+    const USHORT count = RtlCaptureStackBackTrace(1, MaxFrames, frames, nullptr);
+    DWORD64 addresses[MaxFrames];
+    for (USHORT i = 0; i < count; i++)
+        addresses[i] = reinterpret_cast<DWORD64>(frames[i]);
+    AppendStack(text, sizeof(text), addresses, count);
+    AcquireSRWLockExclusive(&g_writeLock);
+    Write(text);
+    ReleaseSRWLockExclusive(&g_writeLock);
 }
 
 void FaultsOnExit()
