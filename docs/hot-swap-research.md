@@ -131,6 +131,6 @@ Open, to settle next:
 
 | Question | How |
 |---|---|
-| Was the swap an **add** or a **replace**? RED Hot Tools replaces an archive of the same name in place, and **inserts** a new one into the depot's list | The player (2026-10-22): the first crash that morning was an add (the versions were named `EDGEmatA.archive` and `EDGEmatB.archive`, both in `archive/pc/mod`); for the 11:02 run both were renamed `EDGEmatA.archive`, so it was a **replace**. Open: whether `EDGEmatB.archive` was still in `archive/pc/mod` at 11:02. Nine replaces of the older `EDGEmat_M3.archive` passed on 2026-10-21 |
+| Was the swap an **add** or a **replace**? RED Hot Tools replaces an archive of the same name in place, and **inserts** a new one into the depot's list | The player (2026-10-22): the first crash that morning was an add (the versions were named `EDGEmatA.archive` and `EDGEmatB.archive`, both in `archive/pc/mod`); for the 11:02 run both were renamed `EDGEmatA.archive`, so it was a **replace**. `EDGEmatB.archive` was no longer in `archive/pc/mod` at 11:02 (the player), so it was a clean replace. Nine replaces of the older `EDGEmat_M3.archive` passed on 2026-10-21. Next: one session in today's setup that replaces `EDGEmat_M3` first, then the new archive, to tell the setup from the archive |
 | What the fail-fast is and where | Windows error reporting's own dumps (`LocalDumps` for `Cyberpunk2077.exe`, set by the player), which catch a fail-fast; Event Viewer's Application log (events 1000 and 1001) for the exception code and module |
 
