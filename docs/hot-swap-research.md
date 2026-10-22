@@ -189,3 +189,16 @@ A static reading of the 2.31 exe (the helpers stay in the scratchpad):
 
 So the swapped archive failed the engine's own checks at the moment of the swap, and the engine quits on purpose. The same files load fine at start (HP0 test), so the engine read something at the swap that does not match the file on disk. A lead to test (unverified): the size check compares the archive's header with the size its reader reports; if the reader is a reopened handle (RED Hot Tools reopens the old archive's handle before the load) that still reports the old file's size, two versions of different sizes fail and two of the same size pass.
 
+The four test archives, read on the dev PC with the engine's header checks (a scratchpad script, not committed):
+
+| Archive | Size (bytes) | Version | Files | Engine's checks |
+|---|---|---|---|---|
+| `EDGEmat_M3.archive`, leather | 14,467,072 | 12 | 27 | pass |
+| `EDGEmat_M3.archive`, base look | 13,959,168 | 12 | 25 | pass |
+| `EDGEmatA.archive`, version 1 | 6,348,800 | 12 | 9 | pass |
+| `EDGEmatA.archive`, version 2 | 6,340,608 | 12 | 9 | pass |
+
+Every file passes on disk, and the two versions of each pair differ in size, which fits the lead of a reader reporting the old size. The two `EDGEmatA` versions share only 2 of their 9 paths, so they are not the "same file list" pair the H2 tests assumed.
+
+The check's error numbers (2.31): **1**, the header is wrong for the file (under 4 KB, not `RDAR`, the header's size differs from the reader's, the index past the end, not 4 KB aligned); **2**, an unsupported version; **4**, the header or the index could not be read; any other number comes from the index's own parse (`+0x7bd31c`). The number in the engine's message would tell a size mismatch (1) from a dead file handle (4).
+
