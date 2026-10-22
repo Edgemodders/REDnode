@@ -204,3 +204,18 @@ The check's error numbers (2.31): **1**, the header is wrong for the file (under
 
 The player adds (2026-10-22): the `EDGEmat_M3` archives were rebuilt for other EDGEmat tests after 2026-10-21, so today's two versions are not the files that passed nine swaps that day. Yesterday's passes therefore do not count against the size lead. Next, a test with no new build: install `EDGEmatA.archive` version 1, swap the identical file (same size), then version 2 (a different size). If the identical swap passes and version 2 ends the game, the size lead holds.
 
+### HP0: the identical file fails too; REDnode 0.26.18
+
+2026-10-22 at 11:56: a swap of `EDGEmat_M3.archive` with the same file that was installed (the player) ended the game the same way (`TerminateProcess(1)` from the engine's fatal quit, after the archive load). The sizes matched, so the size lead is out.
+
+REDnode 0.26.18 adds the engine's own message to the fault log. The engine's assert reporter (`+0x29ce848` in 2.31) formats every assert message into one 1 KB buffer (`+0x3b268f0`) before the fatal quit. The plugin finds the buffer by the reporter's `lea` (one match in 2.31; none or several turn it off) and, when the game is ended during a watch, writes "the engine's last message: ..." under the stack: for this failure, the archive's path and the error number (1 a header that does not fit the file, 2 a version, 4 a read that failed).
+
+### HP0 run with 0.26.18: test
+
+On the laptop, `Cyberpunk 2077 - Copy`, one copy of the game, REDnode 0.26.18 (the update zip over 0.26.17).
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. With the game closed: one `EDGEmatA.archive` (version 1) in `archive\pc\mod`, `archive\pc\hot` empty. Start the game, load the save. **Mark**.
+2. In **Refresh test**, swap version 1 itself (the identical file). **Mark** if the game is still running.
+3. Send `rednode-faults.log` (its last lines carry the engine's message) and the plugin log (its line "the engine's message buffer found").
+

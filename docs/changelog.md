@@ -24,7 +24,7 @@ How to keep it:
 
 **Other**
 
-- During an archive swap, `red4ext/logs/rednode-faults.log` now also names whatever ends the game (TerminateProcess, ExitProcess or a fail-fast), with its status and stack, for crashes that leave no crash report.
+- During an archive swap, `red4ext/logs/rednode-faults.log` now also names whatever ends the game (TerminateProcess, ExitProcess or a fail-fast), with its status, its stack and the game engine's last error message, for crashes that leave no crash report.
 
 ## 0.26.15 (2026-10-20)
 

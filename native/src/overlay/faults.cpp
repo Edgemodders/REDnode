@@ -16,6 +16,12 @@
 // this process is written with its status, thread and stack before it goes ahead. A
 // __fastfail instruction skips both; Windows error reporting's own dumps catch that one.
 //
+// The engine ends itself on a failed fatal check (docs/hot-swap-research.md, "HP0: the game
+// ends itself"): its assert reporter formats the message into one 1 KB buffer, then its fatal
+// quit calls TerminateProcess. The buffer is found by a byte pattern in the reporter (one match
+// in 2.31), and an end during a watch also writes the engine's last message from it, such as
+// "Failed to load archive <path>, error 1, try regenerating archives!".
+//
 // The file is written with WriteFile and flushed at once, since the process may be gone a
 // moment later. Outside a watch the handler returns at its first check.
 
@@ -216,6 +222,36 @@ NtTerminateProcessFn g_terminateOriginal = nullptr;
 void* g_failFastAt = nullptr;
 RaiseFailFastFn g_failFastOriginal = nullptr;
 bool g_exitHooksTried = false;
+const char* g_assertMessage = nullptr; // the engine's assert message buffer, when found
+
+// The engine's assert message buffer in its .text: the reporter formats into it with
+//   mov r8d,400h; and qword ptr [rsp+28h],0; lea r14,[rip+buffer]
+constexpr uint8_t AssertBufferPattern[] = {0x41, 0xB8, 0x00, 0x04, 0x00, 0x00, 0x48, 0x83,
+                                           0x64, 0x24, 0x28, 0x00, 0x4C, 0x8D, 0x35};
+
+void FindAssertMessage()
+{
+    auto* image = reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
+    __try
+    {
+        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(image);
+        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(image + dos->e_lfanew);
+        const auto* section = IMAGE_FIRST_SECTION(nt);
+        for (WORD i = 0; i < nt->FileHeader.NumberOfSections; i++, section++)
+        {
+            if (std::memcmp(section->Name, ".text", 6) != 0)
+                continue;
+            const uint8_t* code = image + section->VirtualAddress;
+            const size_t size = section->Misc.VirtualSize;
+            const uint8_t* found = FindAssertBufferIn(code, size);
+            g_assertMessage = reinterpret_cast<const char*>(found);
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        g_assertMessage = nullptr;
+    }
+}
 
 LONG NTAPI NtTerminateProcessDetour(HANDLE aProcess, LONG aStatus)
 {
@@ -257,8 +293,10 @@ void AttachExitHooks()
         g_terminateAt = nullptr;
     if (!failFast)
         g_failFastAt = nullptr;
-    Log("Faults: exit hooks %s (NtTerminateProcess), %s (RaiseFailFastException)", terminate ? "attached" : "NOT attached",
-        failFast ? "attached" : "NOT attached");
+    FindAssertMessage();
+    Log("Faults: exit hooks %s (NtTerminateProcess), %s (RaiseFailFastException); the engine's message buffer %s",
+        terminate ? "attached" : "NOT attached", failFast ? "attached" : "NOT attached",
+        g_assertMessage ? "found" : "not found");
 }
 
 void DetachExitHooks()
@@ -376,9 +414,54 @@ void FaultsOnEnd(const char* aHow, unsigned long aStatus)
     for (USHORT i = 0; i < count; i++)
         addresses[i] = reinterpret_cast<DWORD64>(frames[i]);
     AppendStack(text, sizeof(text), addresses, count);
+    char message[1100];
+    if (CopyMessage(g_assertMessage, message, sizeof(message)))
+    {
+        Append(text, sizeof(text), "  the engine's last message: ");
+        Append(text, sizeof(text), message);
+        Append(text, sizeof(text), "\r\n");
+    }
     AcquireSRWLockExclusive(&g_writeLock);
     Write(text);
     ReleaseSRWLockExclusive(&g_writeLock);
+}
+
+const uint8_t* FindAssertBufferIn(const uint8_t* aCode, size_t aSize)
+{
+    constexpr size_t n = sizeof(AssertBufferPattern);
+    const uint8_t* found = nullptr;
+    for (size_t i = 0; i + n + 4 <= aSize; i++)
+    {
+        if (std::memcmp(aCode + i, AssertBufferPattern, n) != 0)
+            continue;
+        if (found)
+            return nullptr; // more than one: not the game version this was read from
+        int32_t disp;
+        std::memcpy(&disp, aCode + i + n, 4);
+        found = aCode + i + n + 4 + disp;
+    }
+    return found;
+}
+
+bool CopyMessage(const char* aFrom, char* aOut, size_t aSize)
+{
+    if (!aFrom || aSize < 2)
+        return false;
+    size_t used = 0;
+    __try
+    {
+        for (size_t i = 0; i < 1024 && used + 1 < aSize && aFrom[i]; i++)
+        {
+            const char c = aFrom[i];
+            aOut[used++] = (c == '\r' || c == '\n' || c == '\t') ? ' ' : (c >= 32 && c < 127 ? c : '?');
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        return false;
+    }
+    aOut[used] = 0;
+    return used > 0;
 }
 
 void FaultsOnExit()

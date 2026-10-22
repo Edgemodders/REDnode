@@ -191,6 +191,8 @@ std::string Faults(const std::string& aMethod, const json::Value& aParams, std::
 void UpdateFaults();  // game thread, each frame: logs the end of a watch
 void FaultsOnExit();  // DllMain's process detach: who called ExitProcess during a watch
 void FaultsOnEnd(const char* aHow, unsigned long aStatus); // the exit hooks: who ends the game during a watch
+const uint8_t* FindAssertBufferIn(const uint8_t* aCode, size_t aSize); // the engine's assert message buffer
+bool CopyMessage(const char* aFrom, char* aOut, size_t aSize); // a C string read safely, as one printable line
 // opus.cpp: a read-only look at the game's sound pak index and open paks (opus.state, H1c).
 struct OpusPlaces
 {

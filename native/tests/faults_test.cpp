@@ -8,6 +8,7 @@
 #include "../src/overlay/overlay.hpp"
 
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -140,11 +141,31 @@ int main()
         FaultsOnEnd("TerminateProcess", 1);
     Check(Count(ReadAll(file), "being ended by") == 4, "a watch writes at most 4 ends");
 
+    // The engine's assert buffer: the reporter's lea r14,[rip+disp] after the 1 KB size.
+    {
+        uint8_t code[64] = {0x90, 0x90, 0x41, 0xB8, 0x00, 0x04, 0x00, 0x00, 0x48, 0x83, 0x64, 0x24, 0x28,
+                            0x00, 0x4C, 0x8D, 0x35, 0x10, 0x00, 0x00, 0x00};
+        Check(FindAssertBufferIn(code, sizeof(code)) == code + 21 + 0x10, "the assert buffer is found from its lea");
+        uint8_t twice[64] = {};
+        const uint8_t one[] = {0x41, 0xB8, 0x00, 0x04, 0x00, 0x00, 0x48, 0x83, 0x64, 0x24, 0x28, 0x00, 0x4C, 0x8D, 0x35};
+        std::memcpy(twice, one, sizeof(one));
+        std::memcpy(twice + 30, one, sizeof(one));
+        Check(FindAssertBufferIn(twice, sizeof(twice)) == nullptr, "two matches find nothing");
+        char out[64];
+        Check(CopyMessage("Failed to load archive x, error 1\n", out, sizeof(out)) &&
+                  std::string(out) == "Failed to load archive x, error 1 ",
+              "a message is copied as one line");
+    }
+
     StopFaults();
     Fault();
     FaultsOnEnd("TerminateProcess", 1);
     Check(Count(ReadAll(file), "fault 0x") == 9 && Count(ReadAll(file), "being ended by") == 4,
           "after stop, nothing more is written");
+    {
+        char out[64];
+        Check(!CopyMessage(reinterpret_cast<const char*>(0x10), out, sizeof(out)), "an unreadable buffer is skipped");
+    }
 
     std::filesystem::remove_all(root);
     std::printf("\n%s: %d failure(s)\n", g_failures ? "FAILED" : "PASSED", g_failures);
