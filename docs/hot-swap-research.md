@@ -40,7 +40,7 @@ Three crash reports from the laptop (game 2.31, RTX 3070 Laptop with 8 GB, 16 GB
 | 10:11:01 | **D3D12MA: Out of memory** (the GPU memory allocator); about 3.4 of 8 GB used at the last sample | A new session from 10:09:41. **No swap** |
 | 10:14:26 | **D3D12MA: Out of memory**, while a save loaded (the camera not placed yet) | A new session from 10:13:08. **No swap** |
 
-Two of the three crashes came in sessions with no swap. RED Hot Tools had moved the swapped archive into `archive/pc/mod`, so the game loaded it normally at start. The reading, **unverified**: the new archive's content makes the GPU ask for more memory than it has, for example a texture whose header declares a far bigger size or more mips than it holds. If so, these crashes are not caused by the swap at all, and a patch would not fix them. HP0 checks this first.
+The two out-of-memory crashes came in sessions with no swap. The player then said they may have started the game twice by a double click, so two copies ran at once and shared the 8 GB of graphics memory. That explains both, so they say nothing about swaps. The crash that counts is the first: the GPU stopped 18 seconds after a swap, while REDnode's next call to the game was already waiting. The player has more crash reports with swap activity; HP0 reads them.
 
 The earlier H2a crashes (2026-10-21, at the first swap of some sessions, with the Fia leggings mod installed) left no reports. Their cause is open.
 
@@ -61,7 +61,7 @@ Names follow the RED4ext SDK and the game's RTTI where they exist. How they hold
 
 | Phase | Builds or does | Answers |
 |---|---|---|
-| **HP0 Crash triage** | No code. Start the game with only the new archive installed normally, no swap; inspect its textures (size, format, mip count) in WolvenKit, or with a REDnode reader of `.xbm` headers in the archive (`archive-index.js` already reads the file table) | Whether the 2026-10-22 crashes come from the archive's content or from the swap |
+| **HP0 Crash triage** | No code. Read every crash report that follows a swap (the game's report, its GPU breadcrumbs, REDnode's logs of the session), and rule out the archive's own content: the swapped version installed normally, with no swap, must not crash | Where swap crashes happen (GPU device removed, out of memory, an access violation) and whether they follow every swap or only some content |
 | **HP1 Map** | Static reading of the 2.31 exe and read-only probes in the plugin, as in H1c-1: `resources.state(path)` (loaded or not, reference count, which entities and components hold it); Equipment-EX's slots and items read in the plugin | What holds a worn item's mesh and textures, from the slot to the GPU, and what a swap leaves stale |
 | **HP2 Safe point** | A hold of the threads that touch resources, built on what exists: the game thread pump, the Present hook (hold the render thread between frames, after the GPU's fence), the audio park. Measure what has to be held | A point where resources can be released and replaced without another thread using them |
 | **HP3 Swap and resync** | Under the hold: swap the archive, drop cache entries for every path the old **or** the new archive has (comparing their file tables), then bring each holder up to date. Two ways to compare: (a) rebuild the holders the game's own way, as taking the item off and putting it back does; (b) replace resources in place, keeping the objects (the "replace game objects" idea) | Which way is reliable, and what each costs in time and risk |
@@ -87,16 +87,16 @@ HP0 can run now. HP1 to HP4 are research on game 2.31; each one's findings decid
 | The engine's resource ownership is deep and spread over threads | HP1 may show a hold that is too broad to be practical. Then the fallback is HP3 (a): rebuild the holders, not the resources |
 | Game 2.5 | Research on 2.31 now; every pattern needs checking on 2.5 before a release |
 | Other mods hold references | ArchiveXL's dynamic appearances, Equipment-EX, wardrobe mods. Each needs a test |
-| The crashes may not be the swap's | HP0 first, so the patch is aimed at the right problem |
+| The crashes may not be the swap's | HP0 first, so the patch is aimed at the right problem. Two of 2026-10-22's three were two copies of the game running at once |
 
 ## HP0 test
 
-On the laptop, game 2.31. No swap in this test.
+On the laptop, game 2.31. No swap in this test: it rules out the archive's own content. Make sure only one copy of the game runs (Task Manager shows one `Cyberpunk2077.exe`).
 
 0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
-1. With the game closed: put `EDGEmatB.archive` (the version swapped at 10:08) in `archive\pc\mod`, and only it: no other version of the trousers, `archive\pc\hot` empty. Note your texture quality setting.
+1. With the game closed: put `EDGEmatB.archive` (the version swapped at 10:08) in `archive\pc\mod`, and only it: no other version of the trousers, `archive\pc\hot` empty.
 2. Start the game and load the save wearing the trousers. **Mark**.
 3. Play for two minutes, looking at V's legs now and then. **Mark**.
-4. Quit. If the game crashed, send the crash report folder (`%LOCALAPPDATA%\REDEngine\ReportQueue\`). Either way, send the archive itself, or WolvenKit's view of its textures: each `.xbm`'s width, height, format and mip count.
+4. Quit. If the game crashed, send the crash report folder (`%LOCALAPPDATA%\REDEngine\ReportQueue\`).
 
 A crash here, with no swap, points at the archive's content. No crash points back at the swap.
