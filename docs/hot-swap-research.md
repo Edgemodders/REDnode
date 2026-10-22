@@ -224,7 +224,7 @@ On the laptop, `Cyberpunk 2077 - Copy`, one copy of the game, REDnode 0.26.18 (t
 2026-10-22 at 12:15, on the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.18, the identical `EDGEmat_M3.archive` swapped over itself. The plugin log: "the engine's message buffer found". The game was ended the same way, and the fault log now carries the engine's words:
 
 ```
-the engine's last message: Failed to load archive C:\Program Files (x86)\Steam\steamapps\common\Cyberpunk 2077 - Copyrchive\pc\mod\EDGEmat_M3.archive, error 1, try regenerating archives!
+the engine's last message: Failed to load archive C:\Program Files (x86)\Steam\steamapps\common\Cyberpunk 2077 - Copy\archive\pc\mod\EDGEmat_M3.archive, error 1, try regenerating archives!
 ```
 
 Error 1 with a file that passes every check on disk, and an identical file at that, means the reader the engine used reported something other than the file: most likely a size of 0, the first check (a reader whose file handle is closed reports no size). A lead from RED Hot Tools' source (MIT, `ArchiveLoader.cpp`), unverified:
