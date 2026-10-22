@@ -45,6 +45,25 @@ const sim = {
   money: 12450,
 };
 
+/** A game value for ink bindings (I2c), as the plugin reads it each frame. */
+export function inkSource(name) {
+  const now = new Date();
+  return {
+    'player.health': sim.health,
+    'player.healthMax': sim.healthMax,
+    'player.stamina': 100,
+    'player.memory': 80,
+    'player.money': sim.money,
+    'player.level': sim.level,
+    'player.streetCred': 18,
+    'player.x': sim.pos.x,
+    'player.y': sim.pos.y,
+    'player.z': sim.pos.z,
+    'game.hour': now.getHours(),
+    'game.minute': now.getMinutes(),
+  }[name];
+}
+
 const listeners = new Set();
 /** Host events, as window.rednode.on gets them. */
 export function onHostEvent(fn) {

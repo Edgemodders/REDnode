@@ -35,7 +35,7 @@ export { tweakdb } from "./tweakdb.js";
 export type { TweakId, Flat, RecordTypeName } from "./tweakdb.js";
 export { audio } from "./audio.js";
 export { ink } from "./ink.js";
-export type { InkAnchor, InkColor, InkProps, InkTextProps, InkContainerProps, InkImageProps, InkNode, InkMount, InkMountOptions } from "./ink.js";
+export type { InkAnchor, InkColor, InkTone, InkTextStyle, InkAlign, InkSource, InkProps, InkTextProps, InkContainerProps, InkImageProps, InkBarProps, InkListProps, InkNode, InkMount, InkMountOptions } from "./ink.js";
 export { archives } from "./archives.js";
 export type { ReloadOptions, ReloadResult, SoundState } from "./archives.js";
 export type { Sound, SoundCategory, SoundEnd, SoundInfo, PlayOptions, TraceBatch, PostedEvent, GameSound, SoundSearch, SoundEventInfo } from "./audio.js";

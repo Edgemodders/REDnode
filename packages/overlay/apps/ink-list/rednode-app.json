@@ -1,0 +1,12 @@
+{
+  "id": "ink-list",
+  "name": "Ink list",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "The test of the ink API's lists from data (phase I2c): a list of contracts on the HUD built with ink.list, and buttons that add, remove, move and rename them, so only what changed goes to the game; and a header rebuilt with mount.update. Needs Codeware.",
+  "main": "mod.mjs",
+  "open": false,
+  "requires": {
+    "codeware": ">=1.16"
+  }
+}

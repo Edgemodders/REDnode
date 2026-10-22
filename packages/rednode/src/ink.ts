@@ -115,9 +115,43 @@ export interface InkProps {
 /** How a child lines up across a `column` (left to right) or a `row` (top to bottom). */
 export type InkAlign = "left" | "center" | "right" | "top" | "bottom" | "fill";
 
+/**
+ * A game value the plugin reads every frame for a bound node (I2c), with no round trip to
+ * the mod: `player.health`, `player.healthMax`, `player.stamina` and `player.memory` (0 to 100),
+ * `player.money`, `player.level`, `player.streetCred`, `player.x`, `player.y`, `player.z`,
+ * `game.hour`, `game.minute`.
+ */
+export type InkSource =
+  | "player.health"
+  | "player.healthMax"
+  | "player.stamina"
+  | "player.memory"
+  | "player.money"
+  | "player.level"
+  | "player.streetCred"
+  | "player.x"
+  | "player.y"
+  | "player.z"
+  | "game.hour"
+  | "game.minute";
+
 /** Properties of {@link ink.text}. */
 export interface InkTextProps extends InkProps {
   text?: string;
+  /**
+   * Shows a game value, read by the plugin every frame and changed on screen only when the
+   * shown text changes. The mod sends nothing after this.
+   *
+   * @example
+   * ```ts
+   * ink.text("", { style: "value", bind: "player.health", format: "{value} HP" });
+   * ```
+   */
+  bind?: InkSource;
+  /** How a bound value shows: `{value}` stands for it. `"{value}"` if not given. */
+  format?: string;
+  /** Decimals of a bound value, 0 if not given. */
+  decimals?: number;
   /** One of the game's text styles; see {@link InkTextStyle}. Its props win over the style's. */
   style?: InkTextStyle;
   /** The font size: the style's, or 32. */
@@ -155,6 +189,30 @@ export interface InkImageProps extends InkProps {
   icon?: string;
 }
 
+/** Properties of {@link ink.bar}. */
+export interface InkBarProps extends InkProps {
+  /** The bar's length: 300 if not given. */
+  width?: number;
+  /** Its thickness: 8 if not given. */
+  height?: number;
+  /** How full it is, from 0 to 1, when it is not bound. */
+  value?: number;
+  /** A game value that fills it, read every frame by the plugin; see {@link InkSource}. */
+  bind?: InkSource;
+  /** What the bound value is out of: a number, or a source such as `"player.healthMax"`. 100 if not given. */
+  of?: number | InkSource;
+  /** The track's tone, behind the fill: `"background"` if not given. */
+  track?: InkTone;
+}
+
+/** Properties of {@link ink.list}, besides its items. */
+export interface InkListProps<T> extends InkContainerProps {
+  /** `"column"` (the default) or `"row"`. */
+  direction?: "column" | "row";
+  /** The items to show, one node each. */
+  items?: readonly T[];
+}
+
 /** One widget of a tree. */
 export interface InkNode<P extends InkProps = InkProps> {
   /** Unique within the mod. */
@@ -187,6 +245,19 @@ export interface InkMount {
   readonly key: string;
   /** A node of this mount by its `id`. */
   get(id: string): InkNode | undefined;
+  /**
+   * Replaces the mount's tree with a new one built from data, sending only what changed:
+   * nodes of the same tag and shape keep their widgets and get the changed props; others are
+   * replaced.
+   *
+   * @example
+   * ```ts
+   * const draw = (s) => ink.column({ gap: 4 }, ...s.map((t) => ink.text(t, { style: "body" })));
+   * const board = ink.mount("hud", { anchor: "left", x: 80 }, draw(["Watson", "Kabuki"]));
+   * board.update(draw(["Watson", "Japantown"])); // one text changes
+   * ```
+   */
+  update(...children: InkNode[]): void;
   /** Removes the tree from the game. REDnode also removes it when the mod stops. */
   unmount(): void;
 }
@@ -289,6 +360,8 @@ interface State {
   sent: Record<string, unknown>; // the wire props the game has
   node: InkNode;
   icon?: { record: string; atlas: string; part: string } | null; // an icon once read from TweakDB
+  bar?: InkBarProps; // a bar's own props (ink.bar)
+  list?: ListState<unknown>; // a list's renderer and its items by key (ink.list)
 }
 
 interface MountState {
@@ -373,9 +446,10 @@ function wire(s: State): Record<string, unknown> {
     }
   }
   let margin = p.margin !== undefined ? sides(p.margin) : null;
-  if (inPanel && margin === null && parent && parent.children.indexOf(s) > 0) {
-    const gap = (parent.props as InkContainerProps).gap ?? 0;
-    if (gap) margin = parentTag === "column" ? [0, gap, 0, 0] : [gap, 0, 0, 0];
+  if (inPanel && margin === null && parent) {
+    // Always sent in a panel, so a child that becomes the first loses its gap (I2c's lists).
+    const gap = parent.children.indexOf(s) > 0 ? ((parent.props as InkContainerProps).gap ?? 0) : 0;
+    margin = parentTag === "column" ? [0, gap, 0, 0] : [gap, 0, 0, 0];
   }
   if (margin) out.margin = margin;
   if (p.pad !== undefined) out.padding = sides(p.pad);
@@ -427,6 +501,14 @@ function wire(s: State): Record<string, unknown> {
       if (p.part !== undefined) out.part = p.part;
     }
   }
+  if (s.tag === "text" && p.bind !== undefined) {
+    out.binding = { source: p.bind, target: "text", format: p.format ?? "{value}", decimals: p.decimals ?? 0 };
+  }
+  // A bar's fill (internal props, set by ink.bar): scaled from its left edge.
+  const internal = s.props as { $pivot?: number[]; $scale?: number[]; $binding?: unknown };
+  if (internal.$pivot) out.pivot = internal.$pivot;
+  if (internal.$scale) out.scale = internal.$scale;
+  if (internal.$binding) out.binding = internal.$binding;
   // ink.widget: capitalized props are the widget's own methods, passed as they are.
   for (const [k, v] of Object.entries(p)) if (/^[A-Z]/.test(k)) out[k] = v;
   if (p.id !== undefined) out.name = p.id;
@@ -444,6 +526,7 @@ function changes(t: State, now: Record<string, unknown>): Record<string, unknown
   if (dropped.length || "bind" in changed) {
     changed.bind = { ...Object.fromEntries(dropped.map((k) => [k, null])), ...after };
   }
+  if (t.sent.binding && !now.binding) changed.binding = null; // unbound: the plugin stops reading it
   return changed;
 }
 
@@ -470,11 +553,13 @@ function send(t: State): void {
   if (Object.keys(changed).length) enqueue({ op: "set", mount: t.mount.key, key: t.key, props: changed });
 }
 
-function add(s: State, mount: MountState): void {
+function add(s: State, mount: MountState, index?: number): void {
   if (s.mount) throw new Error(`ink: a node is in one mount at a time (${s.tag} ${s.key} is mounted already)`);
   s.mount = mount;
   s.sent = wire(s);
-  enqueue({ op: "add", mount: mount.key, key: s.key, parent: s.parent?.key ?? "", tag: s.tag, props: s.sent });
+  const op: Record<string, unknown> = { op: "add", mount: mount.key, key: s.key, parent: s.parent?.key ?? "", tag: s.tag, props: s.sent };
+  if (index !== undefined) op.index = index;
+  enqueue(op);
   resolveIcon(s);
   for (const c of s.children) add(c, mount);
 }
@@ -483,6 +568,91 @@ function detach(s: State): void {
   s.mount = null;
   s.sent = {};
   for (const c of s.children) detach(c);
+}
+
+function stateOf(n: unknown): State {
+  const s = (n as Record<symbol, State> | null)?.[NODE];
+  if (!s) throw new Error("ink: not an ink node");
+  return s;
+}
+
+function siblingsOf(s: State, mount: MountState | null): State[] {
+  return s.parent ? s.parent.children : (mount?.roots ?? []);
+}
+
+// A panel's children take their gap and alignment from their place: send them again after
+// the children changed.
+function resendChildren(list: State[]): void {
+  for (const c of list) send(c);
+}
+
+// Puts a node at a place among a parent's children (or a mount's roots), on screen too.
+function attach(s: State, parent: State | null, mount: MountState | null, index: number): void {
+  if (s.parent || s.mount) throw new Error(`ink: ${s.tag} ${s.key} has a place already`);
+  s.parent = parent;
+  const list = parent ? parent.children : (mount?.roots ?? []);
+  const at = Math.max(0, Math.min(index, list.length));
+  list.splice(at, 0, s);
+  const m = parent ? parent.mount : mount;
+  if (m?.open) add(s, m, at < list.length - 1 ? at : undefined);
+}
+
+// Takes a node off its parent and the screen.
+function remove(s: State): void {
+  const m = s.mount;
+  const list = siblingsOf(s, m);
+  const at = list.indexOf(s);
+  if (at >= 0) list.splice(at, 1);
+  if (m?.open) enqueue({ op: "remove", mount: m.key, key: s.key });
+  detach(s);
+  s.parent = null;
+}
+
+function move(s: State, index: number): void {
+  const m = s.mount;
+  const list = siblingsOf(s, m);
+  const from = list.indexOf(s);
+  if (from < 0 || from === index) return;
+  list.splice(from, 1);
+  list.splice(index, 0, s);
+  if (m?.open) enqueue({ op: "move", mount: m.key, key: s.key, index });
+}
+
+// Brings a node in line with a freshly built one: the same tag and shape keep the widget and
+// send only the props that changed; anything else is replaced. Returns the node that stays.
+function patch(old: State, fresh: State): State {
+  // The same tag keeps the widget; children are matched by place, and the extra ones added or
+  // removed. Lists and bars keep their own children, so another of them is replaced.
+  const sameShape =
+    old.tag === fresh.tag &&
+    old.list === undefined &&
+    fresh.list === undefined &&
+    (old.bar === undefined) === (fresh.bar === undefined);
+  if (!sameShape) {
+    const parent = old.parent;
+    const m = old.mount;
+    const at = siblingsOf(old, m).indexOf(old);
+    remove(old);
+    attach(fresh, parent, m, at);
+    return fresh;
+  }
+  old.props = { ...fresh.props };
+  old.bar = fresh.bar;
+  if (old.mount?.open) {
+    send(old);
+    resolveIcon(old);
+  }
+  const freshChildren = fresh.children.slice();
+  for (const extra of old.children.slice(freshChildren.length)) remove(extra);
+  freshChildren.forEach((f, i) => {
+    f.parent = null; // it joins old, or is patched into old's child
+    if (i < old.children.length) {
+      const kept = patch(old.children[i], f);
+      if (kept !== old.children[i]) old.children[i] = kept;
+    } else attach(f, old, old.mount, i);
+  });
+  if (old.tag === "column" || old.tag === "row") resendChildren(old.children);
+  return old;
 }
 
 function find(list: State[], id: string): State | undefined {
@@ -500,17 +670,12 @@ function isNode(v: unknown): v is InkNode {
   return !!v && typeof v === "object" && NODE in (v as object);
 }
 
+function newState(tag: string, props: Record<string, unknown>): State {
+  return { key: `k${nextKey++}`, tag, props: { ...props }, children: [], parent: null, mount: null, sent: {}, node: null as unknown as InkNode };
+}
+
 function make<P extends InkProps>(tag: string, props: P, children: Child[] = []): InkNode<P> {
-  const s: State = {
-    key: `k${nextKey++}`,
-    tag,
-    props: { ...props } as Record<string, unknown>,
-    children: [],
-    parent: null,
-    mount: null,
-    sent: {},
-    node: null as unknown as InkNode,
-  };
+  const s = newState(tag, props as Record<string, unknown>);
   for (const c of children) {
     const cs = (c as unknown as Record<symbol, State>)[NODE];
     if (!cs) throw new Error(`ink: a child of ${tag} is not an ink node`);
@@ -518,20 +683,24 @@ function make<P extends InkProps>(tag: string, props: P, children: Child[] = [])
     cs.parent = s;
     s.children.push(cs);
   }
+  return expose<P>(s, (next) => {
+    Object.assign(s.props, next);
+    if (!s.mount?.open) return;
+    // A panel's gap and align are its children's margins and alignment: they change with it.
+    const touched = [s, ...("gap" in next || "align" in next ? s.children : [])];
+    for (const t of touched) send(t);
+    if ("icon" in next) resolveIcon(s);
+  });
+}
+
+function expose<P extends InkProps>(s: State, set: (next: Partial<P>) => void): InkNode<P> {
   const node: InkNode<P> = {
     key: s.key,
-    tag,
+    tag: s.tag,
     get props() {
-      return s.props as Readonly<P>;
+      return (s.bar ?? s.props) as Readonly<P>;
     },
-    set(next: Partial<P>) {
-      Object.assign(s.props, next);
-      if (!s.mount?.open) return;
-      // A panel's gap and align are its children's margins and alignment: they change with it.
-      const touched = [s, ...("gap" in next || "align" in next ? s.children : [])];
-      for (const t of touched) send(t);
-      if ("icon" in next) resolveIcon(s);
-    },
+    set,
   };
   Object.defineProperty(node, NODE, { value: s });
   s.node = node;
@@ -543,6 +712,91 @@ function container<P extends InkContainerProps>(tag: string, args: (P | Child)[]
   const [first, ...rest] = args;
   if (first !== undefined && !isNode(first)) return make(tag, first as P, rest as Child[]);
   return make(tag, {} as P, args as Child[]);
+}
+
+// ink.bar: a canvas with a track and a fill, the fill scaled from its left edge.
+function barParts(b: InkBarProps): { canvas: Record<string, unknown>; track: Record<string, unknown>; fill: Record<string, unknown> } {
+  const { value, bind, of, track, tone, color, width, height, ...rest } = b;
+  const canvas = { ...rest, width: width ?? 300, height: height ?? 8 };
+  const fill: Record<string, unknown> = { anchor: "fill", $pivot: [0, 0.5] };
+  if (color !== undefined) fill.color = color;
+  else fill.tone = tone ?? "normal";
+  if (bind !== undefined) fill.$binding = { source: bind, target: "scaleX", of: of ?? 100 };
+  else fill.$scale = [Math.max(0, Math.min(1, value ?? 0)), 1];
+  return { canvas, track: { anchor: "fill", tone: track ?? "background" }, fill };
+}
+
+function makeBar(b: InkBarProps): InkNode<InkBarProps> {
+  const parts = barParts(b);
+  const s = newState("canvas", parts.canvas);
+  s.bar = { ...b };
+  const trackState = newState("rect", parts.track);
+  const fillState = newState("rect", parts.fill);
+  for (const c of [trackState, fillState]) {
+    c.parent = s;
+    s.children.push(c);
+    expose(c, () => {});
+  }
+  return expose<InkBarProps>(s, (next) => {
+    s.bar = { ...s.bar, ...next };
+    const now = barParts(s.bar as InkBarProps);
+    s.props = now.canvas;
+    s.children[0].props = now.track;
+    s.children[1].props = now.fill;
+    for (const t of [s, ...s.children]) send(t);
+  });
+}
+
+// ink.list: a column or row of one node per item, by key.
+interface ListState<T> {
+  render: (item: T, index: number) => InkNode;
+  key: (item: T, index: number) => string | number;
+  entries: Map<string | number, State>;
+}
+
+function setItems<T>(s: State, items: readonly T[]): void {
+  const list = s.list as ListState<T>;
+  const keys = items.map((item, i) => list.key(item, i));
+  if (new Set(keys).size !== keys.length) throw new Error("ink: ink.list's keys must be unique");
+  for (const [k, st] of [...list.entries]) {
+    if (!keys.includes(k)) {
+      remove(st);
+      list.entries.delete(k);
+    }
+  }
+  items.forEach((item, i) => {
+    const k = keys[i];
+    const fresh = stateOf(list.render(item, i));
+    const st = list.entries.get(k);
+    if (!st) {
+      attach(fresh, s, s.mount, i);
+      list.entries.set(k, fresh);
+      return;
+    }
+    move(st, i);
+    const kept = patch(st, fresh);
+    if (kept !== st) list.entries.set(k, kept);
+  });
+  resendChildren(s.children);
+}
+
+function makeList<T>(
+  props: InkListProps<T>,
+  render: (item: T, index: number) => InkNode,
+  key: (item: T, index: number) => string | number,
+): InkNode<InkListProps<T>> {
+  const { direction, items, ...rest } = props;
+  const s = newState(direction === "row" ? "row" : "column", rest as Record<string, unknown>);
+  s.list = { render, key, entries: new Map() } as ListState<unknown>;
+  setItems(s, items ?? []);
+  return expose<InkListProps<T>>(s, (next) => {
+    const { items: nextItems, direction: _d, ...other } = next;
+    if (Object.keys(other).length) {
+      Object.assign(s.props, other);
+      for (const t of [s, ...("gap" in other || "align" in other ? s.children : [])]) send(t);
+    }
+    if (nextItems) setItems(s, nextItems);
+  });
 }
 
 /**
@@ -581,6 +835,17 @@ export const ink = {
     return {
       key: m.key,
       get: (id) => find(m.roots, id)?.node,
+      update(...next) {
+        if (!m.open) return;
+        const fresh = next.map(stateOf);
+        for (const s of m.roots.slice(fresh.length)) remove(s);
+        fresh.forEach((f, i) => {
+          if (i < m.roots.length) {
+            const kept = patch(m.roots[i], f);
+            if (kept !== m.roots[i]) m.roots[i] = kept;
+          } else attach(f, null, m, i);
+        });
+      },
       unmount() {
         if (!m.open) return;
         m.open = false;
@@ -609,6 +874,38 @@ export const ink = {
   /** A filled rectangle: give it `width`, `height` and `color`. */
   rect(props: InkProps = {}): InkNode<InkProps> {
     return make("rect", props);
+  },
+  /**
+   * A bar: a track and a fill from its left edge, `value` full (0 to 1), or bound to a game
+   * value the plugin reads every frame.
+   *
+   * @example
+   * ```ts
+   * ink.bar({ bind: "player.health", of: "player.healthMax", width: 300, height: 8 });
+   * ```
+   */
+  bar(props: InkBarProps = {}): InkNode<InkBarProps> {
+    return makeBar(props);
+  },
+  /**
+   * A column (or `direction: "row"`) of one node per item. Give it new `items` with `set`:
+   * new keys are added at their place, gone ones removed, moved ones moved, and the others
+   * patched, so only what changed goes to the game.
+   *
+   * @example
+   * ```ts
+   * const board = ink.list({ gap: 6, items: contracts },
+   *   (c) => ink.row({ gap: 12 }, ink.text(c.name, { style: "body" }), ink.text(`${c.reward} €$`, { style: "value" })),
+   *   (c) => c.id);
+   * board.set({ items: next });
+   * ```
+   */
+  list<T>(
+    props: InkListProps<T>,
+    render: (item: T, index: number) => InkNode,
+    key: (item: T, index: number) => string | number = (_item, i) => i,
+  ): InkNode<InkListProps<T>> {
+    return makeList(props, render, key);
   },
   /** A filled circle. */
   circle(props: InkProps = {}): InkNode<InkProps> {

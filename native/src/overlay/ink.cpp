@@ -10,6 +10,8 @@
 //                 "tag":"text","props":{...}}
 //                {"op":"set","mount":"m1","key":"n2","props":{...}}
 //                {"op":"remove","mount":"m1","key":"n2"}    the node and all under it
+//                {"op":"move","mount":"m1","key":"n2","index":0}  among its siblings (I2c)
+//              "add" takes an "index" among its siblings too; without one it goes last
 //                {"op":"unmount","mount":"m1"}
 //              -> {"errors":[...]}: a failed op or prop is reported and the rest go on
 //   ink.clear  {"package":"p"}   removes every mount of the package (the host, when it stops)
@@ -28,6 +30,10 @@
 //   styleSheet "path.inkstyle"  bind {"tintColor":"MainColors.Red"} (null unties one): the game
 //   look (I2b) ties a widget to the game's own style names. The sheet is applied first and the
 //   bindings last, whatever their order.
+//   pivot [x,y]  scale [x,y]
+//   binding {"source":"player.health","target":"text","format":"{value} HP","decimals":0}
+//           {"source":"player.health","target":"scaleX","of":"player.healthMax"} (of: a source or a
+//           number): a game value the plugin reads each frame, and shows when it changes (I2c)
 // A name starting with a capital letter is a method of the widget, called with the value as
 // its arguments (an array, or one value): the escape hatch for what the props do not cover.
 
@@ -35,6 +41,11 @@
 #include "overlay.hpp"
 
 #include <atomic>
+#include <chrono>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
+#include <algorithm>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -58,6 +69,9 @@ struct Node
     std::string tag;
     Value props; // an object: every prop the node has now
     WeakHandle<IScriptable> widget;
+    std::vector<std::string> children; // in their order on screen
+    std::string shown;                 // a bound text, as last shown
+    double fraction = -1;              // a bound scale, as last shown
 };
 
 struct Mount
@@ -67,8 +81,9 @@ struct Mount
     std::string layer;
     WeakHandle<IScriptable> window;
     WeakHandle<IScriptable> canvas;
-    std::vector<std::string> order; // node keys, parents before children
+    std::vector<std::string> roots; // the top nodes, in their order on screen
     std::unordered_map<std::string, Node> nodes;
+    std::vector<std::string> bound; // nodes with a binding
     uint32_t builds = 0;
     std::string lastError; // logged once until it changes
 };
@@ -226,6 +241,7 @@ constexpr Setter Setters[] = {
     {"letterCase", "SetLetterCase", false, false},
     {"textAlign", "SetHorizontalAlignment", false, false},
     {"styleSheet", "SetStyle", false, false},
+    {"pivot", "SetRenderTransformPivot;FloatFloat", true, false},
 };
 
 // bind {"tintColor": "MainColors.Red", "opacity": null}: ties a widget property to a name in
@@ -255,10 +271,40 @@ bool ApplyBinds(Obj& aWidget, const Value& aBinds, std::string& aError, int aWhi
     return ok;
 }
 
+Value Number(double aValue)
+{
+    Value v;
+    v.kind = Value::Kind::Number;
+    v.number = aValue;
+    v.text = std::to_string(aValue);
+    return v;
+}
+
+Value Bool(bool aValue)
+{
+    Value v;
+    v.kind = Value::Kind::Bool;
+    v.boolean = aValue;
+    return v;
+}
+
+Value Vector2(double aX, double aY)
+{
+    Value v;
+    v.kind = Value::Kind::Object;
+    v.fields.emplace_back("X", Number(aX));
+    v.fields.emplace_back("Y", Number(aY));
+    return v;
+}
+
 bool ApplyProp(Obj& aWidget, const std::string& aKey, const Value& aValue, std::string& aError)
 {
     if (aKey == "bind")
         return ApplyBinds(aWidget, aValue, aError);
+    if (aKey == "binding")
+        return true; // read each frame by UpdateBindings
+    if (aKey == "scale" && aValue.kind == Value::Kind::Array && aValue.items.size() == 2)
+        return Call(aWidget, "SetScale", Args({Vector2(aValue.items[0].number, aValue.items[1].number)}), aError);
     for (const auto& s : Setters)
     {
         if (aKey != s.prop)
@@ -308,9 +354,16 @@ Obj ParentOf(Mount& aMount, const Node& aNode)
     return it == aMount.nodes.end() ? Obj{} : it->second.widget.Lock();
 }
 
+std::vector<std::string>& Siblings(Mount& aMount, const Node& aNode)
+{
+    return aNode.parent.empty() ? aMount.roots : aMount.nodes[aNode.parent].children;
+}
+
 bool BuildNode(Mount& aMount, const std::string& aKey, std::vector<std::string>& aErrors)
 {
     Node& node = aMount.nodes[aKey];
+    node.shown.clear(); // a new widget: bound values are shown again
+    node.fraction = -1;
     Obj parent = ParentOf(aMount, node);
     if (!parent)
     {
@@ -327,6 +380,35 @@ bool BuildNode(Mount& aMount, const std::string& aKey, std::vector<std::string>&
     node.widget = widget;
     ApplyAll(widget, aKey, node.props, aErrors);
     return true;
+}
+
+// A node and every node under it, in order on screen.
+size_t BuildTree(Mount& aMount, const std::string& aKey, std::vector<std::string>& aErrors)
+{
+    if (!BuildNode(aMount, aKey, aErrors))
+        return 0;
+    size_t built = 1;
+    const auto children = aMount.nodes[aKey].children;
+    for (const auto& child : children)
+        built += BuildTree(aMount, child, aErrors);
+    return built;
+}
+
+// Puts a widget at its node's place among its siblings (ink's ReorderChild).
+void PlaceWidget(Mount& aMount, const std::string& aKey, std::vector<std::string>& aErrors)
+{
+    Node& node = aMount.nodes[aKey];
+    const auto& siblings = Siblings(aMount, node);
+    const auto at = std::find(siblings.begin(), siblings.end(), aKey) - siblings.begin();
+    Obj parent = ParentOf(aMount, node);
+    Obj widget = node.widget.Lock();
+    if (!parent || !widget)
+        return;
+    Value ref = RefArg(widget);
+    std::string e;
+    if (!Call(parent, "ReorderChild", Args({ref, Number(double(at))}), e))
+        Note(aErrors, aKey + ": " + e);
+    DropRefArg(ref);
 }
 
 // Removes a widget from its parent (ink's RemoveChild); nothing when either is gone.
@@ -365,10 +447,10 @@ bool Build(Mount& aMount, std::vector<std::string>& aErrors)
     aMount.canvas = canvas;
     aMount.builds += 1;
     size_t built = 0;
-    for (const auto& key : aMount.order)
-        built += BuildNode(aMount, key, aErrors) ? 1 : 0;
+    for (const auto& key : aMount.roots)
+        built += BuildTree(aMount, key, aErrors);
     Log("Ink: %s's mount %s on %s: %zu of %zu widgets built (build %u)", aMount.package.c_str(), aMount.key.c_str(),
-        aMount.layer.c_str(), built, aMount.order.size(), aMount.builds);
+        aMount.layer.c_str(), built, aMount.nodes.size(), aMount.builds);
     return true;
 }
 
@@ -417,24 +499,26 @@ void Merge(Value& aInto, const Value& aProps)
     }
 }
 
-// The node and every node under it, in the mount's order.
-std::vector<std::string> Subtree(const Mount& aMount, const std::string& aKey)
+// The node and every node under it.
+void Subtree(const Mount& aMount, const std::string& aKey, std::vector<std::string>& aOut)
 {
-    std::vector<std::string> out;
-    for (const auto& key : aMount.order)
+    aOut.push_back(aKey);
+    if (auto it = aMount.nodes.find(aKey); it != aMount.nodes.end())
     {
-        for (std::string k = key; !k.empty();)
-        {
-            if (k == aKey)
-            {
-                out.push_back(key);
-                break;
-            }
-            auto it = aMount.nodes.find(k);
-            k = it == aMount.nodes.end() ? std::string() : it->second.parent;
-        }
+        for (const auto& child : it->second.children)
+            Subtree(aMount, child, aOut);
     }
-    return out;
+}
+
+void Track(Mount& aMount, const std::string& aKey)
+{
+    const Value* binding = aMount.nodes[aKey].props.Get("binding");
+    const bool has = binding && binding->kind == Value::Kind::Object;
+    const bool listed = std::find(aMount.bound.begin(), aMount.bound.end(), aKey) != aMount.bound.end();
+    if (has && !listed)
+        aMount.bound.push_back(aKey);
+    if (!has && listed)
+        std::erase(aMount.bound, aKey);
 }
 
 void RunOp(const std::string& aPackage, const Value& aOp, std::vector<std::string>& aErrors)
@@ -497,9 +581,15 @@ void RunOp(const std::string& aPackage, const Value& aOp, std::vector<std::strin
         if (!node.parent.empty() && !m.nodes.contains(node.parent))
             return Note(aErrors, key + ": no parent " + node.parent);
         m.nodes[key] = std::move(node);
-        m.order.push_back(key);
-        if (m.canvas.Lock())
-            BuildNode(m, key, aErrors);
+        Node& added = m.nodes[key];
+        auto& siblings = Siblings(m, added);
+        const Value* index = aOp.Get("index");
+        const bool inside = index && index->kind == Value::Kind::Number && index->number >= 0 &&
+                            size_t(index->number) < siblings.size();
+        siblings.insert(inside ? siblings.begin() + std::ptrdiff_t(index->number) : siblings.end(), key);
+        Track(m, key);
+        if (m.canvas.Lock() && BuildNode(m, key, aErrors) && inside)
+            PlaceWidget(m, key, aErrors); // AddChild put it last
         return;
     }
 
@@ -513,6 +603,12 @@ void RunOp(const std::string& aPackage, const Value& aOp, std::vector<std::strin
         if (!props || props->kind != Value::Kind::Object)
             return;
         Merge(n->second.props, *props);
+        if (props->Get("binding"))
+        {
+            n->second.shown.clear();
+            n->second.fraction = -1;
+            Track(m, key);
+        }
         Obj widget = n->second.widget.Lock();
         if (!widget)
             return; // applied when the mount is built again
@@ -525,9 +621,27 @@ void RunOp(const std::string& aPackage, const Value& aOp, std::vector<std::strin
         Obj parent = ParentOf(m, n->second);
         Obj widget = n->second.widget.Lock();
         RemoveWidget(parent, widget); // its children go with it
-        for (const auto& k : Subtree(m, key))
+        std::erase(Siblings(m, n->second), key);
+        std::vector<std::string> gone;
+        Subtree(m, key, gone);
+        for (const auto& k : gone)
+        {
             m.nodes.erase(k);
-        std::erase_if(m.order, [&](const std::string& k) { return !m.nodes.contains(k); });
+            std::erase(m.bound, k);
+        }
+        return;
+    }
+
+    if (op == "move")
+    {
+        const Value* index = aOp.Get("index");
+        if (!index || index->kind != Value::Kind::Number || index->number < 0)
+            return Note(aErrors, key + ": move needs an index");
+        auto& siblings = Siblings(m, n->second);
+        std::erase(siblings, key);
+        const size_t at = std::min(size_t(index->number), siblings.size());
+        siblings.insert(siblings.begin() + std::ptrdiff_t(at), key);
+        PlaceWidget(m, key, aErrors);
         return;
     }
 
@@ -545,6 +659,238 @@ void RemoveMounts(const std::string* aPackage)
         }
         Unmount(it->second);
         it = g_mounts.erase(it);
+    }
+}
+
+// ---------- bindings (I2c) ----------
+//
+// Game values a node shows with no round trip to Node. Each source is read at most once a
+// frame, and only while some node binds it. The game objects they come from are found again
+// every 2 s, or when they are gone (a save load).
+
+struct Sources
+{
+    WeakHandle<IScriptable> player;
+    Value statsId;
+    Value money; // the eddies' item id
+    WeakHandle<IScriptable> pools;
+    WeakHandle<IScriptable> stats;
+    WeakHandle<IScriptable> shop;
+    WeakHandle<IScriptable> time;
+    uint64_t foundAt = 0;
+    bool found = false;
+};
+Sources& g_sources = *new Sources();
+std::unordered_map<std::string, double>& g_values = *new std::unordered_map<std::string, double>(); // this frame's
+uint64_t g_valuesFrame = 0;
+double g_bindMicros = 0;
+uint64_t g_bindFrames = 0;
+uint64_t g_bindLogAt = 0;
+
+Obj System(const char* aGetter)
+{
+    Obj none;
+    Obj system;
+    std::string e;
+    CallNative(none, "GameInstance", aGetter, Args({EmptyObject()}), &system, e);
+    return system;
+}
+
+bool FindSources(uint64_t aFrame)
+{
+    if (g_sources.found && g_sources.player.Lock() && aFrame - g_sources.foundAt < 120)
+        return true;
+    g_sources.found = false;
+    g_sources.foundAt = aFrame;
+    Obj none;
+    Obj player;
+    std::string e;
+    if (!CallNative(none, nullptr, "GetPlayer", Args({EmptyObject()}), &player, e) || !player)
+        return false;
+    Value entity;
+    if (!CallNativeValue(player, nullptr, "GetEntityID", Args(), entity, e))
+        return false;
+    if (!CallNativeValue(none, nullptr, "Cast;EntityID;StatsObjectID", Args({entity}), g_sources.statsId, e))
+        return false;
+    CallNativeValue(none, "MarketSystem", "Money", Args(), g_sources.money, e);
+    g_sources.player = player;
+    g_sources.pools = System("GetStatPoolsSystem");
+    g_sources.stats = System("GetStatsSystem");
+    g_sources.shop = System("GetTransactionSystem");
+    g_sources.time = System("GetTimeSystem");
+    g_sources.found = true;
+    return true;
+}
+
+bool ReadNumber(Obj& aSelf, const char* aFn, const Value& aArgs, double& aOut)
+{
+    Value v;
+    std::string e;
+    if (!aSelf || !CallNativeValue(aSelf, nullptr, aFn, aArgs, v, e) || v.kind != Value::Kind::Number)
+        return false;
+    aOut = v.number;
+    return true;
+}
+
+// One source's value this frame, read once.
+bool Source(const std::string& aName, uint64_t aFrame, double& aOut)
+{
+    if (g_valuesFrame != aFrame)
+    {
+        g_values.clear();
+        g_valuesFrame = aFrame;
+    }
+    if (auto it = g_values.find(aName); it != g_values.end())
+    {
+        aOut = it->second;
+        return true;
+    }
+    if (!FindSources(aFrame))
+        return false;
+    Obj player = g_sources.player.Lock();
+    Obj pools = g_sources.pools.Lock();
+    Obj stats = g_sources.stats.Lock();
+    const Value& id = g_sources.statsId;
+    bool ok = false;
+    double v = 0;
+    if (aName == "player.health")
+        ok = ReadNumber(pools, "GetStatPoolValue", Args({id, Text("Health"), Bool(false)}), v);
+    else if (aName == "player.healthMax")
+        ok = ReadNumber(pools, "GetStatPoolMaxPointValue", Args({id, Text("Health")}), v);
+    else if (aName == "player.stamina")
+        ok = ReadNumber(pools, "GetStatPoolValue", Args({id, Text("Stamina"), Bool(true)}), v);
+    else if (aName == "player.memory")
+        ok = ReadNumber(pools, "GetStatPoolValue", Args({id, Text("Memory"), Bool(true)}), v);
+    else if (aName == "player.level")
+        ok = ReadNumber(stats, "GetStatValue", Args({id, Text("Level")}), v);
+    else if (aName == "player.streetCred")
+        ok = ReadNumber(stats, "GetStatValue", Args({id, Text("StreetCred")}), v);
+    else if (aName == "player.money")
+    {
+        Obj shop = g_sources.shop.Lock();
+        if (shop && player && g_sources.money.kind == Value::Kind::Object)
+        {
+            Value who = RefArg(player);
+            ok = ReadNumber(shop, "GetItemQuantity", Args({who, g_sources.money}), v);
+            DropRefArg(who);
+        }
+    }
+    else if (aName == "player.x" || aName == "player.y" || aName == "player.z")
+    {
+        Value pos;
+        std::string e;
+        if (player && CallNativeValue(player, nullptr, "GetWorldPosition", Args(), pos, e))
+        {
+            for (const char* axis : {"X", "Y", "Z"})
+            {
+                const Value* a = pos.Get(axis);
+                if (a && a->kind == Value::Kind::Number)
+                    g_values[std::string("player.") + char(axis[0] + ('x' - 'X'))] = a->number;
+            }
+            if (auto it = g_values.find(aName); it != g_values.end())
+            {
+                aOut = it->second;
+                return true;
+            }
+        }
+    }
+    else if (aName == "game.hour" || aName == "game.minute")
+    {
+        Obj time = g_sources.time.Lock();
+        Value t;
+        std::string e;
+        if (time && CallNativeValue(time, nullptr, "GetGameTime", Args(), t, e))
+        {
+            const Value* seconds = t.Get("seconds");
+            if (seconds && seconds->kind == Value::Kind::Number)
+            {
+                const long long total = (long long)seconds->number;
+                g_values["game.hour"] = double((total / 3600) % 24);
+                g_values["game.minute"] = double((total / 60) % 60);
+                aOut = g_values[aName];
+                return true;
+            }
+        }
+    }
+    if (!ok)
+        return false;
+    g_values[aName] = v;
+    aOut = v;
+    return true;
+}
+
+std::string Format(const Value& aBinding, double aValue)
+{
+    const Value* d = aBinding.Get("decimals");
+    const int decimals = d && d->kind == Value::Kind::Number ? std::clamp(int(d->number), 0, 6) : 0;
+    char number[64];
+    std::snprintf(number, sizeof(number), "%.*f", decimals, aValue);
+    std::string format = Field(aBinding, "format");
+    if (format.empty())
+        return number;
+    for (size_t at = format.find("{value}"); at != std::string::npos; at = format.find("{value}", at))
+    {
+        format.replace(at, 7, number);
+        at += std::strlen(number);
+    }
+    return format;
+}
+
+void UpdateBindings(uint64_t aFrame)
+{
+    const auto started = std::chrono::steady_clock::now();
+    size_t count = 0;
+    for (auto& [id, m] : g_mounts)
+    {
+        for (const auto& key : m.bound)
+        {
+            auto it = m.nodes.find(key);
+            if (it == m.nodes.end())
+                continue;
+            Node& node = it->second;
+            const Value* binding = node.props.Get("binding");
+            Obj widget = node.widget.Lock();
+            if (!binding || binding->kind != Value::Kind::Object || !widget)
+                continue;
+            ++count;
+            double value = 0;
+            if (!Source(Field(*binding, "source"), aFrame, value))
+                continue;
+            if (Field(*binding, "target") == "scaleX")
+            {
+                double of = 1;
+                const Value* ofValue = binding->Get("of");
+                if (ofValue && ofValue->kind == Value::Kind::Number)
+                    of = ofValue->number;
+                else if (ofValue && ofValue->kind == Value::Kind::String && !Source(ofValue->text, aFrame, of))
+                    continue;
+                const double fraction = of > 0 ? std::clamp(value / of, 0.0, 1.0) : 0.0;
+                if (std::abs(fraction - node.fraction) < 0.001)
+                    continue;
+                node.fraction = fraction;
+                std::string e;
+                Call(widget, "SetScale", Args({Vector2(fraction, 1)}), e);
+                continue;
+            }
+            const std::string text = Format(*binding, value);
+            if (text == node.shown)
+                continue;
+            node.shown = text;
+            std::string e;
+            ApplyProp(widget, "text", Text(text), e);
+        }
+    }
+    if (!count)
+        return;
+    g_bindMicros += std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - started).count();
+    g_bindFrames += 1;
+    if (aFrame - g_bindLogAt >= 1800) // about every 30 s at 60 fps
+    {
+        Log("Ink: %zu binding(s), %zu source(s) a frame, %.1f us a frame on average", count, g_values.size(),
+            g_bindMicros / double(g_bindFrames));
+        g_bindLogAt = aFrame;
+        g_bindMicros = 0;
+        g_bindFrames = 0;
     }
 }
 
@@ -599,8 +945,19 @@ std::string Ink(const std::string& aMethod, const json::Value& aParams, std::str
         return {};
     }
     std::vector<std::string> errors;
+    std::map<std::string, int> counts;
     for (const auto& op : ops->items)
+    {
+        counts[Field(op, "op")] += 1;
         RunOp(package, op, errors);
+    }
+    // A batch that adds, removes or moves widgets is logged with its ops, to see that a
+    // change sends only what changed (I2c); changes of props alone stay quiet.
+    if (counts["add"] || counts["remove"] || counts["move"])
+    {
+        Log("Ink: %s: %d add, %d remove, %d move, %d set", package.c_str(), counts["add"], counts["remove"],
+            counts["move"], counts["set"]);
+    }
     if (!errors.empty())
         Log("Ink: %s: %zu error(s), the first: %s", package.c_str(), errors.size(), errors.front().c_str());
     return ErrorsJson(errors);
@@ -610,7 +967,11 @@ void UpdateInk(uint64_t aFrame)
 {
     if (g_hostGone.exchange(false))
         RemoveMounts(nullptr);
-    if (g_mounts.empty() || aFrame % CheckFrames)
+    if (g_mounts.empty())
+        return;
+    if (!InMainMenu())
+        UpdateBindings(aFrame);
+    if (aFrame % CheckFrames)
         return;
     // Mounts the game removed (a save load rebuilds the HUD) are built again once a game runs.
     bool inGame = false;
@@ -642,6 +1003,7 @@ void InkHostGone()
 
 void ClearInk()
 {
+    g_sources = Sources{};
     g_mounts.clear();
 }
 } // namespace rednode::overlay::detail

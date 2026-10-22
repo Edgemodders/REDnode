@@ -8,10 +8,13 @@
 //   docs/examples/run/<id>/   the app's files, with rednode:// URLs pointed at the docs'
 //                             copies; a Node mod gets a runner page and its mod.mjs as mod.js
 //   docs/examples/kit/        the UI kit, copied from packages/ui/src
+//   docs/examples/sdk/        the rednode package's ink module, compiled from packages/rednode/src,
+//                             so the previews run the real ink code (I2c) against the simulation
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import hljs from 'highlight.js';
+import ts from 'typescript';
 import { GROUPS, NOTES } from './notes.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -287,6 +290,17 @@ ${groups}
 rmSync(out, { recursive: true, force: true });
 mkdirSync(join(out, 'kit'), { recursive: true });
 cpSync(join(repo, 'packages', 'ui', 'src', 'rednode-ui.js'), join(out, 'kit', 'rednode-ui.js'));
+
+// The ink module and what it imports, compiled as they are (no type checks: the package's
+// own build does those).
+mkdirSync(join(out, 'sdk'), { recursive: true });
+for (const name of ['ink', 'transport']) {
+  const source = readFileSync(join(repo, 'packages', 'rednode', 'src', `${name}.ts`), 'utf8');
+  const { outputText } = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },
+  });
+  writeFileSync(join(out, 'sdk', `${name}.js`), outputText);
+}
 
 const found = APP_ROOTS.flatMap((root) =>
   readdirSync(root.dir)

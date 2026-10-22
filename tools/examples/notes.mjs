@@ -37,6 +37,30 @@ export const NOTES = {
     tryThis: ['Switch on "Game theme" to see the game\'s own look.', 'Add an `rn-tab` of your own with a few controls.'],
     preview: 'The Sound tab plays a tone instead of the game\'s sound events, which only exist in the game.',
   },
+  'ink-vitals': {
+    group: 'hud',
+    summary: 'V\'s health and RAM as bars, and money, on the HUD in the game\'s own look. Every value is bound: the plugin reads it each frame, and the mod sends nothing after building it. Needs Codeware.',
+    teaches: ['bind', 'format', 'ink.bar', 'of', 'ink.row align'],
+    how: [
+      'A text with `bind: "player.health"` shows a game value. The plugin reads it every frame and changes the text only when what it shows changes, so a hit shows at once with no update code in the mod.',
+      '`ink.bar({ bind, of })` fills from its left edge, `value / of` full; `of` is a number or another source, such as `"player.healthMax"`.',
+      'The sources: health and its max, stamina and RAM (0 to 100), money, level, street cred, V\'s position and the game\'s clock.',
+    ],
+    tryThis: ['Add stamina: `meter("STA", "player.stamina", 100, "success", "{value}%")`.', 'Show the clock: two texts bound to `game.hour` and `game.minute`.'],
+    preview: 'Press Hurt V below and watch the bar and the number follow, read four times a second here (every frame in the game).',
+  },
+  'ink-list': {
+    group: 'tests',
+    summary: 'A list of contracts on the HUD built from data with ink.list, with buttons that add, remove, move and rename items, and a header rebuilt with mount.update.',
+    teaches: ['ink.list', 'list.set({ items })', 'mount.update', 'keys'],
+    how: [
+      '`ink.list(props, render, key)` draws one node per item. `list.set({ items })` compares the new items with the old by key: new ones are added at their place, gone ones removed, moved ones moved, and the rest drawn again and compared, so only changed props go to the game.',
+      '`mount.update(tree)` does the same for a whole tree built again from data: nodes of the same tag keep their widgets, children are matched by place.',
+      'In the game, the plugin logs each batch that adds, removes or moves widgets, with its counts.',
+    ],
+    tryThis: ['Press Show, then Add at top, Last to top and Rename second.', 'Press Update header a few times.'],
+    preview: 'The box stands for the game\'s screen; the Mod log shows each change.',
+  },
   'ink-styles': {
     group: 'tests',
     summary: 'A gallery of the ink API\'s layout and look words on the HUD: every text style and tone, the plain and the game look, align, grow, gap, pad and icons, with buttons that change them live.',

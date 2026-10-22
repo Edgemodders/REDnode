@@ -1474,6 +1474,60 @@ bool CallNative(Handle<IScriptable>& aSelf, const char* aClass, const std::strin
     return true;
 }
 
+bool CallNativeValue(Handle<IScriptable>& aSelf, const char* aClass, const std::string& aFn, const json::Value& aArgs,
+                     json::Value& aOut, std::string& aError)
+{
+    CBaseFunction* fn = nullptr;
+    if (aSelf)
+    {
+        std::vector<CBaseFunction*> candidates;
+        for (const CClass* c = aSelf->GetType(); c && candidates.empty(); c = c->parent)
+        {
+            for (auto* f : c->funcs)
+            {
+                if (Matches(f, aFn))
+                    candidates.push_back(f);
+            }
+        }
+        if (candidates.empty())
+        {
+            aError = Str(aSelf->GetType()->GetName()) + " has no method \"" + aFn + "\"";
+            return false;
+        }
+        fn = Pick(candidates, aArgs.items.size(), aFn, aError);
+    }
+    else
+    {
+        Value params;
+        params.kind = Value::Kind::Object;
+        if (aClass)
+            params.fields.emplace_back("class", Text(aClass));
+        params.fields.emplace_back("fn", Text(aFn));
+        Handle<IScriptable> none;
+        fn = Resolve(params, none, aArgs.items.size(), aError);
+    }
+    if (!fn)
+        return false;
+    std::vector<std::unique_ptr<Slot>> slots;
+    std::vector<bool> wanted;
+    std::unique_ptr<Slot> ret;
+    if (!Run(fn, aSelf, aArgs, slots, wanted, ret, aError))
+        return false;
+    aOut = Value{};
+    if (!ret)
+        return true;
+    // Plain values only (numbers, structs, names): an object answer would be handed a reference.
+    const auto kind = ret->type->GetType();
+    if (kind == Kind::Handle || kind == Kind::WeakHandle)
+    {
+        aError = Str(fn->fullName) + " answers an object: use CallNative";
+        return false;
+    }
+    std::string json;
+    ToJson(ret->type, ret->mem, json, 0);
+    return json::Parse(json, aOut, aError);
+}
+
 json::Value RefArg(const Handle<IScriptable>& aObject)
 {
     Value ref;

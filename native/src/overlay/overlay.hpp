@@ -294,6 +294,9 @@ void StopTrace();
 // is empty, converting JSON arguments as rtti.call does. aObject receives a returned object.
 bool CallNative(RED4ext::Handle<RED4ext::IScriptable>& aSelf, const char* aClass, const std::string& aFn,
                 const json::Value& aArgs, RED4ext::Handle<RED4ext::IScriptable>* aObject, std::string& aError);
+// The same for a function that answers a plain value (a number, a struct, a name), as JSON.
+bool CallNativeValue(RED4ext::Handle<RED4ext::IScriptable>& aSelf, const char* aClass, const std::string& aFn,
+                     const json::Value& aArgs, json::Value& aOut, std::string& aError);
 json::Value RefArg(const RED4ext::Handle<RED4ext::IScriptable>& aObject); // an object as a call argument
 void DropRefArg(const json::Value& aRef);                                  // and let go of it after
 // ink.cpp: the ink driver (I2a): ink.apply, ink.clear and ink.state, on the game thread.

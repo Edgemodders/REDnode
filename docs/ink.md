@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b passed in game on 2026-10-22** (REDnode 0.29.0, [results](#i2b-test-results)); placement across resolutions is left for later, as agreed. **I2c's plan** ([I2c: plan](#i2c-plan)) awaits the owner's agreement. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b passed in game on 2026-10-22** (REDnode 0.29.0, [results](#i2b-test-results)); placement across resolutions is left for later, as agreed. I2c's plan was agreed on 2026-10-22, with the language split off as I2d. **I2c is built in REDnode 0.30.0** and awaits its in-game test ([I2c test](#i2c-test)). The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -403,4 +403,34 @@ The test: take damage and watch the bar and the numbers; spend money; let the RA
 ### I2d: language (after I2c)
 
 The game's language in the plugin and a change event; `LocKey#` and secondary keys in ink texts (`SetLocalizedText`, so the engine follows a language change by itself) and in the `ui` builder; `t()` with a package's `locales/<language>.json`, `{name}` parameters, plurals (`Intl.PluralRules`) and V's gender forms; missing keys logged once. That is L1's core and L3 of the Localization plan; the UI kit's `data-t`, manifest names, `fmt` and REDnode's own text (L1's rest and L2) stay in the Localization plan's order.
+
+## I2c: build (REDnode 0.30.0)
+
+Agreed with the owner on 2026-10-22, as planned, with the language split off as I2d.
+
+| Part | Where |
+|---|---|
+| Bindings: a node's `binding` prop names a source; each frame the plugin reads the sources some node binds (each at most once a frame, from game objects found again every 2 s or after a load), and changes a text or a fill's scale only when what shows changes. A perf line every 1800 frames: bindings, sources and microseconds a frame | `native/src/overlay/ink.cpp` (`UpdateBindings`, `Source`) |
+| `CallNativeValue`: the plain-value side of `CallNative`, so the driver chains game calls (V's entity id to its stats id) | `native/src/overlay/reflect.cpp` |
+| Children in order: each node keeps its children's order, `add` takes an `index` (ink's `ReorderChild` after `AddChild`), a new `move` op, and a rebuild after a load puts them back in order. A batch that adds, removes or moves widgets is logged with its counts | `native/src/overlay/ink.cpp` |
+| `bind`, `format`, `decimals` on texts; `ink.bar({ bind, of, value, track })`; `ink.list(props, render, key)` with `set({ items })`; `mount.update(...)`; patching: the same tag keeps its widget and sends only changed props, children matched by place or by key | `packages/rednode/src/ink.ts` |
+| A panel's children always send their margin, so a child that becomes the first loses its gap | `packages/rednode/src/ink.ts` |
+| The docs previews run the package's real ink module, compiled by the examples build into `docs/examples/sdk`, and the page draws the plugin's props; bindings read the simulated game | `tools/examples/build.mjs`, `docs/assets/examples/sim/` |
+| Samples: **Ink vitals** 0.1.0 (health and RAM bars, money, all bound) and **Ink list** 0.1.0 (the test of lists and `mount.update`) | `packages/overlay/apps/ink-vitals`, `ink-list` |
+
+Checked: the plugin builds and its tests pass; the package builds; the built ink module, driven with a stand-in transport, sends one `add` with an `index` for an item added at the top, one `remove`, one `move`, one `set` for a rename, only the new text for a grown tree, and margins fixed after a removal and a reversal; in the mock game Ink list's buttons sent only their changes; the docs previews of Ink vitals (bound values and bars from the simulated game) and Ink Coords draw. Not checked in the game: every source (which calls answer, and with what), the bars' scale from the left edge, `ReorderChild`, and the bindings' cost a frame.
+
+## I2c test
+
+On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.30.0 (update zip over 0.29.0), with Codeware.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
+1. Switch on **Ink vitals** (Ink Coords may stay on; Ink styles off). Load a save. At the bottom left: "VITALS", an HP bar with its number, a RAM bar with a percentage, and your money? Do the numbers match the game's own HUD? **Mark**.
+2. Take some damage (a fall, or a fight): do the HP bar and number drop at once and climb back as health returns? **Mark**.
+3. Use a quickhack, then wait: does the RAM bar drop and refill? Buy or sell something: does the money change? **Mark**.
+4. Switch on **Ink list**, open the overlay and press **Show**. Close the overlay: "CONTRACTS" and "3 contracts" at the left, and three contracts under them (#1 Watson, #2 Kabuki, #3 Japantown, each with a reward)? **Mark**.
+5. Open the overlay and press, looking at the list after each: **Add** (a 4th at the bottom), **Add at top** (a new first), **Remove first**, **Last to top**, **Rename second** ("prime"), **Shuffle** (the order reversed). Does each show as its log line says, with even gaps? **Mark**.
+6. Press **Update header** three times: does the title change (Open gigs, Fixer board, Contracts)? **Mark**.
+7. Load the same save again and wait a few seconds: are the vitals and the list back, the list in its last order? **Mark**.
+8. Quit. Send `rednode-mods.log` and this run's `red4ext/logs/rednode-*.log` (its `Ink:` lines: each list change's counts, and the bindings' cost a frame).
 

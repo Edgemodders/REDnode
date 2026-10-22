@@ -1,0 +1,12 @@
+{
+  "id": "ink-vitals",
+  "name": "Ink vitals",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "V's health and RAM as bars, and money, on the HUD in the game's own look. Every value is bound: the plugin reads it every frame and the mod sends nothing after building it. The sample of phase I2c. Needs Codeware.",
+  "main": "mod.mjs",
+  "open": false,
+  "requires": {
+    "codeware": ">=1.16"
+  }
+}

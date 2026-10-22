@@ -419,95 +419,111 @@ function openWindow(id, spec) {
 }
 
 // ---------- ink ----------
-// The game draws a mod's ink tree on its own HUD. Here a 16:9 box stands for the screen,
-// in the HUD layer's units scaled to the box (1920 across: unverified against the game's).
+// The game draws a mod's ink tree on its own HUD. Here a 16:9 box stands for the screen, and
+// the page draws what the plugin would build from the package's batches (ink.apply): the
+// same props, read as CSS. Units: the HUD layer's, 1920 across here (unverified against the
+// game's, which follows the screen: 2560 on a 2560x1440 one).
 
 const INK_UNITS = 1920;
-const INK_PALETTE = { white: '#ffffff', black: '#000000', red: '#ff6158', cyan: '#5ef6ff', yellow: '#fcee0a', green: '#1fd17a', blue: '#408cff', grey: '#a0a0a0' };
+// The game's MainColors, as sRGB (its HDR values clipped), for bound colors.
+const INK_GAME_COLORS = {
+  'MainColors.Red': '#ff6159', 'MainColors.Blue': '#5ef6ff', 'MainColors.Yellow': '#ffd741', 'MainColors.Green': '#1ded83',
+  'MainColors.Warning': '#f86a32', 'MainColors.ActiveRed': '#ff7167', 'MainColors.Grey': '#a09a96', 'MainColors.White': '#ffffff',
+  'MainColors.Fullscreen_PrimaryBackgroundDarkest': 'rgba(13, 14, 23, 0.9)',
+};
 const INK_ANCHORS = {
-  'top-left': [0, 0], top: [0.5, 0], 'top-right': [1, 0], left: [0, 0.5], center: [0.5, 0.5], right: [1, 0.5],
-  'bottom-left': [0, 1], bottom: [0.5, 1], 'bottom-right': [1, 1], fill: [0, 0],
+  TopLeft: [0, 0], TopCenter: [0.5, 0], TopRight: [1, 0], CenterLeft: [0, 0.5], Centered: [0.5, 0.5], CenterRight: [1, 0.5],
+  BottomLeft: [0, 1], BottomCenter: [0.5, 1], BottomRight: [1, 1],
 };
-// The game look (I2b): the game's MainColors as sRGB (its HDR values clipped), and its text styles.
-const INK_TONES = {
-  normal: '#ff6159', accent: '#5ef6ff', highlight: '#ffd741', success: '#1ded83', warning: '#f86a32',
-  danger: '#ff7167', dim: '#a09a96', white: '#ffffff', background: 'rgba(13, 14, 23, 0.9)',
-};
-const INK_GAME_COLORS = { 'MainColors.Red': '#ff6159', 'MainColors.Blue': '#5ef6ff', 'MainColors.Yellow': '#ffd741', 'MainColors.Green': '#1ded83', 'MainColors.White': '#ffffff', 'MainColors.Grey': '#a09a96' };
-const INK_TEXT = {
-  title: [70, 600, true, 'normal'], subtitle: [60, 600, true, 'normal'], heading: [50, 600, true, 'normal'], body: [42, 500, false, 'normal'],
-  label: [38, 500, true, 'normal'], value: [42, 600, false, 'accent'], small: [30, 500, false, 'normal'], fluff: [25, 500, true, 'normal'],
-};
-const INK_ALIGN = { left: 'flex-start', top: 'flex-start', center: 'center', right: 'flex-end', bottom: 'flex-end', fill: 'stretch' };
-const inkMounts = new Map(); // mount key -> { options, el }
+const INK_SELF = { Left: 'flex-start', Top: 'flex-start', Center: 'center', Right: 'flex-end', Bottom: 'flex-end', Fill: 'stretch' };
+const inkMounts = new Map(); // mount key -> { el }
 const inkNodes = new Map(); // "mount/key" -> { el, tag, props, parent, mount }
 let inkHud = null;
+let inkTimer = null;
 
-function inkColor(c) {
-  if (Array.isArray(c)) return `rgba(${c[0]},${c[1]},${c[2]},${(c[3] ?? 255) / 255})`;
-  if (INK_GAME_COLORS[c]) return INK_GAME_COLORS[c];
-  if (/^[A-Za-z]+\.[A-Za-z0-9_.]+$/.test(String(c))) return '#ff6159'; // another game color: shown red here
-  return INK_PALETTE[String(c).toLowerCase()] ?? String(c);
-}
-
-function inkScale() {
-  return (inkHud?.clientWidth || 640) / INK_UNITS;
-}
+const inkScale = () => (inkHud?.clientWidth || 640) / INK_UNITS;
+const inkRgba = (c) => `rgba(${c[0]},${c[1]},${c[2]},${(c[3] ?? 255) / 255})`;
+const inkParentTag = (n) => (n.parent ? inkNodes.get(`${n.mount}/${n.parent}`)?.tag : 'canvas');
 
 function inkStyle(n) {
   const k = inkScale();
   const p = n.props;
   const el = n.el;
-  const parentTag = n.parent ? inkNodes.get(`${n.mount}/${n.parent}`)?.tag : 'canvas';
-  const inPanel = parentTag === 'column' || parentTag === 'row';
+  const panel = inkParentTag(n);
+  const inPanel = panel === 'column' || panel === 'row';
   if (n.tag === 'column' || n.tag === 'row') {
     el.style.display = 'flex';
     el.style.flexDirection = n.tag === 'column' ? 'column' : 'row';
-    el.style.alignItems = INK_ALIGN[p.align] ?? 'flex-start';
-    el.style.gap = `${(p.gap ?? 0) * k}px`;
+    el.style.alignItems = 'flex-start';
   }
-  if (p.pad !== undefined) el.style.padding = (Array.isArray(p.pad) ? [p.pad[1], p.pad[2], p.pad[3], p.pad[0]] : [p.pad]).map((v) => `${v * k}px`).join(' ');
-  if (inPanel) {
-    el.style.alignSelf = INK_ALIGN[p.align] ?? '';
-    el.style.flexGrow = p.grow ?? '';
-  }
-  if (!inPanel) {
-    const opts = n.parent ? {} : inkMounts.get(n.mount)?.options ?? {};
-    const anchor = p.anchor ?? opts.anchor ?? 'top-left';
-    const [ax, ay] = INK_ANCHORS[anchor] ?? [0, 0];
+  if (n.tag === 'canvas') el.style.position = 'relative';
+  if (!inPanel && p.anchor) {
     el.style.position = 'absolute';
-    if (anchor === 'fill') Object.assign(el.style, { inset: '0' });
-    else {
+    if (p.anchor === 'Fill') {
+      el.style.left = el.style.top = el.style.translate = '';
+      el.style.inset = '0';
+    } else {
+      const [ax, ay] = INK_ANCHORS[p.anchor] ?? [0, 0];
+      const [px, py] = p.anchorPoint ?? [0, 0];
+      const [tx, ty] = p.translation ?? [0, 0];
       el.style.left = `${ax * 100}%`;
       el.style.top = `${ay * 100}%`;
-      el.style.transform = `translate(${-ax * 100}%, ${-ay * 100}%) translate(${(p.x ?? opts.x ?? 0) * k}px, ${(p.y ?? opts.y ?? 0) * k}px)`;
+      el.style.translate = `calc(${-px * 100}% + ${tx * k}px) calc(${-py * 100}% + ${ty * k}px)`;
     }
   }
-  if (p.width !== undefined) el.style.width = `${p.width * k}px`;
-  if (p.height !== undefined) el.style.height = `${p.height * k}px`;
-  if (p.margin !== undefined) el.style.margin = (Array.isArray(p.margin) ? [p.margin[1], p.margin[2], p.margin[3], p.margin[0]] : [p.margin]).map((v) => `${v * k}px`).join(' ');
-  el.style.opacity = p.opacity ?? 1;
+  if (inPanel) {
+    el.style.alignSelf = INK_SELF[panel === 'column' ? p.hAlign : p.vAlign] ?? '';
+    el.style.flexGrow = p.sizeRule === 'Stretch' ? String(p.sizeCoefficient ?? 1) : '';
+    if (p.margin) el.style.margin = [p.margin[1], p.margin[2], p.margin[3], p.margin[0]].map((v) => `${v * k}px`).join(' ');
+  }
+  if (p.padding) el.style.padding = [p.padding[1], p.padding[2], p.padding[3], p.padding[0]].map((v) => `${v * k}px`).join(' ');
+  if (p.size && p.anchor !== 'Fill') {
+    if (p.size[0]) el.style.width = `${p.size[0] * k}px`;
+    if (p.size[1]) el.style.height = `${p.size[1] * k}px`;
+  }
+  const bound = p.bind?.tintColor ? INK_GAME_COLORS[p.bind.tintColor] ?? '#ff6159' : null;
+  const color = bound ?? (p.tint ? inkRgba(p.tint) : n.tag === 'text' ? '#ffffff' : '');
+  el.style.opacity = p.opacity ?? (p.bind?.opacity ? 0.4 : 1);
   el.style.visibility = p.visible === false ? 'hidden' : '';
-  const style = n.tag === 'text' ? INK_TEXT[p.style] : undefined;
-  const game = p.look === 'game' || (p.look !== 'plain' && (p.tone !== undefined || style !== undefined));
-  const tone = p.tone ?? style?.[3] ?? (n.tag === 'rect' || n.tag === 'circle' ? 'background' : 'normal');
-  const color = p.color !== undefined ? inkColor(p.color) : game ? INK_TONES[tone] : n.tag === 'text' ? '#ffffff' : '';
   if (n.tag === 'text') {
-    el.textContent = p.text ?? '';
+    if (!p.binding) el.textContent = p.text ?? '';
     el.style.color = color;
-    el.style.fontSize = `${(p.size ?? style?.[0] ?? 32) * k}px`;
-    el.style.fontWeight = p.weight === 'Semi-Bold' || p.weight === 'Bold' ? 600 : style?.[1] ?? 500;
-    el.style.textTransform = (p.case ?? (style?.[2] ? 'upper' : '')) === 'upper' ? 'uppercase' : p.case === 'lower' ? 'lowercase' : '';
-    el.style.textAlign = p.textAlign ?? '';
-    if (p.style === 'fluff' && p.opacity === undefined) el.style.opacity = 0.4;
+    el.style.fontSize = `${(p.fontSize ?? 32) * k}px`;
+    el.style.fontWeight = /Semi-Bold|Bold/.test(p.font?.[1] ?? '') ? 600 : 500;
+    el.style.textTransform = p.letterCase === 'UpperCase' ? 'uppercase' : p.letterCase === 'LowerCase' ? 'lowercase' : '';
+    el.style.textAlign = (p.textAlign ?? '').toLowerCase();
     el.style.whiteSpace = 'pre';
   } else if (n.tag === 'rect' || n.tag === 'circle') {
     el.style.background = color || '#ffffff';
     el.style.borderRadius = n.tag === 'circle' ? '50%' : '';
   } else if (n.tag === 'image') {
     el.style.border = `1px dashed ${color || '#888'}`;
-    el.title = `${p.icon ?? `${p.atlas ?? ''} ${p.part ?? ''}`}: atlas images show only in the game`;
+    el.title = `${p.atlas ?? ''} ${p.part ?? ''}: atlas images show only in the game`;
   }
+  if (p.pivot) el.style.transformOrigin = `${p.pivot[0] * 100}% ${p.pivot[1] * 100}%`;
+  if (p.scale) el.style.scale = `${p.scale[0]} ${p.scale[1]}`;
+}
+
+// Bindings: the plugin reads them every frame; the page, four times a second.
+function inkBindings() {
+  for (const n of inkNodes.values()) {
+    const b = n.props.binding;
+    if (!b) continue;
+    const value = host.inkSource(b.source);
+    if (value === undefined) continue;
+    if (b.target === 'scaleX') {
+      const of = typeof b.of === 'string' ? host.inkSource(b.of) : b.of ?? 1;
+      n.el.style.transformOrigin = '0% 50%';
+      n.el.style.scale = `${of > 0 ? Math.max(0, Math.min(1, value / of)) : 0} 1`;
+    } else {
+      n.el.textContent = (b.format ?? '{value}').replaceAll('{value}', Number(value).toFixed(b.decimals ?? 0));
+    }
+  }
+}
+
+function inkInsert(parent, el, index) {
+  const before = index === undefined ? null : parent.children[index] ?? null;
+  parent.insertBefore(el, before);
 }
 
 function inkOp(op) {
@@ -520,11 +536,13 @@ function inkOp(op) {
         background: 'linear-gradient(160deg, #1b2330, #0c0f14)', border: '1px solid #333', fontFamily: 'Rajdhani, sans-serif',
       });
       stage.append(inkHud);
+      inkTimer = setInterval(inkBindings, 250);
     }
+    inkMounts.get(op.mount)?.el.remove();
     const el = document.createElement('div');
     Object.assign(el.style, { position: 'absolute', inset: '0' });
     inkHud.append(el);
-    inkMounts.set(op.mount, { options: op.options ?? {}, el });
+    inkMounts.set(op.mount, { el });
     hostLog('info', 'ink: a tree is on the HUD (in the game, Codeware draws it on the HUD layer)');
     return;
   }
@@ -533,26 +551,38 @@ function inkOp(op) {
   if (op.op === 'unmount') {
     mount.el.remove();
     inkMounts.delete(op.mount);
-    for (const k of [...inkNodes.keys()]) if (k.startsWith(`${op.mount}/`)) inkNodes.delete(k);
+    for (const key of [...inkNodes.keys()]) if (key.startsWith(`${op.mount}/`)) inkNodes.delete(key);
     return;
   }
   const id = `${op.mount}/${op.key}`;
+  const n = inkNodes.get(id);
   if (op.op === 'add') {
     const parent = op.parent ? inkNodes.get(`${op.mount}/${op.parent}`)?.el : mount.el;
     const el = document.createElement(op.tag === 'text' ? 'span' : 'div');
-    const n = { el, tag: op.tag, props: { ...op.props }, parent: op.parent, mount: op.mount };
-    inkNodes.set(id, n);
-    parent?.append(el);
+    const node = { el, tag: op.tag, props: { ...op.props }, parent: op.parent, mount: op.mount };
+    inkNodes.set(id, node);
+    if (parent) inkInsert(parent, el, op.index);
+    inkStyle(node);
+  } else if (op.op === 'set' && n) {
+    for (const [k, v] of Object.entries(op.props ?? {})) {
+      if (k === 'bind' && v && n.props.bind) n.props.bind = Object.fromEntries(Object.entries({ ...n.props.bind, ...v }).filter(([, x]) => x !== null));
+      else if (v === null) delete n.props[k];
+      else n.props[k] = v;
+    }
     inkStyle(n);
-  } else if (op.op === 'set') {
-    const n = inkNodes.get(id);
-    if (!n) return;
-    Object.assign(n.props, op.props);
-    inkStyle(n);
+  } else if (op.op === 'remove' && n) {
+    n.el.remove();
+    for (const key of [...inkNodes.keys()]) if (!document.contains(inkNodes.get(key).el)) inkNodes.delete(key);
+  } else if (op.op === 'move' && n) {
+    const parent = n.el.parentElement;
+    n.el.remove();
+    inkInsert(parent, n.el, op.index);
   }
 }
 
 function clearInk() {
+  clearInterval(inkTimer);
+  inkTimer = null;
   inkHud?.remove();
   inkHud = null;
   inkMounts.clear();
