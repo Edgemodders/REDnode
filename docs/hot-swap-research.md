@@ -219,3 +219,23 @@ On the laptop, `Cyberpunk 2077 - Copy`, one copy of the game, REDnode 0.26.18 (t
 2. In **Refresh test**, swap version 1 itself (the identical file). **Mark** if the game is still running.
 3. Send `rednode-faults.log` (its last lines carry the engine's message) and the plugin log (its line "the engine's message buffer found").
 
+### HP0 run with 0.26.18: results
+
+2026-10-22 at 12:15, on the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.26.18, the identical `EDGEmat_M3.archive` swapped over itself. The plugin log: "the engine's message buffer found". The game was ended the same way, and the fault log now carries the engine's words:
+
+```
+the engine's last message: Failed to load archive C:\Program Files (x86)\Steam\steamapps\common\Cyberpunk 2077 - Copyrchive\pc\mod\EDGEmat_M3.archive, error 1, try regenerating archives!
+```
+
+Error 1 with a file that passes every check on disk, and an identical file at that, means the reader the engine used reported something other than the file: most likely a size of 0, the first check (a reader whose file handle is closed reports no size). A lead from RED Hot Tools' source (MIT, `ArchiveLoader.cpp`), unverified:
+
+| Step | What RED Hot Tools does |
+|---|---|
+| Unload | Closes the system handle of the mounted archive with the same path |
+| Move | Deletes the old file, renames the new one into its place |
+| Load | Finds the old archive's entry with `std::lower_bound` and `strcmp` (`FindArchivePosition`), and **reopens its handle only if that finds it**; then calls the engine's load |
+
+`lower_bound` with `strcmp` finds the entry only if the engine keeps the mod archives in `strcmp` order (case-sensitive: every uppercase letter before every lowercase one). If the engine orders them another way, such as case-insensitively, the search can miss an archive whose name starts with uppercase letters (`EDGEmat_M3`, `EDGEmatA`) among names that start with lowercase ones. Its handle then stays closed, and the engine's load reads through it and fails with error 1. Whether it misses depends on the other archives' names around it, which would explain why a swap of the same name can pass in one setup and fail in another.
+
+Next, a test with no new build: the same file under a name that sorts the same both ways, such as `zzz_rednode_test.archive` (after every other name, case-sensitive or not).
+
