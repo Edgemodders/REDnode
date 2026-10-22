@@ -43,6 +43,8 @@ nav:
     url: /hot-swap-research.html
   - title: TweakDB API
     url: /tweakdb.html
+  - title: Native game UI
+    url: /ink.html
   - title: Sound API
     url: /sound.html
   - title: Sound Tools
