@@ -21,6 +21,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [O6a Runtime](#o6a-runtime) | In the game | O6a | 2026-10-12 | plugin 0.9.0 | Pass |
 | [O6b Game API](#o6b-game-api) | In the game | O6b | 2026-10-12 | plugin 0.10.0 | Pass |
 | [C1 Kernel MCP server](#c1-kernel-mcp-server) | In the game, with Claude Code | REDagent C1 | 2026-10-12 | host 0.4.0 | Pass |
+| [MCP asks before changes](#mcp-asks-before-changes) | In the game, with Claude Code | MCP | Not run | 0.26.16 | Not run |
 | [O8 Mod Manager](#o8-mod-manager) | In the game | O8 | 2026-10-13 | plugin 0.14.0 | Pass |
 | [W1 World API](#w1-world-api) | In the game | W1 | 2026-10-13 | 0.15.0 | Pass |
 | [O9 Debugger](#o9-debugger) | In the game | O9 | 2026-10-13 | 0.16.0 | Pass |
@@ -507,6 +508,18 @@ Built 2026-10-20 in REDnode 0.26.13: `ui.list` in the UI builder, sample **Live 
    5. "Close the Coords HUD, then open it again."
    6. "Give V 50 eddies." (Claude Code asks first; check Vitals)
 4. Quit. `claude mcp list`: `rednode` fails to connect, as expected with the game closed.
+
+### MCP asks before changes
+
+[Source](mcp.md#how-api_read-tells-a-read). Built 2026-10-21, REDnode 0.26.16, asked for by EDGEchat. Checked with an MCP client against a stand-in for the game: only `api_call` and `archives_reload` carry the ask flag, `api_read` runs `GetPlayer`, refuses `GiveItem`, and runs a record's `DisplayName` once `tweakdb` returned the record. Not run in the game yet. Needs Claude Code with REDnode's server (EDGEchat's `edge` plugin, or added by hand), in **auto mode**, so any question asked comes from the flag. Uses an archive you can swap, such as one of the H2a trouser versions, and Vitals.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. Load a save. **F10**, launcher: **MCP server** on. Start a **new** Claude Code session in auto mode. **Mark**.
+2. Ask "Using the rednode tools, what are V's health, level and money, and what is in V's leg slots?" It should use `api_read` and **not** ask you. **Mark**.
+3. Ask "Use api_read to give V 50 eddies." `api_read` should refuse it, and Claude Code should move to `api_call`, which **asks you**. Allow it; check Vitals. **Mark**.
+4. Ask it to give 50 more. It asks **again** (no "don't ask again"). Deny it this time. **Mark**.
+5. Ask it to swap an archive into the game with `archives_reload`. It asks you; allow it. **Mark**.
+6. Quit the game.
 
 ## World API
 

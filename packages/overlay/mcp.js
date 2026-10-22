@@ -6,7 +6,8 @@
 //                                Authorization: Bearer <token> (see the launcher)
 //
 // Tools: logs, apps, game_state, perf, gameapi_lookup, window_text, window_image,
-// window_console, game_image, api_call, api_get, tweakdb, archives_reload. See docs/mcp.md.
+// window_console, game_image, api_read, api_call, api_get, tweakdb, archives_reload.
+// See docs/mcp.md.
 
 'use strict';
 
@@ -25,13 +26,32 @@ REDnode runs overlay apps (web pages drawn on top of the game) and Node mods (No
 - game_image: the game's screen as the player sees it, with or without the overlay.
 - tweakdb: TweakDB flats and records, read from the running game.
 - archives_reload: swaps changed archives into the running game through RED Hot Tools, for seeing an asset change without a restart. Archives that change the game's sound paks are swapped with the game paused and its sound index loaded again; a sound that just played may keep its old version until the game loads it again (for a weapon, equip it again).
-- api_call, api_get: live calls into the game. Game objects come back as {"$ref": n, "$type": "..."}; pass {"$ref": n} back as self. Most functions take the game instance first: pass {}. 64-bit numbers are strings. References die when a save loads.
-api_call can change the player's game, such as their money or health, and archives_reload replaces files in the game's mod folder: ask before changes the user did not request.
+- api_read, api_call, api_get: live calls into the game. Game objects come back as {"$ref": n, "$type": "..."}; pass {"$ref": n} back as self. Most functions take the game instance first: pass {}. 64-bit numbers are strings. References die when a save loads.
+Use api_read for reads: it runs functions named like reads (Get, Is, Has, Can, Find) and a TweakDB record's methods, and refuses the rest. api_call runs any function and can change the player's game, such as their money or health; archives_reload replaces files in the game's mod folder. Both ask the player before every call.
 Guide: https://edgemodders.github.io/REDnode/overlay-apps.html`;
 
 const text = (t) => ({ content: [{ type: 'text', text: typeof t === 'string' ? t : JSON.stringify(t, null, 2) }] });
 const fail = (t) => ({ content: [{ type: 'text', text: t }], isError: true });
 const READ = { readOnlyHint: true, openWorldHint: false };
+// Claude Code asks the player before every call of a tool with this, in every permission mode.
+const ASK_FIRST = { 'anthropic/requiresUserInteraction': true };
+
+// api_read's rule. The game's own const flag cannot tell reads from changes (in 2.31, 1,865
+// const functions are not getters, such as SetAIRole, and two thirds of the getters are not
+// const), so the name decides: a read starts with one of READ_START and has none of
+// CHANGE_WORDS as a word after it (GetOrCreate...). TweakDB records' methods only read flats.
+const READ_START = /^(Get|Is|Has|Can|Find)(?=[A-Z0-9_]|$)/;
+const CHANGE_WORDS =
+  /(^|[a-z0-9_])(Create|Spawn|Set|Add|Remove|Apply|Request|Give|Take|Kill|Destroy|Delete|Clear|Reset|Start|Stop|Trigger|Send|Queue|Register|Unregister|Activate|Deactivate|Enable|Disable|Toggle|Load|Unload|Equip|Unequip|Consume|Drop|Teleport|Push|Pop|Change|Modify|Update|Increment|Decrement|Init|Initialize|Release|Acquire|Lock|Unlock|Play|Fire|Notify|Commit|Save|Spend|Award|Grant|Force|Kick|Open|Close|Show|Hide)(?=[A-Z0-9_]|$)/;
+const RECORD_TYPE = /^gamedata\w*_Record$/;
+
+/** Whether api_read may run fn; selfType is the $type of self when known. */
+function isRead(fn, selfType) {
+  const name = String(fn).split(';')[0];
+  if (selfType && RECORD_TYPE.test(selfType)) return true;
+  const m = READ_START.exec(name);
+  return !!m && !CHANGE_WORDS.test(name.slice(m[0].length));
+}
 
 /**
  * @param {object} host  functions from main.js: log, version, logs, apps, setOpen, restart,
@@ -41,6 +61,33 @@ const READ = { readOnlyHint: true, openWorldHint: false };
 function createMcp(host) {
   let server = null;
   let current = { enabled: false, port: 0, token: '' };
+  // The $type of each object reference the tools handed out, so api_read knows a TweakDB record.
+  const refTypes = new Map();
+
+  function noteRefs(value, depth = 0) {
+    if (!value || typeof value !== 'object' || depth > 6) return;
+    if (typeof value.$ref === 'number' && typeof value.$type === 'string') {
+      refTypes.set(value.$ref, value.$type);
+      if (refTypes.size > 5000) refTypes.delete(refTypes.keys().next().value);
+    }
+    for (const v of Array.isArray(value) ? value : Object.values(value)) noteRefs(v, depth + 1);
+  }
+
+  async function gameCall({ fn, class: cls, self, args }) {
+    const params = { fn, args: args ?? [] };
+    if (cls) params.class = cls;
+    if (self !== undefined) params.self = { $ref: self };
+    const r = await host.call('rtti.call', params);
+    noteRefs(r);
+    return r;
+  }
+
+  const CALL_INPUT = {
+    fn: z.string().describe('The function name, or its full name for overloads, such as "Cast;EntityID;StatsObjectID"'),
+    class: z.string().optional().describe('For a static function: the class, such as "GameInstance"'),
+    self: z.number().int().optional().describe('For a method: the object reference number ($ref)'),
+    args: z.array(z.unknown()).optional().describe('The arguments. The game instance is {}; 64-bit numbers are strings; enums are member names'),
+  };
 
   function build() {
     const mcp = new McpServer({ name: 'rednode', version: host.version }, { instructions: INSTRUCTIONS });
@@ -248,27 +295,49 @@ function createMcp(host) {
     );
 
     mcp.registerTool(
+      'api_read',
+      {
+        title: 'Read from the game',
+        description:
+          'Calls a game function that reads, as api_call does, without asking the player: one named like a read ' +
+          '(starting with Get, Is, Has, Can or Find, with no word such as Create, Set, Add or Remove after it), ' +
+          'or any method of a TweakDB record (a gamedata..._Record from tweakdb or another call). Refuses the rest: use api_call for those. ' +
+          'Game objects come back as {"$ref": n, "$type": "..."}. Functions with out parameters return {result, out}.',
+        inputSchema: CALL_INPUT,
+        annotations: READ,
+      },
+      async (input) => {
+        const selfType = input.self !== undefined ? refTypes.get(input.self) : undefined;
+        if (!isRead(input.fn, selfType)) {
+          return fail(
+            `${input.fn} does not look like a read: api_read runs functions starting with Get, Is, Has, Can or Find ` +
+              '(with no word such as Create, Set, Add or Remove after it) and the methods of TweakDB records. ' +
+              'Use api_call, which asks the player first.',
+          );
+        }
+        try {
+          return text(await gameCall(input));
+        } catch (err) {
+          return fail(err.message);
+        }
+      },
+    );
+
+    mcp.registerTool(
       'api_call',
       {
         title: 'Call the game',
         description:
           'Calls a game function, as `api` in the rednode package does: a global function by name, a static function with class (script or native name), or a method with self. ' +
           'Arguments are checked against the game\'s types first. Game objects come back as {"$ref": n, "$type": "..."}. Functions with out parameters return {result, out}. ' +
-          'This can change the player\'s game.',
-        inputSchema: {
-          fn: z.string().describe('The function name, or its full name for overloads, such as "Cast;EntityID;StatsObjectID"'),
-          class: z.string().optional().describe('For a static function: the class, such as "GameInstance"'),
-          self: z.number().int().optional().describe('For a method: the object reference number ($ref)'),
-          args: z.array(z.unknown()).optional().describe('The arguments. The game instance is {}; 64-bit numbers are strings; enums are member names'),
-        },
+          'This can change the player\'s game, so the player is asked before every call: use api_read for reads.',
+        inputSchema: CALL_INPUT,
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        _meta: ASK_FIRST,
       },
-      async ({ fn, class: cls, self, args }) => {
-        const params = { fn, args: args ?? [] };
-        if (cls) params.class = cls;
-        if (self !== undefined) params.self = { $ref: self };
+      async (input) => {
         try {
-          return text(await host.call('rtti.call', params));
+          return text(await gameCall(input));
         } catch (err) {
           return fail(err.message);
         }
@@ -288,7 +357,9 @@ function createMcp(host) {
       },
       async ({ self, prop }) => {
         try {
-          return text(await host.call('rtti.get', { self: { $ref: self }, prop }));
+          const r = await host.call('rtti.get', { self: { $ref: self }, prop });
+          noteRefs(r);
+          return text(r);
         } catch (err) {
           return fail(err.message);
         }
@@ -302,7 +373,7 @@ function createMcp(host) {
         description:
           "Reads TweakDB, the game's tuning database, from the running game. op 'get': a flat's type and value " +
           "(path such as 'Items.Preset_Lexington_Default.magazineCapacity'). op 'record': the record as a game " +
-          "object reference, to call its methods with api_call (path such as 'Items.money'). op 'records': the ids " +
+          "object reference, to read its methods with api_read (path such as 'Items.money'). op 'records': the ids " +
           "of every record of a type (type such as 'Vehicle' or 'gamedataVehicle_Record'). Ids are hashes shown as " +
           '"0x..."; the game keeps no names. Record types and their methods are in gameapi_lookup.',
         inputSchema: {
@@ -321,6 +392,7 @@ function createMcp(host) {
             return text({ type: r.type, count: r.ids.length, ids: r.ids.slice(0, max), more: Math.max(0, r.ids.length - max) });
           }
           const r = await host.call(op === 'get' ? 'tweakdb.get' : 'tweakdb.record', { path });
+          noteRefs(r);
           return text(r ?? `TweakDB has no ${op === 'get' ? 'flat' : 'record'} "${path}"`);
         } catch (err) {
           return fail(err.message);
@@ -339,11 +411,13 @@ function createMcp(host) {
           'reloaded as it is. Needs RED Hot Tools in the game and a loaded save. Objects already in the world keep ' +
           'the old asset until they load it again (respawn, or re-apply the appearance). An archive with the game\'s sound paks ' +
           '(.opuspak, .opusinfo) is swapped with the game paused and its sound index loaded again; a sound that just played ' +
-          'may keep its old version until the game loads it again (for a weapon, equip it again). A broken archive can crash the game.',
+          'may keep its old version until the game loads it again (for a weapon, equip it again). A broken archive can crash the game. ' +
+          'The player is asked before every call.',
         inputSchema: {
           files: z.array(z.string()).min(1).describe('Full paths, or names of archives in archive/pc/mod'),
         },
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        _meta: ASK_FIRST,
       },
       async ({ files }) => {
         try {
@@ -447,4 +521,4 @@ const WINDOW_TEXT = `(() => {
   return out.join('\\n');
 })()`;
 
-module.exports = { createMcp };
+module.exports = { createMcp, isRead };

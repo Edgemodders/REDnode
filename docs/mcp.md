@@ -29,14 +29,27 @@ The server listens only on `127.0.0.1`, port 41820, and every request needs the 
 | `window_image` | A picture of an overlay window: its own pixels, before REDnode places it on the game. Not the game behind it, its place on screen, or the cursor | No |
 | `window_console` | What an overlay window's page logged (`console.log`, `console.error` and the like) and its uncaught errors: the last 200 messages since it opened. `level` keeps that level and above; `limit` the newest few (default 50). Node mods log to `logs` instead. REDnode 0.16.0 or later | No |
 | `game_image` | A picture of the game's screen now: the game alone, or with `overlay: true` the overlay windows and cursor on it, as the player sees it. Scaled to at most `maxWidth` (default 1280). HDR is converted to SDR, so its colors are approximate. Fails while the game is loading or minimized. Plugin 0.13.0 or later | No |
-| `tweakdb` | TweakDB from the running game: a flat's type and value (`get`), a record as an object reference for `api_call` (`record`), or the ids of every record of a type (`records`, at most 500 unless `limit` says more). Ids are `"0x..."` hashes. REDnode 0.19.0 or later. Read only: changes go through a package's `tweakdb.set`, which REDnode can undo | No |
+| `tweakdb` | TweakDB from the running game: a flat's type and value (`get`), a record as an object reference for `api_read` (`record`), or the ids of every record of a type (`records`, at most 500 unless `limit` says more). Ids are `"0x..."` hashes. REDnode 0.19.0 or later. Read only: changes go through a package's `tweakdb.set`, which REDnode can undo | No |
 | `archives_reload` | Swaps archives into the running game through RED Hot Tools, as a package's `archives.reload` does: full paths to `.archive`, `.xl` or `.yaml` files, or names of archives in `archive/pc/mod`. Needs RED Hot Tools and a loaded save. Refuses archives that change the game's sound paks, which crash a running game. Answers with what was swapped and what failed. REDnode 0.26.0 or later | **Yes**: it replaces files in the game's mod folder, and a broken archive can crash the game |
+| `api_read` | A live game call that reads, without asking: the same as `api_call`, for functions named like reads (starting with `Get`, `Is`, `Has`, `Can` or `Find`, with no word such as `Create`, `Set`, `Add` or `Remove` after it) and every method of a TweakDB record. It refuses the rest. REDnode 0.26.16 or later | No |
 | `api_call` | A live game call, as `api` makes it: a global function, a static function (`class`), or a method (`self`). Game objects come back as `{ "$ref": n, "$type": "..." }` | **Yes**: it can change the player's game, such as money or health |
 | `api_get` | A property of a game object | No |
 
 A REDnode package can use the same tools: it lists `"permissions": ["mcp"]` in its `rednode-app.json`, the player allows it in the launcher, and `kernel.mcp()` in the `rednode` package gives it the address and its own token. The server then runs for it even with the **MCP server** switch off; that switch only controls access from outside, such as Claude Code. REDagent uses the tools this way.
 
-Claude Code asks before it uses a tool, unless you allow it. Allow the read-only tools freely; keep `api_call` and `archives_reload` on ask.
+Claude Code asks before it uses a tool, unless you allow it. Allow the read-only tools freely. From REDnode 0.26.16, `api_call` and `archives_reload` carry `_meta: { "anthropic/requiresUserInteraction": true }`, as EDGEdeck's deploy, undo and remove do: Claude Code asks you before every call of them, in every permission mode, auto mode included, with no "don't ask again". Reads go through `api_read`, which never asks.
+
+### How `api_read` tells a read
+
+The game's own `const` flag cannot: in 2.31, 1,865 `const` functions are not getters (such as `SetAIRole` and `SendMinigameFailedToAllNPCs`), and two thirds of the functions named like getters are not `const`. So the name decides:
+
+| Rule | Example |
+|---|---|
+| Runs a name starting with `Get`, `Is`, `Has`, `Can` or `Find` | `GetItemInSlot`, `IsSlotEmpty` |
+| Refuses it when a word after that marks a change: `Create`, `Spawn`, `Set`, `Add`, `Remove`, `Apply`, `Request`, `Give`, `Take`, `Kill`, `Start`, `Stop`, `Send`, `Queue`, `Load`, `Equip`, `Play` and others (the list is `CHANGE_WORDS` in `packages/overlay/mcp.js`) | `GetOrCreateEntity`, `GetAndRemove` |
+| Runs every method of a TweakDB record (`gamedata..._Record`), known from the `$type` a tool returned | `DisplayName` on a record from `tweakdb` |
+
+Of the 12,964 functions in 2.31 named like reads, it runs 12,339 and refuses 625, some of them reads (`GetKillDelay`), which then go through `api_call`. A function named like a read could still change something (unverified for most of them). The rule is only in the MCP server: the `rednode` package's `api` is not limited.
 
 The server also gives the agent short instructions: what REDnode is, what each tool is for, and the game API's rules (the game instance is `{}`, 64-bit numbers are strings, references die when a save loads).
 
