@@ -276,7 +276,11 @@ Value Number(double aValue)
     Value v;
     v.kind = Value::Kind::Number;
     v.number = aValue;
-    v.text = std::to_string(aValue);
+    // A whole number as one, so an Int32 parameter takes it: its conversion reads the text,
+    // to keep 64-bit values exact, and "0.000000" is not whole (ReorderChild, I2c's test).
+    char text[64];
+    std::snprintf(text, sizeof(text), aValue == std::floor(aValue) && std::abs(aValue) < 1e15 ? "%.0f" : "%.17g", aValue);
+    v.text = text;
     return v;
 }
 

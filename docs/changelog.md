@@ -33,6 +33,7 @@ How to keep it:
 
 **Other**
 
+- REDnode's own native calls into the game remember the functions they find, so reading game values every frame costs less.
 - REDnode's scripts keep the root widgets of a few HUD and menu screens (`REDnodeInk.reds`), the first part of the coming ink API for the game's own UI. Nothing changes on screen.
 - During an archive swap, `red4ext/logs/rednode-faults.log` now also names whatever ends the game (TerminateProcess, ExitProcess or a fail-fast), with its status, its stack and the game engine's last error message, for crashes that leave no crash report.
 

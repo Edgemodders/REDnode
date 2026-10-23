@@ -1422,9 +1422,19 @@ std::string TweakUpdate(const Value& aParams, std::string& aError)
 }
 } // namespace
 
-bool CallNative(Handle<IScriptable>& aSelf, const char* aClass, const std::string& aFn, const json::Value& aArgs,
-                Handle<IScriptable>* aObject, std::string& aError)
+// The function a native caller names, found once and remembered: the driver calls the same
+// few functions every frame (I2c's bindings), and finding them by name each time cost most of
+// a call. By the class (the object's, or the named one) and the name and the argument count.
+std::unordered_map<std::string, CBaseFunction*>& g_nativeFns = *new std::unordered_map<std::string, CBaseFunction*>();
+
+CBaseFunction* FindNative(Handle<IScriptable>& aSelf, const char* aClass, const std::string& aFn, size_t aArgs,
+                          std::string& aError)
 {
+    char owner[32];
+    std::snprintf(owner, sizeof(owner), "%p", aSelf ? static_cast<const void*>(aSelf->GetType()) : nullptr);
+    const std::string key = std::string(owner) + "\n" + (aClass ? aClass : "") + "\n" + aFn + "\n" + std::to_string(aArgs);
+    if (auto it = g_nativeFns.find(key); it != g_nativeFns.end())
+        return it->second;
     CBaseFunction* fn = nullptr;
     if (aSelf)
     {
@@ -1441,9 +1451,9 @@ bool CallNative(Handle<IScriptable>& aSelf, const char* aClass, const std::strin
         if (candidates.empty())
         {
             aError = Str(aSelf->GetType()->GetName()) + " has no method \"" + aFn + "\"";
-            return false;
+            return nullptr;
         }
-        fn = Pick(candidates, aArgs.items.size(), aFn, aError);
+        fn = Pick(candidates, aArgs, aFn, aError);
     }
     else
     {
@@ -1453,8 +1463,17 @@ bool CallNative(Handle<IScriptable>& aSelf, const char* aClass, const std::strin
             params.fields.emplace_back("class", Text(aClass));
         params.fields.emplace_back("fn", Text(aFn));
         Handle<IScriptable> none;
-        fn = Resolve(params, none, aArgs.items.size(), aError);
+        fn = Resolve(params, none, aArgs, aError);
     }
+    if (fn)
+        g_nativeFns[key] = fn;
+    return fn;
+}
+
+bool CallNative(Handle<IScriptable>& aSelf, const char* aClass, const std::string& aFn, const json::Value& aArgs,
+                Handle<IScriptable>* aObject, std::string& aError)
+{
+    CBaseFunction* fn = FindNative(aSelf, aClass, aFn, aArgs.items.size(), aError);
     if (!fn)
         return false;
 
@@ -1477,35 +1496,7 @@ bool CallNative(Handle<IScriptable>& aSelf, const char* aClass, const std::strin
 bool CallNativeValue(Handle<IScriptable>& aSelf, const char* aClass, const std::string& aFn, const json::Value& aArgs,
                      json::Value& aOut, std::string& aError)
 {
-    CBaseFunction* fn = nullptr;
-    if (aSelf)
-    {
-        std::vector<CBaseFunction*> candidates;
-        for (const CClass* c = aSelf->GetType(); c && candidates.empty(); c = c->parent)
-        {
-            for (auto* f : c->funcs)
-            {
-                if (Matches(f, aFn))
-                    candidates.push_back(f);
-            }
-        }
-        if (candidates.empty())
-        {
-            aError = Str(aSelf->GetType()->GetName()) + " has no method \"" + aFn + "\"";
-            return false;
-        }
-        fn = Pick(candidates, aArgs.items.size(), aFn, aError);
-    }
-    else
-    {
-        Value params;
-        params.kind = Value::Kind::Object;
-        if (aClass)
-            params.fields.emplace_back("class", Text(aClass));
-        params.fields.emplace_back("fn", Text(aFn));
-        Handle<IScriptable> none;
-        fn = Resolve(params, none, aArgs.items.size(), aError);
-    }
+    CBaseFunction* fn = FindNative(aSelf, aClass, aFn, aArgs.items.size(), aError);
     if (!fn)
         return false;
     std::vector<std::unique_ptr<Slot>> slots;

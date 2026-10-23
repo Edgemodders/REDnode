@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b passed in game on 2026-10-22** (REDnode 0.29.0, [results](#i2b-test-results)); placement across resolutions is left for later, as agreed. I2c's plan was agreed on 2026-10-22, with the language split off as I2d. **I2c is built in REDnode 0.30.0** and awaits its in-game test ([I2c test](#i2c-test)). The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b passed in game on 2026-10-22** (REDnode 0.29.0, [results](#i2b-test-results)); placement across resolutions is left for later, as agreed. I2c's plan was agreed on 2026-10-22, with the language split off as I2d. **I2c's first run (0.30.0)** passed except list moves ([results](#i2c-test-first-run-0300)); REDnode 0.30.1 fixes them and awaits the retest ([I2c retest](#i2c-retest)). The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -433,4 +433,33 @@ On the laptop, `Cyberpunk 2077 - Copy`, REDnode 0.30.0 (update zip over 0.29.0),
 6. Press **Update header** three times: does the title change (Open gigs, Fixer board, Contracts)? **Mark**.
 7. Load the same save again and wait a few seconds: are the vitals and the list back, the list in its last order? **Mark**.
 8. Quit. Send `rednode-mods.log` and this run's `red4ext/logs/rednode-*.log` (its `Ink:` lines: each list change's counts, and the bindings' cost a frame).
+
+## I2c test: first run (0.30.0)
+
+2026-10-22 at 19:54 to 20:06, on the laptop, REDnode 0.30.0, with Codeware.
+
+| Step | Result |
+|---|---|
+| 1 to 3, Ink vitals | **Passed**: the HP and RAM bars and numbers and the money showed and followed damage, a quickhack's RAM and a purchase |
+| 4, Ink list shown | Passed: "16 add" in one batch |
+| 5, list changes | **Failed** except **Add**: Add at top added at the bottom, Last to top and Shuffle did not move anything, and the screen no longer matched the list |
+| 6, Update header | Passed |
+| 7, a save load | Passed, and the list showed **in the right order**: the plugin's own order was right all along |
+
+**Why:** every op that needed a place failed in the plugin log with "k56: argument 2 (newIndex, Int32): Int32 needs a whole number". The driver's number helper wrote the index as text, `"0.000000"`, and the plugin's Int32 conversion reads the text (to keep 64-bit values exact), so `ReorderChild` never ran. Adds at the end and removes need no place, so they worked; the rebuild after the load adds the children in the plugin's order, so it was right.
+
+**The bindings' cost:** 5 bindings over 4 sources, about 0.25 to 0.37 ms a frame (one first reading of 21 ms covered the first frames after the load, when the game objects are found). Most of a read was finding the game function by name each time.
+
+**Fixed in REDnode 0.30.1:** whole numbers are written whole (`ReorderChild` takes the index); the functions the driver calls are found once and remembered (`FindNative` in reflect.cpp), for every native call, bindings included.
+
+## I2c retest
+
+On the laptop, REDnode 0.30.1 (update zip over 0.30.0), with Codeware; Ink vitals and Ink list on.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
+1. Load a save. Ink vitals at the bottom left as before? Take a little damage: do the bar and number follow? **Mark**.
+2. Open the overlay, press **Show** in the Ink list window, close the overlay: three contracts? **Mark**.
+3. Open the overlay and press, looking at the list after each: **Add at top** (a new first), **Last to top**, **Remove first**, **Rename second**, **Shuffle** (the order reversed), **Add** (a new last). Does each match its log line, with even gaps? **Mark**.
+4. Load the same save again: the list back in its last order? **Mark**.
+5. Quit. Send `rednode-mods.log` and this run's `red4ext/logs/rednode-*.log` (no "Int32" errors now, and the bindings' cost a frame).
 
