@@ -52,7 +52,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [RED Hot Tools Edgemodders build and the guard](hot-swap-research.md#the-edgemodders-build-and-the-guard-test) | In the game | HP0 | 2026-10-22 | 0.26.19, RED Hot Tools 1.3.0+edgemodders.1 | **Pass** (laptop): the official RED Hot Tools' swap refused with the message, the game running on; the Edgemodders build's swap went through |
 | [H2 resumed](world.md#h2-resumed-test-with-the-fixed-red-hot-tools) | In the game | H2 | 2026-10-22 | 0.26.19, RED Hot Tools 1.3.0+edgemodders.1, Refresh test 0.2.3 | **Pass** (laptop): no crash in five swaps; Reset look showed the new version on the worn item; Off and on both ways |
 | [H2b-0 Reset look both ways](world.md#h2b-0-reset-look-both-ways-test) | In the game | H2 | 2026-10-22 | 0.26.19 | **Pass** (laptop): six swaps both ways, each shown by Reset look with the item worn |
-| [Development folders](#development-folders) | In the game | #16 | Not run | 0.33.0 | Awaiting its run |
+| [Development folders](#development-folders) | In the game | #16 | 2026-10-23 | 0.33.0 | **Pass** (2.31 backup folder): a folder added in the launcher, its Hello mod copy ran instead of the installed one with the DEV tag, two edits hot-reloaded it, Remove brought the installed copy back, bad paths refused ([results](#development-folders-results)) |
 | [Launcher settings drawer](#launcher-settings-drawer) | In the game | Launcher | 2026-10-23 | 0.32.2 | **Pass** (laptop): the player: "It looks perfect". 0.32.3 then shows the version line as "Version 0.32.3" |
 | [Q-A Quest API](quests.md#q-a-test) | In the game | Q-A | 2026-10-23 | 0.32.0 | **Pass** (laptop): facts read and set, the watcher heard each change and kept working after a load, the tracked entry read, V teleported back, the MCP tools read without asking and asked to set ([results](quests.md#q-a-test-results)) |
 | [I2d Ink language](ink.md#i2d-test) | In the game | I2d | 2026-10-22 | 0.31.0 | **Pass** (laptop): game keys and `t()` in English and French, plurals, V's gender, fallbacks logged once; the language set at the main menu applies with no restart ([results](ink.md#i2d-test-results)) |
@@ -566,6 +566,10 @@ Before: make a folder outside the game, for example `E:\Modding\DevTest`, and co
 5. Press **Remove** beside the folder: the installed Hello mod comes back. **Mark**.
 6. Paste a path that does not exist, then the game's own apps folder: each is refused with a message. **Mark**.
 7. Quit the game. Send `rednode-overlay.log` and `rednode-mods.log`.
+
+#### Development folders: results
+
+2026-10-23, REDnode 0.33.0, the game run from the 2.31 backup folder: **pass**, all steps. The host log shows each step: at step 2 "Development folder added: E:\Modding\DevTest", the installed Hello mod skipped ("already loaded from E:\Modding\DevTest\hello-mod") and "New package: hello-mod (development copy, …)"; at step 4 two saves of `mod.mjs`, each "Changed: hello-mod (mod.mjs). Reloading."; at step 5 "Development folder removed" and the installed Hello mod back as "New package: hello-mod". The refusals of step 6 show only in the launcher, as designed, and the player saw both. #16 closed.
 
 ## World API
 
