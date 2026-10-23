@@ -1117,3 +1117,43 @@ The fix plan:
 
 Photo mode and the wardrobe preview (`gameuiWardrobeSetPreviewGameController`) have their own copies of V and likely need the same step. Until then: swap outside the inventory, or unequip and equip the item again in the inventory.
 
+
+## H2c World objects: plan
+
+Proposed on 2026-10-23, **not yet agreed**. H2c finishes H2 for things in the world. The owner's aim (2026-10-22): scenes built and stored in EDGEbuilder, with NPCs, props and the rest, load into the game from EDGEbuilder, and a swapped archive shows on them as it does on what V wears. EDGEquest needs the same pieces for quest NPCs and places (EDGEbuilder's [#3](https://github.com/Edgemodders/EDGEbuilder/issues/3)).
+
+**What REDnode has today** (W1): `world.spawn` takes a `template` or a `record`, an appearance and components, through Codeware's DynamicEntitySystem; `move`, `remove`, entity events. Missing:
+
+| Gap | Why it matters |
+|---|---|
+| NPCs never tried. `record: "Character.…"` is in the types but no test spawned a person | A scene's people, EDGEquest's quest NPCs |
+| The host does not know what a package spawned | Nothing to refresh after a swap, and spawns outlive a stopped package (EDGEbuilder removes its own) |
+| No way to find the game's entities near a point | Refreshing the props and NPCs around V after a swap; EDGEbuilder's B3b picking needs the same (its probe 1) |
+| A swap refreshes only what V wears | Props, NPCs and placed objects keep the old look |
+| The inventory preview keeps the old look | [Parked](#h2b-limit-the-inventory-preview-keeps-the-old-look-parked) with a fix plan |
+| No scene load | Every tool that wants an EDGEbuilder scene in the game would rebuild it object by object |
+
+**Candidates in the game API** (`gameapi/2.31/rtti.json`; all **unverified**):
+
+| Need | Candidate |
+|---|---|
+| Entities near a point | `GameInstance.GetEntityList()` (every entity the game has attached), filtered by distance; or `TargetingSystem.GetTargetParts(V, query, parts)` with a search query (what CET mods use to find what is in front of V) |
+| Show a swapped file on a world entity | `entEntity.ScheduleAppearanceChange(name)` with `GetCurrentAppearanceName()`, or through another appearance and back; for REDnode's own spawns, remove and spawn again with the same spec |
+| An NPC that stands still and stays friendly | DynamicEntitySpec's `recordID` with a `Character.*` record, then the game's attitude and AI calls (to find in the spike) |
+
+**Phases:**
+
+| Step | Builds | Answers |
+|---|---|---|
+| **H2c-a Spike** | A test app through `api` only (no REDnode change, runs on 0.33.0): spawn an NPC by record and by template, with an appearance; list the entities near V both ways, with the resources their components name; refresh a spawned prop, a spawned NPC and a game NPC after a swap (appearance again, and respawn) | Whether an NPC spawns and stays where it was put, what it does (walks off, fights, talks), whether it survives a save; which listing is fast enough; which refresh shows the new file on each kind, at what cost |
+| **H2c-b Build** | From what the spike finds: the host keeps what each package spawned (removed when the package stops, as posted sounds are); `world.spawn` for NPCs with the options the spike needs; `archives.reload` refreshes REDnode's spawns and the entities near V that use the swapped files, after what V wears; the inventory preview fix; `world.load(scene)` and `world.unload(name)` reading EDGEbuilder's [scene format](https://edgemodders.github.io/EDGEbuilder/scene.html); MCP tools to spawn and list (spawn asks first) | One swap shows everywhere it is seen; any package loads an EDGEbuilder scene in one call |
+
+**For EDGEbuilder** (its repo, through a note on its issues once agreed): NPCs as a scene kind (`npc`: a `Character.*` record or a template, an appearance), which changes its scene format; and its Rebuild previews through `world.load` once that exists.
+
+**To agree with the owner:**
+
+| Question | Recommendation |
+|---|---|
+| Does REDnode read EDGEbuilder's scene file (`world.load`), or only give EDGEbuilder the pieces? | REDnode reads it. EDGEquest and others can then load a scene without EDGEbuilder running, and the format stays EDGEbuilder's to pin |
+| What does a loaded NPC do? | Stands where it was placed, friendly, idle, until a package says otherwise. Behaviour (walk, talk, fight) is a later phase |
+| Refresh the game's NPCs and props around V after every swap, or only REDnode's spawns by default? | Both, but only entities that use a file in the swapped archive, so an unrelated swap touches nothing. The match compares their components' resource hashes with the archive's file table, which `archive-index.js` already reads; whether components show every file an entity uses (meshes from an `.app`, materials) is for the spike, **unverified** |
