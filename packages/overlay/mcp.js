@@ -27,6 +27,7 @@ REDnode runs overlay apps (web pages drawn on top of the game) and Node mods (No
 - tweakdb: TweakDB flats and records, read from the running game.
 - archives_reload: swaps changed archives into the running game through RED Hot Tools, for seeing an asset change without a restart. Archives that change the game's sound paks are swapped with the game paused and its sound index loaded again; a sound that just played may keep its old version until the game loads it again (for a weapon, equip it again).
 - api_read, api_call, api_get: live calls into the game. Game objects come back as {"$ref": n, "$type": "..."}; pass {"$ref": n} back as self. Most functions take the game instance first: pass {}. 64-bit numbers are strings. References die when a save loads.
+For a quest: game_facts and game_journal read facts and journal entries; game_facts_set, game_journal_set and game_teleport change the player's save or move V, and ask first.
 Use api_read for reads: it runs functions named like reads (Get, Is, Has, Can, Find) and a TweakDB record's methods, and refuses the rest. api_call runs any function and can change the player's game, such as their money or health; archives_reload replaces files in the game's mod folder. Both ask the player before every call.
 Guide: https://edgemodders.github.io/REDnode/overlay-apps.html`;
 
@@ -424,6 +425,202 @@ function createMcp(host) {
       async ({ files, refresh }) => {
         try {
           return text(await host.reloadArchives(files, refresh));
+        } catch (err) {
+          return fail(err.message);
+        }
+      },
+    );
+
+    // ---------- quest facts, the journal and moving V (Q-A, asked for by EDGEquest) ----------
+
+    // Runs game calls with the references they hand out let go after.
+    async function withRefs(fn) {
+      const refs = [];
+      const call = async (params) => {
+        const r = await host.call('rtti.call', { args: [], ...params });
+        if (r && typeof r === 'object' && typeof r.$ref === 'number') refs.push(r.$ref);
+        return r;
+      };
+      try {
+        return await fn(call);
+      } finally {
+        if (refs.length) host.call('rtti.release', { refs }).catch(() => {});
+      }
+    }
+    const system = (call, getter) => call({ class: 'GameInstance', fn: getter, args: [{}] });
+    const JOURNAL_KINDS = {
+      quest: 'gameJournalQuest',
+      phase: 'gameJournalQuestPhase',
+      objective: 'gameJournalQuestObjective',
+      subobjective: 'gameJournalQuestSubObjective',
+      mappin: 'gameJournalQuestMapPin',
+    };
+    const kindOf = (kind) => JOURNAL_KINDS[kind ?? 'objective'] ?? kind;
+    const KIND_INPUT = z.string().optional().describe('quest, phase, objective (default), subobjective, mappin, or the game\'s class name');
+
+    mcp.registerTool(
+      'game_facts',
+      {
+        title: 'Read quest facts',
+        description: 'Reads the game\'s quest facts by name (an unset fact reads 0). Needs a loaded save.',
+        inputSchema: { names: z.array(z.string()).min(1).describe('Fact names') },
+        annotations: READ,
+      },
+      async ({ names }) => {
+        try {
+          return text(
+            await withRefs(async (call) => {
+              const qs = await system(call, 'GetQuestsSystem');
+              if (!qs) throw new Error('No quests system: load a save first');
+              const values = await Promise.all(names.map((n) => call({ self: { $ref: qs.$ref }, fn: 'GetFact', args: [n] })));
+              return Object.fromEntries(names.map((n, i) => [n, values[i]]));
+            }),
+          );
+        } catch (err) {
+          return fail(err.message);
+        }
+      },
+    );
+
+    mcp.registerTool(
+      'game_facts_set',
+      {
+        title: 'Set quest facts',
+        description: 'Sets the game\'s quest facts. This changes the player\'s save, so the player is asked before every call.',
+        inputSchema: { facts: z.record(z.string(), z.number().int()).describe('Fact names and their new values') },
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        _meta: ASK_FIRST,
+      },
+      async ({ facts }) => {
+        try {
+          return text(
+            await withRefs(async (call) => {
+              const qs = await system(call, 'GetQuestsSystem');
+              if (!qs) throw new Error('No quests system: load a save first');
+              for (const [name, value] of Object.entries(facts)) await call({ self: { $ref: qs.$ref }, fn: 'SetFact', args: [name, value] });
+              const now = await Promise.all(Object.keys(facts).map((n) => call({ self: { $ref: qs.$ref }, fn: 'GetFact', args: [n] })));
+              return Object.fromEntries(Object.keys(facts).map((n, i) => [n, now[i]]));
+            }),
+          );
+        } catch (err) {
+          return fail(err.message);
+        }
+      },
+    );
+
+    mcp.registerTool(
+      'game_journal',
+      {
+        title: 'Read the journal',
+        description:
+          'Reads journal entries by path: each one\'s state (Inactive, Active, Succeeded, Failed) and whether it is tracked, or null when the path is not in the journal. ' +
+          'With no paths, answers the tracked entry and its path (built from its parents\' ids; unverified for every kind). Needs a loaded save.',
+        inputSchema: { paths: z.array(z.string()).optional().describe('Journal paths'), kind: KIND_INPUT },
+        annotations: READ,
+      },
+      async ({ paths, kind }) => {
+        try {
+          return text(
+            await withRefs(async (call) => {
+              const j = await system(call, 'GetJournalManager');
+              if (!j) throw new Error('No journal: load a save first');
+              const on = (fn, args) => call({ self: { $ref: j.$ref }, fn, args });
+              if (!paths?.length) {
+                const tracked = await on('GetTrackedEntry', []);
+                if (!tracked) return { tracked: null };
+                const ids = [];
+                for (let e = tracked; e && ids.length < 12; e = await on('GetParentEntry', [{ $ref: e.$ref }])) {
+                  const id = await call({ self: { $ref: e.$ref }, fn: 'GetId' });
+                  if (id) ids.unshift(id);
+                }
+                return { tracked: { path: ids.join('/'), state: await on('GetEntryState', [{ $ref: tracked.$ref }]) } };
+              }
+              const out = {};
+              for (const path of paths) {
+                const e = await on('GetEntryByString', [path, kindOf(kind)]);
+                out[path] = e
+                  ? { state: await on('GetEntryState', [{ $ref: e.$ref }]), tracked: await on('IsEntryTracked', [{ $ref: e.$ref }]) }
+                  : null;
+              }
+              return out;
+            }),
+          );
+        } catch (err) {
+          return fail(err.message);
+        }
+      },
+    );
+
+    mcp.registerTool(
+      'game_journal_set',
+      {
+        title: 'Change a journal entry',
+        description: 'Changes a journal entry\'s state (with the game\'s notification), or tracks it. This changes the player\'s save, so the player is asked before every call.',
+        inputSchema: {
+          path: z.string().describe('The journal path'),
+          state: z.enum(['Inactive', 'Active', 'Succeeded', 'Failed']).optional().describe('The new state'),
+          track: z.boolean().optional().describe('Track the entry'),
+          kind: KIND_INPUT,
+        },
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        _meta: ASK_FIRST,
+      },
+      async ({ path, state, track, kind }) => {
+        try {
+          return text(
+            await withRefs(async (call) => {
+              const j = await system(call, 'GetJournalManager');
+              if (!j) throw new Error('No journal: load a save first');
+              const on = (fn, args) => call({ self: { $ref: j.$ref }, fn, args });
+              const done = {};
+              if (state) done.changed = await on('ChangeEntryState', [path, kindOf(kind), state, 'Notify']);
+              if (track) {
+                const e = await on('GetEntryByString', [path, kindOf(kind)]);
+                if (e) await on('TrackEntry', [{ $ref: e.$ref }]);
+                done.tracked = !!e;
+              }
+              return done;
+            }),
+          );
+        } catch (err) {
+          return fail(err.message);
+        }
+      },
+    );
+
+    mcp.registerTool(
+      'game_teleport',
+      {
+        title: 'Move V',
+        description: 'Moves V to a position (yaw in degrees) or to a world node by its reference ("$/…", or its hash; unverified which the game takes). The player is asked before every call.',
+        inputSchema: {
+          x: z.number().optional(),
+          y: z.number().optional(),
+          z: z.number().optional(),
+          yaw: z.number().optional(),
+          nodeRef: z.string().optional().describe('A node reference instead of a position'),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+        _meta: ASK_FIRST,
+      },
+      async ({ x, y, z: zz, yaw, nodeRef }) => {
+        try {
+          if (!nodeRef && [x, y, zz].some((v) => typeof v !== 'number')) return fail('Give x, y and z, or nodeRef');
+          return text(
+            await withRefs(async (call) => {
+              const facility = await system(call, 'GetTeleportationFacility');
+              const player = await call({ fn: 'GetPlayer', args: [{}] });
+              if (!facility || !player) throw new Error('No player: load a save first');
+              if (nodeRef) await call({ self: { $ref: facility.$ref }, fn: 'TeleportToNode', args: [{ $ref: player.$ref }, nodeRef] });
+              else
+                await call({
+                  self: { $ref: facility.$ref },
+                  fn: 'Teleport',
+                  args: [{ $ref: player.$ref }, { X: x, Y: y, Z: zz, W: 1 }, { Roll: 0, Pitch: 0, Yaw: yaw ?? 0 }],
+                });
+              return { moved: true };
+            }),
+          );
         } catch (err) {
           return fail(err.message);
         }

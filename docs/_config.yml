@@ -45,6 +45,8 @@ nav:
     url: /tweakdb.html
   - title: Native game UI
     url: /ink.html
+  - title: Quest API
+    url: /quests.html
   - title: Sound API
     url: /sound.html
   - title: Sound Tools

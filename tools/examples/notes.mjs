@@ -241,6 +241,18 @@ export const NOTES = {
     tryThis: ['Press Change, then Read: the name changed. Press Restart below: it is back.'],
     preview: 'The preview\'s TweakDB holds a few made-up records. In the game it is the game\'s own database.',
   },
+  'quest-test': {
+    group: 'game',
+    summary: 'Read, watch and set quest facts, read and track journal entries, and move V back to a kept spot: the calls for testing a quest in the running game.',
+    teaches: ['quests.facts', 'quests.watch', 'quests.setFact', 'journal.entry', 'journal.tracked', 'game.player.teleport'],
+    how: [
+      'An unset fact reads 0. Setting a fact changes the player\'s save, so test on a save you can lose.',
+      '`quests.watch` hears each change as the game makes it, with no polling: REDnode registers a small script listener with the quests system for each name, and registers it again after every save load.',
+      'A journal path names a quest, phase or objective; `journal.entry` answers `null` for a path the journal does not have.',
+    ],
+    tryThis: ['Press Watch, then Set +1: the watcher logs the change on its own.', 'Press Here, then Teleport after V has moved.'],
+    preview: 'The preview\'s quests system holds a few made-up facts and one journal entry. In the game they are the player\'s own.',
+  },
   'world-test': {
     group: 'game',
     summary: 'Spawn an entity in front of V with a mesh component built by api.$new, move it in a circle as fast as the game allows, and remove it.',

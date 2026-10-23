@@ -337,6 +337,14 @@ export const audio = path(['audio'], {
     return async () => off();
   },
 });
+// A watcher hears "quests.fact:<name>" game events, as in the real package.
+export const quests = path(['quests'], {
+  async watch(names, handler) {
+    const offs = [...new Set(names)].map((name) => listen('game', `quests.fact:${name}`, (e) => handler({ name, value: Number(e.value) })));
+    return async () => offs.forEach((off) => off());
+  },
+});
+export const journal = path(['journal']);
 export const kernel = path(['kernel']);
 export const archives = path(['archives']);
 export const pkg = path(['pkg']);

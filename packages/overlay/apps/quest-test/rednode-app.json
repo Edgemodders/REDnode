@@ -1,0 +1,8 @@
+{
+  "id": "quest-test",
+  "name": "Quest test",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "A sample of the Quest API (Q-A): reads, watches and sets quest facts, reads and tracks journal entries, and moves V to a saved spot.",
+  "main": "mod.mjs"
+}

@@ -355,6 +355,12 @@ export const game = {
     async setHealth(v) {
       sim.health = Math.max(0, Math.min(sim.healthMax, Number(v)));
     },
+    async teleport(to) {
+      if (sim.mainMenu) throw new Error('teleport: no teleportation facility: load a save first');
+      if ('nodeRef' in to) throw new Error('teleport: the simulated game has no world nodes');
+      sim.pos = { x: Number(to.x), y: Number(to.y), z: Number(to.z) };
+      if (typeof to.yaw === 'number') sim.yaw = (to.yaw * Math.PI) / 180;
+    },
   },
   audio: {
     async play(name) {
@@ -374,6 +380,67 @@ export const game = {
     return onHostEvent((m) => {
       if (m.event === 'game-state') fn(gameState());
     });
+  },
+};
+
+// ---------- quests (Q-A) ----------
+// Facts and a small journal. A changed fact is sent as the game event "quests.fact:<name>",
+// as the plugin's REDnodeFactListener does, so watchers hear it in pages and Node mods alike.
+
+const facts = new Map([['sq030_dam_meetup_done', 1]]);
+const JOURNAL = 'quests/side_quests/sq030/sq030_01_meet_judy/obj_meet_judy';
+const entries = new Map([[JOURNAL, { state: 'Active', tracked: true }]]);
+const needSave = (what) => {
+  if (sim.mainMenu) throw new Error(`${what}: no ${what === 'journal' ? 'journal' : 'quests system'}: load a save first`);
+};
+
+export const quests = {
+  async fact(name) {
+    needSave('quests');
+    return facts.get(name) ?? 0;
+  },
+  async facts(names) {
+    needSave('quests');
+    return Object.fromEntries(names.map((n) => [n, facts.get(n) ?? 0]));
+  },
+  async setFact(name, value) {
+    needSave('quests');
+    const v = Math.trunc(Number(value));
+    if ((facts.get(name) ?? 0) === v) return;
+    facts.set(name, v);
+    emit({ event: 'game', name: `quests.fact:${name}`, value: v, frame: sim.frame });
+  },
+  async watch(names, handler) {
+    needSave('quests');
+    const offs = [...new Set(names)].map((name) => game.on(`quests.fact:${name}`, (e) => handler({ name, value: Number(e.value) })));
+    return async () => offs.forEach((off) => off());
+  },
+};
+
+export const journal = {
+  async entry(path) {
+    needSave('journal');
+    const e = entries.get(path);
+    return e ? { path, ...e } : null;
+  },
+  async setState(path, state) {
+    needSave('journal');
+    const e = entries.get(path);
+    if (!e) return false;
+    e.state = state;
+    return true;
+  },
+  async track(path) {
+    needSave('journal');
+    if (!entries.has(path)) return false;
+    for (const e of entries.values()) e.tracked = false;
+    entries.get(path).tracked = true;
+    return true;
+  },
+  async tracked() {
+    needSave('journal');
+    for (const [path, e] of entries) if (e.tracked) return { path, hash: 0x2d1f6a3 };
+    return null;
   },
 };
 

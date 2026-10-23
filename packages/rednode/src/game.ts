@@ -101,6 +101,18 @@ export interface Player {
    * ```
    */
   setHealth(value: number): Promise<void>;
+
+  /**
+   * Moves V: to a position (`yaw` in degrees, 0 by default), or to a world node by its
+   * reference (`"$/…"`, or its hash as a string; unverified which forms the game takes).
+   *
+   * @example
+   * ```ts
+   * const here = await game.player.position();
+   * await game.player.teleport({ ...here, z: here.z + 20 }); // a drop from 20 m
+   * ```
+   */
+  teleport(to: { x: number; y: number; z: number; yaw?: number } | { nodeRef: string }): Promise<void>;
 }
 
 /** The game's audio. */
@@ -316,6 +328,16 @@ export const game: Game = {
     async setHealth(value: number) {
       const pools = await api.GameInstance.GetStatPoolsSystem(instance);
       await pools!.RequestSettingStatPoolValue(await playerStatsId(), "Health", value, null, false);
+    },
+    async teleport(to) {
+      const facility = (await api.GameInstance.GetTeleportationFacility(instance)) as unknown as Record<
+        string,
+        (...args: unknown[]) => Promise<unknown>
+      > | null;
+      if (!facility) throw new Error("teleport: no teleportation facility: load a save first");
+      const p = await player();
+      if ("nodeRef" in to) await facility.TeleportToNode(p, to.nodeRef);
+      else await facility.Teleport(p, { X: to.x, Y: to.y, Z: to.z, W: 1 }, { Roll: 0, Pitch: 0, Yaw: to.yaw ?? 0 });
     },
   },
   audio: {

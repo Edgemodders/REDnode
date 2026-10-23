@@ -18,6 +18,7 @@ How to keep it:
 - A package's `requires` can name `rednode` with a version, for app packs that need a REDnode new enough. The overlay host answers with its own version.
 - Each release on GitHub also carries the app packs' zips, such as REDnode Sound Tools, each as its own file.
 - The MCP tool `api_read` reads from the game without asking: it runs functions named like reads (`Get`, `Is`, `Has`, `Can`, `Find`) and a TweakDB record's methods, and refuses the rest. See [the MCP server](https://edgemodders.github.io/REDnode/mcp.html).
+- The Quest API, for testing a quest in the running game: `quests.fact`, `quests.facts` and `quests.setFact` read and set the game's quest facts, `quests.watch` hears each change of named facts as the game makes it (with no polling, kept across save loads), `journal.entry`, `journal.setState`, `journal.track` and `journal.tracked` read and change journal entries, and `game.player.teleport` moves V to a position or a world node. MCP tools for assistants: `game_facts` and `game_journal` read without asking; `game_facts_set`, `game_journal_set` and `game_teleport` ask first. See [Quest API](https://edgemodders.github.io/REDnode/quests.html). Sample: **Quest test**.
 - The **Test timer** is now a sample in the download, off until you switch it on: a stopwatch whose **Mark** writes the step and the time to the Mod log and `red4ext/logs/rednode-mods.log`, to match log lines to what you did while testing a mod.
 
 **Changed**

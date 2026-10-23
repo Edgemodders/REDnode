@@ -151,6 +151,8 @@ const roots = {
   game: host.game,
   api: host.api,
   tweakdb: host.tweakdb,
+  quests: host.quests,
+  journal: host.journal,
   world: host.world,
   audio: host.audio,
   kernel: host.kernel,
