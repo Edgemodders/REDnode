@@ -11,6 +11,10 @@ How to keep it:
 
 ## Unreleased
 
+## 0.32.1 (2026-10-23)
+
+**For game version 2.31 only.** Game version 2.5 is not supported yet: RED4ext will not load this REDnode on 2.5. REDnode moves to 2.5 as soon as RED4ext, redscript and Codeware support it.
+
 **New**
 
 - The `ink` API (experimental, needs Codeware): Node mods build trees of the game's own UI widgets on the HUD (`ink.mount`, `ink.column`, `ink.text` and the rest), drawn by the game rather than the overlay. REDnode builds them again after a save load and removes them when the mod stops. The game look comes from the game's own style sheet: a text `style` (`title`, `label`, `value` and the rest) or a `tone` (`normal`, `accent`, `danger` and the rest) gives the game's exact sizes and colors with no styling by hand. Layout with `gap`, `pad`, `align` and `grow`; the game's icons by TweakDB record. Game values bound to texts and bars (`bind: "player.health"`, `ink.bar`), read by the plugin every frame with no update code in the mod; lists from data (`ink.list`, `mount.update`) that send only what changed. See [Native game UI](https://edgemodders.github.io/REDnode/ink.html). Text in the player's language: an ink text set to `"LocKey#…"` shows the game's own translation, and `t()` takes a package's own text from `locales/<language>.json`, with parameters, plurals and V's gender, and follows a language change. `game.language()` and the `language` event give the game's language. Samples: **Ink Coords**, **Ink vitals**, **Ink styles**, **Ink list** and **Ink language**.
@@ -19,6 +23,7 @@ How to keep it:
 - Each release on GitHub also carries the app packs' zips, such as REDnode Sound Tools, each as its own file.
 - The MCP tool `api_read` reads from the game without asking: it runs functions named like reads (`Get`, `Is`, `Has`, `Can`, `Find`) and a TweakDB record's methods, and refuses the rest. See [the MCP server](https://edgemodders.github.io/REDnode/mcp.html).
 - The Quest API, for testing a quest in the running game: `quests.fact`, `quests.facts` and `quests.setFact` read and set the game's quest facts, `quests.watch` hears each change of named facts as the game makes it (with no polling, kept across save loads), `journal.entry`, `journal.setState`, `journal.track` and `journal.tracked` read and change journal entries, and `game.player.teleport` moves V to a position or a world node. MCP tools for assistants: `game_facts` and `game_journal` read without asking; `game_facts_set`, `game_journal_set` and `game_teleport` ask first. See [Quest API](https://edgemodders.github.io/REDnode/quests.html). Sample: **Quest test**.
+- New samples in the download, off until you switch them on: **Ink Coords** and **Ink vitals** (the game's own UI, need Codeware) and **Quest test**.
 - The **Test timer** is now a sample in the download, off until you switch it on: a stopwatch whose **Mark** writes the step and the time to the Mod log and `red4ext/logs/rednode-mods.log`, to match log lines to what you did while testing a mod.
 
 **Changed**

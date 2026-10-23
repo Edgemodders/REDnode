@@ -32,7 +32,7 @@ const zip = join(out, `REDnode-${version}.zip`);
 
 // The samples players get. Each starts off; the player switches it on in the launcher.
 // The other apps in packages/overlay/apps are tests and stay in the repo.
-const SAMPLES = ['hello-mod', 'ask-mod', 'kit', 'vitals', 'coords', 'perf', 'timer'];
+const SAMPLES = ['hello-mod', 'ask-mod', 'kit', 'vitals', 'coords', 'perf', 'timer', 'ink-coords', 'ink-vitals', 'quest-test'];
 
 for (const need of ['REDnode.dll', 'Scripts', join('host', 'REDnode-overlay.exe')]) {
   if (!existsSync(join(plugin, need))) {
@@ -102,6 +102,9 @@ writeFileSync(
   join(target, 'README.txt'),
   [
     `REDnode ${version}: a Node.js modding framework for Cyberpunk 2077 (PC, single-player).`,
+    '',
+    'For game version 2.31 only. Game version 2.5 is not supported yet: REDnode moves to it once',
+    'RED4ext, redscript and Codeware support 2.5.',
     '',
     'Needs: RED4ext and redscript. Some packages also need Codeware, TweakXL or ArchiveXL;',
     'the Mod Manager says which.',
