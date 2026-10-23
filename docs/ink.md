@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b passed in game on 2026-10-22** (REDnode 0.29.0, [results](#i2b-test-results)); placement across resolutions is left for later, as agreed. I2c's plan was agreed on 2026-10-22, with the language split off as I2d. **I2c passed in game on 2026-10-22** (REDnode 0.30.1, [retest results](#i2c-retest-results), after a [first run](#i2c-test-first-run-0300) on 0.30.0 whose list moves failed). Next: I2d, the language. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b passed in game on 2026-10-22** (REDnode 0.29.0, [results](#i2b-test-results)); placement across resolutions is left for later, as agreed. I2c's plan was agreed on 2026-10-22, with the language split off as I2d. **I2c passed in game on 2026-10-22** (REDnode 0.30.1, [retest results](#i2c-retest-results), after a [first run](#i2c-test-first-run-0300) on 0.30.0 whose list moves failed). **I2d's plan** ([I2d: plan](#i2d-plan)) awaits the owner's agreement. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -480,4 +480,35 @@ On the laptop, REDnode 0.30.1 (update zip over 0.30.0), with Codeware; Ink vital
 **The bindings' cost** with the remembered functions: 5 bindings over 4 sources, **0.13 to 0.17 ms a frame**, against 0.25 to 0.37 ms on 0.30.0. The first reading after each load (14.6 ms) covers the first frames, when the driver finds V and the game systems again: one short hitch at a load, not a cost each frame. A later build could find them before the first bound frame.
 
 I2c is done. Next in the plan: I2d, the language (L1's core and L3 of the [Localization](localization.md) plan).
+
+## I2d: plan
+
+Text in the player's language, for ink first and for Node mods in general: the core of the [Localization](localization.md) plan's L1, and its L3 (ink).
+
+### What the game gives
+
+Read from the game's scripts and the API dump:
+
+| Piece | What it is |
+|---|---|
+| The language | A setting: group `/language`, `OnScreen` (the interface; also `VoiceOver` and `Subtitles`), a `ConfigVarListName` whose value is the game's own name, such as `en-us`, `fr-fr`, `ar-ar`. The settings screen reads it this way (`settingsMain.swift`), and so can REDnode, as it reads `/audio/volume` |
+| A change | The settings screen's own widgets get `inkLocalizationChangedEvent` when the language changes. Whether the change applies at once or after a restart is unverified |
+| The game's text | `"LocKey#12345"` and secondary keys (`"UI-…"`). A text widget shows one in the player's language with `SetLocalizedText`, and the engine follows a language change by itself (unverified) |
+
+### What I2d builds
+
+| Piece | What |
+|---|---|
+| The language in the plugin | Reads `/language` `OnScreen` at each save load and every 2 s, and sends a `language` event when it changes. No Codeware needed |
+| `game.language()` and `game.on("language")` | In the `rednode` package, for Node mods and pages: the game's name (`fr-fr`) and its standard tag (`fr-FR`) for `Intl` |
+| Game keys in ink | A text whose text is `"LocKey#…"` or `"UI-…"` (or `key: "…"`) goes through `SetLocalizedText`, so the game draws its own translation |
+| `t(key, params)` | The package's own text from `locales/<language>.json` in its folder: `{name}` parameters; plurals by `count` with the language's categories (`one`, `few`, `many`, `other`, from `Intl.PluralRules`); `m` and `f` forms by V's gender (body or voice: unverified, the test checks). A missing key falls back to the same language's other region (`es-mx` to `es-es`), then English, then the key itself, and is logged once per key and language |
+| Live in ink | `t()` gives a text that remembers its key: an ink node showing one is sent again in the new language when the language changes. Game keys need nothing, the engine does it |
+| Elsewhere | `t()` works as a plain string in the `ui` builder and in code; following a change there (and the UI kit's `data-t`, `fmt`, manifest names, REDnode's own text) stays in the Localization plan's L1 rest and L2 |
+
+### Sample and test
+
+**Ink language** (a test app): an ink panel with a game key (the game's own word for a menu, found with REDbridge's `loc.search`), a `t()` text with a parameter, a plural in three counts, a gendered line, and a key the package lacks; with `locales/en-us.json` and `locales/fr-fr.json`. The test: English first; switch the game to French in its settings (and back) and see which texts follow at once; the Mod log lists the missing key once; `game.language()` in the window.
+
+Open, for the test to settle: whether the language changes live, and which gender the game's own gendered text follows.
 
