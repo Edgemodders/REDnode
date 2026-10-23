@@ -13,6 +13,7 @@ How to keep it:
 
 **New**
 
+- **Development folders**: in the launcher's Settings drawer, with Developer mode on, add folders from your own projects. Their packages run from there, with hot reload, instead of their installed copies, so a mod can be developed outside the game folder. The Mod Manager marks such a package **DEV** and names the copy it hides. A folder can be one package or hold several. See [Development folders](https://edgemodders.github.io/REDnode/overlay-apps.html#development-folders).
 - The UI kit's `rn-window` takes `drawer`: a panel that belongs to the page's main window, such as a settings drawer beside it. It has no title-bar actions but close, which only hides it, and the main window keeps its space, pin and reset actions.
 
 **Changed**

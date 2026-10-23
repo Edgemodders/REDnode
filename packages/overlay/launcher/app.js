@@ -176,7 +176,48 @@ $('mcp-copy').addEventListener('click', async () => {
 $('dev').addEventListener('change', async (e) => {
   const on = await window.rednode.apps.developer(e.detail.checked);
   $('dev').checked = on;
+  $('devdirs').hidden = !on;
+  if (on) showDevFolders(await window.rednode.apps.devFolders());
   RednodeUI.notify(on ? 'Windows show a debug button next to close' : 'Developer mode off', { title: 'Developer mode' });
+});
+
+// Development folders (#16), under Developer mode: packages there run instead of their
+// installed copies, with hot reload.
+function showDevFolders(list) {
+  $('devdir-list').replaceChildren(
+    ...list.map((f) => {
+      const line = el('div', 'devdir');
+      const name = el('span', f.exists ? 'path' : 'path gone', f.dir);
+      // rtl keeps the end of a long path in view; a bdi keeps its characters in order.
+      name.replaceChildren(Object.assign(document.createElement('bdi'), { textContent: f.dir }));
+      name.title = f.exists ? `${f.dir}\n${f.packages} package${f.packages === 1 ? '' : 's'}` : `${f.dir}\nThis folder is gone`;
+      const remove = document.createElement('rn-button');
+      remove.setAttribute('variant', 'ghost');
+      remove.textContent = 'Remove';
+      remove.addEventListener('click', () => devFolderOp('remove', f.dir));
+      line.append(name, remove);
+      return line;
+    }),
+  );
+}
+async function devFolderOp(op, dir) {
+  try {
+    showDevFolders(await window.rednode.apps.devFolders(op, dir));
+    $('devdir-error').hidden = true;
+    return true;
+  } catch (err) {
+    $('devdir-error').textContent = cleanError(err);
+    $('devdir-error').hidden = false;
+    return false;
+  }
+}
+$('devdir-input').addEventListener('submit', async (e) => {
+  const dir = String(e.detail?.value ?? '').trim();
+  if (!dir) return;
+  if (await devFolderOp('add', dir)) {
+    $('devdir-input').value = '';
+    RednodeUI.notify('Its packages run from there now, with hot reload', { title: 'Development folder' });
+  }
 });
 
 // Open at start: off, the game starts with only HUD widgets showing, until F10.
@@ -215,6 +256,8 @@ async function refresh() {
     showTheme(await window.rednode.apps.theme());
     $('mcp').checked = await window.rednode.apps.mcp();
     $('dev').checked = await window.rednode.apps.developer();
+    $('devdirs').hidden = !$('dev').checked;
+    if ($('dev').checked && !drawer.hidden) showDevFolders(await window.rednode.apps.devFolders());
     $('start').checked = await window.rednode.apps.openAtStart();
     $('tips').checked = await window.rednode.apps.tooltips();
     const state = await window.rednode.state();
@@ -357,6 +400,7 @@ $('more-open').addEventListener('click', () => act('Mod Manager', () => window.r
 const drawer = $('drawer');
 function showDrawer(on) {
   drawer.hidden = !on;
+  if (on && $('dev').checked) window.rednode.apps.devFolders().then(showDevFolders, () => {});
   $('gear').setAttribute('aria-expanded', String(on));
   if (on) $('gear').removeAttribute('variant');
   else $('gear').setAttribute('variant', 'ghost');

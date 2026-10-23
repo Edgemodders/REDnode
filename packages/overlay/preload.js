@@ -93,6 +93,8 @@ contextBridge.exposeInMainWorld('rednode', {
     renderPath: (path) => ipcRenderer.invoke('rednode:host:render-path', path),
     /** Gets hot reload, or turns it on or off. */
     hotReload: (on) => ipcRenderer.invoke('rednode:host:hot-reload', on),
+    /** Development folders (#16): op 'list', 'add' or 'remove', with a folder's full path. Answers the list as it is now. */
+    devFolders: (op, dir) => ipcRenderer.invoke('rednode:host:dev-folders', op ?? 'list', dir),
     /** Gets Open at start, or turns it on or off. Off: the game starts with only HUD widgets showing, until F10. */
     openAtStart: (on) => ipcRenderer.invoke('rednode:host:open-at-start', on),
     /** Gets the Tooltips switch, or turns it on or off for every window. */

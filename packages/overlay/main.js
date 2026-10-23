@@ -54,22 +54,105 @@ const logFile = arg('log') ?? null;
 // --render overrides the setting saved by the launcher.
 const renderArg = arg('render');
 
-// Where apps are found: the apps built into the host, then the apps folder.
-// Packaged, the plugin passes the game's apps folder; in the repo it is ./apps.
-// Built-in apps may use host-only calls. The launcher is pinned: always open, not listed.
-const APP_ROOTS = [
+// Where apps are found: the apps built into the host, the player's development folders,
+// then the apps folder. Packaged, the plugin passes the game's apps folder; in the repo it
+// is ./apps. Built-in apps may use host-only calls. The launcher is pinned: always open,
+// not listed. The first copy of a package id found wins, so a development copy runs
+// instead of the installed one.
+const BUILTIN_ROOTS = [
   { dir: path.join(__dirname, 'launcher'), single: true, builtin: true, pinned: true },
   { dir: path.join(__dirname, 'modlog'), single: true, builtin: true },
   { dir: path.join(__dirname, 'manager'), single: true, builtin: true, manager: true },
   // The Welcome window: opened at the first start, until the player closes it once.
   { dir: path.join(__dirname, 'welcome'), single: true, builtin: true },
-  // --apps-dir may list several folders, separated by ";", for example REDnode's
-  // examples and another repo's packages during development.
-  ...(arg('apps-dir') ?? path.join(__dirname, 'apps'))
-    .split(';')
-    .filter(Boolean)
-    .map((dir) => ({ dir })),
 ];
+// --apps-dir may list several folders, separated by ";", for example REDnode's
+// examples and another repo's packages during development.
+const INSTALLED_ROOTS = (arg('apps-dir') ?? path.join(__dirname, 'apps'))
+  .split(';')
+  .filter(Boolean)
+  .map((dir) => ({ dir }));
+const APP_ROOTS = [...BUILTIN_ROOTS, ...INSTALLED_ROOTS];
+
+// ---------- development folders (#16) ----------
+//
+// Folders in the modder's own projects that REDnode also scans and watches, with hot
+// reload, kept in settings.devFolders. A folder is a package itself (it holds
+// rednode-app.json) or holds packages, as the apps folder does. They are set from the
+// launcher's Settings drawer (Developer mode) and take effect at once.
+
+function devFolders() {
+  return Array.isArray(settings.devFolders) ? settings.devFolders.filter((d) => typeof d === 'string') : [];
+}
+
+function setRoots() {
+  APP_ROOTS.splice(0, APP_ROOTS.length, ...BUILTIN_ROOTS, ...devFolders().map((dir) => ({ dir, dev: true })), ...INSTALLED_ROOTS);
+}
+
+// The package folders a root holds: itself when it is a package, else its subfolders.
+function packageDirsOf(root) {
+  if (root.single) return [root.dir];
+  if (!fs.existsSync(root.dir)) return [];
+  if (fs.existsSync(path.join(root.dir, 'rednode-app.json'))) return [root.dir];
+  return fs.readdirSync(root.dir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => path.join(root.dir, d.name));
+}
+
+// Copies of a package that another copy hides: id -> [folders], for the Mod Manager.
+const hiddenCopies = new Map();
+const reportedHidden = new Set(); // "id|folder", so each is logged once
+function noteHidden(id, dir, by) {
+  if (!hiddenCopies.has(id)) hiddenCopies.set(id, []);
+  if (!hiddenCopies.get(id).includes(dir)) hiddenCopies.get(id).push(dir);
+  const key = `${id}|${dir}`;
+  if (!reportedHidden.has(key)) {
+    reportedHidden.add(key);
+    log(`Skipped ${dir}: package "${id}" is already loaded from ${by}`);
+  }
+}
+
+// Checks a folder the player adds: a full path to a folder that exists, not one REDnode
+// already watches. Windows' Copy as path adds quotes; they are dropped.
+function checkDevFolder(input) {
+  const dir = path.resolve(String(input ?? '').trim().replace(/^"(.*)"$/, '$1'));
+  if (!String(input ?? '').trim() || !path.isAbsolute(String(input).trim().replace(/^"(.*)"$/, '$1'))) {
+    throw new Error('Give the full path of a folder, such as E:\\Modding\\MyMod');
+  }
+  if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) throw new Error(`No folder at ${dir}`);
+  const same = (a, b) => path.relative(a, b) === '' || (!path.relative(a, b).startsWith('..') && !path.isAbsolute(path.relative(a, b)));
+  for (const root of [...INSTALLED_ROOTS, ...devFolders().map((d) => ({ dir: d }))]) {
+    if (same(root.dir, dir)) throw new Error(`REDnode already watches ${dir}${root.dir !== dir ? ` (it is inside ${root.dir})` : ''}`);
+  }
+  return dir;
+}
+
+function devFolderList() {
+  return devFolders().map((dir) => {
+    const exists = fs.existsSync(dir);
+    const packages = exists ? packageDirsOf({ dir }).filter((d) => fs.existsSync(path.join(d, 'rednode-app.json'))).length : 0;
+    return { dir, exists, packages };
+  });
+}
+
+// Adds or removes a folder, then looks at every folder again: the packages there start,
+// and a development copy takes over from its installed copy (or hands back to it).
+function changeDevFolders(op, input) {
+  const list = devFolders();
+  if (op === 'add') {
+    const dir = checkDevFolder(input);
+    settings.devFolders = [...list, dir];
+    log(`Development folder added: ${dir}`);
+  } else if (op === 'remove') {
+    const dir = String(input ?? '');
+    if (!list.includes(dir)) throw new Error(`Not a development folder: ${dir}`);
+    settings.devFolders = list.filter((d) => d !== dir);
+    log(`Development folder removed: ${dir}`);
+  } else return devFolderList();
+  writeJson('settings.json', settings);
+  setRoots();
+  rewatchAppRoots();
+  rescanApps();
+  return devFolderList();
+}
 // What a package may ask for in its manifest's "permissions"; the player grants each in the launcher.
 const PERMISSIONS = {
   mcp: "REDnode's tools for AI agents (the kernel MCP server)",
@@ -466,21 +549,17 @@ function missingOf(id) {
 
 function discoverApps() {
   apps.clear();
+  hiddenCopies.clear();
   for (const root of APP_ROOTS) {
-    const dirs = root.single
-      ? [root.dir]
-      : fs.existsSync(root.dir)
-        ? fs.readdirSync(root.dir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => path.join(root.dir, d.name))
-        : [];
-    for (const dir of dirs) {
+    for (const dir of packageDirsOf(root)) {
       try {
         const manifest = readManifest(dir);
         if (!manifest) continue;
         if (apps.has(manifest.id)) {
-          log(`Skipped ${dir}: app id "${manifest.id}" is already used by ${apps.get(manifest.id).dir}`);
+          noteHidden(manifest.id, dir, apps.get(manifest.id).dir);
           continue;
         }
-        apps.set(manifest.id, { manifest, dir, builtin: !!root.builtin, pinned: !!root.pinned, manager: !!root.manager });
+        apps.set(manifest.id, { manifest, dir, builtin: !!root.builtin, pinned: !!root.pinned, manager: !!root.manager, dev: !!root.dev });
       } catch (err) {
         log(`Skipped an app: ${err.message}`);
       }
@@ -797,16 +876,18 @@ function stopPackage(id) {
 // by REDagent, works without a restart.
 const lastManifestError = new Map(); // folder -> message, so an invalid manifest is logged once
 function rescanApps() {
-  const found = new Map(); // id -> { dir, manifest }
+  const found = new Map(); // id -> { dir, manifest, dev }
+  hiddenCopies.clear();
   for (const root of APP_ROOTS) {
-    if (root.single || !fs.existsSync(root.dir)) continue;
-    for (const d of fs.readdirSync(root.dir, { withFileTypes: true })) {
-      if (!d.isDirectory()) continue;
-      const dir = path.join(root.dir, d.name);
+    if (root.single) continue;
+    for (const dir of packageDirsOf(root)) {
       try {
         const manifest = readManifest(dir);
         lastManifestError.delete(dir);
-        if (manifest && !found.has(manifest.id)) found.set(manifest.id, { dir, manifest });
+        if (!manifest) continue;
+        if (apps.get(manifest.id)?.builtin) noteHidden(manifest.id, dir, apps.get(manifest.id).dir);
+        else if (found.has(manifest.id)) noteHidden(manifest.id, dir, found.get(manifest.id).dir);
+        else found.set(manifest.id, { dir, manifest, dev: !!root.dev });
       } catch (err) {
         if (lastManifestError.get(dir) !== err.message) log(`Skipped an app: ${err.message}`);
         lastManifestError.set(dir, err.message);
@@ -832,9 +913,9 @@ function rescanApps() {
   }
   for (const [id, now] of found) {
     if (apps.has(id)) continue;
-    const entry = { manifest: now.manifest, dir: now.dir, builtin: false, pinned: false };
+    const entry = { manifest: now.manifest, dir: now.dir, builtin: false, pinned: false, dev: now.dev };
     apps.set(id, entry);
-    log(`New package: ${id}`);
+    log(`New package: ${id}${now.dev ? ` (development copy, from ${now.dir})` : ''}`);
     startPackage(entry);
     changed = true;
   }
@@ -853,6 +934,13 @@ function watchAppRoots() {
     try {
       const w = fs.watch(root.dir, { recursive: true }, (_type, file) => {
         const parts = String(file ?? '').split(/[\\/]/);
+        // A development folder that is a package itself: only its manifest matters here.
+        if (fs.existsSync(path.join(root.dir, 'rednode-app.json')) || parts[0] === 'rednode-app.json') {
+          if (file && !(parts.length === 1 && parts[0] === 'rednode-app.json') && !lastManifestError.has(root.dir)) return;
+          clearTimeout(timer);
+          timer = setTimeout(rescanApps, 600);
+          return;
+        }
         // A package folder itself, its manifest, or any file of a package that was skipped
         // (its manifest named a file not written yet). Other files are hot reload's business.
         const skipped = lastManifestError.has(path.join(root.dir, parts[0]));
@@ -866,6 +954,12 @@ function watchAppRoots() {
       log(`Cannot watch ${root.dir}: ${err.message}`);
     }
   }
+}
+
+// After the development folders changed: watch the folders as they are now.
+function rewatchAppRoots() {
+  for (const w of rootWatchers.splice(0)) w.close();
+  watchAppRoots();
 }
 
 function shouldOpen(entry) {
@@ -2358,6 +2452,10 @@ function appList() {
         description: m.description,
         kind: m.kind,
         builtin: entry.builtin,
+        // A development copy (#16), loaded from one of the player's development folders.
+        dev: !!entry.dev,
+        dir: entry.builtin ? null : entry.dir,
+        hiddenCopies: hiddenCopies.get(m.id) ?? [],
         app: !!m.entry,
         open: isEnabled(entry),
         inLauncher: isInLauncher(entry),
@@ -3135,6 +3233,12 @@ ipcMain.handle('rednode:host:hot-reload', (event, on) => {
   return hotReload;
 });
 
+// Development folders (#16): the list, or add and remove one. The launcher's Settings drawer.
+ipcMain.handle('rednode:host:dev-folders', (event, op, dir) => {
+  fromLauncher(event);
+  return changeDevFolders(op, dir);
+});
+
 // Tooltips (the UI kit's, for title attributes): on by default; the launcher's switch
 // turns them off in every window, for players who know REDnode.
 ipcMain.handle('rednode:host:tooltips', (event, on) => {
@@ -3454,6 +3558,8 @@ app.whenReady().then(() => {
   log(`REDnode overlay host ${VERSION}${app.isPackaged ? ' (packaged)' : ''}`);
   positions = readJson('window-positions.json', {});
   settings = { apps: {}, ...readJson('settings.json', {}) };
+  setRoots();
+  if (devFolders().length) log(`Development folders: ${devFolders().join('; ')}`);
   renderPath = ['gpu', 'cpu'].includes(renderArg) ? renderArg : settings.renderPath === 'cpu' ? 'cpu' : 'gpu';
   log(`Render path: ${renderPath}`);
   // Never hold a shared texture long: Chromium has only a few.
@@ -3481,7 +3587,9 @@ app.whenReady().then(() => {
     call: (method, params, id) => packageCall(id, method, params),
     state: hostState,
     dataDir: dataDirOf,
-    appsDirs: APP_ROOTS.filter((r) => !r.builtin).map((r) => r.dir),
+    get appsDirs() {
+      return APP_ROOTS.filter((r) => !r.builtin).map((r) => r.dir);
+    },
     secret,
     mcpFor,
     bridgeFor,

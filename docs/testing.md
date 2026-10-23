@@ -52,6 +52,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [RED Hot Tools Edgemodders build and the guard](hot-swap-research.md#the-edgemodders-build-and-the-guard-test) | In the game | HP0 | 2026-10-22 | 0.26.19, RED Hot Tools 1.3.0+edgemodders.1 | **Pass** (laptop): the official RED Hot Tools' swap refused with the message, the game running on; the Edgemodders build's swap went through |
 | [H2 resumed](world.md#h2-resumed-test-with-the-fixed-red-hot-tools) | In the game | H2 | 2026-10-22 | 0.26.19, RED Hot Tools 1.3.0+edgemodders.1, Refresh test 0.2.3 | **Pass** (laptop): no crash in five swaps; Reset look showed the new version on the worn item; Off and on both ways |
 | [H2b-0 Reset look both ways](world.md#h2b-0-reset-look-both-ways-test) | In the game | H2 | 2026-10-22 | 0.26.19 | **Pass** (laptop): six swaps both ways, each shown by Reset look with the item worn |
+| [Development folders](#development-folders) | In the game | #16 | Not run | 0.33.0 | Awaiting its run |
 | [Launcher settings drawer](#launcher-settings-drawer) | In the game | Launcher | 2026-10-23 | 0.32.2 | **Pass** (laptop): the player: "It looks perfect". 0.32.3 then shows the version line as "Version 0.32.3" |
 | [Q-A Quest API](quests.md#q-a-test) | In the game | Q-A | 2026-10-23 | 0.32.0 | **Pass** (laptop): facts read and set, the watcher heard each change and kept working after a load, the tracked entry read, V teleported back, the MCP tools read without asking and asked to set ([results](quests.md#q-a-test-results)) |
 | [I2d Ink language](ink.md#i2d-test) | In the game | I2d | 2026-10-22 | 0.31.0 | **Pass** (laptop): game keys and `t()` in English and French, plurals, V's gender, fallbacks logged once; the language set at the main menu applies with no restart ([results](ink.md#i2d-test-results)) |
@@ -550,6 +551,21 @@ Asked for by the player on 2026-10-23, REDnode 0.32.2: the launcher's title is *
 4. Close the drawer with its ✕, open it again with the gear, then close it with the gear. Close the launcher with the REDNODE tab while the drawer is open: both go. **Mark**.
 5. Drag the launcher by its grip, then use **Reset position** on its title bar: it goes back. **Mark**.
 6. Switch the theme to **HUD red** and **EDGE** with the drawer open: the drawer follows. **Mark**.
+
+### Development folders
+
+[Source](overlay-apps.md#development-folders). EDGEchat's request #16, built on 2026-10-23 in REDnode 0.33.0: folders in the modder's own projects that REDnode also watches, with hot reload, set in the launcher's Settings drawer under Developer mode. Checked in the mock game with two folders set before the start: a copy of the Hello mod in a project folder ran instead of the installed one (logged as skipped), a folder that is itself a package started with `pkg.dir` its own folder, `pkg.appsDirs` held both folders and the apps folder, an edit to the copy's `mod.mjs` hot-reloaded it, and when the copy changed its `id` the installed Hello mod started again. Adding and removing a folder from the launcher was not run there.
+
+Before: make a folder outside the game, for example `E:\Modding\DevTest`, and copy `red4ext\plugins\REDnode\apps\hello-mod` into it as `E:\Modding\DevTest\hello-mod`. In the copy's `rednode-app.json`, change `"name"` to `"Hello mod (dev)"`.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. Load a save. **F10**, the launcher, the gear: switch **Developer mode** on. **Development folders** shows under it. **Mark**.
+2. Paste `E:\Modding\DevTest` into the field and press **Enter**. It is listed with **Remove**, and the launcher or Mod Manager shows **Hello mod (dev)**. **Mark**.
+3. Open the **Mod Manager**: Hello mod (dev) has a **DEV** tag, and its details say "Development copy, from E:\Modding\DevTest\hello-mod" and name the installed copy it hides. **Mark**.
+4. Switch Hello mod (dev) on if it is off. With **Hot reload** on, change a line in `E:\Modding\DevTest\hello-mod\mod.mjs` and save: the mod restarts with the change. **Mark**.
+5. Press **Remove** beside the folder: the installed Hello mod comes back. **Mark**.
+6. Paste a path that does not exist, then the game's own apps folder: each is refused with a message. **Mark**.
+7. Quit the game. Send `rednode-overlay.log` and `rednode-mods.log`.
 
 ## World API
 

@@ -387,7 +387,23 @@ Every node has `set(props)`, which updates the open window at once.
 | Memory | A mod process costs about 80 MB. Players can put mods in one **shared process** with the launcher; three mods then took about 92 MB in total. A native crash in the shared process stops every mod in it, so a mod with native addons should set `"isolation": "process"` |
 | Hot reload | With **Hot reload** on in the launcher's settings (the gear at the right of the Theme row), saving a mod's file restarts the mod, and saving an app's file reloads its page |
 | New and removed packages | The host watches the apps folders while it runs. A new package folder starts (if its manifest has `"open": true`), a changed manifest restarts its package, and a removed folder stops it. A package whose manifest names a file that does not exist yet is skipped, and looked at again when any of its files changes |
+| Developing outside the game folder | Add your project's folder as a [development folder](#development-folders): the package runs from there, with hot reload, instead of its installed copy |
 | `.mjs` | Use the `.mjs` extension for `import` syntax, or add a `package.json` with `"type": "module"` |
+
+### Development folders
+
+A package can live in your own project, for example `E:\Modding\MyMod\`, and still run in the game with hot reload. You copy it into the game's apps folder only when you install it for real. REDnode 0.33.0 or later.
+
+1. Press **F10**, open the launcher and its settings (the gear at the right of the Theme row), and switch on **Developer mode**.
+2. Under **Development folders**, paste the folder's full path and press **Enter**. Its packages start at once.
+
+| Good to know | |
+|---|---|
+| What a folder holds | Either one package (the folder has its own `rednode-app.json`) or packages in subfolders, as the apps folder does |
+| A package in two places | The development copy runs. The installed copy is skipped, and the Mod Manager shows the package as **DEV** with the copy it hides. Remove the folder, or change the copy's `id`, and the installed copy runs again |
+| `pkg.dir` | The folder the package runs from. `pkg.dataDir` stays the same, so a development copy and the installed copy share their settings and saved data |
+| `pkg.appsDirs` | Holds the development folders too, before the apps folder. REDagent writes only inside these folders, so it can work on your project's packages, still showing you each change first |
+| Where it is kept | In the overlay host's `settings.json`, as `devFolders`. Each folder is kept until you press **Remove**, also when Developer mode is off, but the list shows only with Developer mode on |
 
 ## Data, secrets and the kernel
 

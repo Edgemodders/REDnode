@@ -18,7 +18,10 @@ export interface PackageInfo {
    * writes: settings, caches, history. It survives updates of the package.
    */
   readonly dataDir: string;
-  /** The folders where packages are installed, for tools that read other packages' files. */
+  /**
+   * The folders packages are loaded from, for tools that read other packages' files: the
+   * player's development folders first (REDnode 0.33.0 or later), then the apps folder.
+   */
   readonly appsDirs: readonly string[];
 }
 

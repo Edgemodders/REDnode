@@ -284,9 +284,11 @@ function renderRows() {
       const name = el('td', 'name');
       name.append(el('b', '', i.name));
       if (freshThisVisit.has(i.id)) name.append(el('span', 'new', 'NEW'));
+      if (i.dev) name.append(el('span', 'dev', 'DEV'));
       const missing = missingOf(i);
       if (missing.length) name.append(el('span', 'needs', 'NEEDS'));
-      name.title = `${i.name} (${i.id})${missing.length ? `
+      name.title = `${i.name} (${i.id})${i.dev ? `
+Development copy, from ${i.dir}` : ''}${missing.length ? `
 Needs ${missing.map(wantsText).join(', ')}` : ''}`;
       const cells = [
         [tick],
@@ -369,6 +371,9 @@ function renderDetails() {
   parts.push(el('h2', '', i.name));
   parts.push(el('div', 'meta', [kindLabel(i), i.version && `v${i.version}`, i.builtin ? 'built into REDnode' : i.author, i.id].filter(Boolean).join(' · ')));
   if (i.description) parts.push(el('div', 'desc', i.description));
+  // Where it runs from: a development folder (#16), and any copy it hides.
+  if (i.dev) parts.push(el('div', 'perm dim', `Development copy, from ${i.dir}`));
+  for (const dir of i.hiddenCopies ?? []) parts.push(el('div', 'perm dim', `Hidden while this copy runs: ${dir}`));
 
   parts.push(el('div', 'section', 'Switches'));
   if (!i.manager) parts.push(toggle(i.app ? 'Open' : 'Running', i.open, (on) => act(i.name, () => window.rednode.apps.setOpen(i.id, on))));
