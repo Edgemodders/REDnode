@@ -218,7 +218,7 @@ async function refresh() {
     $('start').checked = await window.rednode.apps.openAtStart();
     $('tips').checked = await window.rednode.apps.tooltips();
     const state = await window.rednode.state();
-    $('version').textContent = `REDNODE ${state.version}`;
+    $('version').textContent = `Version ${state.version}`;
     // Solo mode: which package has the screen, and a way out.
     $('solo').hidden = !state.solo;
     $('solo-name').textContent = state.solo?.name ?? '';

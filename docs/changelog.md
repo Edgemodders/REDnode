@@ -17,7 +17,7 @@ How to keep it:
 
 **Changed**
 
-- The launcher's settings (GPU sharing, Hot reload, MCP server, Developer mode, Open at start, Tooltips) moved to a **Settings** drawer beside it, opened with the gear at the right of the Theme row, one setting a row with a line on what it does. The launcher's title is now just **REDNODE**, so it no longer gets cut off.
+- The launcher's settings (GPU sharing, Hot reload, MCP server, Developer mode, Open at start, Tooltips) moved to a **Settings** drawer beside it, opened with the gear at the right of the Theme row, one setting a row with a line on what it does. The launcher's title is now just **REDNODE**, so it no longer gets cut off. Its version line reads "Version 0.32.3" rather than repeating the name.
 
 ## 0.32.1 (2026-10-23)
 
