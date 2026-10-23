@@ -21,7 +21,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [O6a Runtime](#o6a-runtime) | In the game | O6a | 2026-10-12 | plugin 0.9.0 | Pass |
 | [O6b Game API](#o6b-game-api) | In the game | O6b | 2026-10-12 | plugin 0.10.0 | Pass |
 | [C1 Kernel MCP server](#c1-kernel-mcp-server) | In the game, with Claude Code | REDagent C1 | 2026-10-12 | host 0.4.0 | Pass |
-| [MCP asks before changes](#mcp-asks-before-changes) | In the game, with Claude Code | MCP | 2026-10-23 | 0.32.0 | **Partial** (laptop, Claude Code in auto mode): `api_call` asked every time, a denial held, `archives_reload` asked; step 2 asked too, because `api_read` refused `GetItemInEquipSlot` (its rule took the noun "Equip" for a change) and Claude Code went to `api_call`. REDnode 0.32.1 fixes the rule; **step 2 to run again** ([results](#mcp-asks-before-changes-results)) |
+| [MCP asks before changes](#mcp-asks-before-changes) | In the game, with Claude Code | MCP | 2026-10-23 | 0.32.1 | **Pass** (laptop, Claude Code in auto mode): reads went through `api_read` with no question, `api_call` asked every time, a denial held, `archives_reload` asked. The first run (0.32.0) asked at step 2: `api_read` refused `GetItemInEquipSlot`, fixed in 0.32.1 ([results](#mcp-asks-before-changes-results)) |
 | [O8 Mod Manager](#o8-mod-manager) | In the game | O8 | 2026-10-13 | plugin 0.14.0 | Pass |
 | [W1 World API](#w1-world-api) | In the game | W1 | 2026-10-13 | 0.15.0 | Pass |
 | [O9 Debugger](#o9-debugger) | In the game | O9 | 2026-10-13 | 0.16.0 | Pass |
@@ -535,6 +535,8 @@ Built 2026-10-20 in REDnode 0.26.13: `ui.list` in the UI builder, sample **Live 
 #### MCP asks before changes: results
 
 2026-10-23, laptop, REDnode 0.32.0, Claude Code in auto mode with EDGEchat's `edge` plugin. Steps 3, 4 and 5 passed: `api_call` asked each time with no "don't ask again", a denied call did not run, and `archives_reload` asked. Step 2 asked as well: to read V's leg slot Claude Code called `GetItemInEquipSlot` through `api_call`. `api_read` refuses a name with a change word after its start, and "Equip" in "EquipSlot" is a noun; of 2.31's 9,504 names that start like reads, that rule refused 543, most of them reads. So the ask flag worked; the read rule did not. REDnode 0.32.1 refuses only a change word joined with `Or`, `And` or `Then` (7 names, all `GetOrCreate…` or `GetOrAdd…`). Retest: steps 0 to 2 only.
+
+Retest, 2026-10-23, laptop, REDnode 0.32.1: **pass**. The same question (V's health, level, money and leg slots) was answered with no question asked.
 
 ## World API
 
