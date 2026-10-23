@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b passed in game on 2026-10-22** (REDnode 0.29.0, [results](#i2b-test-results)); placement across resolutions is left for later, as agreed. I2c's plan was agreed on 2026-10-22, with the language split off as I2d. **I2c passed in game on 2026-10-22** (REDnode 0.30.1, [retest results](#i2c-retest-results), after a [first run](#i2c-test-first-run-0300) on 0.30.0 whose list moves failed). I2d's plan was agreed on 2026-10-22. **I2d is built in REDnode 0.31.0** and awaits its in-game test ([I2d test](#i2d-test)). The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b passed in game on 2026-10-22** (REDnode 0.29.0, [results](#i2b-test-results)); placement across resolutions is left for later, as agreed. I2c's plan was agreed on 2026-10-22, with the language split off as I2d. **I2c passed in game on 2026-10-22** (REDnode 0.30.1, [retest results](#i2c-retest-results), after a [first run](#i2c-test-first-run-0300) on 0.30.0 whose list moves failed). I2d's plan was agreed on 2026-10-22. **I2d passed in game on 2026-10-22** (REDnode 0.31.0, [results](#i2d-test-results)): **phase I2 is done.** The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -540,4 +540,26 @@ On the laptop, REDnode 0.31.0 (update zip over 0.30.1), with Codeware; the game 
 3. With French on: "Récompense : 500 €$", "1 contrat trouvé", "5 contrats trouvés", "Merci, monsieur." or "madame.", the number written `1 234 567,89`; the line French lacks still in English? **Mark**.
 4. Set the language back to English, as in step 2, and load the save. Does everything come back to English? **Mark**.
 5. Quit. Send `rednode-mods.log` and this run's `red4ext/logs/rednode-*.log` (its "Ink: the game's language is …" lines).
+
+## I2d test: results
+
+2026-10-22 at 21:21 to 21:31, on the laptop, REDnode 0.31.0, with Codeware. **Passed**: every step, and the game quit cleanly.
+
+| Step | Result |
+|---|---|
+| 1, English | The panel as expected: the game's word "Inventory" by `LocKey#` and by secondary key, the package's text, plurals 1, 2 and 5, and "Thanks, miss." for the owner's V (the body gender read works). The key no file has was logged once |
+| 2, French | The Language settings are only at the main menu (as found before the run). The change applied **with no restart**: the plugin saw it within a second ("the game's language is fr-fr"), and loading the save rebuilt the panels in French, the game's keys included |
+| 3, French text | The package's French text, plurals, gender and number format; the key French lacks in English, logged once |
+| 4, back to English | Everything back in English |
+
+Found, for a later build:
+
+| What | Fix |
+|---|---|
+| Moving through the language selector counted as changes: the plugin reported `es-es` on the way from English to French, 0.6 s apart, and the package logged six missing keys for a language the player never chose | Report a new language only once it has read the same twice |
+| On a change, the mod's own handler ran before the new file was read, so its log line used the old text (the panel was right: ink sends `t()`'s texts again once the file is read) | `game.language()` waits for the file of the language it answers |
+
+The bindings cost 0.10 to 0.19 ms a frame in this run (5 bindings, 4 sources).
+
+**Phase I2 is done:** the driver (I2a), layout and the game look (I2b), bound values and lists from data (I2c), and the language (I2d). Next in the design's order: I3 Input (buttons, sliders, lists and text input in menus, with the game's cursor), I4 the game look's ready pieces, I5 Screens, I6 frame drawing. The order with the other work (H2c with EDGEbuilder, the Sound API's S2, a release) is to agree with the owner.
 

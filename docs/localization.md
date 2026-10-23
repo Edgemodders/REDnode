@@ -1,6 +1,6 @@
 # Localization
 
-Status: **proposed** on 2026-10-18. L1's core (the game's language, `t()`, plurals, gender forms, game keys) and L3 (ink) are planned as the native game UI's phase I2d ([plan](ink.md#i2d-plan), 2026-10-22); the rest of L1 and L2 are not scheduled. Today every string REDnode shows is English: the launcher, the Mod Manager, the Welcome window and the UI kit's own words. Packages have no way to ship text in other languages. This page plans localization for all of REDnode: overlay windows, Node mods, manifests and the [native game UI](design.html#ink).
+Status: **proposed** on 2026-10-18. L1's core (the game's language, `t()`, plurals, gender forms, game keys) and L3 (ink) were built as the native game UI's phase I2d and passed in game on 2026-10-22 ([results](ink.md#i2d-test-results)): the language is set only at the main menu and applies with no restart. The rest of L1 and L2 are not scheduled. Today every string REDnode shows is English: the launcher, the Mod Manager, the Welcome window and the UI kit's own words. Packages have no way to ship text in other languages. This page plans localization for all of REDnode: overlay windows, Node mods, manifests and the [native game UI](design.html#ink).
 
 ## Three sources
 
