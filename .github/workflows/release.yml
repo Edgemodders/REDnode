@@ -88,5 +88,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $version = (Get-Content VERSION -Raw).Trim()
-          $packs = Get-ChildItem native/build/release -Filter '*.zip' | Where-Object Name -ne "REDnode-$version.zip" | ForEach-Object FullName
+          # @(...) keeps it a list: one pack would be a single string, which splatting splits into characters.
+          $packs = @(Get-ChildItem native/build/release -Filter '*.zip' | Where-Object Name -ne "REDnode-$version.zip" | ForEach-Object FullName)
           gh release create "v$version" "native/build/release/REDnode-$version.zip" @packs --target $env:GITHUB_SHA --title "REDnode $version" --notes-file "$env:RUNNER_TEMP/notes.md" --generate-notes
