@@ -12,6 +12,7 @@
  */
 
 import { api } from "./api.js";
+import { currentLanguage, startText, type Language } from "./i18n.js";
 import { cleanError, transport, type HostMessage } from "./transport.js";
 
 /** Stops a subscription made with {@link Game.on} or {@link Game.onState}. */
@@ -43,6 +44,8 @@ export interface GameEvent {
   entityId?: string;
   /** For entity events: the entity's class, for example `"gameObject"`. */
   entityType?: string;
+  /** For the `"language"` event: the game's new interface language, such as `"fr-fr"`. */
+  language?: string;
 }
 
 /** What the game is showing, and whether REDnode is linked to it. */
@@ -140,6 +143,19 @@ export interface Game {
    * ```
    */
   on<T = GameEvent>(name: string, handler: EventHandler<T>): Unsubscribe;
+
+  /**
+   * The interface language the player chose in the game: its own name (`"fr-fr"`) and the
+   * standard tag (`"fr-FR"`) for `Intl`. `game.on("language", …)` hears a change, with the new
+   * name in the event's `language`.
+   *
+   * @example
+   * ```ts
+   * const { tag } = await game.language();
+   * const eddies = new Intl.NumberFormat(tag).format(123456);
+   * ```
+   */
+  language(): Promise<Language>;
 
   /**
    * Reads what the game is showing: menus, photo mode, scenes, the main menu.
@@ -255,9 +271,14 @@ export const game: Game = {
         const e: GameEvent = { name: String(m.name), value: Number(m.value), frame: Number(m.frame) };
         if (typeof m.entityId === "string") e.entityId = m.entityId;
         if (typeof m.entityType === "string") e.entityType = m.entityType;
+        if (typeof m.language === "string") e.language = m.language;
         void handler(e as T);
       }
     });
+  },
+  async language() {
+    await startText();
+    return currentLanguage();
   },
   async state() {
     const s = await transport().state();

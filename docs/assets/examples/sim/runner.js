@@ -436,6 +436,7 @@ const INK_ANCHORS = {
   BottomLeft: [0, 1], BottomCenter: [0.5, 1], BottomRight: [1, 1],
 };
 const INK_SELF = { Left: 'flex-start', Top: 'flex-start', Center: 'center', Right: 'flex-end', Bottom: 'flex-end', Fill: 'stretch' };
+const INK_GAME_TEXT = { 'LocKey#15396': 'Inventory', 'UI-ResourceExports-Inventory': 'Inventory' };
 const inkMounts = new Map(); // mount key -> { el }
 const inkNodes = new Map(); // "mount/key" -> { el, tag, props, parent, mount }
 let inkHud = null;
@@ -486,7 +487,8 @@ function inkStyle(n) {
   el.style.opacity = p.opacity ?? (p.bind?.opacity ? 0.4 : 1);
   el.style.visibility = p.visible === false ? 'hidden' : '';
   if (n.tag === 'text') {
-    if (!p.binding) el.textContent = p.text ?? '';
+    // A game key: the game shows its own translation; here, English for the keys the samples use.
+    if (!p.binding) el.textContent = p.locKey ? INK_GAME_TEXT[p.locKey] ?? p.locKey : p.text ?? '';
     el.style.color = color;
     el.style.fontSize = `${(p.fontSize ?? 32) * k}px`;
     el.style.fontWeight = /Semi-Bold|Bold/.test(p.font?.[1] ?? '') ? 600 : 500;

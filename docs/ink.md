@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b passed in game on 2026-10-22** (REDnode 0.29.0, [results](#i2b-test-results)); placement across resolutions is left for later, as agreed. I2c's plan was agreed on 2026-10-22, with the language split off as I2d. **I2c passed in game on 2026-10-22** (REDnode 0.30.1, [retest results](#i2c-retest-results), after a [first run](#i2c-test-first-run-0300) on 0.30.0 whose list moves failed). **I2d's plan** ([I2d: plan](#i2d-plan)) awaits the owner's agreement. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b passed in game on 2026-10-22** (REDnode 0.29.0, [results](#i2b-test-results)); placement across resolutions is left for later, as agreed. I2c's plan was agreed on 2026-10-22, with the language split off as I2d. **I2c passed in game on 2026-10-22** (REDnode 0.30.1, [retest results](#i2c-retest-results), after a [first run](#i2c-test-first-run-0300) on 0.30.0 whose list moves failed). I2d's plan was agreed on 2026-10-22. **I2d is built in REDnode 0.31.0** and awaits its in-game test ([I2d test](#i2d-test)). The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -511,4 +511,33 @@ Read from the game's scripts and the API dump:
 **Ink language** (a test app): an ink panel with a game key (the game's own word for a menu, found with REDbridge's `loc.search`), a `t()` text with a parameter, a plural in three counts, a gendered line, and a key the package lacks; with `locales/en-us.json` and `locales/fr-fr.json`. The test: English first; switch the game to French in its settings (and back) and see which texts follow at once; the Mod log lists the missing key once; `game.language()` in the window.
 
 Open, for the test to settle: whether the language changes live, and which gender the game's own gendered text follows.
+
+## I2d: build (REDnode 0.31.0)
+
+Agreed with the owner on 2026-10-22, as planned. The owner's reminder the same day: never start the game on the dev PC, which would update it to 2.5 (a 2.31 backup is kept); every in-game test runs on the laptop.
+
+| Part | Where |
+|---|---|
+| The language: the plugin reads `/language` `OnScreen` through the settings system at the start and every 120 frames, and sends a game event `language` (with `language`) when it changes, the first reading included; the bridge method `game.language` answers the current one | `native/src/overlay/ink.cpp` (`ReadLanguage`, `UpdateLanguage`) |
+| Game keys in ink: `locKey`, set with `SetLocalizedText` | `native/src/overlay/ink.cpp` |
+| `t(key, params)`, `LocalText`, `languageTag`; locale files read from a Node mod's folder or beside a page; the fallback chain (the player's language, its other regions, English, the key) with one log line per missing key; plurals with `Intl.PluralRules`; `m`/`f` forms by V's body gender (`GetResolvedGenderName`; whether the game's gendered text follows the body or the voice is unverified) | `packages/rednode/src/i18n.ts` |
+| `game.language()`, the `language` field on game events | `packages/rednode/src/game.ts` |
+| Ink texts take `"LocKey#…"` or `key: "UI-…"` (the game's text) and `t()`'s texts, sent again when the language or the loaded text changes | `packages/rednode/src/ink.ts` |
+| The docs previews compile and use `i18n` too; game keys show their English word | `tools/examples/build.mjs`, `docs/assets/examples/sim/` |
+| **Ink language** 0.1.0, the test, with `locales/en-us.json` and `locales/fr-fr.json` | `packages/overlay/apps/ink-language` |
+
+The game's text key for "Inventory", found with REDbridge's `loc.search`: `LocKey#15396`, secondary key `UI-ResourceExports-Inventory`. Each game text has a female and a male form in its files.
+
+Checked: the plugin builds and its tests pass; the package builds; the built modules with a stand-in transport answering `fr-fr`: French text, plurals 1 and 5, the female form, the English fallback and the key fallback each logged once, game keys passed through as `locKey`, and a switch to English sending only the `t()` text again; in the mock game the real host read the package's `locales` folder; the docs preview shows the English panel. Not checked in the game: the language read and its event, `SetLocalizedText` and its following a change, V's gender.
+
+## I2d test
+
+On the laptop, REDnode 0.31.0 (update zip over 0.30.1), with Codeware; the game in English to start.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
+1. Switch on **Ink language** (others may stay on). Load a save. At the left: "LANGUAGE TEST", a line `en-us (en-US) 1,234,567.89`, "The game's own word, by key: Inventory", "Inventory", "Reward: 500 €$", "1 contract found", "2 contracts found", "5 contracts found", a thanks line, and two small lines (the last reads "nowhere")? Does the thanks line match V's body (mister or miss)? **Mark**.
+2. Open the game's Settings, Language, and set the on-screen language to French (Français). Apply, and go back to the game. Did the panel change to French, and how: at once, after leaving the settings, or only after a restart or a save load? Did both "Inventory" lines turn into French? Does the Ink language window's log show "The language changed to fr-fr"? **Mark**.
+3. With French on: "Récompense : 500 €$", "1 contrat trouvé", "5 contrats trouvés", "Merci, monsieur." or "madame.", the number written `1 234 567,89`; the line French lacks still in English? **Mark**.
+4. Set the language back to English, as in step 2. Does everything come back to English? **Mark**.
+5. Quit. Send `rednode-mods.log` and this run's `red4ext/logs/rednode-*.log` (its "Ink: the game's language is …" lines).
 

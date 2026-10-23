@@ -1,0 +1,7 @@
+{
+  "title": "Test de langue",
+  "gameKey": "Le mot du jeu, par sa clé :",
+  "reward": "Récompense : {amount} €$",
+  "found": { "one": "{count} contrat trouvé", "other": "{count} contrats trouvés" },
+  "thanks": { "m": "Merci, monsieur.", "f": "Merci, madame." }
+}

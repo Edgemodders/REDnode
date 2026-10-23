@@ -18,6 +18,7 @@
  * @module
  */
 
+import { LocalText, onTextChange } from "./i18n.js";
 import { cleanError, transport } from "./transport.js";
 
 /** Where a node sits in a canvas (a mount or `ink.canvas`); `x` and `y` move it from there. */
@@ -137,7 +138,13 @@ export type InkSource =
 
 /** Properties of {@link ink.text}. */
 export interface InkTextProps extends InkProps {
-  text?: string;
+  /**
+   * The text: a string; `"LocKey#12345"`, which the game shows in the player's language and
+   * changes by itself with it; or {@link t}'s text, sent again when the language changes.
+   */
+  text?: string | LocalText;
+  /** One of the game's own text keys, such as `"UI-ResourceExports-Inventory"`: the game shows its translation. */
+  key?: string;
   /**
    * Shows a game value, read by the plugin every frame and changed on screen only when the
    * shown text changes. The mod sends nothing after this.
@@ -373,6 +380,23 @@ interface MountState {
 
 let nextKey = 1;
 let nextMount = 1;
+const openMounts = new Set<MountState>();
+let followingText = false;
+
+// t()'s texts in ink follow the language: each one is sent again in the new language.
+function followText(): void {
+  if (followingText) return;
+  followingText = true;
+  onTextChange(() => {
+    const walk = (list: State[]) => {
+      for (const s of list) {
+        if ((s.props as InkTextProps).text instanceof LocalText) send(s);
+        walk(s.children);
+      }
+    };
+    for (const m of openMounts) walk(m.roots);
+  });
+}
 let queue: Record<string, unknown>[] = [];
 let flushing = false;
 
@@ -485,7 +509,10 @@ function wire(s: State): Record<string, unknown> {
   if (s.tag === "text") {
     out.font = [p.font ?? FONT, p.weight ?? textStyle?.weight ?? "Medium"];
     out.fontSize = p.size ?? textStyle?.size ?? 32;
-    out.text = p.text ?? "";
+    // The game's own text by its key (I2d): the game draws it in the player's language.
+    const gameKey = p.key ?? (typeof p.text === "string" && p.text.startsWith("LocKey#") ? p.text : undefined);
+    if (gameKey !== undefined) out.locKey = gameKey;
+    else out.text = p.text === undefined ? "" : String(p.text);
     const letterCase = p.case ?? (textStyle?.upper ? "upper" : undefined);
     if (letterCase !== undefined) out.letterCase = CASES[letterCase] ?? "OriginalCase";
     if (p.textAlign !== undefined) out.textAlign = TEXT_ALIGN[p.textAlign] ?? "Left";
@@ -824,6 +851,8 @@ export const ink = {
   mount(layer: "hud", options: InkMountOptions, ...children: Child[]): InkMount {
     if (layer !== "hud") throw new Error(`ink: no layer "${layer}" yet: use "hud"`);
     const m: MountState = { key: `m${nextMount++}`, options: { ...options }, roots: [], open: true };
+    openMounts.add(m);
+    followText();
     enqueue({ op: "mount", mount: m.key, layer });
     for (const c of children) {
       const s = (c as unknown as Record<symbol, State>)[NODE];
@@ -849,6 +878,7 @@ export const ink = {
       unmount() {
         if (!m.open) return;
         m.open = false;
+        openMounts.delete(m);
         enqueue({ op: "unmount", mount: m.key });
         for (const s of m.roots) detach(s);
       },
@@ -868,7 +898,7 @@ export const ink = {
     return container("row", args);
   },
   /** A line of text, in the game's Rajdhani by default. */
-  text(text: string, props: Omit<InkTextProps, "text"> = {}): InkNode<InkTextProps> {
+  text(text: string | LocalText, props: Omit<InkTextProps, "text"> = {}): InkNode<InkTextProps> {
     return make("text", { ...props, text });
   },
   /** A filled rectangle: give it `width`, `height` and `color`. */

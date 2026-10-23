@@ -314,6 +314,8 @@ globalThis[Symbol.for('rednode.transport')] = {
   state: async () => ({}),
 };
 export { ink } from '../../../examples/sdk/ink.js';
+export { t, LocalText, languageTag } from '../../../examples/sdk/i18n.js';
+import { currentLanguage, startText } from '../../../examples/sdk/i18n.js';
 
 export const game = {
   instance,
@@ -322,6 +324,8 @@ export const game = {
   state: () => call({ path: ['game', 'state'], args: [] }),
   on: (name, fn) => listen('game', name, fn),
   onState: (fn) => listen('state', null, fn),
+  // The simulated game speaks English; the package's real i18n module reads the locales files.
+  language: async () => (await startText(), currentLanguage()),
 };
 
 export const api = path(['api']);

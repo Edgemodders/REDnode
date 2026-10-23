@@ -294,7 +294,7 @@ cpSync(join(repo, 'packages', 'ui', 'src', 'rednode-ui.js'), join(out, 'kit', 'r
 // The ink module and what it imports, compiled as they are (no type checks: the package's
 // own build does those).
 mkdirSync(join(out, 'sdk'), { recursive: true });
-for (const name of ['ink', 'transport']) {
+for (const name of ['ink', 'i18n', 'transport']) {
   const source = readFileSync(join(repo, 'packages', 'rednode', 'src', `${name}.ts`), 'utf8');
   const { outputText } = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 },

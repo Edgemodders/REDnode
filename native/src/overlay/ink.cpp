@@ -16,6 +16,11 @@
 //              -> {"errors":[...]}: a failed op or prop is reported and the rest go on
 //   ink.clear  {"package":"p"}   removes every mount of the package (the host, when it stops)
 //   ink.state  {}                each mount: its package, node count and whether it is on screen
+//   game.language {}             the game's interface language, {"language":"en-us"} (I2d)
+//
+// The language: the plugin reads the game's setting /language OnScreen at the start and every
+// 120 frames, and sends a game event "language" ({"event":"game","name":"language",
+// "language":"fr-fr"}) when it changes, the first reading included.
 //
 // Each mount is a full-size canvas of its own on the layer, named rednode:<package>:<mount>,
 // so a package's widgets stay together and leave together. Layers: "hud" (Codeware's
@@ -242,6 +247,7 @@ constexpr Setter Setters[] = {
     {"textAlign", "SetHorizontalAlignment", false, false},
     {"styleSheet", "SetStyle", false, false},
     {"pivot", "SetRenderTransformPivot;FloatFloat", true, false},
+    {"locKey", "SetLocalizedText", false, true}, // a game key ("LocKey#…", "UI-…"): the game's own text (I2d)
 };
 
 // bind {"tintColor": "MainColors.Red", "opacity": null}: ties a widget property to a name in
@@ -898,6 +904,48 @@ void UpdateBindings(uint64_t aFrame)
     }
 }
 
+// ---------- the game's language (I2d) ----------
+
+std::string& g_language = *new std::string();
+uint64_t g_languageAt = 0;
+WeakHandle<IScriptable>& g_languageVar = *new WeakHandle<IScriptable>();
+
+// The game's /language OnScreen setting: its value is the game's own name, such as "fr-fr".
+bool ReadLanguage(std::string& aOut)
+{
+    std::string e;
+    Obj var = g_languageVar.Lock();
+    if (!var)
+    {
+        Obj none;
+        Obj settings;
+        if (!CallNative(none, "GameInstance", "GetSettingsSystem", Args({EmptyObject()}), &settings, e) || !settings)
+            return false;
+        if (!CallNative(settings, nullptr, "GetVar", Args({Text("/language"), Text("OnScreen")}), &var, e) || !var)
+            return false;
+        g_languageVar = var;
+    }
+    Value value;
+    if (!CallNativeValue(var, nullptr, "GetValue", Args(), value, e) || value.kind != Value::Kind::String || value.text.empty())
+        return false;
+    aOut = value.text;
+    return true;
+}
+
+void UpdateLanguage(uint64_t aFrame)
+{
+    if (!g_language.empty() && aFrame - g_languageAt < 120)
+        return;
+    g_languageAt = aFrame;
+    std::string now;
+    if (!ReadLanguage(now) || now == g_language)
+        return;
+    Log("Ink: the game's language is %s%s", now.c_str(), g_language.empty() ? "" : (" (was " + g_language + ")").c_str());
+    g_language = now;
+    SendJson("{\"event\":\"game\",\"name\":\"language\",\"value\":0,\"frame\":" + std::to_string(aFrame) +
+             ",\"language\":" + JsonString(now) + "}");
+}
+
 std::string ErrorsJson(const std::vector<std::string>& aErrors)
 {
     std::string out = "{\"errors\":[";
@@ -909,11 +957,23 @@ std::string ErrorsJson(const std::vector<std::string>& aErrors)
 
 bool IsInkMethod(const std::string& aMethod)
 {
-    return aMethod == "ink.apply" || aMethod == "ink.clear" || aMethod == "ink.state";
+    return aMethod == "ink.apply" || aMethod == "ink.clear" || aMethod == "ink.state" || aMethod == "game.language";
 }
 
 std::string Ink(const std::string& aMethod, const json::Value& aParams, std::string& aError)
 {
+    if (aMethod == "game.language")
+    {
+        std::string now;
+        if (ReadLanguage(now))
+            g_language = now;
+        if (g_language.empty())
+        {
+            aError = "the game's language could not be read yet";
+            return {};
+        }
+        return "{\"language\":" + JsonString(g_language) + "}";
+    }
     if (aMethod == "ink.state")
     {
         std::string out = "[";
@@ -969,6 +1029,7 @@ std::string Ink(const std::string& aMethod, const json::Value& aParams, std::str
 
 void UpdateInk(uint64_t aFrame)
 {
+    UpdateLanguage(aFrame);
     if (g_hostGone.exchange(false))
         RemoveMounts(nullptr);
     if (g_mounts.empty())
@@ -1008,6 +1069,7 @@ void InkHostGone()
 void ClearInk()
 {
     g_sources = Sources{};
+    g_languageVar = WeakHandle<IScriptable>{};
     g_mounts.clear();
 }
 } // namespace rednode::overlay::detail

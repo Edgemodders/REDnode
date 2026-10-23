@@ -1,0 +1,8 @@
+{
+  "title": "Language test",
+  "gameKey": "The game's own word, by key:",
+  "reward": "Reward: {amount} €$",
+  "found": { "one": "{count} contract found", "other": "{count} contracts found" },
+  "thanks": { "m": "Thanks, mister.", "f": "Thanks, miss." },
+  "onlyEnglish": "Only in English (French falls back to this)"
+}

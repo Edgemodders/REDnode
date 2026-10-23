@@ -1,0 +1,12 @@
+{
+  "id": "ink-language",
+  "name": "Ink language",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "The test of the ink API's phase I2d: text in the player's language. A HUD panel with the game's own text by key, the package's own text from locales/en-us.json and locales/fr-fr.json with a parameter, plurals and V's gender, a key French lacks and one no file has. Switch the game's language and watch it follow. Needs Codeware.",
+  "main": "mod.mjs",
+  "open": false,
+  "requires": {
+    "codeware": ">=1.16"
+  }
+}

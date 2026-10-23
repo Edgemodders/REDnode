@@ -37,6 +37,18 @@ export const NOTES = {
     tryThis: ['Switch on "Game theme" to see the game\'s own look.', 'Add an `rn-tab` of your own with a few controls.'],
     preview: 'The Sound tab plays a tone instead of the game\'s sound events, which only exist in the game.',
   },
+  'ink-language': {
+    group: 'tests',
+    summary: 'A HUD panel in the player\'s language: the game\'s own text by key, and the package\'s own text from locales files with a parameter, plurals and V\'s gender. It follows a language change in the game.',
+    teaches: ['t()', 'locales/<language>.json', 'LocKey#', 'key', 'game.language', 'game.on("language")', 'Intl'],
+    how: [
+      'An ink text set to `"LocKey#15396"`, or with `key: "UI-ResourceExports-Inventory"`, shows the game\'s own word in the player\'s language: the game translates it, and follows a change by itself.',
+      '`t("reward", { amount: 500 })` takes the text from `locales/<language>.json`. `count` picks a plural form and `m` and `f` forms follow V\'s gender. A key French lacks shows in English, and a key no file has shows as itself; each is logged once.',
+      'An ink text showing `t()`\'s text is sent again in the new language when the game\'s language changes. `game.language()` gives the game\'s name and the standard tag, for `Intl`.',
+    ],
+    tryThis: ['Add `locales/de-de.json` with your own German words.', 'Format money with `new Intl.NumberFormat(tag, { maximumFractionDigits: 0 })`.'],
+    preview: 'The simulated game speaks English, so the preview shows the English file; the game\'s keys show their English words.',
+  },
   'ink-vitals': {
     group: 'hud',
     summary: 'V\'s health and RAM as bars, and money, on the HUD in the game\'s own look. Every value is bound: the plugin reads it each frame, and the mod sends nothing after building it. Needs Codeware.',
