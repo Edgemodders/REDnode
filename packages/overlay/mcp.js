@@ -39,11 +39,14 @@ const ASK_FIRST = { 'anthropic/requiresUserInteraction': true };
 
 // api_read's rule. The game's own const flag cannot tell reads from changes (in 2.31, 1,865
 // const functions are not getters, such as SetAIRole, and two thirds of the getters are not
-// const), so the name decides: a read starts with one of READ_START and has none of
-// CHANGE_WORDS as a word after it (GetOrCreate...). TweakDB records' methods only read flats.
+// const), so the name decides: a read starts with one of READ_START, unless a change word is
+// joined to it with Or, And or Then (GetOrCreate..., GetOrAdd...). A change word elsewhere is
+// most often a noun (GetItemInEquipSlot, GetStartTime, IsQuickHackPanelOpen): refusing those
+// sent 543 of 2.31's 9,504 read names to api_call; this refuses 7, all of them changes.
+// TweakDB records' methods only read flats.
 const READ_START = /^(Get|Is|Has|Can|Find)(?=[A-Z0-9_]|$)/;
 const CHANGE_WORDS =
-  /(^|[a-z0-9_])(Create|Spawn|Set|Add|Remove|Apply|Request|Give|Take|Kill|Destroy|Delete|Clear|Reset|Start|Stop|Trigger|Send|Queue|Register|Unregister|Activate|Deactivate|Enable|Disable|Toggle|Load|Unload|Equip|Unequip|Consume|Drop|Teleport|Push|Pop|Change|Modify|Update|Increment|Decrement|Init|Initialize|Release|Acquire|Lock|Unlock|Play|Fire|Notify|Commit|Save|Spend|Award|Grant|Force|Kick|Open|Close|Show|Hide)(?=[A-Z0-9_]|$)/;
+  /(Or|And|Then)(Create|Spawn|Set|Add|Remove|Apply|Request|Give|Take|Kill|Destroy|Delete|Clear|Reset|Start|Stop|Trigger|Send|Queue|Register|Unregister|Activate|Deactivate|Enable|Disable|Toggle|Load|Unload|Equip|Unequip|Consume|Drop|Teleport|Push|Pop|Change|Modify|Update|Increment|Decrement|Init|Initialize|Release|Acquire|Lock|Unlock|Play|Fire|Notify|Commit|Save|Spend|Award|Grant|Force|Kick|Open|Close|Show|Hide)(?=[A-Z0-9_]|$)/;
 const RECORD_TYPE = /^gamedata\w*_Record$/;
 
 /** Whether api_read may run fn; selfType is the $type of self when known. */
@@ -301,7 +304,7 @@ function createMcp(host) {
         title: 'Read from the game',
         description:
           'Calls a game function that reads, as api_call does, without asking the player: one named like a read ' +
-          '(starting with Get, Is, Has, Can or Find, with no word such as Create, Set, Add or Remove after it), ' +
+          '(starting with Get, Is, Has, Can or Find, but not one that also changes, such as GetOrCreate...), ' +
           'or any method of a TweakDB record (a gamedata..._Record from tweakdb or another call). Refuses the rest: use api_call for those. ' +
           'Game objects come back as {"$ref": n, "$type": "..."}. Functions with out parameters return {result, out}.',
         inputSchema: CALL_INPUT,
@@ -312,7 +315,7 @@ function createMcp(host) {
         if (!isRead(input.fn, selfType)) {
           return fail(
             `${input.fn} does not look like a read: api_read runs functions starting with Get, Is, Has, Can or Find ` +
-              '(with no word such as Create, Set, Add or Remove after it) and the methods of TweakDB records. ' +
+              '(but not one that also changes, such as GetOrCreate...) and the methods of TweakDB records. ' +
               'Use api_call, which asks the player first.',
           );
         }

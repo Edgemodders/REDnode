@@ -21,7 +21,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [O6a Runtime](#o6a-runtime) | In the game | O6a | 2026-10-12 | plugin 0.9.0 | Pass |
 | [O6b Game API](#o6b-game-api) | In the game | O6b | 2026-10-12 | plugin 0.10.0 | Pass |
 | [C1 Kernel MCP server](#c1-kernel-mcp-server) | In the game, with Claude Code | REDagent C1 | 2026-10-12 | host 0.4.0 | Pass |
-| [MCP asks before changes](#mcp-asks-before-changes) | In the game, with Claude Code | MCP | Not run | 0.26.16 | Not run |
+| [MCP asks before changes](#mcp-asks-before-changes) | In the game, with Claude Code | MCP | 2026-10-23 | 0.32.0 | **Partial** (laptop, Claude Code in auto mode): `api_call` asked every time, a denial held, `archives_reload` asked; step 2 asked too, because `api_read` refused `GetItemInEquipSlot` (its rule took the noun "Equip" for a change) and Claude Code went to `api_call`. REDnode 0.32.1 fixes the rule; **step 2 to run again** ([results](#mcp-asks-before-changes-results)) |
 | [O8 Mod Manager](#o8-mod-manager) | In the game | O8 | 2026-10-13 | plugin 0.14.0 | Pass |
 | [W1 World API](#w1-world-api) | In the game | W1 | 2026-10-13 | 0.15.0 | Pass |
 | [O9 Debugger](#o9-debugger) | In the game | O9 | 2026-10-13 | 0.16.0 | Pass |
@@ -52,7 +52,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [RED Hot Tools Edgemodders build and the guard](hot-swap-research.md#the-edgemodders-build-and-the-guard-test) | In the game | HP0 | 2026-10-22 | 0.26.19, RED Hot Tools 1.3.0+edgemodders.1 | **Pass** (laptop): the official RED Hot Tools' swap refused with the message, the game running on; the Edgemodders build's swap went through |
 | [H2 resumed](world.md#h2-resumed-test-with-the-fixed-red-hot-tools) | In the game | H2 | 2026-10-22 | 0.26.19, RED Hot Tools 1.3.0+edgemodders.1, Refresh test 0.2.3 | **Pass** (laptop): no crash in five swaps; Reset look showed the new version on the worn item; Off and on both ways |
 | [H2b-0 Reset look both ways](world.md#h2b-0-reset-look-both-ways-test) | In the game | H2 | 2026-10-22 | 0.26.19 | **Pass** (laptop): six swaps both ways, each shown by Reset look with the item worn |
-| [Q-A Quest API](quests.md#q-a-test) | In the game | Q-A | Not run | 0.32.0 | Awaiting its run |
+| [Q-A Quest API](quests.md#q-a-test) | In the game | Q-A | 2026-10-23 | 0.32.0 | **Pass** (laptop): facts read and set, the watcher heard each change and kept working after a load, the tracked entry read, V teleported back, the MCP tools read without asking and asked to set ([results](quests.md#q-a-test-results)) |
 | [I2d Ink language](ink.md#i2d-test) | In the game | I2d | 2026-10-22 | 0.31.0 | **Pass** (laptop): game keys and `t()` in English and French, plurals, V's gender, fallbacks logged once; the language set at the main menu applies with no restart ([results](ink.md#i2d-test-results)) |
 | [I2c Ink data](ink.md#i2c-test) | In the game | I2c | 2026-10-22 | 0.30.0 | **Partial** (laptop): bindings, bars, adds, removes, mount.update and the rebuild order passed; list inserts and moves failed (the index written as "0.000000", refused as an Int32) ([first run](ink.md#i2c-test-first-run-0300)). Retest 2026-10-22, 0.30.1: **Pass** (laptop): inserts, moves, removes and gaps right, the order kept across a load, bindings 0.13 to 0.17 ms a frame ([results](ink.md#i2c-retest-results)) |
 | [I2b Ink layout and look](ink.md#i2b-test) | In the game | I2b | 2026-10-22 | 0.29.0 | **Pass** (laptop): the game look on REDnode's widgets, styles, tones, align, gap, grow, icons (one game record points at a missing atlas part), rebuilt after a load, nothing at the main menu, no crash ([results](ink.md#i2b-test-results)) |
@@ -531,6 +531,10 @@ Built 2026-10-20 in REDnode 0.26.13: `ui.list` in the UI builder, sample **Live 
 4. Ask it to give 50 more. It asks **again** (no "don't ask again"). Deny it this time. **Mark**.
 5. Ask it to swap an archive into the game with `archives_reload`. It asks you; allow it. **Mark**.
 6. Quit the game.
+
+#### MCP asks before changes: results
+
+2026-10-23, laptop, REDnode 0.32.0, Claude Code in auto mode with EDGEchat's `edge` plugin. Steps 3, 4 and 5 passed: `api_call` asked each time with no "don't ask again", a denied call did not run, and `archives_reload` asked. Step 2 asked as well: to read V's leg slot Claude Code called `GetItemInEquipSlot` through `api_call`. `api_read` refuses a name with a change word after its start, and "Equip" in "EquipSlot" is a noun; of 2.31's 9,504 names that start like reads, that rule refused 543, most of them reads. So the ask flag worked; the read rule did not. REDnode 0.32.1 refuses only a change word joined with `Or`, `And` or `Then` (7 names, all `GetOrCreate…` or `GetOrAdd…`). Retest: steps 0 to 2 only.
 
 ## World API
 

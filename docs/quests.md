@@ -1,6 +1,6 @@
 # Quest API
 
-Status: **Q-A built on 2026-10-22 in REDnode 0.32.0**, awaiting its in-game test ([Q-A test](#q-a-test)). It answers [EDGEquest](https://edgemodders.github.io/EDGEquest/design.html)'s request [#15](https://github.com/Edgemodders/REDnode/issues/15), for its phase Q3 "Try it": pack and deploy a quest, then drive it and watch it in the running game, from EDGEquest's `quest_try` and from an assistant, without raw `api_call`.
+Status: **Q-A passed in game on 2026-10-23** (REDnode 0.32.0, [results](#q-a-test-results)). It answers [EDGEquest](https://edgemodders.github.io/EDGEquest/design.html)'s request [#15](https://github.com/Edgemodders/REDnode/issues/15), for its phase Q3 "Try it": pack and deploy a quest, then drive it and watch it in the running game, from EDGEquest's `quest_try` and from an assistant, without raw `api_call`.
 
 ## What the game has
 
@@ -50,3 +50,18 @@ On the laptop, REDnode 0.32.0 (update zip over 0.31.0). **Quest test** in the la
 5. Load the save again, press **Set +1**: the watcher still reports it. **Mark**.
 6. With Claude Code connected to REDnode's MCP server: ask it to read the fact `rednode_test`, then to set it to 5. Reading does not ask; setting asks. **Mark**.
 7. Quit. Send `rednode-mods.log`.
+
+## Q-A test: results
+
+2026-10-23, laptop, REDnode 0.32.0. **Pass**, every step:
+
+| Step | Seen |
+|---|---|
+| 1 Read | The facts listed with their values; a made-up name read 0 |
+| 2 Watch, Set +1 | Each change logged at once by the watcher |
+| 3 Tracked, Read entry | The tracked entry's path and state |
+| 4 Here, Teleport | V back at the kept spot |
+| 5 A save load | The watcher still reported changes |
+| 6 Claude Code | `game_facts` read without asking; `game_facts_set` asked first |
+
+Still open: starting a quest phase or node (no game call found), and whether a running phase picks up an archive swapped in with `archives_reload`.

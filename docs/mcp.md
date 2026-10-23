@@ -31,7 +31,7 @@ The server listens only on `127.0.0.1`, port 41820, and every request needs the 
 | `game_image` | A picture of the game's screen now: the game alone, or with `overlay: true` the overlay windows and cursor on it, as the player sees it. Scaled to at most `maxWidth` (default 1280). HDR is converted to SDR, so its colors are approximate. Fails while the game is loading or minimized. Plugin 0.13.0 or later | No |
 | `tweakdb` | TweakDB from the running game: a flat's type and value (`get`), a record as an object reference for `api_read` (`record`), or the ids of every record of a type (`records`, at most 500 unless `limit` says more). Ids are `"0x..."` hashes. REDnode 0.19.0 or later. Read only: changes go through a package's `tweakdb.set`, which REDnode can undo | No |
 | `archives_reload` | Swaps archives into the running game through RED Hot Tools, as a package's `archives.reload` does, then refreshes what V wears so it shows the new version (`refresh: false` skips it, REDnode 0.26.20 or later): full paths to `.archive`, `.xl` or `.yaml` files, or names of archives in `archive/pc/mod`. Needs RED Hot Tools and a loaded save. Refuses archives that change the game's sound paks, which crash a running game. Answers with what was swapped and what failed. REDnode 0.26.0 or later | **Yes**: it replaces files in the game's mod folder, and a broken archive can crash the game |
-| `api_read` | A live game call that reads, without asking: the same as `api_call`, for functions named like reads (starting with `Get`, `Is`, `Has`, `Can` or `Find`, with no word such as `Create`, `Set`, `Add` or `Remove` after it) and every method of a TweakDB record. It refuses the rest. REDnode 0.26.16 or later | No |
+| `api_read` | A live game call that reads, without asking: the same as `api_call`, for functions named like reads (starting with `Get`, `Is`, `Has`, `Can` or `Find`, but not one that also changes, such as `GetOrCreate…`) and every method of a TweakDB record. It refuses the rest. REDnode 0.26.16 or later | No |
 | `game_facts` | Quest facts by name (`names`); an unset fact reads 0. See [Quest API](quests.html). REDnode 0.32.0 or later | No |
 | `game_facts_set` | Sets quest facts (`facts`: names and whole numbers) and answers their new values. REDnode 0.32.0 or later | **Yes**: it changes the player's save |
 | `game_journal` | Journal entries by path (`paths`, `kind`): each one's state and whether it is tracked, or `null`. With no paths, the tracked entry and its path. REDnode 0.32.0 or later | No |
@@ -50,11 +50,11 @@ The game's own `const` flag cannot: in 2.31, 1,865 `const` functions are not get
 
 | Rule | Example |
 |---|---|
-| Runs a name starting with `Get`, `Is`, `Has`, `Can` or `Find` | `GetItemInSlot`, `IsSlotEmpty` |
-| Refuses it when a word after that marks a change: `Create`, `Spawn`, `Set`, `Add`, `Remove`, `Apply`, `Request`, `Give`, `Take`, `Kill`, `Start`, `Stop`, `Send`, `Queue`, `Load`, `Equip`, `Play` and others (the list is `CHANGE_WORDS` in `packages/overlay/mcp.js`) | `GetOrCreateEntity`, `GetAndRemove` |
+| Runs a name starting with `Get`, `Is`, `Has`, `Can` or `Find` | `GetItemInSlot`, `GetItemInEquipSlot`, `IsQuickHackPanelOpen` |
+| Refuses it when a change word is joined to it with `Or`, `And` or `Then`: `Create`, `Add`, `Set`, `Remove`, `Spawn` and others (the list is `CHANGE_WORDS` in `packages/overlay/mcp.js`) | `GetOrCreateBlackboard`, `GetOrAddVendor` |
 | Runs every method of a TweakDB record (`gamedata..._Record`), known from the `$type` a tool returned | `DisplayName` on a record from `tweakdb` |
 
-Of the 12,964 functions in 2.31 named like reads, it runs 12,339 and refuses 625, some of them reads (`GetKillDelay`), which then go through `api_call`. A function named like a read could still change something (unverified for most of them). The rule is only in the MCP server: the `rednode` package's `api` is not limited.
+Of the 9,504 function names in 2.31 that start like reads, it refuses 7, all `GetOrCreate…` or `GetOrAdd…`. Until REDnode 0.32.1 it refused any name with a change word anywhere after the start, 543 names, most of them reads where the word is a noun (`GetItemInEquipSlot`, `GetStartTime`, `IsOpen`), which then went through `api_call` and asked. A function named like a read could still change something (unverified for most of them). The rule is only in the MCP server: the `rednode` package's `api` is not limited.
 
 The server also gives the agent short instructions: what REDnode is, what each tool is for, and the game API's rules (the game instance is `{}`, 64-bit numbers are strings, references die when a save loads).
 

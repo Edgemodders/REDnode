@@ -27,6 +27,7 @@ How to keep it:
 
 **Fixed**
 
+- The MCP tool `api_read` no longer refuses reads whose names hold a word like `Equip`, `Start` or `Open` as a noun, such as `GetItemInEquipSlot` or `IsQuickHackPanelOpen`, which then went through `api_call` and asked you first. It refuses only reads that also change something, such as `GetOrCreate…`.
 - Sending many game calls at once (more than 256 in one frame) no longer leaves the extra ones unanswered until they time out after 5 seconds: the plugin runs 256 a frame and carries the rest to the next frames, and refuses past 4096 waiting with a message.
 - The game no longer crashes when quitting after a Node mod held objects made by another plugin, such as Codeware's: REDnode lets go of every object it holds when the game stops, while the other plugins are still loaded.
 - `api.$new` with properties on a class written in redscript no longer breaks the object it makes (and crashes the game at its next use): script fields are now set where the game keeps them, as `$get` and `$set` already did.
