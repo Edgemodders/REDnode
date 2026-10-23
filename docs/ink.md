@@ -1,6 +1,6 @@
 # Native game UI (ink)
 
-Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b passed in game on 2026-10-22** (REDnode 0.29.0, [results](#i2b-test-results)); placement across resolutions is left for later, as agreed. I2c's plan was agreed on 2026-10-22, with the language split off as I2d. **I2c's first run (0.30.0)** passed except list moves ([results](#i2c-test-first-run-0300)); REDnode 0.30.1 fixes them and awaits the retest ([I2c retest](#i2c-retest)). The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
+Status: **I1 passed in game on 2026-10-22** (REDnode 0.27.2, [third run](#i1-test-third-run-0272)), after a crash in the first run (0.27.0) and one at quit in the second (0.27.1), both REDnode bugs, fixed. What it means for I2: [I1: what it decides](#i1-what-it-decides). Decided by the owner the same day: the `ink` API requires Codeware. **I2a passed in game on 2026-10-22** (REDnode 0.28.0, [results](#i2a-test-results)). **I2b passed in game on 2026-10-22** (REDnode 0.29.0, [results](#i2b-test-results)); placement across resolutions is left for later, as agreed. I2c's plan was agreed on 2026-10-22, with the language split off as I2d. **I2c passed in game on 2026-10-22** (REDnode 0.30.1, [retest results](#i2c-retest-results), after a [first run](#i2c-test-first-run-0300) on 0.30.0 whose list moves failed). Next: I2d, the language. The design, the tags and the phases I1 to I6 are in the design doc, [section 06](design.html#ink). Order agreed with the owner on 2026-10-21: H2 `world.refresh`, then this API from I1, then the Sound API's S2. H2 stopped after H2b on 2026-10-22; H2c (NPCs, props, with EDGEbuilder) comes after this API.
 
 The game draws its own UI with **ink**, a tree of widgets with logic controllers. REDnode's overlay apps and the `ui` builder draw in Chromium over the game; the game's UI never sees them. The `ink` API lets JavaScript and TypeScript mods build into the game's own UI, drawn by the engine, the way redscript mods do.
 
@@ -462,4 +462,22 @@ On the laptop, REDnode 0.30.1 (update zip over 0.30.0), with Codeware; Ink vital
 3. Open the overlay and press, looking at the list after each: **Add at top** (a new first), **Last to top**, **Remove first**, **Rename second**, **Shuffle** (the order reversed), **Add** (a new last). Does each match its log line, with even gaps? **Mark**.
 4. Load the same save again: the list back in its last order? **Mark**.
 5. Quit. Send `rednode-mods.log` and this run's `red4ext/logs/rednode-*.log` (no "Int32" errors now, and the bindings' cost a frame).
+
+## I2c retest: results
+
+2026-10-22 at 20:15 to 20:23, on the laptop, REDnode 0.30.1, with Codeware. **Passed**: every step, no errors in the plugin log, and the game quit cleanly.
+
+| Change | The plugin log | On screen |
+|---|---|---|
+| Show | 16 add (two mounts) | Three contracts and the header |
+| Add at top | 4 add, 1 set (the old first's gap) | A new first |
+| Last to top | 1 move, 2 set (the gaps of the two that changed place) | The last on top |
+| Remove first | 1 remove, 1 set | The first gone, the new first without a gap |
+| Shuffle (reverse) | 2 move, 2 set | The order reversed |
+| Add | 4 add | A new last |
+| A save load | 17 of 17 and 3 of 3 widgets built | The list in its last order |
+
+**The bindings' cost** with the remembered functions: 5 bindings over 4 sources, **0.13 to 0.17 ms a frame**, against 0.25 to 0.37 ms on 0.30.0. The first reading after each load (14.6 ms) covers the first frames, when the driver finds V and the game systems again: one short hitch at a load, not a cost each frame. A later build could find them before the first bound frame.
+
+I2c is done. Next in the plan: I2d, the language (L1's core and L3 of the [Localization](localization.md) plan).
 
