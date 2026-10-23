@@ -492,7 +492,7 @@ Read from the game's scripts and the API dump:
 | Piece | What it is |
 |---|---|
 | The language | A setting: group `/language`, `OnScreen` (the interface; also `VoiceOver` and `Subtitles`), a `ConfigVarListName` whose value is the game's own name, such as `en-us`, `fr-fr`, `ar-ar`. The settings screen reads it this way (`settingsMain.swift`), and so can REDnode, as it reads `/audio/volume` |
-| A change | The settings screen's own widgets get `inkLocalizationChangedEvent` when the language changes. Whether the change applies at once or after a restart is unverified |
+| A change | The settings screen's own widgets get `inkLocalizationChangedEvent` when the language changes. Whether the change applies at once or after a restart is unverified. The Language group shows only before a save is loaded (the settings screen passes `IsPreGame` when it lists its groups; the pause menu's Settings has none, seen in the I2d test): the language cannot change during play |
 | The game's text | `"LocKey#12345"` and secondary keys (`"UI-…"`). A text widget shows one in the player's language with `SetLocalizedText`, and the engine follows a language change by itself (unverified) |
 
 ### What I2d builds
@@ -536,8 +536,8 @@ On the laptop, REDnode 0.31.0 (update zip over 0.30.1), with Codeware; the game 
 
 0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step. Type what you saw into its note before each **Mark**.
 1. Switch on **Ink language** (others may stay on). Load a save. At the left: "LANGUAGE TEST", a line `en-us (en-US) 1,234,567.89`, "The game's own word, by key: Inventory", "Inventory", "Reward: 500 €$", "1 contract found", "2 contracts found", "5 contracts found", a thanks line, and two small lines (the last reads "nowhere")? Does the thanks line match V's body (mister or miss)? **Mark**.
-2. Open the game's Settings, Language, and set the on-screen language to French (Français). Apply, and go back to the game. Did the panel change to French, and how: at once, after leaving the settings, or only after a restart or a save load? Did both "Inventory" lines turn into French? Does the Ink language window's log show "The language changed to fr-fr"? **Mark**.
+2. The Language settings are not in the pause menu's Settings (found in this test: the settings screen shows some groups only before a save is loaded, `IsPreGame`). Quit to the main menu, open **Settings**, **Language**, and set the on-screen language to French (Français); apply. If the game asks for a restart, restart it. If the main menu has no Language settings either, set the game's language in Steam instead (the game's Properties, General, Language), which needs a restart. Then load the save. Is the panel in French? Did both "Inventory" lines turn into French? Does the Ink language window's log show "The language changed to fr-fr" (only when no restart was needed)? **Mark**.
 3. With French on: "Récompense : 500 €$", "1 contrat trouvé", "5 contrats trouvés", "Merci, monsieur." or "madame.", the number written `1 234 567,89`; the line French lacks still in English? **Mark**.
-4. Set the language back to English, as in step 2. Does everything come back to English? **Mark**.
+4. Set the language back to English, as in step 2, and load the save. Does everything come back to English? **Mark**.
 5. Quit. Send `rednode-mods.log` and this run's `red4ext/logs/rednode-*.log` (its "Ink: the game's language is …" lines).
 
