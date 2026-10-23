@@ -239,7 +239,7 @@
   // ---------- rn-window ----------
 
   class RnWindow extends Base {
-    static observedAttributes = ['title', 'draggable', 'closable', 'no-rollup', 'no-debug', 'no-space'];
+    static observedAttributes = ['title', 'draggable', 'closable', 'no-rollup', 'no-debug', 'no-space', 'drawer'];
     constructor() {
       super(
         `
@@ -284,8 +284,9 @@ footer:empty { display: none; }
         const ev = new CustomEvent('close', { cancelable: true, bubbles: true, composed: true });
         if (!this.dispatchEvent(ev)) return; // the app handles it
         // The page's only window: close the app, as the launcher's switch does, so the
-        // launcher shows it off and can open it again. Otherwise hide this window.
-        if (window.rednode?.close && document.querySelectorAll('rn-window').length === 1) window.rednode.close();
+        // launcher shows it off and can open it again. Otherwise (a drawer, or one of
+        // several windows) hide this window.
+        if (window.rednode?.close && this.isMain()) window.rednode.close();
         else this.hidden = true;
       });
       // Title-bar actions (move to space, roll up, pin to HUD, reset position, debug) need
@@ -326,12 +327,19 @@ footer:empty { display: none; }
       this.closeMenu();
     }
 
+    // Whether this is the page's only window. A drawer (the `drawer` attribute: a panel that
+    // belongs to the main window, such as a settings drawer beside it) does not count.
+    isMain() {
+      return !this.hasAttribute('drawer') && document.querySelectorAll('rn-window:not([drawer])').length === 1;
+    }
+
     // The window's actions, most used first: the first three get icons next to close.
     // Overlay-window actions (spaces, the HUD pin, position) show only on a page's only
-    // window, since they act on the whole page.
+    // window, since they act on the whole page. A drawer has none: only its close button.
     actions() {
+      if (this.hasAttribute('drawer')) return [];
       const info = this._info;
-      const whole = !!info && !!window.rednode && document.querySelectorAll('rn-window').length === 1;
+      const whole = !!info && !!window.rednode && this.isMain();
       const run = (action, arg) => () => window.rednode.windowAction(action, arg).catch(() => {});
       const list = [];
       if (whole && !info.tool && info.spaces.names.length > 1 && !this.hasAttribute('no-space')) {
@@ -502,7 +510,7 @@ footer:empty { display: none; }
     }
     /** Rolls the window up to its title bar, or back down. Emits "rollup" with { rolled }. */
     toggleRollup() {
-      if (this.hasAttribute('no-rollup')) return;
+      if (this.hasAttribute('no-rollup') || this.hasAttribute('drawer')) return;
       const rolled = !this.hasAttribute('rolled');
       this.toggleAttribute('rolled', rolled);
       playSound(soundFor(this, 'press'));

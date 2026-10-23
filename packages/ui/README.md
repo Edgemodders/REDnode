@@ -38,7 +38,7 @@ Themes are CSS custom properties, so an app can adjust one: `--rn-bg`, `--rn-pan
 
 | Element | Attributes | Events (`detail`) |
 |---|---|---|
-| `rn-window` | `title`, `draggable` (title area becomes the drag handle), `closable`, `no-space`, `no-rollup`, `no-debug` (leave that title-bar action out). Slots: default, `status` (right of the title), `footer` | `close` (cancelable; hides the window unless cancelled) |
+| `rn-window` | `title`, `draggable` (title area becomes the drag handle), `closable`, `no-space`, `no-rollup`, `no-debug` (leave that title-bar action out), `drawer` (a panel that belongs to the page's main window, such as a settings drawer beside it: no title-bar actions but close, which only hides it, and the main window keeps its space, pin and reset actions). Slots: default, `status` (right of the title), `footer` | `close` (cancelable; hides the window unless cancelled) |
 | `rn-panel` | `title` | |
 | `rn-button` | `variant`: `ghost` or `danger`; `disabled`; `sound`, `hover-sound` | normal `click` |
 | `rn-toggle` | `label`, `checked`, `disabled`, `sound` | `change` (`{ checked }`) |

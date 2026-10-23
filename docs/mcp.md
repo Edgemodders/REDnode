@@ -8,7 +8,7 @@ Status: **REDagent phase C1, passed in game on 2026-10-12.** Claude Code on the 
 
 | Step | How |
 |---|---|
-| 1. Turn it on | In the game, open the REDnode launcher (**F10**, then the REDNODE tab). Switch **MCP server** on. For developers running the host from the repo, it is on already |
+| 1. Turn it on | In the game, open the REDnode launcher (**F10**, then the REDNODE tab), and its settings with the gear at the right of the Theme row. Switch **MCP server** on. For developers running the host from the repo, it is on already |
 | 2. Copy the setup command | Press **Copy setup** in the launcher |
 | 3. Add it to Claude Code, once | Paste the command into a terminal on the same PC and run it. It looks like `claude mcp add --transport http --scope user rednode http://127.0.0.1:41820/mcp --header "Authorization: Bearer ..."` |
 | 4. Check | `claude mcp list` shows `rednode` as connected while the game runs |
@@ -65,7 +65,7 @@ Built 2026-10-12, host 0.4.0. Tested against a stand-in for the game with an MCP
 In the game, in this order. Claude Code runs on the same PC; switch to it with **Alt+Tab**:
 
 1. Start the game and load a save.
-2. **F10**, open the launcher, switch **MCP server** on, and press **Copy setup**.
+2. **F10**, open the launcher and its settings (the gear at the right of the Theme row), switch **MCP server** on, and press **Copy setup**.
 3. Alt+Tab to a terminal, paste the command and run it. Then run `claude mcp list`: `rednode` shows as connected.
 4. Start a **new** Claude Code session (MCP servers load when a session starts), and ask in turn:
    1. "Using the rednode tools, what are V's health, level and money?" It should look up the functions, then call the game. Claude Code asks before each `api_call`; allow them.

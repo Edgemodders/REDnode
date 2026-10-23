@@ -7,9 +7,12 @@
 <style>
   /* Collapsed, only the tab at the bottom is drawn; the rest is transparent
      and clicks through to the game. Expanded, the app list opens above it. */
-  html, body { margin: 0; width: 380px; height: 560px; overflow: hidden; background: transparent; }
+  html, body { margin: 0; width: 690px; height: 560px; overflow: hidden; background: transparent; }
   .dock { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-  rn-window { width: 380px; max-height: 500px; }
+  /* The panel, and the settings drawer beside it on the right, their bottoms in line. */
+  .row { display: flex; align-items: flex-end; gap: 8px; }
+  #panel { width: 380px; max-height: 500px; }
+  #drawer { width: 300px; max-height: 500px; }
   rn-window[hidden] { display: none; }
   .dock { padding-bottom: 2px; }
   /* The tab stays visible over the game, so it gets a dark backing. */
@@ -34,8 +37,19 @@
   .status b.off { color: var(--rn-danger); }
   #rn-notifications { bottom: auto !important; top: 8px; }
   .footer { display: flex; flex-direction: column; gap: 8px; padding: 8px 14px 10px; border-top: 1px solid var(--rn-line); }
-  .switches { display: flex; gap: 18px; }
   .themes { display: flex; align-items: center; gap: 6px; }
+  /* The gear, at the right end of the theme row: opens and closes the settings drawer. */
+  #gear { margin-left: auto; }
+  #gear::part(button) { min-height: 28px; padding: 4px 7px; }
+  #gear svg { display: block; width: 15px; height: 15px; }
+  /* The drawer: one setting a row, each with a line on what it does. */
+  .setting { display: flex; flex-direction: column; gap: 2px; padding: 0 0 8px; border-bottom: 1px solid var(--rn-line); }
+  .setting:last-child { border-bottom: 0; padding-bottom: 0; }
+  .setting .what { font-size: 13px; line-height: 1.3; color: var(--rn-dim); }
+  .setting rn-button::part(button) { min-height: 24px; padding: 2px 8px; font-size: 11px; }
+  .setting .line { display: flex; margin-top: 4px; }
+  /* Tighter than a window's usual spacing, so all six fit beside the panel. */
+  #drawer::part(body) { gap: 8px; padding: 12px 14px; }
   /* Spaces: the one shown now, and making, renaming and deleting them. */
   .spaces, .space-edit { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .spaces .label { font: 600 11px var(--rn-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--rn-dim); margin-right: 4px; }
@@ -72,26 +86,12 @@
 </head>
 <body>
   <div class="dock">
-    <rn-window id="panel" title="REDnode apps and mods" no-rollup hidden>
+    <div class="row">
+    <rn-window id="panel" title="REDNODE" no-rollup hidden>
       <span class="status" slot="status">GAME <b id="link" class="off">OFF</b></span>
       <div class="more" id="more" hidden><span id="more-text"></span><rn-button id="more-open" variant="ghost">Open</rn-button></div>
       <div id="apps"><p class="empty">Looking for apps...</p></div>
       <div slot="footer" class="footer">
-        <div class="switches">
-          <rn-toggle id="gpu" label="GPU sharing"></rn-toggle>
-          <rn-toggle id="hot" label="Hot reload"></rn-toggle>
-        </div>
-        <div class="switches">
-          <rn-toggle id="mcp" label="MCP server"></rn-toggle>
-          <rn-button id="mcp-copy" variant="ghost">Copy setup</rn-button>
-        </div>
-        <div class="switches">
-          <rn-toggle id="dev" label="Developer mode"></rn-toggle>
-          <rn-toggle id="start" label="Open at start" title="Off: the game starts with only HUD widgets showing, until you press F10"></rn-toggle>
-        </div>
-        <div class="switches">
-          <rn-toggle id="tips" label="Tooltips" title="Off: no tooltips in any window, once you know REDnode"></rn-toggle>
-        </div>
         <div class="spaces">
           <span class="label">Space</span>
           <span class="now" id="space-now">Main</span>
@@ -109,10 +109,39 @@
           <rn-button data-theme="rednode" variant="ghost">REDnode</rn-button>
           <rn-button data-theme="hud" variant="ghost">HUD red</rn-button>
           <rn-button data-theme="edge" variant="ghost">EDGE</rn-button>
+          <rn-button id="gear" variant="ghost" title="Settings" aria-label="Settings" aria-expanded="false"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M13.16 6.42 L15.11 6.87 L15.11 9.13 L13.16 9.58 L12.77 10.54 L13.82 12.23 L12.23 13.82 L10.54 12.77 L9.58 13.16 L9.13 15.11 L6.87 15.11 L6.42 13.16 L5.46 12.77 L3.77 13.82 L2.18 12.23 L3.23 10.54 L2.84 9.58 L0.89 9.13 L0.89 6.87 L2.84 6.42 L3.23 5.46 L2.18 3.77 L3.77 2.18 L5.46 3.23 L6.42 2.84 L6.87 0.89 L9.13 0.89 L9.58 2.84 L10.54 3.23 L12.23 2.18 L13.82 3.77 L12.77 5.46Z"/><circle cx="8" cy="8" r="2.3"/></svg></rn-button>
         </div>
         <div class="version" id="version"></div>
       </div>
     </rn-window>
+    <rn-window id="drawer" title="Settings" drawer closable hidden>
+      <div class="setting">
+        <rn-toggle id="gpu" label="GPU sharing"></rn-toggle>
+        <div class="what">Off: the slower CPU path. Reopens every window.</div>
+      </div>
+      <div class="setting">
+        <rn-toggle id="hot" label="Hot reload"></rn-toggle>
+        <div class="what">Restarts a mod or reloads an app on a change.</div>
+      </div>
+      <div class="setting">
+        <rn-toggle id="mcp" label="MCP server"></rn-toggle>
+        <div class="what">For AI agents on this PC, such as Claude Code.</div>
+        <div class="line"><rn-button id="mcp-copy" variant="ghost">Copy setup</rn-button></div>
+      </div>
+      <div class="setting">
+        <rn-toggle id="dev" label="Developer mode"></rn-toggle>
+        <div class="what">A debug button on every window's title bar.</div>
+      </div>
+      <div class="setting">
+        <rn-toggle id="start" label="Open at start"></rn-toggle>
+        <div class="what">Off: only HUD widgets until you press F10.</div>
+      </div>
+      <div class="setting">
+        <rn-toggle id="tips" label="Tooltips"></rn-toggle>
+        <div class="what">Hints when you hover a control.</div>
+      </div>
+    </rn-window>
+    </div>
     <div class="tab">
       <div class="grip" data-rednode-drag title="Drag to move"></div>
       <rn-button id="toggle" variant="ghost">REDnode <span id="count"></span></rn-button>

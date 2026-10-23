@@ -11,6 +11,14 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- The UI kit's `rn-window` takes `drawer`: a panel that belongs to the page's main window, such as a settings drawer beside it. It has no title-bar actions but close, which only hides it, and the main window keeps its space, pin and reset actions.
+
+**Changed**
+
+- The launcher's settings (GPU sharing, Hot reload, MCP server, Developer mode, Open at start, Tooltips) moved to a **Settings** drawer beside it, opened with the gear at the right of the Theme row, one setting a row with a line on what it does. The launcher's title is now just **REDNODE**, so it no longer gets cut off.
+
 ## 0.32.1 (2026-10-23)
 
 **For game version 2.31 only.** Game version 2.5 is not supported yet: RED4ext will not load this REDnode on 2.5. REDnode moves to 2.5 as soon as RED4ext, redscript and Codeware support it.

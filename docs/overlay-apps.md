@@ -385,7 +385,7 @@ Every node has `set(props)`, which updates the open window at once.
 | Output | `console.log` goes to `red4ext/logs/rednode-mods.log`, tagged with the mod id. Open the built-in **Mod log** app from the launcher to watch it live in game; **Copy** puts the lines shown on the clipboard, ready to paste into a bug report. A crash shows only the stack lines in your own code |
 | Isolation | Each mod runs on its own thread in a mod process. A thrown error, an endless loop or `process.exit()` stops only your mod. The launcher shows it as **CRASHED** or **NOT RESPONDING** with a **Restart** button |
 | Memory | A mod process costs about 80 MB. Players can put mods in one **shared process** with the launcher; three mods then took about 92 MB in total. A native crash in the shared process stops every mod in it, so a mod with native addons should set `"isolation": "process"` |
-| Hot reload | With the launcher's **Hot reload** switch on, saving a mod's file restarts the mod, and saving an app's file reloads its page |
+| Hot reload | With **Hot reload** on in the launcher's settings (the gear at the right of the Theme row), saving a mod's file restarts the mod, and saving an app's file reloads its page |
 | New and removed packages | The host watches the apps folders while it runs. A new package folder starts (if its manifest has `"open": true`), a changed manifest restarts its package, and a removed folder stops it. A package whose manifest names a file that does not exist yet is skipped, and looked at again when any of its files changes |
 | `.mjs` | Use the `.mjs` extension for `import` syntax, or add a `package.json` with `"type": "module"` |
 
@@ -486,7 +486,7 @@ AI agents have the same as the [MCP tool](mcp.md) `archives_reload`.
 
 Players can sort windows into **spaces**, like virtual desktops: the launcher's **Space** row makes them, the tab switches them, and so does Ctrl+1 to 9 while the overlay is open. Only the current space's windows show; REDnode's own tools show in all. A package needs nothing to take part: its windows join the space the player is in, and the player moves them from the title bar or the Mod Manager.
 
-An `rn-window` title bar shows close and up to three action icons, right to left: move to space (once there is a second space), roll up, pin to HUD, reset position (after the window was moved), and debug in Developer mode. More than three: ⋯ on the far left holds the rest. The overlay-window actions (space, pin, reset) show only on a page's only `rn-window`, since they act on the whole page. To leave one out for a window, add `no-space`, `no-rollup` or `no-debug`.
+An `rn-window` title bar shows close and up to three action icons, right to left: move to space (once there is a second space), roll up, pin to HUD, reset position (after the window was moved), and debug in Developer mode. More than three: ⋯ on the far left holds the rest. The overlay-window actions (space, pin, reset) show only on a page's only `rn-window`, since they act on the whole page. To leave one out for a window, add `no-space`, `no-rollup` or `no-debug`. A panel that belongs to the main window, such as a settings drawer beside it, takes `drawer`: it does not count as a second window, has no actions but close, and closing it only hides it.
 
 ```html
 <rn-window title="Speedometer" draggable no-rollup>...</rn-window>
@@ -700,7 +700,7 @@ The [World test](https://github.com/Edgemodders/REDnode/tree/main/packages/overl
 
 ## Debugging
 
-Turn on **Developer mode** in the launcher. Every window built with the UI kit's `rn-window` then shows a debug button next to its close button. It opens Chromium's DevTools for that window's page, drawn in the game as an overlay window: elements, styles, the console, sources and breakpoints. The Mod Manager's details also open it, in the game or on the desktop (**Window debugger**). Add `no-debug` to an `rn-window` that should never show the button.
+Turn on **Developer mode** in the launcher's settings (the gear at the right of the Theme row). Every window built with the UI kit's `rn-window` then shows a debug button next to its close button. It opens Chromium's DevTools for that window's page, drawn in the game as an overlay window: elements, styles, the console, sources and breakpoints. The Mod Manager's details also open it, in the game or on the desktop (**Window debugger**). Add `no-debug` to an `rn-window` that should never show the button.
 
 A Node mod has a **Debug (Node inspector)** switch in the Mod Manager. On, the mod restarts alone in its own process with Node's inspector, and the Mod Manager shows the inspector's address:
 

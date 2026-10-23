@@ -52,6 +52,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [RED Hot Tools Edgemodders build and the guard](hot-swap-research.md#the-edgemodders-build-and-the-guard-test) | In the game | HP0 | 2026-10-22 | 0.26.19, RED Hot Tools 1.3.0+edgemodders.1 | **Pass** (laptop): the official RED Hot Tools' swap refused with the message, the game running on; the Edgemodders build's swap went through |
 | [H2 resumed](world.md#h2-resumed-test-with-the-fixed-red-hot-tools) | In the game | H2 | 2026-10-22 | 0.26.19, RED Hot Tools 1.3.0+edgemodders.1, Refresh test 0.2.3 | **Pass** (laptop): no crash in five swaps; Reset look showed the new version on the worn item; Off and on both ways |
 | [H2b-0 Reset look both ways](world.md#h2b-0-reset-look-both-ways-test) | In the game | H2 | 2026-10-22 | 0.26.19 | **Pass** (laptop): six swaps both ways, each shown by Reset look with the item worn |
+| [Launcher settings drawer](#launcher-settings-drawer) | In the game | Launcher | Not run | 0.32.2 | Awaiting its run |
 | [Q-A Quest API](quests.md#q-a-test) | In the game | Q-A | 2026-10-23 | 0.32.0 | **Pass** (laptop): facts read and set, the watcher heard each change and kept working after a load, the tracked entry read, V teleported back, the MCP tools read without asking and asked to set ([results](quests.md#q-a-test-results)) |
 | [I2d Ink language](ink.md#i2d-test) | In the game | I2d | 2026-10-22 | 0.31.0 | **Pass** (laptop): game keys and `t()` in English and French, plurals, V's gender, fallbacks logged once; the language set at the main menu applies with no restart ([results](ink.md#i2d-test-results)) |
 | [I2c Ink data](ink.md#i2c-test) | In the game | I2c | 2026-10-22 | 0.30.0 | **Partial** (laptop): bindings, bars, adds, removes, mount.update and the rebuild order passed; list inserts and moves failed (the index written as "0.000000", refused as an Int32) ([first run](ink.md#i2c-test-first-run-0300)). Retest 2026-10-22, 0.30.1: **Pass** (laptop): inserts, moves, removes and gaps right, the order kept across a load, bindings 0.13 to 0.17 ms a frame ([results](ink.md#i2c-retest-results)) |
@@ -537,6 +538,18 @@ Built 2026-10-20 in REDnode 0.26.13: `ui.list` in the UI builder, sample **Live 
 2026-10-23, laptop, REDnode 0.32.0, Claude Code in auto mode with EDGEchat's `edge` plugin. Steps 3, 4 and 5 passed: `api_call` asked each time with no "don't ask again", a denied call did not run, and `archives_reload` asked. Step 2 asked as well: to read V's leg slot Claude Code called `GetItemInEquipSlot` through `api_call`. `api_read` refuses a name with a change word after its start, and "Equip" in "EquipSlot" is a noun; of 2.31's 9,504 names that start like reads, that rule refused 543, most of them reads. So the ask flag worked; the read rule did not. REDnode 0.32.1 refuses only a change word joined with `Or`, `And` or `Then` (7 names, all `GetOrCreate…` or `GetOrAdd…`). Retest: steps 0 to 2 only.
 
 Retest, 2026-10-23, laptop, REDnode 0.32.1: **pass**. The same question (V's health, level, money and leg slots) was answered with no question asked.
+
+### Launcher settings drawer
+
+Asked for by the player on 2026-10-23, REDnode 0.32.2: the launcher's title is **REDNODE** (it was cut off), and its six settings moved to a **Settings** drawer on the right, opened with a gear at the right of the Theme row. The UI kit's `rn-window` gained `drawer` for it. Checked before the build in a picture of the real page with a stand-in for the host: all six settings fit beside the panel, bottoms in line.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. **F10**, open the launcher. The title reads **REDNODE** in full. If you had moved the launcher, it starts at its default place once (its page is wider). **Mark**.
+2. Press the gear at the right of the Theme row. The **Settings** drawer opens on the right of the panel with GPU sharing, Hot reload, MCP server (with Copy setup), Developer mode, Open at start and Tooltips, each with a line on what it does, and the gear lights up. **Mark**.
+3. Switch **Tooltips** off and on again: it works as before. Click on the game to the right of the panel while the drawer is closed: the click reaches the game. **Mark**.
+4. Close the drawer with its ✕, open it again with the gear, then close it with the gear. Close the launcher with the REDNODE tab while the drawer is open: both go. **Mark**.
+5. Drag the launcher by its grip, then use **Reset position** on its title bar: it goes back. **Mark**.
+6. Switch the theme to **HUD red** and **EDGE** with the drawer open: the drawer follows. **Mark**.
 
 ## World API
 

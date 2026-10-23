@@ -352,9 +352,22 @@ $('solo-end').addEventListener('click', () => act('Solo mode', () => window.redn
 
 $('more-open').addEventListener('click', () => act('Mod Manager', () => window.rednode.apps.setOpen('modmanager', true)));
 
+// The settings drawer, on the right of the panel: the gear opens and closes it, and so do
+// its own close button and the panel closing.
+const drawer = $('drawer');
+function showDrawer(on) {
+  drawer.hidden = !on;
+  $('gear').setAttribute('aria-expanded', String(on));
+  if (on) $('gear').removeAttribute('variant');
+  else $('gear').setAttribute('variant', 'ghost');
+}
+$('gear').addEventListener('click', () => showDrawer(drawer.hidden));
+drawer.addEventListener('close', () => showDrawer(false)); // a drawer's close hides only it
+
 $('toggle').addEventListener('click', () => {
   panel.hidden = !panel.hidden;
-  if (!panel.hidden) refresh();
+  if (panel.hidden) showDrawer(false);
+  else refresh();
 });
 
 // Keep memory and state current while the list is open.
