@@ -5,6 +5,9 @@
 'use strict';
 
 const $ = (id) => document.getElementById(id);
+// Under the admin permission (the Admin Tools pack and other admin packages).
+const ADMIN_WARNING =
+  'Allow this only for a package you trust: it can end or restart any of your mods, and switch on AI tools you switched off.';
 const PAGE = 14; // rows a page: as many as the window shows without scrolling
 
 const STATUS = {
@@ -471,6 +474,7 @@ function renderDetails() {
     parts.push(el('div', 'section', 'Permissions'));
     for (const p of i.permissions) {
       parts.push(el('div', 'perm', `Asks for ${p.what}`));
+      if (p.name === 'admin') parts.push(el('div', 'perm warn', ADMIN_WARNING));
       // REDbridge is not part of REDnode: where it was found, or a button that gets it.
       if (p.name === 'bridge' && i.bridge && !bridgeInRequires) parts.push(...bridgeBlock(i));
       parts.push(toggle('Allowed', p.granted, (on) => act(i.name, () => window.rednode.apps.grant(i.id, p.name, on))));

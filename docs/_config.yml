@@ -53,6 +53,8 @@ nav:
     url: /sound.html
   - title: Sound Tools
     url: /sound-tools.html
+  - title: Admin Tools
+    url: /admin-tools.html
   - title: Localization
     url: /localization.html
   - title: Tests

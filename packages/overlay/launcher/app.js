@@ -43,6 +43,10 @@ function el(tag, className, text) {
   return e;
 }
 
+// Under the admin permission, as in the Mod Manager.
+const ADMIN_WARNING =
+  'Allow this only for a package you trust: it can end or restart any of your mods, and switch on AI tools you switched off.';
+
 function makeRow(item) {
   const root = el('div', 'app');
   const text = el('div');
@@ -75,6 +79,7 @@ function makeRow(item) {
     );
     line.append(allow);
     root.append(line);
+    if (p.name === 'admin') root.append(el('div', 'perm-warn', ADMIN_WARNING));
     grants.set(p.name, allow);
   }
 

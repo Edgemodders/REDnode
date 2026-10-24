@@ -64,10 +64,6 @@ const BUILTIN_ROOTS = [
   { dir: path.join(__dirname, 'launcher'), single: true, builtin: true, pinned: true },
   { dir: path.join(__dirname, 'modlog'), single: true, builtin: true },
   { dir: path.join(__dirname, 'manager'), single: true, builtin: true, manager: true },
-  // The Task Manager (SV1): what each package costs, End task. "admin": it may manage packages.
-  { dir: path.join(__dirname, 'tasks'), single: true, builtin: true, admin: true },
-  // The Tools Manager (SV3): every MCP tool an assistant sees, switched on and off.
-  { dir: path.join(__dirname, 'toolsmanager'), single: true, builtin: true, admin: true },
   // The Welcome window: opened at the first start, until the player closes it once.
   { dir: path.join(__dirname, 'welcome'), single: true, builtin: true },
 ];
@@ -166,6 +162,9 @@ const PERMISSIONS = {
   front: "staying above other packages' windows, with REDnode's own tools",
   solo: "hiding every other package's windows while it asks (solo mode)",
   archives: "swapping archives in the game's mod folder while the game runs (hot-loading, through RED Hot Tools)",
+  // The Admin Tools pack (Task Manager, Tools Manager) and other admin packages: the
+  // host's tasks and tools calls (fromAdmin). The Mod Manager and launcher show a warning under it.
+  admin: "managing REDnode: what every package costs, ending or restarting any package, and switching AI assistants' tools on and off",
 };
 // What a package may offer other packages in its manifest's "provides".
 const PROVIDES = ['agent'];
@@ -607,7 +606,7 @@ function discoverApps() {
           noteHidden(manifest.id, dir, apps.get(manifest.id).dir);
           continue;
         }
-        apps.set(manifest.id, { manifest, dir, builtin: !!root.builtin, pinned: !!root.pinned, manager: !!root.manager, admin: !!root.admin, dev: !!root.dev });
+        apps.set(manifest.id, { manifest, dir, builtin: !!root.builtin, pinned: !!root.pinned, manager: !!root.manager, dev: !!root.dev });
       } catch (err) {
         log(`Skipped an app: ${err.message}`);
       }
@@ -2495,7 +2494,22 @@ ipcMain.on('rednode:drag-regions', (event, regions) => {
 
 function fromLauncher(event) {
   const w = windowFor(event.sender);
-  if (!w?.app.pinned && !w?.app.manager && !w?.app.admin) throw new Error('Only the REDnode launcher, Mod Manager, Task Manager and Tools Manager can manage apps');
+  if (!w?.app.pinned && !w?.app.manager) throw new Error('Only the REDnode launcher and Mod Manager can manage apps');
+}
+
+// The tasks and tools calls: the launcher, the Mod Manager, or a package the player
+// allowed "admin" (the Admin Tools pack's Task Manager and Tools Manager, or another's).
+// Answers the caller's name, for the log.
+function fromAdmin(event) {
+  const w = windowFor(event.sender);
+  if (w?.app.pinned || w?.app.manager) return w.app.manifest.name;
+  const id = w && (w.app.built ? built.get(w.app.built)?.modId : w.app.manifest.id);
+  const entry = id && apps.get(id);
+  if (entry && isGranted(id, 'admin')) return entry.manifest.name;
+  if (entry?.manifest.permissions.includes('admin')) {
+    throw new Error(`${entry.manifest.name} needs the admin permission: allow it in the Mod Manager`);
+  }
+  throw new Error('Only a package that asks for the admin permission, once the player allows it, can manage other packages');
 }
 
 function isEnabled(entry) {
@@ -3283,16 +3297,16 @@ async function taskList() {
 }
 
 ipcMain.handle('rednode:tasks:list', async (event) => {
-  fromLauncher(event);
+  fromAdmin(event);
   return taskList();
 });
 
 ipcMain.handle('rednode:tasks:end', (event, id) => {
-  fromLauncher(event);
+  const who = fromAdmin(event);
   const entry = apps.get(id);
   if (!entry || entry.pinned) throw new Error(`No package "${id}"`);
   if (entry.builtin) throw new Error(`${entry.manifest.name} is part of REDnode: close its window instead`);
-  log(`End task: ${id}`);
+  log(`End task: ${id}, by ${who}`);
   const ended = isMod(entry.manifest) ? mods.end(id) : false;
   services.removed(id);
   // A page app's window closes; a mod's windows close as it stops (not as the player's
@@ -3302,12 +3316,12 @@ ipcMain.handle('rednode:tasks:end', (event, id) => {
 });
 
 ipcMain.handle('rednode:tasks:restart', (event, id) => {
-  fromLauncher(event);
+  const who = fromAdmin(event);
   const entry = apps.get(id);
   if (!entry || entry.pinned) throw new Error(`No package "${id}"`);
   if (isMod(entry.manifest)) {
     if (!mods.isEnabled(id)) throw new Error(`${entry.manifest.name} is switched off: switch it on in the Mod Manager`);
-    mods.restart(id, 'Restarted from the Task Manager');
+    mods.restart(id, `Restarted by ${who}`);
   }
   if (entry.manifest.entry && settings.apps[id]?.open !== false) openApp(entry);
   return true;
@@ -3504,13 +3518,13 @@ function toolsList() {
 }
 
 ipcMain.handle('rednode:tools:list', (event) => {
-  fromLauncher(event);
+  fromAdmin(event);
   return toolsList();
 });
 
 // A switch: one tool (key), or a whole package (group), or "Off for new packages".
 ipcMain.handle('rednode:tools:set', (event, what, id, on) => {
-  fromLauncher(event);
+  const who = fromAdmin(event);
   const t = mcpToolSettings();
   if (what === 'tool') {
     if (on) {
@@ -3532,7 +3546,7 @@ ipcMain.handle('rednode:tools:set', (event, what, id, on) => {
   } else if (what === 'new-off') t.newOff = !!on;
   else throw new Error(`Unknown switch "${what}"`);
   saveToolSettings(t);
-  log(`Tools Manager: ${what} ${id ?? ''} ${on ? 'on' : 'off'}`);
+  log(`Tools: ${what} ${id ?? ''} ${on ? 'on' : 'off'}, by ${who}`);
   return toolsList();
 });
 

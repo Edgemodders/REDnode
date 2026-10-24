@@ -2,7 +2,9 @@
 // One row per package: its Node mod's process (CPU, memory), the mod's own thread (how
 // busy its event loop is, its JavaScript heap), its windows, and its game and service
 // calls. End task stops it now; Restart starts it again.
-// Uses window.rednode.tasks, which the host gives only to apps built into REDnode.
+// Part of the Admin Tools pack. Uses window.rednode.tasks, which the host answers only
+// for a package the player allowed the "admin" permission; until then the details pane
+// says so.
 'use strict';
 
 const $ = (id) => document.getElementById(id);

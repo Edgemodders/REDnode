@@ -3,7 +3,9 @@
 // @tool functions. A switch per tool and per group takes it away from every assistant at
 // once; the switches are kept across starts. Also: which assistants have connected, and
 // their recent calls of mods' tools.
-// Uses window.rednode.tools, which the host gives only to apps built into REDnode.
+// Part of the Admin Tools pack. Uses window.rednode.tools, which the host answers only
+// for a package the player allowed the "admin" permission; until then the details pane
+// says so.
 'use strict';
 
 const $ = (id) => document.getElementById(id);

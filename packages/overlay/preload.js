@@ -128,13 +128,13 @@ contextBridge.exposeInMainWorld('rednode', {
   agent: (msg) => ipcRenderer.send('rednode:agent', msg),
   /** Other packages' services (SV1); used by `service` in the rednode package. Events arrive as {event: 'service', provider, name, data}. */
   service: (msg) => ipcRenderer.invoke('rednode:service', msg),
-  /** The Tools Manager's calls (SV3): every MCP tool, the player's switches, the assistants. Built-in apps only. */
+  /** The Tools Manager's calls (SV3): every MCP tool, the player's switches, the assistants. Packages with the admin permission, the launcher and the Mod Manager. */
   tools: {
     list: () => ipcRenderer.invoke('rednode:tools:list'),
     /** what: 'tool' (id is its key), 'group' (a package id, or 'rednode'), or 'new-off'. */
     set: (what, id, on) => ipcRenderer.invoke('rednode:tools:set', what, id, on),
   },
-  /** The Task Manager's calls: every running package's costs, End task, Restart. Built-in apps only. */
+  /** The Task Manager's calls: every running package's costs, End task, Restart. Packages with the admin permission, the launcher and the Mod Manager. */
   tasks: {
     list: () => ipcRenderer.invoke('rednode:tasks:list'),
     end: (id) => ipcRenderer.invoke('rednode:tasks:end', id),

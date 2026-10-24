@@ -1,0 +1,9 @@
+{
+  "id": "admin-tools",
+  "name": "REDnode Admin Tools",
+  "version": "0.1.0",
+  "rednode": ">=0.37.0",
+  "summary": "An optional app pack for managing REDnode itself: the Task Manager (what every package costs, End task, Restart) and the Tools Manager (every tool an AI assistant sees, switched on and off).",
+  "guide": "https://edgemodders.github.io/REDnode/admin-tools.html",
+  "apps": ["taskmanager", "toolsmanager"]
+}

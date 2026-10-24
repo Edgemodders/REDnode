@@ -1,10 +1,12 @@
 {
   "id": "taskmanager",
   "name": "Task Manager",
-  "version": "0.36.0",
+  "version": "0.1.0",
   "author": "Edgemodders",
   "description": "Every running package and what it costs: CPU, memory, its thread's load, game calls and service calls. End task stops one that misbehaves; Restart starts it again.",
   "entry": "index.html",
+  "permissions": ["admin", "front"],
+  "requires": { "rednode": ">=0.37.0" },
   "kind": "window",
   "width": 900,
   "height": 520,

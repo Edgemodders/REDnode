@@ -37,7 +37,7 @@ const FONTS =
 // Same scheme as the docs page, or the browser paints the preview frame opaque.
 const SCHEME = '<meta name="color-scheme" content="dark">';
 // API names that have a page in the API reference (docs/api, made by TypeDoc).
-const API_PAGES = new Set(['game', 'ui', 'api', 'tweakdb', 'world', 'audio', 'agent', 'kernel', 'pkg', 'secrets', 'channel']);
+const API_PAGES = new Set(['game', 'ui', 'api', 'tweakdb', 'world', 'audio', 'agent', 'kernel', 'pkg', 'secrets', 'channel', 'admin']);
 
 // The samples in the player download, read from the release script.
 const SAMPLES = (() => {

@@ -649,7 +649,9 @@ It writes `service.json` beside your `rednode-app.json`; ship it with the packag
 
 ## The Task Manager
 
-The built-in **Task Manager** (in the launcher) lists every running package and what it costs, refreshed every second or five: CPU and memory (a Node mod's process with its windows), how busy the mod's own thread is and its heap, game calls a second with their round trip, and service calls in and out. A mod in the shared process shows the whole process's CPU and memory, since Windows sees no finer; its Thread and Heap columns are its own. **End task** stops a package now, also one stuck in an endless loop, and closes its windows; it stays switched on, so it runs again with the next game or with **Restart**.
+The **Task Manager**, in the optional [Admin Tools](admin-tools.md) pack, lists every running package and what it costs, refreshed every second or five: CPU and memory (a Node mod's process with its windows), how busy the mod's own thread is and its heap, game calls a second with their round trip, and service calls in and out. A mod in the shared process shows the whole process's CPU and memory, since Windows sees no finer; its Thread and Heap columns are its own. **End task** stops a package now, also one stuck in an endless loop, and closes its windows; it stays switched on, so it runs again with the next game or with **Restart**. It was built into REDnode 0.34.0 to 0.36.0.
+
+To write an admin tool of your own, ask for the `admin` permission and use `admin` from the `rednode` package in a page: see [The admin permission](admin-tools.md#the-admin-permission).
 
 ## Asking the AI assistant
 

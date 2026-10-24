@@ -91,7 +91,7 @@ An assistant sees two tools, `edgebuilder__scenes` and `edgebuilder__load`, with
 
 ## Companion apps
 
-Asked for by the owner on 2026-10-24, to go with services. Both are built-in tool windows like the Mod Manager (the tool layer, opened from the launcher), so they stay reachable when a package misbehaves.
+Asked for by the owner on 2026-10-24, to go with services. Built into REDnode 0.34.0 to 0.36.0 as tool windows like the Mod Manager; from REDnode 0.37.0 they are the optional [Admin Tools](admin-tools.md) pack, with the `admin` permission (agreed with the owner on 2026-10-24: not every player wants to manage REDnode at that level, and the permission lets other modders write admin apps).
 
 ### Task Manager
 

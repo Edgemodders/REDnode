@@ -40,8 +40,6 @@ const PARTS = [
   { name: 'Mod log', ...json('packages/overlay/modlog/rednode-app.json') },
   { name: 'Mod Manager', ...json('packages/overlay/manager/rednode-app.json') },
   { name: 'Welcome', ...json('packages/overlay/welcome/rednode-app.json') },
-  { name: 'Task Manager', ...json('packages/overlay/tasks/rednode-app.json') },
-  { name: 'Tools Manager', ...json('packages/overlay/toolsmanager/rednode-app.json') },
   { name: 'Plugin README', ...pattern('native/README.md', /(\(version: )([0-9][^,]*)(,)/) },
 ];
 
