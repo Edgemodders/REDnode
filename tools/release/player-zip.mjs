@@ -113,7 +113,7 @@ writeFileSync(
     'Get REDbridge button on such a package: it downloads REDbridge from GitHub, and .NET 10',
     'for your Windows user if missing, with no admin rights. A copy EDGEdeck or REDcode fetched works too.',
     '',
-    'Press F10 in the game to open the overlay. Samples are in the launcher, switched off.',
+    'Press F10 in the game to open the overlay. The samples are switched off: turn them on in the Mod Manager (in the launcher).',
     'Install REDnode packages into red4ext/plugins/REDnode/apps/<package>/.',
     '',
     'Docs: https://edgemodders.github.io/REDnode/',

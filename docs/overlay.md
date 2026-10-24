@@ -1,6 +1,6 @@
 # HTML overlay
 
-Status: **O6 One runtime and O8 Mod Manager passed in game.** O1 to O6b have all passed; the O4 scene threshold is still open (see the O4 result). Node mods run in the host beside overlay apps, both use the `rednode` package, and `api` calls any game function, typed. Next: REDagent, then O7 Display. To build an app today, see the [Overlay apps](overlay-apps.md) guide. The proof of concept passed in game, alone and side by side with CET and 10 other RED4ext plugins (2026-10-11). See [Test results](#test-results) and [the plan](#plan-for-the-real-version).
+Status: **in use.** Phases O1 to O6 and O8 to O11 passed in game (2026-10-11 to 2026-10-14), then a polish phase (REDnode 0.24.2 to 0.24.7, 2026-10-17). Open: the O4 scene threshold (see the O4 result). Not done yet: O7 Display, and O12 Console (proposed). To build an app, read the [Overlay apps](overlay-apps.md) guide; this page is the design and its test record. The proof of concept passed in game, alone and side by side with CET and 10 other RED4ext plugins (2026-10-11). See [Test results](#test-results) and [the plan](#plan-for-the-real-version).
 
 REDnode overlay apps are small web apps (HTML, CSS and JavaScript) drawn on top of the game, like CET's ImGui windows. They talk to the game through the same `rednode` API as Node mods.
 

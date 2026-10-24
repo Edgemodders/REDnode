@@ -446,7 +446,7 @@ Showed: Chromium drops `movementX` from injected moves, so the host sends raw mo
 
 ### SP2 Sound Tracer
 
-[Source](sound.md#sp2-retest-rednode-02612). Built 2026-10-20 in REDnode 0.26.10: the Sound Tracer app, event names from the host, the trace log, `ui.copy`. REDbridge installed for names. 0.26.11 adds events played on V, Stop and Stop all, and a layout that cannot overflow sideways; 0.26.12 a close button, and a package's events stopped when it stops.
+[Source](sound.md#sp2-retest-rednode-02612-or-02613). Built 2026-10-20 in REDnode 0.26.10: the Sound Tracer app, event names from the host, the trace log, `ui.copy`. REDbridge installed for names. 0.26.11 adds events played on V, Stop and Stop all, and a layout that cannot overflow sideways; 0.26.12 a close button, and a package's events stopped when it stops.
 
 | Run | Build | Result |
 |---|---|---|

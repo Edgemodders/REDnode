@@ -1,6 +1,6 @@
 # TweakDB API
 
-Status: **planned**, agreed with the user on 2026-10-13 ("We need to do it"). Phases T1 to T3, right after W2's in-game test and before overlay phase O7 Display. The user chose the recommended answers below on 2026-10-13: reads in the plugin, writes through TweakXL, undo per package.
+Status: **reads and writes in use.** T1, reads (REDnode 0.19.0), and T2, writes through TweakXL with undo per package (REDnode 0.20.0, TweakXL 1.11.4), passed in game on 2026-10-14. T3, offline reads, waits for REDbridge's `tweakdb` methods ([REDbridge #3](https://github.com/Edgemodders/REDbridge/issues/3)). To use it, read [Overlay apps: TweakDB](overlay-apps.md#tweakdb). The rest of this page is the design and its test record, agreed with the owner on 2026-10-13: reads in the plugin, writes through TweakXL, undo per package.
 
 TweakDB is the game's database of tuning data: items, weapons, vehicles, characters, perks, status effects, UI icons. It holds **records** (`Items.Preset_Yinglong_Default`, of a type such as `gamedataWeaponItem_Record`) and **flats**, the single values inside them (`Items.money.quality`). Most gameplay mods change TweakDB.
 

@@ -30,6 +30,10 @@ How to keep it:
 
 - The docs site's example previews load again: since 0.32.0 every preview stopped at a script error.
 
+**Other**
+
+- The player zip's README says to switch the samples on in the Mod Manager. The docs correct several out-of-date pages: sound archives do swap (since 0.26.8), TweakDB writes exist, the manifest table lists every permission and field, and permissions are allowed in the Mod Manager.
+
 ## 0.32.1 (2026-10-23)
 
 **For game version 2.31 only.** Game version 2.5 is not supported yet: RED4ext will not load this REDnode on 2.5. REDnode moves to 2.5 as soon as RED4ext, redscript and Codeware support it.

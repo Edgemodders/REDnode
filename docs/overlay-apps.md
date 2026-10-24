@@ -1,6 +1,6 @@
 # Overlay apps
 
-Overlay apps are small web apps drawn on top of the game: HTML, CSS and JavaScript. They talk to the game through the `rednode` package and can play the game's own UI sounds. [Node mods](#node-mods) use the same package from Node, and can open windows without writing HTML. Every app example on this page was tested in game on 2026-10-11 (Cyberpunk 2077 2.31), and the Node mod and game API examples on 2026-10-12.
+Overlay apps are small web apps drawn on top of the game: HTML, CSS and JavaScript. They talk to the game through the `rednode` package and can play the game's own UI sounds. [Node mods](#node-mods) use the same package from Node, and can open windows without writing HTML. Every example on this page was tested in game on Cyberpunk 2077 2.31, each with the REDnode version its section names.
 
 Status: **developer preview.** See the [overlay design](overlay.md) for how it works and what is planned.
 
@@ -302,7 +302,7 @@ Import the `rednode` package, the same one Node mods use. An import map lets the
 |---|---|
 | `game.player.position()` | V's world position. Rejects at the main menu, where there is no player |
 | `game.audio.play(name)` | Plays a game sound event |
-| `game.on(name, handler)` | A game event. Today `"PlayerPuppet.OnGameAttached"`, at the main menu and on every save load |
+| `game.on(name, handler)` | A game event: `"PlayerPuppet.OnGameAttached"` (at the main menu and on every save load), `"language"` (the player changed the game's language), and the `quests.fact:<name>` events that [`quests.watch`](quests.md) uses |
 | `game.state()`, `game.onState(handler)` | Whether a menu, photo mode, a scene or the main menu is showing, the overlay mode, and whether the game is linked |
 | `game.call(method, params)` | Any bridge method by name, for example `"game.info"` |
 
@@ -411,7 +411,7 @@ A package can live in your own project, for example `E:\Modding\MyMod\`, and sti
 |---|---|---|
 | `pkg.id`, `pkg.dir`, `pkg.dataDir` | This package's id, its folder in the apps folder, and a data folder of its own outside it, which survives updates. Write files to `dataDir`, never to `dir`: hot reload watches `dir` | Node mods |
 | `secrets.get(name)`, `secrets.set(name, value)`, `secrets.delete(name)` | Secrets such as an API key, encrypted with the player's Windows account and kept by the host. A package reads only its own. A secret that cannot be decrypted, for example one saved under another Windows account, reads as `null` | Node mods and apps |
-| `kernel.mcp()` | The address and a token for the [kernel MCP server](mcp.md), for an AI agent in the package. The package must list `"permissions": ["mcp"]` in its manifest, and the player must allow it in the launcher | Node mods and apps |
+| `kernel.mcp()` | The address and a token for the [kernel MCP server](mcp.md), for an AI agent in the package. The package must list `"permissions": ["mcp"]` in its manifest, and the player must allow it in the Mod Manager | Node mods and apps |
 | `channel.post(data)`, `channel.on(handler)` | Messages between a package's pages and its own Node mod: a web UI with a Node backend | Node mods and apps |
 | `kernel.requirements()` | The package's `requires`, checked against the game folder (see [Requirements](#requirements)) | Node mods and apps |
 | `tweakdb` | TweakDB's records and flats, read from the running game (see [TweakDB](#tweakdb)) | Node mods and apps |
@@ -544,7 +544,7 @@ Solo ends when the package turns it off, stops or crashes, another package takes
 
 ## Calling other packages
 
-A package can offer functions to every other package, and call theirs: a quest mod asks a world builder for a scene's places, a HUD widget asks a stats mod for its numbers. REDnode 0.34.0 and later; the plan, with what comes next (descriptions from JSDoc, AI assistants calling them as tools), is on the [Mod services](services.md) page.
+A package can offer functions to every other package, and call theirs: a quest mod asks a world builder for a scene's places, a HUD widget asks a stats mod for its numbers. REDnode 0.34.0 and later; descriptions from JSDoc come with 0.35.0 and AI assistants calling them as tools with 0.36.0. The design and its tests are on the [Mod services](services.md) page.
 
 To offer some, name a **service file** in the manifest. Every function it exports can be called by other packages, by your package's id:
 
@@ -653,7 +653,7 @@ The built-in **Task Manager** (in the launcher) lists every running package and 
 
 ## Asking the AI assistant
 
-A package can ask the AI assistant (REDagent) a question and show the answer: a build suggestion, an explanation of an error, a summary of the game state. Add `"permissions": ["agent"]` to the manifest; the player allows it in the launcher or the Mod Manager, and REDagent must be installed and on.
+A package can ask the AI assistant (REDagent) a question and show the answer: a build suggestion, an explanation of an error, a summary of the game state. Add `"permissions": ["agent"]` to the manifest; the player allows it in the Mod Manager, and REDagent must be installed and on.
 
 ```js
 import { agent, ui } from 'rednode';
@@ -732,7 +732,7 @@ await shop.GiveItem(player, await api.MarketSystem.Money(), 100);   // a change:
 
 ## TweakDB
 
-TweakDB is the game's database of tuning data: items, weapons, vehicles, characters, perks. A **record** is one thing (`Items.Preset_Lexington_Default`, a `gamedataWeaponItem_Record`); a **flat** is one value in it (`Items.Preset_Lexington_Default.quality`). `tweakdb` reads them from the running game and needs nothing else installed. Changing them comes later, through TweakXL ([plan](tweakdb.md)).
+TweakDB is the game's database of tuning data: items, weapons, vehicles, characters, perks. A **record** is one thing (`Items.Preset_Lexington_Default`, a `gamedataWeaponItem_Record`); a **flat** is one value in it (`Items.Preset_Lexington_Default.quality`). `tweakdb` reads them from the running game and needs nothing else installed. Changing them needs TweakXL: see [Changing TweakDB](#changing-tweakdb) below.
 
 ```js
 import { tweakdb } from 'rednode';

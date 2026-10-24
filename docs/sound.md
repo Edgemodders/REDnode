@@ -1,6 +1,6 @@
 # Sound API
 
-Status: **S1 Play** passed in game on 2026-10-16 (REDnode 0.24.0), and its pan fix in REDnode 0.24.1 the same day. Open: the scanner's slow motion. Agreed with the user on 2026-10-14: REDnode builds its own audio engine first, for tighter integration with the EDGE platform and other plugins. [Audioware](https://github.com/cyb3rpsych0s1s/audioware) stays the fallback, as a dependency through `requires`, only if building our own proves prohibitive. Order: after the [TweakDB API](tweakdb.md) and overlay phase O11 Spaces.
+Status: **S1 Play in use** since REDnode 0.24.1 (passed in game on 2026-10-16), and the [Sound Tools](sound-tools.md) pack (SP1 to SP4, passed in game on 2026-10-20). Next: S2 Space, not scheduled yet. Open: the scanner's slow motion. To use sound, read [Overlay apps: Your own sounds](overlay-apps.md#your-own-sounds). Agreed with the owner on 2026-10-14: REDnode builds its own audio engine, for tighter integration with the EDGE platform and other plugins. [Audioware](https://github.com/cyb3rpsych0s1s/audioware) stays the fallback, as a dependency through `requires`, only if building our own proves prohibitive.
 
 ## Clean-room rule
 
