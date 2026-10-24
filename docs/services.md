@@ -203,6 +203,22 @@ Before: REDnode 0.34.0 deployed. Load a save.
 9. Select Crash mod again and press **Restart**: it runs again with its window. **Mark**.
 10. Quit the game. Send `rednode-mods.log` and `rednode-overlay.log`.
 
+### SV1 test: results
+
+2026-10-24, REDnode 0.36.0 (all three phases on one build), the 2.31 backup folder: **pass**, every step.
+
+| Step | Seen in the logs |
+|---|---|
+| 1 | Counter panel, switched on first, said "Counter service is off"; with the service on, "Connected to Counter service 0.2.0: add, fail, get, reset, wait" |
+| 2 | add(1) three times and add(10): 13, each answered in about 1 ms |
+| 3 | wait(3000) answered after 3003 ms; wait(40000) failed at 30 s, and the service logged "wait(40000) stopped: the caller gave up" |
+| 4 | Stop: "Stopped", and the service's signal aborted at once |
+| 5 | fail() and nothing() failed with their reasons |
+| 6 | Off: "Counter service is off: switch it on in the Mod Manager"; on again, get() answered 0 |
+| 7 | The Task Manager showed the calls (eight add(1) in two seconds) |
+| 8 | End task on Crash mod stuck in its endless loop (in the shared process with the Hello mod): stopped in the same second, its window closed, the Hello mod ran on |
+| 9 | Restart brought Crash mod back with its window |
+
 ## SV2: built
 
 Built on 2026-10-24 in **REDnode 0.35.0**, right after SV1.
@@ -234,6 +250,10 @@ Before: REDnode 0.35.0 or later deployed (SV1's test can run first on the same b
 3. Press **Bad call**: it fails with `add: "by" must be a number, not a string`, and Counter service's log has no line for it (the host refused it before the service saw it). **Mark**.
 4. Quit the game. Send `rednode-mods.log`.
 
+### SV2 test: results
+
+2026-10-24, REDnode 0.36.0: **pass**. The Mod Manager's Service section listed the functions; **Describe** logged "Described 5 functions"; **Bad call** failed with `add: "by" must be a number, not a string`, and the service logged nothing for it.
+
 ## SV3: built
 
 Built on 2026-10-24 in **REDnode 0.36.0**, right after SV2.
@@ -242,7 +262,7 @@ Built on 2026-10-24 in **REDnode 0.36.0**, right after SV2.
 |---|---|
 | Each `@tool` function as the MCP tool `<package>__<function>`: the author's description, the parameters as the tool's input (the JSON Schema turned into zod for the MCP SDK), `readOnlyHint` for `@readonly`, the ask flag for the rest; named arguments put in order for the call | `packages/overlay/mcp.js` (`zodOf`, `toolInput`, `modToolName`) |
 | `mod_services`, `mod_read` (read-only tools, no asking), `mod_call` (asks) | `mcp.js` |
-| Which assistant calls: the desktop token named by its `initialize` request (the name Claude Code sends there is unverified), a package's token by the package's name; `service.caller()` gives `{ assistant }` | `mcp.js` (`handle` reads the body), `main.js` (`seenToken`) |
+| Which assistant calls: the desktop token named by its `initialize` request (Claude Code sends "claude-code", seen in game), a package's token by the package's name; `service.caller()` gives `{ assistant }` | `mcp.js` (`handle` reads the body), `main.js` (`seenToken`) |
 | The switches: `settings.mcpTools` (`off`, `offPackages`, `newOff`, `known`); a switched-off REDnode tool is not built; a switched-off mod tool is left out and refused by `mod_call` | `main.js` (`allModTools`, `callModTool`, `toolsList`, `rednode:tools:*`) |
 | The Tools Manager | `packages/overlay/toolsmanager` (built in, `toolsmanager`) |
 | Each assistant call in the mod's own log and the Tools Manager's recent calls | `main.js` |
@@ -272,4 +292,16 @@ Before: REDnode 0.36.0 deployed, with REDagent 0.3.1. In the launcher's settings
 4. In the Tools Manager, switch `counter_service__add` off. Ask Claude Code to add 1 again: the call fails or the tool is gone, and `mod_call` is refused with "switched ... off". Switch it on again. **Mark**.
 5. In REDagent's chat, ask "What is the count in Counter service?": it reads it without asking. Ask it to reset the count: REDagent asks you first; allow it. **Mark**.
 6. Quit the game. Send `rednode-mods.log` and `rednode-overlay.log`.
+
+### SV3 test: first run
+
+2026-10-24, REDnode 0.36.0. Claude Code names itself **claude-code** in its `initialize` request, so the logs and the Tools Manager show it by that name.
+
+| Step | Result |
+|---|---|
+| 1 Tools Manager | Pass |
+| 2 Read without asking | Pass: "claude-code called get as a tool" |
+| 3 Add 5, asked first | Open: no call of `add` reached REDnode |
+| 4 Switch off and on | Pass: the switch was logged off and on; no call of `add` went through while off |
+| 5 REDagent | Not run: the REDagent on that install has no Agent SDK yet ("the window offers to get it") |
 {% endraw %}
