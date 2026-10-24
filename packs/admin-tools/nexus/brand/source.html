@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>REDnode Admin Tools brand</title>
+<!-- The source of the pack's brand images, in REDnode's style. tools/brand/render.cjs draws
+     it at each size: #banner (2560 x 640), #social (1280 x 640), #icon (256 x 256). -->
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Rajdhani:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #08090d; --panel: #10131b; --line: #262c3d; --fg: #e3e6ee; --dim: #8a93a8;
+    --yellow: #fcee0a; --cyan: #19f3ff; --green: #5dffa1;
+    --display: "Chakra Petch", sans-serif; --body: "Rajdhani", sans-serif; --mono: "JetBrains Mono", monospace; }
+  html, body { margin: 0; overflow: hidden; background: var(--bg); }
+  .art { position: relative; overflow: hidden; background:
+      radial-gradient(ellipse at 0% 100%, rgba(252, 238, 10, .08), transparent 55%),
+      linear-gradient(rgba(25, 243, 255, .045) 1px, transparent 1px) 0 0 / 40px 40px,
+      linear-gradient(90deg, rgba(25, 243, 255, .045) 1px, transparent 1px) 0 0 / 40px 40px,
+      var(--bg); }
+  .corner { position: absolute; width: 58px; height: 58px; border: 0 solid var(--yellow); }
+  .corner.tl { left: 32px; top: 32px; border-left-width: 3px; border-top-width: 3px; }
+  .corner.br { right: 32px; bottom: 32px; border-right-width: 3px; border-bottom-width: 3px; }
+  .kicker { font: 500 28px var(--mono); letter-spacing: .3em; text-transform: uppercase; color: var(--cyan); white-space: nowrap; }
+  .title { font: 700 186px/0.9 var(--display); text-transform: uppercase; letter-spacing: .01em; color: var(--fg); white-space: nowrap; }
+  .title b { color: var(--yellow); font-weight: 700; }
+  .tag { font: 500 46px/1.25 var(--body); color: #c9cfdd; }
+  .rule { height: 4px; background: var(--line); position: relative; }
+  .rule::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 18%; background: var(--yellow); }
+  .panel { background: var(--panel); border: 1px solid var(--line);
+    clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 22px 100%, 0 calc(100% - 22px)); }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 40px; font: 500 22px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+  .row span:first-child { color: var(--dim); }
+  .row + .row { border-top: 2px solid var(--line); }
+  .c { color: var(--cyan); } .y { color: var(--yellow); } .g { color: var(--green); }
+  .wave { position: absolute; display: flex; align-items: flex-end; gap: 6px; border-bottom: 2px solid var(--line); }
+  .wave i { display: block; width: 8px; background: var(--cyan); border-radius: 1px 1px 0 0; }
+  .wave i.hot { background: #ff4d6d; }
+
+  /* banner: 2560 x 640 */
+  #banner { width: 2560px; height: 640px; }
+  #banner .text { position: absolute; left: 112px; top: 96px; width: 1300px; }
+  #banner .title { margin: 26px 0 30px; }
+  #banner .tag { max-width: 1100px; }
+  #banner .rule { margin-top: 44px; width: 1120px; }
+  #banner .panel { position: absolute; right: 112px; top: 178px; width: 720px; padding: 22px 44px; }
+  #banner .row { padding: 22px 0; }
+  #banner .wave { right: 112px; bottom: 70px; width: 720px; height: 90px; opacity: .5; }
+
+  /* social: 1280 x 640 */
+  #social { width: 1280px; height: 640px; }
+  #social .corner { width: 36px; height: 36px; left: 16px; top: 16px; }
+  #social .corner.br { left: auto; top: auto; right: 16px; bottom: 16px; }
+  #social .text { position: absolute; left: 80px; top: 92px; width: 1120px; }
+  #social .kicker { font-size: 17px; }
+  #social .title { font-size: 128px; margin: 22px 0 22px; }
+  #social .tag { font-size: 30px; max-width: 760px; }
+  #social .rule { margin-top: 26px; width: 560px; }
+  #social .panel { position: absolute; left: 80px; right: 80px; top: 440px; display: flex; padding: 22px 22px; }
+  #social .row { flex: 1; display: block; padding: 0; font-size: 15px; }
+  #social .row + .row { border-top: 0; }
+  #social .row span { display: block; }
+  #social .row span + span { margin-top: 8px; }
+  #social .wave { right: 80px; top: 230px; width: 300px; height: 120px; opacity: .55; gap: 5px; }
+  #social .wave i { width: 7px; }
+
+  /* nexus: 1280 x 640, the social layout 55 px lower, leaving the top for the EDGEmodders
+     header the owner adds by hand (after REDnode's own nexus.png) */
+  #nexus { width: 1280px; height: 640px; }
+  #nexus .corner { width: 36px; height: 36px; left: 16px; top: 16px; }
+  #nexus .corner.br { left: auto; top: auto; right: 16px; bottom: 16px; }
+  #nexus .text { position: absolute; left: 74px; top: 147px; width: 1120px; }
+  #nexus .kicker { font-size: 17px; }
+  #nexus .title { font-size: 128px; margin: 22px 0 22px; }
+  #nexus .tag { font-size: 30px; max-width: 760px; }
+  #nexus .rule { margin-top: 26px; width: 560px; }
+  #nexus .panel { position: absolute; left: 74px; right: 86px; top: 495px; display: flex; padding: 22px 22px; }
+  #nexus .row { flex: 1; display: block; padding: 0; font-size: 15px; }
+  #nexus .row + .row { border-top: 0; }
+  #nexus .row span { display: block; }
+  #nexus .row span + span { margin-top: 8px; }
+  #nexus .wave { right: 86px; top: 290px; width: 300px; height: 120px; opacity: .55; gap: 5px; }
+  #nexus .wave i { width: 7px; }
+
+  /* icon: 256 x 256 */
+  #icon { width: 256px; height: 256px; clip-path: polygon(0 0, 214px 0, 256px 42px, 256px 256px, 42px 256px, 0 214px); }
+  #icon .corner { width: 26px; height: 26px; border-width: 0; }
+  #icon .corner.tl { left: 20px; top: 20px; border-left-width: 5px; border-top-width: 5px; }
+  #icon .corner.br { right: 20px; bottom: 20px; border-right-width: 5px; border-bottom-width: 5px; }
+  #icon .title { position: absolute; left: 0; right: 0; top: 74px; text-align: center; font-size: 92px; }
+  #icon .wave { left: 58px; right: 58px; bottom: 58px; height: 34px; justify-content: space-between; gap: 0; }
+  #icon .wave i { width: 6px; }
+  #icon .wave { align-items: flex-end; }
+  #icon .wave i:nth-child(-n+4) { background: var(--yellow); }
+</style>
+</head>
+<body>
+<script>
+  // Which image: ?kind=banner, social, nexus or icon (or the same as the URL's hash).
+  const kind = new URLSearchParams(location.search).get('kind') || location.hash.slice(1) || 'banner';
+  // A CPU meter: low bars, and one mod stuck at 100 % in red (the bar at `hot`).
+  const wave = (n, h, seed = 7, hot = Math.round(n * 0.7)) => {
+    let x = seed;
+    const bars = [];
+    for (let i = 0; i < n; i++) {
+      x = (x * 9301 + 49297) % 233280; // a fixed sequence, so every render is the same
+      const v = i === hot ? 1 : 0.12 + 0.4 * (x / 233280);
+      bars.push(`<i${i === hot ? ' class="hot"' : ''} style="height:${Math.max(4, Math.round(h * v))}px"></i>`);
+    }
+    return `<div class="wave">${bars.join('')}</div>`;
+  };
+  const rows = `
+    <div class="row"><span>Tasks</span><span class="c">Every mod's CPU and memory</span></div>
+    <div class="row"><span>End task</span><span class="y">Even a stuck mod</span></div>
+    <div class="row"><span>AI tools</span><span class="g">Switched on or off</span></div>`;
+  const text = (kicker) => `
+    <div class="text">
+      <div class="kicker">${kicker}</div>
+      <div class="title">Admin<b>Tools</b></div>
+      <div class="tag">See what every REDnode mod costs, stop the one that misbehaves, and choose what AI assistants may touch.</div>
+      <div class="rule"></div>
+    </div>`;
+  const art = {
+    banner: `${text('// REDnode app pack · Cyberpunk 2077 PC')}<div class="panel">${rows}</div>${wave(52, 90)}`,
+    social: `${text('// REDnode app pack · Cyberpunk 2077 PC')}<div class="panel">${rows}</div>${wave(28, 120, 11)}`,
+    nexus: `${text('// REDnode app pack · Cyberpunk 2077 PC')}<div class="panel">${rows}</div>${wave(28, 120, 11)}`,
+    icon: `<div class="title">A<b>T</b></div>${wave(13, 34, 3, 9)}`,
+  }[kind];
+  document.body.innerHTML = `<div id="${kind}" class="art"><div class="corner tl"></div><div class="corner br"></div>${art}</div>`;
+</script>
+</body>
+</html>

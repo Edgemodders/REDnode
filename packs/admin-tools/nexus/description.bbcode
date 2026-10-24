@@ -1,0 +1,93 @@
+[center][img]https://raw.githubusercontent.com/Edgemodders/REDnode/main/packs/admin-tools/nexus/brand/banner.png[/img][/center]
+
+[center][size=5][b][color=#fcee0a]See what every REDnode mod costs. Stop the one that misbehaves. Choose what AI assistants may touch.[/color][/b][/size][/center]
+
+[center][size=3]REDnode Admin Tools is an app pack for players and modders who run several REDnode mods: two windows over the game, a Task Manager for what each mod costs and a Tools Manager for what AI assistants can do through REDnode.[/size][/center]
+
+[center][size=3]What changed in each version: [url=https://github.com/Edgemodders/REDnode/blob/main/packs/admin-tools/changelog.md]the pack's changelog[/url] · Guide: [url=https://edgemodders.github.io/REDnode/admin-tools.html]Admin Tools docs[/url][/size][/center]
+
+[line]
+
+[quote][size=4][b][color=#fcee0a]STATUS: PREVIEW[/color][/b][/size]
+Built in the open and tested in the game, on game version 2.31. It runs on [url=https://www.nexusmods.com/cyberpunk2077/mods/REDNODE_PAGE]REDnode[/url] REDNODE_VERSION or later, which you need first.
+[b]You do not need it to play REDnode mods.[/b] It is for when you want to look under the hood.[/quote]
+[line]
+
+[color=#19f3ff][i]Screenshot 1: the Task Manager over the game, a stuck mod at 100 % Thread[/i][/color]
+
+[size=5][b][color=#fcee0a]What is in the pack[/color][/b][/size]
+
+[size=4][b][color=#19f3ff]Task Manager[/color][/b][/size]
+Every running REDnode package, refreshed every second or five, sorted by any column.
+[list]
+[*][b]CPU and memory[/b] of each mod's process and its windows.[/*]
+[*][b]Thread and heap:[/b] how busy each mod's own thread is, and its memory. A mod stuck in an endless loop shows at about 100 %, even when it shares a process with others.[/*]
+[*][b]Game calls[/b] a second with their round trip, and [b]service calls[/b] between mods.[/*]
+[*][b]End task[/b] stops a mod now, even a stuck one, and closes its windows. The other mods keep running. It comes back with your next game, or now with [b]Restart[/b].[/*]
+[/list]
+[color=#19f3ff][i]Screenshot 2: the Task Manager's details for a selected mod, with End task and Restart[/i][/color]
+
+[size=4][b][color=#19f3ff]Tools Manager[/color][/b][/size]
+Every tool an AI assistant can use through REDnode, such as Claude Code on your desktop or [url=https://github.com/Edgemodders/REDagent]REDagent[/url] in the game: REDnode's own (read the game, call it, swap archives) and the tools your mods offer.
+[list]
+[*]What each tool does, its parameters, and whether it [b]only reads[/b] (runs without asking) or [b]asks you first[/b].[/*]
+[*][b]A switch for every tool[/b], and one for every mod: switched off, no assistant sees it. Your switches are kept between game sessions.[/*]
+[*][b]Off for new packages:[/b] a mod you install later starts with its tools off until you allow them.[/*]
+[*]Which assistants have connected, and their recent calls of mods' tools.[/*]
+[/list]
+[color=#19f3ff][i]Screenshot 3: the Tools Manager with REDnode's tools and a mod's tools[/i][/color]
+
+[size=5][b][color=#fcee0a]You stay in control[/color][/b][/size]
+
+Both windows ask for the [b]admin[/b] permission. REDnode shows it in its Mod Manager with a warning, and nothing works until you allow it:
+[quote]Allow this only for a package you trust: it can end or restart any of your mods, and switch on AI tools you switched off.[/quote]
+Withdraw it there at any time. REDnode's own windows cannot be ended. Removing the pack keeps your tool switches as they are; install it again to change them.
+
+[size=5][b][color=#fcee0a]Requirements[/color][/b][/size]
+
+[list]
+[*][url=https://www.nexusmods.com/cyberpunk2077/mods/REDNODE_PAGE]REDnode[/url] REDNODE_VERSION or later, with what it needs (RED4ext, redscript).[/*]
+[*]Cyberpunk 2077 on PC, game version 2.31.[/*]
+[/list]
+[size=5][b][color=#fcee0a]Install[/color][/b][/size]
+
+[list]
+[*][b]Vortex:[/b] Mod Manager Download, then enable and deploy.[/*]
+[*][b]By hand:[/b] extract the zip into the game folder, so the apps land in [i]red4ext/plugins/REDnode/apps/[/i].[/*]
+[/list]
+In the game, press [b]F10[/b] and open the [b]Mod Manager[/b] from the launcher (the [b]REDNODE[/b] tab at the lower left). Select [b]Task Manager[/b], allow its two permissions ([b]managing REDnode[/b], and [b]staying above other packages' windows[/b]), and switch it on. Press [b]Pin to launcher[/b] to keep it one press away. Do the same for [b]Tools Manager[/b].
+
+[b]Uninstall:[/b] remove it in your mod manager, or delete the two app folders ([i]taskmanager[/i], [i]toolsmanager[/i]) from [i]red4ext/plugins/REDnode/apps/[/i]. REDnode itself stays.
+
+[size=5][b][color=#fcee0a]For mod makers[/color][/b][/size]
+
+The [b]admin[/b] permission is open to any REDnode package, so you can make admin apps of your own. Ask for it in your package's [i]rednode-app.json[/i], and use [i]admin[/i] from the [b]rednode[/b] package in an overlay page: [i]admin.tasks()[/i], [i]admin.endTask(id)[/i], [i]admin.restartTask(id)[/i], [i]admin.tools()[/i] and [i]admin.setTool(...)[/i]. Both apps' code is in the [url=https://edgemodders.github.io/REDnode/examples/]example apps[/url], with a live preview. See [url=https://edgemodders.github.io/REDnode/admin-tools.html#the-admin-permission]The admin permission[/url].
+
+[size=5][b][color=#fcee0a]Questions[/color][/b][/size]
+
+[b]The window only says it needs the admin permission.[/b]
+Allow it in the Mod Manager: select the app, then switch [b]Allowed[/b] on under Permissions.
+
+[b]Why does a mod in the shared process show the same CPU as the others?[/b]
+Windows measures whole processes, not the mods inside one. The [b]Thread[/b] and [b]Heap[/b] columns are each mod's own, so they tell them apart.
+
+[b]I switched a tool off but my assistant still lists it.[/b]
+Assistants read the list when they start a session. It is refused from the next request; in Claude Code, start a new session or reconnect the server with [i]/mcp[/i] to see the list change.
+
+[b]Do I need this for REDagent?[/b]
+No. REDagent works without it; the Tools Manager only lets you narrow what it, and other assistants, can use.
+
+[b]Is it free?[/b]
+Yes, and open source under the MIT license, in [url=https://github.com/Edgemodders/REDnode]REDnode's repo[/url].
+
+[line]
+
+[size=5][b][color=#fcee0a]Links[/color][/b][/size]
+
+[list]
+[*]REDnode: [url=https://www.nexusmods.com/cyberpunk2077/mods/REDNODE_PAGE]Nexus page[/url], [url=https://edgemodders.github.io/REDnode/]docs[/url][/*]
+[*]Source and issues: [url=https://github.com/Edgemodders/REDnode]github.com/Edgemodders/REDnode[/url][/*]
+[*]EDGEmodders: [url=https://edgemodders.ai/]edgemodders.ai[/url][/*]
+[*]Community Discord: [url=https://discord.gg/63qP3Erw43]discord.gg/63qP3Erw43[/url][/*]
+[/list]
+[size=2]REDnode Admin Tools is not affiliated with CD PROJEKT RED or Anthropic. Cyberpunk 2077 is a trademark of CD PROJEKT. Claude is a trademark of Anthropic.[/size]
