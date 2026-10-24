@@ -1,3 +1,4 @@
+{% raw %}
 # Mod services
 
 Status: **agreed with the owner on 2026-10-24**, with the recommendations at the end of this page and two companion apps the owner added, the **Task Manager** and the **Tools Manager**. Scheduled after H2c-b and before I3: SV1, SV2, SV3, each with an in-game test. Asked for by the owner the same day: every mod needs a way to reach another and call it, and AI assistants should reach mods the same way. The owner's idea, adopted below: a mod describes its functions in JSDoc comments, and those comments become both the descriptions other mods see and the MCP tools an assistant calls.
@@ -152,3 +153,4 @@ Each phase raises REDnode's version and ends with an in-game test, as every phas
 | A package's tools shown to assistants by default? | Yes, with every change asked first. The player switches tools off in the Tools Manager |
 | Start a provider on demand when it is switched off? | Not in SV1. A clear error first; decide after real use |
 | Companion apps | The Task Manager in SV1, the Tools Manager in SV3 |
+{% endraw %}
