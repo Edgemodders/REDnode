@@ -507,7 +507,7 @@ const records = new Map(
   }),
 );
 const unnamedVehicles = ['0x0000002A4E1F09C3', '0x00000027B95C40E1', '0x0000002C1A773D50'];
-const journal = []; // changes to undo when the package stops: [path, previous value or undefined]
+const tweakUndo = []; // changes to undo when the package stops: [path, previous value or undefined]
 
 function splitFlat(path) {
   const dot = path.lastIndexOf('.');
@@ -548,7 +548,7 @@ export const tweakdb = {
     const [rec, name] = splitFlat(path);
     const r = records.get(rec);
     if (!r) throw new Error(`No record "${rec}"`);
-    journal.push([path, r.flats[name] ? { ...r.flats[name] } : undefined]);
+    tweakUndo.push([path, r.flats[name] ? { ...r.flats[name] } : undefined]);
     r.flats[name] = { type: r.flats[name]?.type ?? (typeof value === 'string' ? 'String' : 'Float'), value };
     log('info', `tweakdb.set ${path}: the simulation keeps it until this example restarts (in the game, TweakXL writes it)`, 'sim');
     return true;
@@ -557,12 +557,12 @@ export const tweakdb = {
     const r = records.get(base);
     if (!r) throw new Error(`No record "${base}"`);
     records.set(path, { type: r.type, flats: structuredClone(r.flats) });
-    journal.push([path, null]);
+    tweakUndo.push([path, null]);
     return true;
   },
   async create(path, type) {
     records.set(path, { type, flats: {} });
-    journal.push([path, null]);
+    tweakUndo.push([path, null]);
     return true;
   },
   async update() {
@@ -572,8 +572,8 @@ export const tweakdb = {
 
 /** Undoes the package's TweakDB changes, as REDnode does when a package stops. */
 export function undoTweaks() {
-  if (!journal.length) return;
-  for (const [path, before] of journal.reverse()) {
+  if (!tweakUndo.length) return;
+  for (const [path, before] of tweakUndo.reverse()) {
     if (before === null) {
       records.delete(path);
       continue;
@@ -584,8 +584,8 @@ export function undoTweaks() {
     if (before === undefined) delete r.flats[name];
     else r.flats[name] = before;
   }
-  log('info', `Undid ${journal.length} TweakDB change(s): the package stopped`, 'host');
-  journal.length = 0;
+  log('info', `Undid ${tweakUndo.length} TweakDB change(s): the package stopped`, 'host');
+  tweakUndo.length = 0;
 }
 
 // ---------- the world ----------
@@ -1030,6 +1030,15 @@ export const secrets = {
   },
 };
 export const channel = { post() {}, on: () => () => {} };
+
+export const service = {
+  async connect(id) {
+    throw new Error(`No package "${id}" in this preview: in the game it must be installed and switched on`);
+  },
+  caller: () => null,
+  signal: () => null,
+  emit() {},
+};
 
 const ANSWER =
   'This is the docs page, so REDagent is not here to answer. In the game, your question goes to REDagent (powered by Claude) with the context this mod sends, and the answer streams into this window the way this text does.';
