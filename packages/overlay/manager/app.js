@@ -449,6 +449,23 @@ function renderDetails() {
       if (isBridgeName(r.name) && i.bridge) parts.push(...bridgeBlock(i));
     }
   }
+  if (i.service) {
+    // Its service (SV1, SV2): the functions other packages may call, as its JSDoc describes them.
+    parts.push(el('div', 'section', 'Service'));
+    if (!i.service.ready) parts.push(el('div', 'dim', i.open ? 'Starting...' : 'Offered while it runs'));
+    for (const f of i.service.functions) {
+      const line = el('div', 'fn');
+      const sig = f.params.map((p) => (p.optional ? `[${p.name}]` : p.name)).join(', ');
+      line.append(el('span', 'fname', `${f.name}(${sig})`));
+      if (f.tool) line.append(el('span', 'badge', f.readonly ? 'TOOL · READS' : 'TOOL'));
+      if (f.deprecated) line.append(el('span', 'badge old', 'OLD'));
+      if (f.description) line.append(el('div', 'dim', f.description));
+      else if (!f.checked) line.append(el('div', 'dim', 'No JSDoc: calls are not checked'));
+      line.title = f.params.map((p) => `${p.name}: ${p.type}${p.description ? ` - ${p.description}` : ''}`).join('\n') + (f.returns ? `\nreturns ${f.returns}` : '');
+      parts.push(line);
+    }
+    if (i.service.events?.length) parts.push(el('div', 'dim', `Events: ${i.service.events.join(', ')}`));
+  }
   const bridgeInRequires = (i.requires ?? []).some((r) => isBridgeName(r.name));
   if (i.permissions?.length) {
     parts.push(el('div', 'section', 'Permissions'));

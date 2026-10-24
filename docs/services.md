@@ -202,4 +202,35 @@ Before: REDnode 0.34.0 deployed. Load a save.
 8. Switch on **Crash mod** in the Mod Manager, and press its **Hang forever**. In the Task Manager its Thread reads about 100 %. Select it and press **End task**: it stops within 2 s and its window closes, and the game and other mods go on. **Mark**.
 9. Select Crash mod again and press **Restart**: it runs again with its window. **Mark**.
 10. Quit the game. Send `rednode-mods.log` and `rednode-overlay.log`.
+
+## SV2: built
+
+Built on 2026-10-24 in **REDnode 0.35.0**, right after SV1.
+
+| Piece | Where |
+|---|---|
+| The JSDoc reader: exported functions (`export function`, `export const f = (...) =>`, `export { a }`), their JSDoc, their parameter lists with TypeScript types and defaults, the type subset to JSON Schema, argument checks, MCP's input schema for SV3 | `packages/rednode/src/describe.ts` (no Node imports, so the host, the command and later a browser can use it) |
+| `rednode describe <source> [--out <file>]`, writing `service.json` beside the nearest `rednode-app.json` | `packages/rednode/bin/rednode.mjs` (the package's `bin`) |
+| The host: reads `service.json` or the service file when a service loads, logs what it could not read, checks each call before the provider sees it, uses `@timeout`, answers `describe` | `packages/overlay/services.js`, `main.js` (`describeService`, `serviceSummary`; mods start once the reader has loaded) |
+| `service.describe(id)` and the description types | `packages/rednode/src/service.ts` |
+| The Mod Manager's **Service** section: each function with its parameters, TOOL or TOOL · READS, its description, the events | `packages/overlay/manager` |
+| Samples | Counter service 0.2.0 (an `@event`), Counter panel 0.2.0 (**Describe**, **Bad call**) |
+
+Checked before the game, in plain Node and in the mock game:
+
+| Check | Result |
+|---|---|
+| The reader on Counter service and on harder sources (object, enum and array parameters, a `@timeout`, `@event`, `Promise<>` results, a file comment that is not a function's, TypeScript-only types, an arrow function, `export { a as b }`, `@deprecated`) | 29 cases passed |
+| The mock game: SV1's 17 cases again, plus a call refused by the host from the JSDoc, too many arguments, `describe` (parameters, tool, readonly, event), a bundled package whose comment-free file is described by `service.json` made from its TypeScript source, and a bad call to it | 26 cases passed |
+| The Mod Manager's details for Counter service | Its Service section lists the five functions, their marks and descriptions, and the event |
+
+## SV2 test
+
+Before: REDnode 0.35.0 or later deployed (SV1's test can run first on the same build). Load a save.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. Mod Manager: switch on **Counter service** and **Counter panel**. Select **Counter service**: its details have a **Service** section listing `add([by])` TOOL, `fail()`, `get()` TOOL · READS, `reset()` TOOL and `wait(ms)`, each with its description, and "Events: changed". **Mark**.
+2. In Counter panel press **Describe**: the log lists the five functions with their parameters and types, their marks, and the `changed` event. **Mark**.
+3. Press **Bad call**: it fails with `add: "by" must be a number, not a string`, and Counter service's log has no line for it (the host refused it before the service saw it). **Mark**.
+4. Quit the game. Send `rednode-mods.log`.
 {% endraw %}

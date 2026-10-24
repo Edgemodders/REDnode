@@ -335,7 +335,7 @@ export const NOTES = {
       '`counter.$on("changed", ...)` hears the service\'s events. `counter.$with({ timeoutMs, signal })` gives calls a timeout or an AbortSignal.',
       'Its rednode-app.json lists `"counter-service": ">=0.1"` in `requires`, so the Mod Manager shows it as missing before the panel runs.',
     ],
-    tryThis: ['Press +1 and +10: the count and the log follow the service\'s events.', 'Press Wait, then Stop, then Stop.', 'Press Fail and Unknown function.'],
+    tryThis: ['Press +1 and +10: the count and the log follow the service\'s events.', 'Press Wait, then Stop, then Stop.', 'Press Fail and Unknown function.', 'In the game, Describe lists the service\'s JSDoc, and Bad call is refused by REDnode before the service sees it.'],
     preview: 'Here the service runs in the same preview; in the game it is a package of its own, and the host carries each call.',
   },
   'world-objects-test': {

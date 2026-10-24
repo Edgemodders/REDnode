@@ -398,6 +398,30 @@ function readManifest(dir) {
   };
 }
 
+/** What the Mod Manager shows of a package's service: each function, described (SV2). */
+function serviceSummary(id, file) {
+  const offer = services?.offer(id);
+  if (!offer) return { file, ready: false, functions: [] };
+  return {
+    file,
+    ready: true,
+    functions: offer.functions.map((name) => {
+      const f = offer.descriptor?.functions?.[name];
+      return {
+        name,
+        description: f?.description ?? '',
+        params: (f?.params ?? []).map((p) => ({ name: p.name, type: p.type, optional: p.optional, description: p.description })),
+        returns: f?.returns?.type ?? null,
+        tool: !!f?.tool,
+        readonly: !!f?.readonly,
+        checked: !!f?.checked,
+        deprecated: f?.deprecated ?? null,
+      };
+    }),
+    events: Object.keys(offer.descriptor?.events ?? {}),
+  };
+}
+
 /** Whether a package runs a Node mod: it has a main, a service file (SV1) or both. */
 const isMod = (m) => !!(m.main || m.service);
 
@@ -2505,7 +2529,7 @@ function appList() {
         tool: isGranted(m.id, 'front'),
         mod: isMod(m) ? mods.info(m.id, metrics) : null,
         // Its service (SV1): the functions it offers other packages, once its service file has loaded.
-        service: m.service ? { file: m.service, functions: services.offer(m.id)?.functions ?? null } : null,
+        service: m.service ? serviceSummary(m.id, m.service) : null,
         closedWindows: [...playerClosed.values()].filter((c) => c.modId === m.id).map((c) => c.win),
         hasWindow: windowsOfPackage(m.id).length > 0,
         // Its space: set for the package, else the one its open windows share, else null.
@@ -3105,6 +3129,29 @@ ipcMain.on('rednode:agent', (event, msg) => {
 
 const callsByCid = new Map(); // `${caller}:${cid}` -> the router's sid, so a caller can cancel
 
+// The JSDoc reader (SV2): the rednode package's describe.js, an ES module, loaded at start.
+let describer = null;
+const describerReady = import(require('node:url').pathToFileURL(path.join(SDK_DIR, 'describe.js')).href).then(
+  (m) => (describer = m),
+  (err) => log(`Service descriptions are off: ${err.message}`),
+);
+
+// A service's description: service.json beside the manifest when the author wrote one
+// (a bundled or TypeScript package, whose built file has lost its comments), else the
+// JSDoc in the service file itself.
+function describeService(id, functions) {
+  const entry = apps.get(id);
+  if (!entry?.manifest.service || !describer) return null;
+  const json = path.join(entry.dir, 'service.json');
+  if (fs.existsSync(json)) {
+    const d = JSON.parse(fs.readFileSync(json, 'utf8'));
+    if (d?.format !== 1 || typeof d.functions !== 'object') throw new Error('service.json is not format 1 (make it with rednode describe)');
+    const warnings = functions.filter((f) => !d.functions[f]).map((f) => `${f} is not in service.json; its calls are not checked`);
+    return { ...d, warnings };
+  }
+  return describer.describeSource(fs.readFileSync(path.join(entry.dir, entry.manifest.service), 'utf8'), functions);
+}
+
 function onService(id, msg) {
   const entry = apps.get(id);
   if (!entry) throw new Error('Unknown package');
@@ -3129,6 +3176,8 @@ function onService(id, msg) {
     case 'emit':
       services.emit(id, msg.name, msg.data);
       return null;
+    case 'describe':
+      return services.describe(String(msg.provider ?? ''));
     default:
       throw new Error(`Unknown service request "${msg?.op}"`);
   }
@@ -3789,6 +3838,8 @@ app.whenReady().then(() => {
   // Mods start below; one may ask for the kernel's tools at once (mcpFor).
   services = createServices({
     entry: (id) => apps.get(id),
+    describe: describeService,
+    checkArgs: (fn, args) => describer?.checkArgs(fn, args) ?? null,
     modState: (id) => mods.state(id),
     toWorker: (id, message) => mods.toWorker(id, message),
     toPackage: (id, message) => {
@@ -3842,8 +3893,13 @@ app.whenReady().then(() => {
   }
   for (const entry of apps.values()) {
     if (shouldOpen(entry)) openApp(entry);
-    if (isMod(entry.manifest)) mods.add(entry, { enabled: shouldOpen(entry), shared: settings.apps[entry.manifest.id]?.shared });
   }
+  // Node mods start once the JSDoc reader has loaded (a few ms), so the first services are described.
+  describerReady.finally(() => {
+    for (const entry of apps.values()) {
+      if (isMod(entry.manifest)) mods.add(entry, { enabled: shouldOpen(entry), shared: settings.apps[entry.manifest.id]?.shared });
+    }
+  });
   setHotReload(hotReloadArg ? hotReloadArg !== 'off' : app.isPackaged ? !!settings.hotReload : true);
   watchAppRoots();
   // Mod memory, for comparing a process per mod with the shared group.

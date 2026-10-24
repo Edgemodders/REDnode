@@ -597,6 +597,54 @@ await counter.$with({ timeoutMs: 60000 }).add(1);            // a longer timeout
 
 The [Counter service](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/counter-service) and [Counter panel](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/counter-panel) samples show both sides, with a timeout, Stop and errors.
 
+### Describing a service
+
+The JSDoc above each exported function is its description (REDnode 0.35.0 and later). The host reads it when the service loads and uses it three ways: it checks every call's arguments before your function sees them, the Mod Manager lists your functions in the package's details, and `service.describe(id)` hands it to other packages. From 0.36.0, functions marked `@tool` also become tools an AI assistant can call.
+
+```js
+/**
+ * Loads a saved scene into the world, near V unless it has its own place.
+ * @tool
+ * @param {string} name The scene's name, as `scenes` lists it.
+ * @param {{ x: number, y: number, z: number }} [at] Where to put it.
+ * @param {'idle' | 'walk'} [mode='idle'] What its people do.
+ * @returns {{ placed: number, missing: string[] }} What was placed, and any asset not found.
+ * @timeout 60000
+ */
+export async function load(name, at, mode = 'idle') { /* ... */ }
+
+/** @event scene-changed {{ name: string, objects: number }} A scene was saved. */
+```
+
+| Tag | Means |
+|---|---|
+| The text before the first tag | What the function does, in a sentence or two. An assistant reads it to decide when to call it |
+| `@param {type} name text` | One parameter, in order. `[name]` or `[name=default]` makes it optional. In TypeScript the type may come from the parameter list instead |
+| `@returns {type} text` | What it answers |
+| `@tool` | An AI assistant may call it (0.36.0). Without it, only other packages can |
+| `@readonly` | It changes nothing: an assistant calls it without asking the player. Every other tool asks first |
+| `@timeout ms` | How long a call may take before it fails, instead of 30 seconds |
+| `@deprecated text` | Still works; the Mod Manager marks it |
+| `@event name {type} text` | An event your service sends with `service.emit`, in any JSDoc block |
+
+| Types the host understands | Becomes |
+|---|---|
+| `string`, `number`, `integer`, `boolean`, `null`, `object`, `any` | That JSON type |
+| `'a' \| 'b'`, `1 \| 2`, `true` | A choice of those values |
+| `A \| B` | Either |
+| `T[]`, `Array<T>` | An array of T |
+| `{ x: number, label?: string }` (in JSDoc, inside the tag's braces: `{{ x: number }}`) | An object with those members, the ones without `?` required |
+
+Anything else is accepted as any value, and the Mod log says which type it could not read when the service starts. A function with no JSDoc can still be called, but its calls are not checked.
+
+**Bundled or TypeScript packages:** a bundler removes comments, so describe the service from its source when you build, with the `rednode` command in the `rednode` package:
+
+```
+npx rednode describe src/service.ts
+```
+
+It writes `service.json` beside your `rednode-app.json`; ship it with the package. The host uses `service.json` when it is there, and the service file's own JSDoc otherwise. From the REDnode repo, the same command is `node packages/rednode/bin/rednode.mjs describe <file>`.
+
 ## The Task Manager
 
 The built-in **Task Manager** (in the launcher) lists every running package and what it costs, refreshed every second or five: CPU and memory (a Node mod's process with its windows), how busy the mod's own thread is and its heap, game calls a second with their round trip, and service calls in and out. A mod in the shared process shows the whole process's CPU and memory, since Windows sees no finer; its Thread and Heap columns are its own. **End task** stops a package now, also one stuck in an endless loop, and closes its windows; it stays switched on, so it runs again with the next game or with **Restart**.

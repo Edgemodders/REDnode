@@ -45,13 +45,29 @@ async function connect() {
   }
 }
 
+// Each function's description, parameters and marks, from the service's JSDoc.
+async function describe() {
+  try {
+    const d = await service.describe('counter-service');
+    for (const f of Object.values(d.functions)) {
+      const params = f.params.map((p) => `${p.name}${p.optional ? '?' : ''}: ${p.type}`).join(', ');
+      const marks = [f.tool && (f.readonly ? 'tool, reads' : 'tool'), !f.checked && 'unchecked'].filter(Boolean).join(', ');
+      log.push(`${f.name}(${params})${f.returns ? ` -> ${f.returns.type}` : ''}${marks ? `  [${marks}]` : ''}  ${f.description}`);
+    }
+    for (const e of Object.values(d.events)) log.push(`event ${e.name}: ${e.description}`);
+    say(`Described ${Object.keys(d.functions).length} functions`);
+  } catch (err) {
+    say(`Describe failed: ${err.message}`, 'danger');
+  }
+}
+
 ui.window({
   title: 'Counter panel',
   anchor: 'left',
   x: 40,
   y: 80,
   width: 460,
-  height: 520,
+  height: 620,
   closable: true,
   children: [
     ui.row(ui.text('Count', { tone: 'dim' }), count),
@@ -75,6 +91,13 @@ ui.window({
       ui.button('Fail', () => run('fail()', () => counter.fail()), { variant: 'ghost' }),
       ui.button('Unknown function', () => run('nothing()', () => counter.nothing()), { variant: 'ghost' }),
       ui.button('Reconnect', connect, { variant: 'ghost' }),
+    ),
+    ui.heading('Descriptions'),
+    ui.row(
+      // REDnode 0.35.0 and later: the service's JSDoc, as the host read it.
+      ui.button('Describe', describe, { variant: 'ghost' }),
+      // Refused by the host before the service sees it: add's JSDoc says "by" is a number.
+      ui.button('Bad call', () => run('add("ten")', () => counter.add('ten')), { variant: 'ghost' }),
     ),
     status,
     log,

@@ -430,6 +430,12 @@ export const service = {
     };
     return handle({});
   },
+  // In a preview, the functions without their JSDoc: the game's host reads that.
+  async describe(id) {
+    const h = await service.connect(id);
+    const functions = Object.fromEntries(h.$info.functions.map((name) => [name, { name, description: '', params: [], checked: false, returns: null, tool: false, readonly: false, timeoutMs: null, deprecated: null }]));
+    return { id, name: id, version: 'preview', functions, events: {} };
+  },
   caller: () => serviceCall?.caller ?? null,
   signal: () => serviceCall?.signal ?? null,
   emit(name, data) {

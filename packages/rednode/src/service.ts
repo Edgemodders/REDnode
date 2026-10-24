@@ -33,6 +33,20 @@
  */
 
 import { cleanError, transport } from "./transport.js";
+import type { EventDescriptor, FunctionDescriptor } from "./describe.js";
+
+export type { EventDescriptor, FunctionDescriptor, ParamDescriptor, Schema } from "./describe.js";
+
+/** A service described, as {@link service.describe} answers: each function's JSDoc as the host read it. */
+export interface ServiceDescription {
+  id: string;
+  name: string;
+  version: string;
+  /** Every exported function, by name: its description, parameters (with JSON Schema), return value and marks. */
+  functions: Record<string, FunctionDescriptor>;
+  /** The events its JSDoc names with `@event`. */
+  events: Record<string, EventDescriptor>;
+}
 
 /** What a provider offers, as {@link service.connect} found it. */
 export interface ServiceInfo {
@@ -187,6 +201,21 @@ export const service = {
   async connect<T = Record<string, (...args: any[]) => any>>(id: string): Promise<ServiceHandle<T>> {
     const info = (await send({ op: "connect", provider: id })) as ServiceInfo;
     return handle<T>(info, {});
+  },
+
+  /**
+   * What a package's service offers, described from its JSDoc (REDnode 0.35.0 or later):
+   * each function's description, its parameters with their types as JSON Schema, what it
+   * returns, and whether it is a `@tool` or `@readonly`. Waits for a provider that is starting.
+   *
+   * @example
+   * ```js
+   * const d = await service.describe("counter-service");
+   * for (const f of Object.values(d.functions)) console.log(f.name, f.description);
+   * ```
+   */
+  async describe(id: string): Promise<ServiceDescription> {
+    return (await send({ op: "describe", provider: id })) as ServiceDescription;
   },
 
   /**

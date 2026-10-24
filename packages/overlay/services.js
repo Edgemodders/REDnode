@@ -27,9 +27,12 @@ const READY_WAIT = 10000; // a call to a provider that is starting waits this lo
  * @param {(id: string, message: object) => boolean} host.toWorker  posts to a mod's worker; false when it is not running
  * @param {(id: string, message: object) => void} host.toPackage    an event for a package's mod and pages
  * @param {(id: string, level: string, text: string) => void} host.modLog   a line in the Mod log
+ * @param {(id: string, functions: string[]) => object | null} host.describe   the service's descriptor (SV2):
+ *        its JSDoc, read from service.json or the service file; null when it cannot be read
+ * @param {(functionKey: string) => boolean} [host.toolOff]   SV3: whether the player switched a tool off
  */
 function createServices(host) {
-  /** Providers whose service file has loaded: id -> { functions: string[], at } */
+  /** Providers whose service file has loaded: id -> { functions: string[], descriptor, at } */
   const ready = new Map();
   /** Calls waiting for an answer: sid -> { provider, fn, resolve, reject, timer, caller } */
   const pending = new Map();
@@ -89,8 +92,16 @@ function createServices(host) {
     /** A provider's service file has loaded, with the names of its exported functions. */
     ready(provider, functions) {
       const names = (Array.isArray(functions) ? functions : []).filter((f) => typeof f === 'string');
-      ready.set(provider, { functions: names, at: Date.now() });
+      let descriptor = null;
+      try {
+        descriptor = host.describe(provider, names);
+      } catch (err) {
+        host.modLog(provider, 'error', `Service description: ${err.message}; calls are not checked`);
+      }
+      ready.set(provider, { functions: names, descriptor, at: Date.now() });
       host.modLog(provider, 'info', `Service ready: ${names.length ? names.join(', ') : 'no functions exported'}`);
+      // What the JSDoc reader could not understand, once a load, so the author can fix it.
+      for (const w of descriptor?.warnings ?? []) host.modLog(provider, 'info', `Service description: ${w}`);
       for (const w of waiting.get(provider) ?? []) {
         clearTimeout(w.timer);
         w.go();
@@ -151,9 +162,17 @@ function createServices(host) {
         if (!offer.functions.includes(fn)) {
           throw new Error(`${nameOf(provider)} has no function "${fn}". It offers: ${offer.functions.join(', ') || 'none'}`);
         }
+        // SV2: the arguments are checked against the function's description before the
+        // provider sees them.
+        const described = offer.descriptor?.functions?.[fn];
+        const list = Array.isArray(args) ? args : [];
+        if (described && host.checkArgs) {
+          const why = host.checkArgs(described, list);
+          if (why) throw new Error(why);
+        }
         const sid = nextSid++;
         const started = performance.now();
-        const timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : CALL_TIMEOUT;
+        const timeoutMs = Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : described?.timeoutMs ?? CALL_TIMEOUT;
         const result = await new Promise((resolve, reject) => {
           const timer = setTimeout(() => {
             pending.delete(sid);
@@ -207,8 +226,24 @@ function createServices(host) {
       for (const id of subscribers.get(provider) ?? []) host.toPackage(id, message);
     },
 
-    /** Whether a provider's service is ready, and its functions. */
+    /** Whether a provider's service is ready, and its functions and descriptor. */
     offer: (provider) => ready.get(provider) ?? null,
+
+    /**
+     * What a provider's service offers, described (SV2): its functions with their JSDoc,
+     * parameters and JSON Schema, and its events. Waits for a starting provider.
+     */
+    async describe(provider) {
+      await whenReady(provider);
+      const m = host.entry(provider).manifest;
+      const offer = ready.get(provider);
+      const d = offer.descriptor;
+      const functions = {};
+      for (const name of offer.functions) {
+        functions[name] = d?.functions?.[name] ?? { name, description: '', params: [], checked: false, returns: null, tool: false, readonly: false, timeoutMs: null, deprecated: null };
+      }
+      return { id: m.id, name: m.name, version: m.version, functions, events: d?.events ?? {} };
+    },
 
     /** Every ready provider: [{ id, functions }]. */
     providers: () => [...ready].map(([id, r]) => ({ id, functions: r.functions })),

@@ -1035,6 +1035,9 @@ export const service = {
   async connect(id) {
     throw new Error(`No package "${id}" in this preview: in the game it must be installed and switched on`);
   },
+  async describe(id) {
+    throw new Error(`No package "${id}" in this preview: in the game it must be installed and switched on`);
+  },
   caller: () => null,
   signal: () => null,
   emit() {},

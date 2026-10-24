@@ -64,6 +64,11 @@
   .details .err { font: 11px/1.35 var(--rn-mono); color: var(--rn-danger); white-space: pre-wrap; word-break: break-word; }
   .details .log { font: 11px/1.35 var(--rn-mono); color: var(--rn-dim); white-space: pre-wrap; word-break: break-word; }
   .details .perm { font-size: 13px; }
+  .details .fn { font-size: 13px; overflow-wrap: anywhere; }
+  .details .fn .fname { font: 12px var(--rn-mono); color: var(--rn-fg); }
+  .details .fn .badge { margin-left: 6px; font: 700 9px var(--rn-mono); letter-spacing: .1em; color: var(--rn-accent-2); border: 1px solid var(--rn-accent-2); padding: 0 4px; }
+  .details .fn .badge.old { color: var(--rn-dim); border-color: var(--rn-dim); }
+  .details .fn .dim { font-size: 12px; }
   .details .req { font-size: 13px; display: flex; gap: 6px; align-items: baseline; }
   .details .req .mark { font: 700 12px var(--rn-mono); width: 14px; }
   .details .req.ok .mark { color: var(--rn-ok); }
