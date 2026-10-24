@@ -1,6 +1,6 @@
 # REDnode Admin Tools on Nexus Mods
 
-The source of the Admin Tools pack's own Nexus Mods page, beside REDnode's (`nexus/` at the repo root) and the Sound Tools pack's. Not on Nexus yet: the pack's in-game test must pass first (docs/admin-tools.md, "Admin Tools test"), and it needs a released REDnode 0.37.0.
+The source of the Admin Tools pack's own Nexus Mods page, beside REDnode's (`nexus/` at the repo root) and the Sound Tools pack's. Not on Nexus yet. Its in-game test passed on 2026-10-24 (docs/admin-tools.md, "Admin Tools test: results"); it needs a released REDnode 0.37.0 first.
 
 | File | What it is |
 |---|---|

@@ -111,3 +111,20 @@ Before: REDnode 0.37.0 deployed, and the Admin Tools draft zip (`REDnode-Admin-T
 6. In the Mod Manager, withdraw the Task Manager's **admin** permission: its details pane says it needs the permission again. **Mark**.
 7. Press **Pin to launcher** for both managers: they show in the launcher. **Mark**.
 8. Quit the game. Send `rednode-overlay.log` and `rednode-mods.log`.
+
+### Admin Tools test: results
+
+2026-10-24, REDnode 0.37.0 with the pack's draft zip, the 2.31 backup folder: **pass**, every step. The player: everything worked.
+
+| Step | Seen in the logs |
+|---|---|
+| 1 | Both managers found as packages (42 apps); they opened at start, as the player had left them open when they were built in, and were closed for the test |
+| 2 | The Task Manager opened without its permissions (its pane said why) |
+| 3 | "Granted admin for taskmanager", "Granted front for taskmanager"; the table filled |
+| 4 | Crash mod hung, then "End task: crash-mod, by Task Manager", stopped in the same second. **Restart** was tried on Counter panel: "End task: counter-panel, by Task Manager", then "Restarted by Task Manager" 2 s later, connected to Counter service again |
+| 5 | The Tools Manager granted and opened; "Tools: tool counter-service:reset off, by Tools Manager", then on |
+| 6 | Each manager's admin permission withdrawn and allowed again ("Withdrew admin for toolsmanager", "Withdrew admin for taskmanager") |
+| 7 | "Pinned taskmanager to the launcher", "Pinned toolsmanager to the launcher" |
+
+Found: a manager opened before its permission is allowed asks the host every second and is refused each time. Nothing of it reaches REDnode's logs; it is quiet once allowed.
+
