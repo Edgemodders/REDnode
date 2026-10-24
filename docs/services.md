@@ -1,6 +1,6 @@
 # Mod services
 
-Status: **proposed on 2026-10-24**, not yet agreed. Asked for by the owner the same day: every mod needs a way to reach another and call it, and AI assistants should reach mods the same way. The owner's idea, adopted below: a mod describes its functions in JSDoc comments, and those comments become both the descriptions other mods see and the MCP tools an assistant calls.
+Status: **agreed with the owner on 2026-10-24**, with the recommendations at the end of this page and two companion apps the owner added, the **Task Manager** and the **Tools Manager**. Scheduled after H2c-b and before I3: SV1, SV2, SV3, each with an in-game test. Asked for by the owner the same day: every mod needs a way to reach another and call it, and AI assistants should reach mods the same way. The owner's idea, adopted below: a mod describes its functions in JSDoc comments, and those comments become both the descriptions other mods see and the MCP tools an assistant calls.
 
 ## The problem
 
@@ -76,7 +76,7 @@ An assistant sees two tools, `edgebuilder__scenes` and `edgebuilder__load`, with
 | **Validation** | The host checks every call's arguments against the schema before it reaches the provider, so a mod never sees a malformed call from an assistant |
 | **MCP tools** | Only exports marked `@tool`. Named `<package>__<function>` (dashes become underscores, 64 characters at most). Added and removed as packages start and stop, with the protocol's `tools/list_changed`. Two fixed tools as well, `mod_services` (every package's descriptors) and `mod_call`, for clients that do not refresh their tool list or when there are too many tools |
 | **Asking first** | A tool marked `@readonly` runs without asking. Every other tool carries `anthropic/requiresUserInteraction`, as `api_call` does, so Claude Code asks before each call. A provider cannot remove the ask; the `@readonly` mark is the author's promise, shown to the player in the Mod Manager |
-| **The player's say** | Each package's details in the Mod Manager list its functions and tools. A switch, **Assistants can use**, hides a package's tools from every assistant. Mod-to-mod calls need no switch, as an npm dependency needs none; a provider limits its callers with `service.caller()` |
+| **The player's say** | Each package's details in the Mod Manager list its functions and tools. The **Tools Manager** (below) switches tools off for every assistant, a whole package or one tool at a time. Mod-to-mod calls need no switch, as an npm dependency needs none; a provider limits its callers with `service.caller()` |
 | **The agent broker** | Stays as it is. Later it can become a service of REDagent's (`redagent.ask`), so one router carries everything |
 
 ## Answers to the owner's idea
@@ -86,22 +86,69 @@ An assistant sees two tools, `edgebuilder__scenes` and `edgebuilder__load`, with
 | Is JSDoc the right source? | Yes. It is where a JavaScript author already writes this, it needs no extra syntax, editors show it, and REDnode's own package already lives by TSDoc. The two catches are covered above: bundlers drop comments (`service.json` at build time), and JSDoc types are loose (a fixed subset turns into JSON Schema; anything else is accepted as any value with a warning) |
 | Through the agent broker? | Through the same host, but the direction differs. The agent broker carries a package's question **to** the assistant. Mod tools carry the assistant's call **to** a package, and assistants already reach the host through the kernel MCP server, so the tools belong there. Both share the host's router, so REDagent and Claude Code get the same tools with no new connection |
 | Opt in or every export? | Every export is callable by other mods; only `@tool` exports reach assistants. A mod author chooses what an assistant may touch, function by function |
-| Safety | An assistant asks the player before any change (the ask flag, as for `api_call`), the player can hide a package from assistants, and every call is written to the Mod log with its caller. Whether REDagent (Agent SDK) honours the ask flag is still unverified, and SV3 tests it |
+| Safety | An assistant asks the player before any change (the ask flag, as for `api_call`), the player can switch off any tool or package in the Tools Manager, and every call is written to the Mod log with its caller. Whether REDagent (Agent SDK) honours the ask flag is still unverified, and SV3 tests it |
+
+## Companion apps
+
+Asked for by the owner on 2026-10-24, to go with services. Both are built-in tool windows like the Mod Manager (the tool layer, opened from the launcher), so they stay reachable when a package misbehaves.
+
+### Task Manager
+
+What each running package costs, and a way to end it.
+
+| Shows | From |
+|---|---|
+| Each running Node mod: its process (own or shared), status (running, restarting, crashed, not responding), uptime | The host's mod runtime |
+| CPU and memory per process | Electron's `app.getAppMetrics()`, which the host already reads for the `Mod processes` log line every 10 s |
+| For mods sharing a process: each mod's JavaScript heap and how busy its event loop is | Asked of each mod worker (`v8.getHeapStatistics()`, `performance.eventLoopUtilization()`), since the operating system sees only the shared process. **Unverified:** the cost of asking every second |
+| Game calls a second and their time on the game thread, per package | The host's bridge, which already counts game calls a frame for the `Perf` line; per package is new |
+| Service calls a second, in and out, per package (from SV1) | The host's router |
+| Each package's overlay windows: their renderer process's CPU and memory | `app.getAppMetrics()` by window |
+
+| Action | Does |
+|---|---|
+| **End task** | Stops the package's mod, as switching it off does, and closes its windows. A mod in the shared process is stopped alone; one that does not stop within 2 s has its process ended, and the other mods in that process restart, as the host does for a crash today. The package stays switched on, so its next start brings it back |
+| **Restart** | Ends and starts it again |
+| Sort, and a 1 s or 5 s refresh | |
+
+Built in **SV1**, where service calls become one of its columns. The rest of it needs nothing from services, so it can be built first within SV1.
+
+### Tools Manager
+
+Every MCP tool an assistant can see, and the player's switch for each.
+
+| Shows | |
+|---|---|
+| Tools grouped by where they come from: REDnode's own (`api_read`, `api_call`, `archives_reload`, `game_facts`, ...) and each package's `@tool` functions | The kernel MCP server's live list |
+| Each tool's name, description and parameters, as an assistant sees them | The descriptors |
+| Whether it runs without asking (`@readonly`, or REDnode's read tools) or asks first | |
+| Its recent calls: when, by which assistant, and the result or error | The MCP server's call log |
+| Which assistants are connected now (Claude Code, REDagent, others by their client name) | The MCP sessions |
+
+| Action | Does |
+|---|---|
+| A switch per tool, and one per group | A switched-off tool leaves every assistant's tool list at once (`tools/list_changed`) and refuses a call already under way to it. Kept in the host's settings across starts, by package id and tool name |
+| **Off for new packages** | Off by default: a package's tools show when it is installed, as agreed. On, a new package's tools start switched off until the player turns them on |
+
+REDnode's own tools can be switched off too. Switching off `api_read` or `api_call` takes the game API away from every assistant, REDagent included; the Tools Manager says so beside them.
+
+Built in **SV3**, with the tools it manages. It replaces the per-package **Assistants can use** switch first planned for the Mod Manager.
 
 ## Phases
 
 | Phase | Builds | Its test shows |
 |---|---|---|
-| **SV1 Calls** | The host's router; the service file; `service.connect`, `caller`, `emit`, `on`; package ids in `requires`; calls and errors in the Mod log; two samples (a Counter service and a Counter panel that calls it) | One mod calls another and hears its events; a stopped provider gives a clear error; hot reload of the provider keeps the caller working |
+| **SV1 Calls** | The host's router; the service file; `service.connect`, `caller`, `emit`, `on`; package ids in `requires`; calls and errors in the Mod log; two samples (a Counter service and a Counter panel that calls it); the **Task Manager** | One mod calls another and hears its events; a stopped provider gives a clear error; hot reload of the provider keeps the caller working. The Task Manager shows each mod's CPU, memory and calls, and **End task** stops a busy mod (the Crash mod's endless loop) without stopping the others |
 | **SV2 Descriptions** | The JSDoc reader and JSON Schema; `npx rednode describe` and `service.json`; argument checks; `service.describe(id)`; the functions listed in the Mod Manager; the samples documented this way; the docs simulation | A bad call is refused before the provider sees it; a bundled mod is described from its `service.json` |
-| **SV3 Assistants** | `@tool` exports as MCP tools, `tools/list_changed`, `mod_services` and `mod_call`, ask first unless `@readonly`, **Assistants can use** in the Mod Manager | Claude Code and REDagent list the sample's tools, read without asking, ask before a change, and lose the tools when the package stops or the switch is off |
+| **SV3 Assistants** | `@tool` exports as MCP tools, `tools/list_changed`, `mod_services` and `mod_call`, ask first unless `@readonly`; the **Tools Manager** | Claude Code and REDagent list the sample's tools, read without asking, ask before a change; a tool switched off in the Tools Manager leaves both lists and refuses its calls, and stays off after a restart |
 
 Each phase raises REDnode's version and ends with an in-game test, as every phase does.
 
-## To agree with the owner
+## Agreed with the owner (2026-10-24)
 
-| Question | Recommendation |
+| Question | Decision |
 |---|---|
 | Order | After H2c-b, before I3: H2c-b's `world.load` is REDnode's own, so it does not wait for services, and EDGEbuilder's and EDGEquest's next steps both gain from services soon after |
-| A package's tools shown to assistants by default? | Yes, with every change asked first. The player can switch a package off |
+| A package's tools shown to assistants by default? | Yes, with every change asked first. The player switches tools off in the Tools Manager |
 | Start a provider on demand when it is switched off? | Not in SV1. A clear error first; decide after real use |
+| Companion apps | The Task Manager in SV1, the Tools Manager in SV3 |
