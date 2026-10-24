@@ -304,4 +304,8 @@ Before: REDnode 0.36.0 deployed, with REDagent 0.3.1. In the launcher's settings
 | 3 Add 5, asked first | Open: no call of `add` reached REDnode |
 | 4 Switch off and on | Pass: the switch was logged off and on; no call of `add` went through while off |
 | 5 REDagent | Not run: the REDagent on that install has no Agent SDK yet ("the window offers to get it") |
+
+### SV3 test: second run (steps 3 and 5)
+
+2026-10-24, the same build: **pass**, so SV3 passed. Claude Code asked before `add` and the call went through ("claude-code called add as a tool"). REDagent 0.3.1 fetched its Agent SDK in 2.8 s, read the count with `get` without asking, asked before `reset` (the call came 7 s into the turn, after the player allowed it), and read 0 after it. Each call is in Counter service's log by the assistant's name.
 {% endraw %}
