@@ -233,4 +233,43 @@ Before: REDnode 0.35.0 or later deployed (SV1's test can run first on the same b
 2. In Counter panel press **Describe**: the log lists the five functions with their parameters and types, their marks, and the `changed` event. **Mark**.
 3. Press **Bad call**: it fails with `add: "by" must be a number, not a string`, and Counter service's log has no line for it (the host refused it before the service saw it). **Mark**.
 4. Quit the game. Send `rednode-mods.log`.
+
+## SV3: built
+
+Built on 2026-10-24 in **REDnode 0.36.0**, right after SV2.
+
+| Piece | Where |
+|---|---|
+| Each `@tool` function as the MCP tool `<package>__<function>`: the author's description, the parameters as the tool's input (the JSON Schema turned into zod for the MCP SDK), `readOnlyHint` for `@readonly`, the ask flag for the rest; named arguments put in order for the call | `packages/overlay/mcp.js` (`zodOf`, `toolInput`, `modToolName`) |
+| `mod_services`, `mod_read` (read-only tools, no asking), `mod_call` (asks) | `mcp.js` |
+| Which assistant calls: the desktop token named by its `initialize` request (the name Claude Code sends there is unverified), a package's token by the package's name; `service.caller()` gives `{ assistant }` | `mcp.js` (`handle` reads the body), `main.js` (`seenToken`) |
+| The switches: `settings.mcpTools` (`off`, `offPackages`, `newOff`, `known`); a switched-off REDnode tool is not built; a switched-off mod tool is left out and refused by `mod_call` | `main.js` (`allModTools`, `callModTool`, `toolsList`, `rednode:tools:*`) |
+| The Tools Manager | `packages/overlay/toolsmanager` (built in, `toolsmanager`) |
+| Each assistant call in the mod's own log and the Tools Manager's recent calls | `main.js` |
+
+What changed from the plan while building:
+
+| Plan | Built | Why |
+|---|---|---|
+| Tools added and removed with `tools/list_changed` | The tool list is built fresh for every request; no notice is sent | The kernel MCP server is stateless (no session, no stream to send a notice on). `mod_services` and `mod_call` reach tools started after a client read its list |
+| `mod_services` and `mod_call` | Also `mod_read` | As `api_read` beside `api_call`: a read-only tool started late can be read without asking |
+| REDagent lists the tools | REDagent 0.3.1 allows mod tools: read-only ones without asking, the rest after asking the player | REDagent refused every kernel tool it did not know |
+
+Checked before the game, in the mock game, as an MCP client over HTTP and through the Tools Manager's page:
+
+| Check | Result |
+|---|---|
+| 23 cases: the tool list (mod tools, not the functions without `@tool`, readonly and ask marks, input schema, JSDoc description), calls by name, a bad input refused, `mod_read` and its refusal, `mod_call`, `mod_services`, the Tools Manager's groups, assistant and recent calls, a tool switched off (gone, refused), a package off, one tool on inside an off package, a REDnode tool off, the switches saved | All passed |
+
+## SV3 test
+
+Before: REDnode 0.36.0 deployed, with REDagent 0.3.1. In the launcher's settings, **MCP server** on; in Claude Code, the `rednode` server set up (the launcher's **Copy setup**). Load a save.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. Mod Manager: switch on **Counter service**. Open the **Tools Manager** from the launcher: REDnode's tools, then **Counter service** with `counter_service__add`, `counter_service__get` (READS) and `counter_service__reset`. Select `counter_service__add`: its description and the parameter `by?: number`. **Mark**.
+2. Start a **new** Claude Code session and ask: "What is the count in Counter service?" It uses `counter_service__get` without asking. **Mark**.
+3. Ask it to add 5 to the count. It uses `counter_service__add`, and Claude Code asks you first; allow it. The Tools Manager's recent calls and Counter service's lines in the Mod log show both calls, by Claude Code. **Mark**.
+4. In the Tools Manager, switch `counter_service__add` off. Ask Claude Code to add 1 again: the call fails or the tool is gone, and `mod_call` is refused with "switched ... off". Switch it on again. **Mark**.
+5. In REDagent's chat, ask "What is the count in Counter service?": it reads it without asking. Ask it to reset the count: REDagent asks you first; allow it. **Mark**.
+6. Quit the game. Send `rednode-mods.log` and `rednode-overlay.log`.
 {% endraw %}

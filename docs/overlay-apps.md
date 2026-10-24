@@ -637,6 +637,8 @@ export async function load(name, at, mode = 'idle') { /* ... */ }
 
 Anything else is accepted as any value, and the Mod log says which type it could not read when the service starts. A function with no JSDoc can still be called, but its calls are not checked.
 
+**Tools for AI assistants (REDnode 0.36.0 and later):** each function marked `@tool` is offered to every assistant connected to REDnode's MCP server (Claude Code on the desktop, REDagent in the game) as the tool `<package>__<function>`, with your description and parameters. Write the description for someone who has never seen your mod: what it does, and when to use it. Mark functions that change nothing `@readonly`: they run without asking; every other tool asks the player before each call, and you cannot turn that off. `service.caller()` is `{ assistant: "<its name>" }` when an assistant calls. The player can switch any tool off in the **Tools Manager**.
+
 **Bundled or TypeScript packages:** a bundler removes comments, so describe the service from its source when you build, with the `rednode` command in the `rednode` package:
 
 ```

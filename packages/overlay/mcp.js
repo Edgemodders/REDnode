@@ -6,8 +6,10 @@
 //                                Authorization: Bearer <token> (see the launcher)
 //
 // Tools: logs, apps, game_state, perf, gameapi_lookup, window_text, window_image,
-// window_console, game_image, api_read, api_call, api_get, tweakdb, archives_reload.
-// See docs/mcp.md.
+// window_console, game_image, api_read, api_call, api_get, tweakdb, archives_reload,
+// the quest tools, and (SV3, docs/services.md) every package's @tool functions as
+// <package>__<function>, with mod_services, mod_read and mod_call. The player switches any
+// of them off in the Tools Manager. See docs/mcp.md.
 
 'use strict';
 
@@ -29,6 +31,7 @@ REDnode runs overlay apps (web pages drawn on top of the game) and Node mods (No
 - api_read, api_call, api_get: live calls into the game. Game objects come back as {"$ref": n, "$type": "..."}; pass {"$ref": n} back as self. Most functions take the game instance first: pass {}. 64-bit numbers are strings. References die when a save loads.
 For a quest: game_facts and game_journal read facts and journal entries; game_facts_set, game_journal_set and game_teleport change the player's save or move V, and ask first.
 Use api_read for reads: it runs functions named like reads (Get, Is, Has, Can, Find) and a TweakDB record's methods, and refuses the rest. api_call runs any function and can change the player's game, such as their money or health; archives_reload replaces files in the game's mod folder. Both ask the player before every call.
+Installed mods offer tools of their own, named <package>__<function>, described by the mod's author: those marked read-only run without asking, the rest ask the player first. mod_services lists every mod's tools, including ones started after this list was read; mod_read and mod_call call them by package and function.
 Guide: https://edgemodders.github.io/REDnode/overlay-apps.html`;
 
 const text = (t) => ({ content: [{ type: 'text', text: typeof t === 'string' ? t : JSON.stringify(t, null, 2) }] });
@@ -57,10 +60,68 @@ function isRead(fn, selfType) {
   return !!m && !CHANGE_WORDS.test(name.slice(m[0].length));
 }
 
+// A JSON Schema from a service description (describe.js's subset) as zod, which the MCP SDK
+// takes for a tool's input.
+function zodOf(s = {}) {
+  let out;
+  if (s.anyOf?.length) out = s.anyOf.length === 1 ? zodOf(s.anyOf[0]) : z.union(s.anyOf.map(zodOf));
+  else if (s.enum?.length) {
+    out = s.enum.every((v) => typeof v === 'string')
+      ? z.enum(s.enum)
+      : s.enum.length === 1
+        ? z.literal(s.enum[0])
+        : z.union(s.enum.map((v) => z.literal(v)));
+  } else {
+    switch (s.type) {
+      case 'string':
+        out = z.string();
+        break;
+      case 'number':
+        out = z.number();
+        break;
+      case 'integer':
+        out = z.number().int();
+        break;
+      case 'boolean':
+        out = z.boolean();
+        break;
+      case 'null':
+        out = z.null();
+        break;
+      case 'array':
+        out = z.array(s.items ? zodOf(s.items) : z.unknown());
+        break;
+      case 'object':
+        if (s.properties) {
+          const shape = {};
+          for (const [k, v] of Object.entries(s.properties)) shape[k] = s.required?.includes(k) ? zodOf(v) : zodOf(v).optional();
+          out = z.object(shape).passthrough();
+        } else out = z.record(z.string(), z.unknown());
+        break;
+      default:
+        out = z.unknown();
+    }
+  }
+  return s.description ? out.describe(s.description) : out;
+}
+
+/** The input shape of a service function as an MCP tool: its parameters by name. */
+function toolInput(fn) {
+  const shape = {};
+  for (const p of fn.params ?? []) {
+    const described = { ...p.schema, description: [p.description, p.default !== undefined ? `Default: ${p.default}.` : ''].filter(Boolean).join(' ') || undefined };
+    shape[p.name] = p.optional ? zodOf(described).optional() : zodOf(described);
+  }
+  return shape;
+}
+
+/** A package function's MCP tool name: <package>__<function>, letters, digits and _ only, 64 at most. */
+const modToolName = (pkg, fn) => `${pkg}__${fn}`.replace(/[^A-Za-z0-9_]/g, '_').slice(0, 64);
+
 /**
  * @param {object} host  functions from main.js: log, version, logs, apps, setOpen, restart,
  *                       state, perf, lookup, webContentsOf, consoleOf, captureGame, call,
- *                       reloadArchives
+ *                       reloadArchives; for SV3: modTools, callModTool, toolOff, seen
  */
 function createMcp(host) {
   let server = null;
@@ -93,8 +154,13 @@ function createMcp(host) {
     args: z.array(z.unknown()).optional().describe('The arguments. The game instance is {}; 64-bit numbers are strings; enums are member names'),
   };
 
-  function build() {
+  // who: the assistant making this request, { name, kind }, from its token (SV3). With
+  // all, REDnode's own tools are built even when switched off: the Tools Manager lists them.
+  function build(who = { name: 'An assistant', kind: 'unknown' }, all = false) {
     const mcp = new McpServer({ name: 'rednode', version: host.version }, { instructions: INSTRUCTIONS });
+    // The player's switches in the Tools Manager: a REDnode tool switched off is not offered.
+    const registerTool = mcp.registerTool.bind(mcp);
+    mcp.registerTool = (name, ...rest) => (!all && host.toolOff?.(`rednode:${name}`) ? null : registerTool(name, ...rest));
 
     mcp.registerTool(
       'logs',
@@ -630,7 +696,122 @@ function createMcp(host) {
       },
     );
 
+    // ---------- packages' tools (SV3) ----------
+
+    // Calls a package function for this assistant, logs it, and answers as a tool.
+    const runModTool = async (pkg, fn, input) => {
+      try {
+        return text(await host.callModTool(who, pkg, fn, input ?? {}));
+      } catch (err) {
+        return fail(err.message);
+      }
+    };
+
+    if (host.modTools) {
+      for (const t of host.modTools()) {
+        registerTool(
+          modToolName(t.pkg, t.fn.name),
+          {
+            title: `${t.pkgName}: ${t.fn.name}`,
+            description: `${t.fn.description || `${t.fn.name}, from ${t.pkgName}.`} (From the ${t.pkgName} mod, described by its author.${t.fn.readonly ? ' It only reads.' : ' The player is asked before every call.'})`,
+            inputSchema: toolInput(t.fn),
+            annotations: t.fn.readonly ? READ : { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+            ...(t.fn.readonly ? {} : { _meta: ASK_FIRST }),
+          },
+          async (input) => runModTool(t.pkg, t.fn.name, input),
+        );
+      }
+
+      mcp.registerTool(
+        'mod_services',
+        {
+          title: 'Mods\' tools',
+          description:
+            'Every running mod that offers tools to assistants: each tool\'s package, function, description, parameters (JSON Schema), and whether it only reads. ' +
+            'Includes mods started after your tool list was read; call those with mod_read or mod_call.',
+          annotations: READ,
+        },
+        async () =>
+          text(
+            host.modTools().map((t) => ({
+              tool: modToolName(t.pkg, t.fn.name),
+              package: t.pkg,
+              function: t.fn.name,
+              description: t.fn.description,
+              readonly: t.fn.readonly,
+              params: t.fn.params.map((p) => ({ name: p.name, type: p.type, optional: p.optional, description: p.description, schema: p.schema })),
+              returns: t.fn.returns?.type ?? null,
+            })),
+          ),
+      );
+
+      const MOD_CALL_INPUT = {
+        package: z.string().describe('The package id, as mod_services lists it'),
+        function: z.string().describe('The function name'),
+        args: z.record(z.string(), z.unknown()).optional().describe('The arguments by parameter name'),
+      };
+      const findTool = (pkg, fn) => host.modTools().find((t) => t.pkg === pkg && t.fn.name === fn);
+
+      mcp.registerTool(
+        'mod_read',
+        {
+          title: 'Call a mod\'s read tool',
+          description: 'Calls a mod\'s tool that only reads (readonly in mod_services), by package and function, without asking the player. Refuses tools that change something: use mod_call for those.',
+          inputSchema: MOD_CALL_INPUT,
+          annotations: READ,
+        },
+        async ({ package: pkg, function: fn, args }) => {
+          const t = findTool(pkg, fn);
+          if (!t) return fail(`${pkg} offers no tool "${fn}" now: see mod_services`);
+          if (!t.fn.readonly) return fail(`${fn} can change the game, so mod_read refuses it: use mod_call, which asks the player`);
+          return runModTool(pkg, fn, args);
+        },
+      );
+
+      mcp.registerTool(
+        'mod_call',
+        {
+          title: 'Call a mod\'s tool',
+          description: 'Calls any mod\'s tool by package and function, such as one started after your tool list was read. The player is asked before every call.',
+          inputSchema: MOD_CALL_INPUT,
+          annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+          _meta: ASK_FIRST,
+        },
+        async ({ package: pkg, function: fn, args }) => {
+          if (!findTool(pkg, fn)) return fail(`${pkg} offers no tool "${fn}" now: see mod_services`);
+          return runModTool(pkg, fn, args);
+        },
+      );
+    }
+
     return mcp;
+  }
+
+  // REDnode's own tools as the Tools Manager lists them: name, title, description, input
+  // (JSON Schema), whether it only reads, and whether it asks the player first.
+  function ownTools() {
+    const mcp = build(undefined, true);
+    const tools = mcp._registeredTools ?? {};
+    const out = [];
+    for (const [name, t] of Object.entries(tools)) {
+      if (name.includes('__')) continue; // packages' own tools are listed per package
+      let input = null;
+      try {
+        input = t.inputSchema ? z.toJSONSchema(t.inputSchema) : null;
+      } catch {
+        input = null;
+      }
+      out.push({
+        name,
+        title: t.title ?? name,
+        description: t.description ?? '',
+        input,
+        readonly: !!t.annotations?.readOnlyHint,
+        asks: !!t._meta?.['anthropic/requiresUserInteraction'],
+      });
+    }
+    mcp.close();
+    return out;
   }
 
   async function handle(req, res) {
@@ -650,7 +831,21 @@ function createMcp(host) {
       res.writeHead(405, { allow: 'POST' }).end(); // stateless: no server-sent stream, no sessions
       return;
     }
-    const mcp = build();
+    // The body, read here to learn the assistant's name from its initialize request.
+    let body;
+    try {
+      const chunks = [];
+      for await (const c of req) chunks.push(c);
+      body = JSON.parse(Buffer.concat(chunks).toString('utf8') || 'null');
+    } catch {
+      res.writeHead(400).end();
+      return;
+    }
+    for (const m of Array.isArray(body) ? body : [body]) {
+      if (m?.method === 'initialize') host.seen?.(token, m.params?.clientInfo?.name ?? null);
+    }
+    const who = host.seen?.(token) ?? { name: 'An assistant', kind: 'unknown' };
+    const mcp = build(who);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -663,7 +858,7 @@ function createMcp(host) {
     });
     try {
       await mcp.connect(transport);
-      await transport.handleRequest(req, res);
+      await transport.handleRequest(req, res, body);
     } catch (err) {
       host.log(`MCP request failed: ${err.message}`);
       if (!res.headersSent) res.writeHead(500).end();
@@ -699,6 +894,10 @@ function createMcp(host) {
       server.listen(current.port, '127.0.0.1', () => host.log(`MCP server on http://127.0.0.1:${current.port}/mcp`));
     },
     stop,
+    /** REDnode's own tools, for the Tools Manager. */
+    ownTools,
+    /** Whether the server runs, and on which port. */
+    status: () => ({ enabled: !!server && current.enabled, port: current.port, external: !!current.external }),
   };
 }
 
@@ -723,4 +922,4 @@ const WINDOW_TEXT = `(() => {
   return out.join('\\n');
 })()`;
 
-module.exports = { createMcp, isRead };
+module.exports = { createMcp, isRead, modToolName };

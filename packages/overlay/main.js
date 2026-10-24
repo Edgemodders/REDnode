@@ -66,6 +66,8 @@ const BUILTIN_ROOTS = [
   { dir: path.join(__dirname, 'manager'), single: true, builtin: true, manager: true },
   // The Task Manager (SV1): what each package costs, End task. "admin": it may manage packages.
   { dir: path.join(__dirname, 'tasks'), single: true, builtin: true, admin: true },
+  // The Tools Manager (SV3): every MCP tool an assistant sees, switched on and off.
+  { dir: path.join(__dirname, 'toolsmanager'), single: true, builtin: true, admin: true },
   // The Welcome window: opened at the first start, until the player closes it once.
   { dir: path.join(__dirname, 'welcome'), single: true, builtin: true },
 ];
@@ -2493,7 +2495,7 @@ ipcMain.on('rednode:drag-regions', (event, regions) => {
 
 function fromLauncher(event) {
   const w = windowFor(event.sender);
-  if (!w?.app.pinned && !w?.app.manager && !w?.app.admin) throw new Error('Only the REDnode launcher, Mod Manager and Task Manager can manage apps');
+  if (!w?.app.pinned && !w?.app.manager && !w?.app.admin) throw new Error('Only the REDnode launcher, Mod Manager, Task Manager and Tools Manager can manage apps');
 }
 
 function isEnabled(entry) {
@@ -3392,11 +3394,158 @@ function onCapture(m) {
   c.resolve({ image, width: m.width, height: m.height, sourceWidth: m.sourceWidth, sourceHeight: m.sourceHeight, overlay: !!m.overlay, hdr: !!m.hdr });
 }
 
+// ---------- assistants and packages' tools (SV3, docs/services.md) ----------
+//
+// A package's @tool functions are MCP tools, named <package>__<function>. The player switches
+// tools off in the Tools Manager; settings.mcpTools keeps { off: [keys], offPackages: [ids],
+// newOff, known: [package ids seen with tools] }. Keys: "rednode:<tool>" for REDnode's own,
+// "<package>:<function>" for a package's.
+
+const mcpToolSettings = () => {
+  const t = settings.mcpTools ?? {};
+  return { off: new Set(t.off ?? []), offPackages: new Set(t.offPackages ?? []), newOff: !!t.newOff, known: new Set(t.known ?? []) };
+};
+function saveToolSettings(t) {
+  settings.mcpTools = { off: [...t.off], offPackages: [...t.offPackages], newOff: t.newOff, known: [...t.known] };
+  writeJson('settings.json', settings);
+}
+const toolKeyOff = (key, t = mcpToolSettings()) => t.off.has(key) || t.offPackages.has(key.slice(0, key.indexOf(':')));
+
+// Every package tool, switched on or not: [{ pkg, pkgName, fn (its descriptor), key, off }].
+function allModTools() {
+  const t = mcpToolSettings();
+  const out = [];
+  let learned = false;
+  for (const { id } of services.providers()) {
+    const entry = apps.get(id);
+    const d = services.offer(id)?.descriptor;
+    const fns = Object.values(d?.functions ?? {}).filter((f) => f.tool);
+    if (!entry || !fns.length) continue;
+    // The first time a package's tools show, "Off for new packages" switches them off.
+    if (!t.known.has(id)) {
+      t.known.add(id);
+      if (t.newOff) t.offPackages.add(id);
+      learned = true;
+    }
+    for (const fn of fns) out.push({ pkg: id, pkgName: entry.manifest.name, fn, key: `${id}:${fn.name}`, off: toolKeyOff(`${id}:${fn.name}`, t) });
+  }
+  if (learned) saveToolSettings(t);
+  return out;
+}
+
+// Which assistant a token belongs to: the desktop token (Claude Code or another MCP client,
+// named by its initialize request) or a package's, such as REDagent's.
+const assistants = new Map(); // token -> { name, kind, lastSeen }
+function seenToken(token, clientName) {
+  let a = assistants.get(token);
+  if (!a) {
+    const pkg = [...packageTokens].find(([, t]) => t === token)?.[0];
+    a = pkg ? { name: apps.get(pkg)?.manifest.name ?? pkg, kind: 'package', pkg } : { name: 'Desktop assistant', kind: 'desktop' };
+    assistants.set(token, a);
+  }
+  if (clientName && a.kind === 'desktop') a.name = clientName;
+  a.lastSeen = Date.now();
+  return a;
+}
+
+const toolCalls = []; // the newest 200 assistant calls of packages' tools, for the Tools Manager
+async function callModTool(who, pkg, fn, input) {
+  const t = allModTools().find((x) => x.pkg === pkg && x.fn.name === fn);
+  if (!t) throw new Error(`${pkg} offers no tool "${fn}" now`);
+  if (t.off) throw new Error(`The player switched ${t.pkgName}'s ${fn} off for assistants (Tools Manager)`);
+  // MCP passes arguments by name; the function takes them in order.
+  const args = t.fn.params.map((p) => input?.[p.name]);
+  while (args.length && args[args.length - 1] === undefined) args.pop();
+  const started = Date.now();
+  const record = { at: started, assistant: who.name, tool: `${pkg}__${fn}`, pkg, fn, ok: false, ms: 0, detail: '' };
+  toolCalls.push(record);
+  if (toolCalls.length > 200) toolCalls.shift();
+  mods.log(pkg, 'info', `${who.name} called ${fn} as a tool`);
+  try {
+    const result = await services.call({ assistant: who.name }, pkg, fn, args);
+    record.ok = true;
+    record.detail = JSON.stringify(result)?.slice(0, 200) ?? 'undefined';
+    return result === undefined ? 'Done.' : result;
+  } catch (err) {
+    record.detail = err.message;
+    throw err;
+  } finally {
+    record.ms = Date.now() - started;
+  }
+}
+
+/** What the Tools Manager shows: every tool by where it comes from, the assistants, the recent calls. */
+function toolsList() {
+  const t = mcpToolSettings();
+  const own = mcp.ownTools().map((x) => ({ key: `rednode:${x.name}`, name: x.name, title: x.title, description: x.description, input: x.input, readonly: x.readonly, asks: x.asks, off: t.off.has(`rednode:${x.name}`) }));
+  const groups = [{ id: 'rednode', name: 'REDnode', builtin: true, off: false, tools: own }];
+  const byPkg = new Map();
+  for (const x of allModTools()) {
+    if (!byPkg.has(x.pkg)) byPkg.set(x.pkg, { id: x.pkg, name: x.pkgName, builtin: false, off: t.offPackages.has(x.pkg), tools: [] });
+    byPkg.get(x.pkg).tools.push({
+      key: x.key,
+      name: `${x.pkg}__${x.fn.name}`.replace(/[^A-Za-z0-9_]/g, '_').slice(0, 64),
+      title: x.fn.name,
+      description: x.fn.description,
+      params: x.fn.params.map((p) => ({ name: p.name, type: p.type, optional: p.optional, description: p.description })),
+      readonly: x.fn.readonly,
+      asks: !x.fn.readonly,
+      off: x.off,
+    });
+  }
+  groups.push(...[...byPkg.values()].sort((a, b) => a.name.localeCompare(b.name)));
+  return {
+    mcp: mcp.status(),
+    newOff: t.newOff,
+    groups,
+    assistants: [...assistants.values()].map((a) => ({ name: a.name, kind: a.kind, lastSeenMs: Date.now() - a.lastSeen })).sort((a, b) => a.lastSeenMs - b.lastSeenMs),
+    recent: toolCalls.slice(-50).reverse(),
+  };
+}
+
+ipcMain.handle('rednode:tools:list', (event) => {
+  fromLauncher(event);
+  return toolsList();
+});
+
+// A switch: one tool (key), or a whole package (group), or "Off for new packages".
+ipcMain.handle('rednode:tools:set', (event, what, id, on) => {
+  fromLauncher(event);
+  const t = mcpToolSettings();
+  if (what === 'tool') {
+    if (on) {
+      t.off.delete(id);
+      // A tool switched on in a package that is off as a whole: the package goes on, its other tools off.
+      const pkg = id.slice(0, id.indexOf(':'));
+      if (pkg !== 'rednode' && t.offPackages.has(pkg)) {
+        t.offPackages.delete(pkg);
+        for (const x of allModTools()) if (x.pkg === pkg && x.key !== id) t.off.add(x.key);
+      }
+    } else t.off.add(id);
+  } else if (what === 'group') {
+    if (id === 'rednode') {
+      for (const x of mcp.ownTools()) (on ? t.off.delete(`rednode:${x.name}`) : t.off.add(`rednode:${x.name}`));
+    } else if (on) {
+      t.offPackages.delete(id);
+      for (const k of [...t.off]) if (k.startsWith(`${id}:`)) t.off.delete(k);
+    } else t.offPackages.add(id);
+  } else if (what === 'new-off') t.newOff = !!on;
+  else throw new Error(`Unknown switch "${what}"`);
+  saveToolSettings(t);
+  log(`Tools Manager: ${what} ${id ?? ''} ${on ? 'on' : 'off'}`);
+  return toolsList();
+});
+
 function mcpHost() {
   const lookup = createLookup(TYPES_FILE, NOTES_DIR);
   return {
     log,
     version: VERSION,
+    // SV3: packages' tools that are switched on, their calls, REDnode's own switches, the assistants.
+    modTools: () => allModTools().filter((x) => !x.off),
+    callModTool,
+    toolOff: (key) => toolKeyOff(key),
+    seen: seenToken,
     logs: () => mods.recentLog(),
     apps: () =>
       appList().map((a) => ({

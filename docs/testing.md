@@ -54,6 +54,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H2b-0 Reset look both ways](world.md#h2b-0-reset-look-both-ways-test) | In the game | H2 | 2026-10-22 | 0.26.19 | **Pass** (laptop): six swaps both ways, each shown by Reset look with the item worn |
 | [SV1 Mod services and the Task Manager](services.md#sv1-test) | In the game | SV1 | Not run | 0.34.0 | Awaiting its run |
 | [SV2 Service descriptions](services.md#sv2-test) | In the game | SV2 | Not run | 0.35.0 | Awaiting its run |
+| [SV3 Mods' tools and the Tools Manager](services.md#sv3-test) | In the game | SV3 | Not run | 0.36.0, REDagent 0.3.1 | Awaiting its run |
 | [H2c-a World objects test](world.md#h2c-a-test) | In the game | H2c | Not run | 0.33.0 + World objects test 0.1.0 | Awaiting its run |
 | [Development folders](#development-folders) | In the game | #16 | 2026-10-23 | 0.33.0 | **Pass** (2.31 backup folder): a folder added in the launcher, its Hello mod copy ran instead of the installed one with the DEV tag, two edits hot-reloaded it, Remove brought the installed copy back, bad paths refused ([results](#development-folders-results)) |
 | [Launcher settings drawer](#launcher-settings-drawer) | In the game | Launcher | 2026-10-23 | 0.32.2 | **Pass** (laptop): the player: "It looks perfect". 0.32.3 then shows the version line as "Version 0.32.3" |
@@ -583,6 +584,10 @@ Before: make a folder outside the game, for example `E:\Modding\DevTest`, and co
 ### SV2 Service descriptions
 
 [Source](services.md#sv2-test). Built 2026-10-24 in REDnode 0.35.0: services described by their JSDoc, calls checked before they reach the provider, `service.describe`, `rednode describe` for bundled packages, the Mod Manager's Service section. Checked in plain Node (29 reader cases) and the mock game (26 cases). The steps are on the source page.
+
+### SV3 Mods' tools and the Tools Manager
+
+[Source](services.md#sv3-test). Built 2026-10-24 in REDnode 0.36.0 with REDagent 0.3.1: `@tool` functions as MCP tools, `mod_services`, `mod_read`, `mod_call`, the Tools Manager's switches. Checked in the mock game as an MCP client (23 cases). The steps are on the source page.
 
 ## World API
 

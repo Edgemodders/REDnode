@@ -39,10 +39,20 @@ The server listens only on `127.0.0.1`, port 41820, and every request needs the 
 | `game_teleport` | Moves V to `x`, `y`, `z` (and `yaw` in degrees) or to a world node (`nodeRef`). REDnode 0.32.0 or later | **Yes**: it moves V |
 | `api_call` | A live game call, as `api` makes it: a global function, a static function (`class`), or a method (`self`). Game objects come back as `{ "$ref": n, "$type": "..." }` | **Yes**: it can change the player's game, such as money or health |
 | `api_get` | A property of a game object | No |
+| `<package>__<function>` | A mod's own tool: each function a package's service file marks `@tool` in its JSDoc, with the author's description and parameters, named by the package id and the function (dashes become `_`). See [Mod services](services.html). REDnode 0.36.0 or later | Only those not marked `@readonly`, which ask the player first |
+| `mod_services` | Every running mod's tools: package, function, description, parameters and whether it only reads, including mods started after the client read its tool list. REDnode 0.36.0 or later | No |
+| `mod_read` | Calls a mod's read-only tool by `package` and `function`, with `args` by name, without asking; refuses the rest. REDnode 0.36.0 or later | No |
+| `mod_call` | Calls any mod's tool by `package` and `function`, with `args` by name. REDnode 0.36.0 or later | **Yes**: whatever the mod does; it asks the player first |
+
+### Mods' tools and the Tools Manager
+
+The server builds its tool list fresh for every request, so a mod's tools are there as soon as the mod runs, and gone when it stops. It is stateless and cannot tell a client that the list changed: a client sees new tools the next time it reads the list (Claude Code: a new session, or `/mcp` reconnect). Meanwhile `mod_services` lists them and `mod_read` or `mod_call` reaches them.
+
+The built-in **Tools Manager** (in the launcher) lists every tool an assistant sees, grouped as REDnode's own and each mod's: what it does, its parameters, and whether it reads, asks first or acts. A switch per tool and per mod takes it away from every assistant at once, and the switches are kept across starts; **Off for new packages** makes a newly installed mod's tools start switched off. It also shows which assistants have connected (Claude Code by the name it gives, REDagent and other packages by their name) and their recent calls of mods' tools. Each call is also written in the mod's own log.
 
 A REDnode package can use the same tools: it lists `"permissions": ["mcp"]` in its `rednode-app.json`, the player allows it in the launcher, and `kernel.mcp()` in the `rednode` package gives it the address and its own token. The server then runs for it even with the **MCP server** switch off; that switch only controls access from outside, such as Claude Code. REDagent uses the tools this way.
 
-Claude Code asks before it uses a tool, unless you allow it. Allow the read-only tools freely. From REDnode 0.26.16, `api_call` and `archives_reload` (and from 0.32.0 `game_facts_set`, `game_journal_set` and `game_teleport`) carry `_meta: { "anthropic/requiresUserInteraction": true }`, as EDGEdeck's deploy, undo and remove do: Claude Code asks you before every call of them, in every permission mode, auto mode included, with no "don't ask again". Reads go through `api_read`, which never asks.
+Claude Code asks before it uses a tool, unless you allow it. Allow the read-only tools freely. From REDnode 0.26.16, `api_call` and `archives_reload` (and from 0.32.0 `game_facts_set`, `game_journal_set` and `game_teleport`, from 0.36.0 `mod_call` and every mod tool not marked `@readonly`) carry `_meta: { "anthropic/requiresUserInteraction": true }`, as EDGEdeck's deploy, undo and remove do: Claude Code asks you before every call of them, in every permission mode, auto mode included, with no "don't ask again". Reads go through `api_read`, which never asks.
 
 ### How `api_read` tells a read
 

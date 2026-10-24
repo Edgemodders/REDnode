@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tools Manager</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<style>
+  html, body { margin: 0; width: 960px; height: 600px; overflow: hidden; background: transparent; }
+  rn-window { position: absolute; inset: 0; }
+  [hidden] { display: none !important; }
+  .status { font: 11px var(--rn-mono); letter-spacing: .08em; color: var(--rn-dim); }
+  .bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font: 11px var(--rn-mono); color: var(--rn-dim); }
+  .bar b { color: var(--rn-fg); font-weight: 600; }
+  .bar .off { color: var(--rn-danger); }
+  .spacer { flex: 1; }
+  .bar rn-input { width: 220px; }
+  rn-toggle { width: auto; }
+  rn-toggle::part(button) { gap: 8px; }
+
+  .main { flex: 1; min-height: 0; display: flex; gap: 12px; }
+  .list { flex: 1; min-width: 0; overflow-y: auto; overflow-x: hidden; border: 1px solid var(--rn-line); background: var(--rn-panel); }
+  .group { display: flex; align-items: center; gap: 8px; position: sticky; top: 0; z-index: 1; padding: 6px 8px;
+    background: var(--rn-panel-2); border-bottom: 1px solid var(--rn-line); font: 600 11px var(--rn-mono); letter-spacing: .1em; text-transform: uppercase; }
+  .group .count { color: var(--rn-dim); font-weight: 400; }
+  .tool { display: grid; grid-template-columns: 34px minmax(0, 210px) 64px minmax(0, 1fr); gap: 8px; align-items: baseline;
+    padding: 5px 8px; border-bottom: 1px solid color-mix(in srgb, var(--rn-line) 60%, transparent); cursor: pointer; font-size: 13px; }
+  .tool:hover { background: color-mix(in srgb, var(--rn-accent-2) 6%, transparent); }
+  .tool.selected { background: color-mix(in srgb, var(--rn-accent) 12%, transparent); }
+  .tool.off .tname, .tool.off .what { color: var(--rn-dim); text-decoration: line-through; }
+  .tname { font: 12px var(--rn-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--rn-fg); }
+  .mode { font: 700 9px var(--rn-mono); letter-spacing: .1em; }
+  .mode.reads { color: var(--rn-ok); }
+  .mode.asks { color: var(--rn-accent-2); }
+  .sw { width: 30px; height: 16px; padding: 0; border: 1px solid var(--rn-line); background: var(--rn-panel-2); cursor: pointer; position: relative; }
+  .sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; background: var(--rn-dim); transition: left .12s; }
+  .sw.on { border-color: color-mix(in srgb, var(--rn-accent) 60%, transparent); }
+  .sw.on::after { left: 16px; background: var(--rn-accent); }
+  .empty { padding: 16px; color: var(--rn-dim); }
+
+  .side { width: 300px; flex: none; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .box { border: 1px solid var(--rn-line); background: var(--rn-panel); padding: 8px 10px; overflow-y: auto; overflow-x: hidden; }
+  .box h3 { margin: 0 0 6px; font: 600 10px var(--rn-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--rn-dim); }
+  .details { flex: 1; min-height: 120px; font-size: 13px; overflow-wrap: anywhere; }
+  .details b { display: block; font: 700 14px var(--rn-display); letter-spacing: .04em; color: var(--rn-accent); margin-bottom: 4px; }
+  .details .mono { font: 11px var(--rn-mono); color: var(--rn-dim); }
+  .details .param { margin-top: 4px; }
+  .details .param code { font: 12px var(--rn-mono); color: var(--rn-fg); }
+  .details .warn { color: var(--rn-danger); margin-top: 6px; }
+  .who, .calls { font: 11px/1.5 var(--rn-mono); color: var(--rn-dim); }
+  .who b { color: var(--rn-fg); font-weight: 600; }
+  .calls { max-height: 150px; }
+  .calls .bad { color: var(--rn-danger); }
+</style>
+</head>
+<body>
+  <rn-window title="Tools Manager" draggable closable>
+    <span class="status" slot="status" id="count">0 TOOLS</span>
+    <div class="bar">
+      <span id="server"></span>
+      <span class="spacer"></span>
+      <rn-input id="search" placeholder="Search tools"></rn-input>
+      <rn-toggle id="newoff" label="Off for new packages" title="On: a package installed from now on starts with its tools switched off, until you switch them on here"></rn-toggle>
+    </div>
+    <div class="main">
+      <div class="list" id="list"></div>
+      <div class="side">
+        <div class="box details" id="details">Select a tool to see what an assistant sees.</div>
+        <div class="box"><h3>Assistants</h3><div class="who" id="who">None yet.</div></div>
+        <div class="box calls" id="callsbox"><h3>Recent calls of mods' tools</h3><div id="calls">None yet.</div></div>
+      </div>
+    </div>
+  </rn-window>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "id": "toolsmanager",
+  "name": "Tools Manager",
+  "version": "0.36.0",
+  "author": "Edgemodders",
+  "description": "Every tool an AI assistant can see through REDnode's MCP server: REDnode's own and each mod's, with what each does and whether it asks first. Switch any tool or mod off for every assistant; see which assistants are connected and their recent calls.",
+  "entry": "index.html",
+  "kind": "window",
+  "width": 960,
+  "height": 600,
+  "anchor": "center",
+  "x": 0,
+  "y": 0,
+  "open": false
+}
