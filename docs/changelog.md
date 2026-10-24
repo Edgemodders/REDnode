@@ -11,6 +11,10 @@ How to keep it:
 
 ## Unreleased
 
+## 0.37.0 (2026-10-24)
+
+**The last release for game version 2.31.** Game version 2.5 is not supported yet: RED4ext will not load this REDnode on 2.5. The next release moves REDnode to 2.5, as soon as RED4ext, redscript and Codeware support it.
+
 **New**
 
 - **Development folders**: in the launcher's Settings drawer, with Developer mode on, add folders from your own projects. Their packages run from there, with hot reload, instead of their installed copies, so a mod can be developed outside the game folder. The Mod Manager marks such a package **DEV** and names the copy it hides. A folder can be one package or hold several. See [Development folders](https://edgemodders.github.io/REDnode/overlay-apps.html#development-folders).

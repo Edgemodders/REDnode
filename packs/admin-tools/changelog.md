@@ -4,6 +4,10 @@ What changed in each release of the Admin Tools pack, for its Nexus page and its
 
 ## Unreleased
 
+## 0.1.0 (2026-10-24)
+
+The first release, for REDnode 0.37.0 on game version 2.31.
+
 **New**
 
 - **Task Manager**: every running package with its CPU, memory, its thread's load and heap, game calls and service calls. **End task** stops one, even one stuck in an endless loop, and **Restart** starts it again. Built into REDnode 0.34.0 to 0.36.0; now in this pack.
