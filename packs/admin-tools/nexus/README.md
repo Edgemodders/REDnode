@@ -16,7 +16,7 @@ The source of the Admin Tools pack's own Nexus Mods page, beside REDnode's (`nex
 
 | In `description.bbcode` | Replace with |
 |---|---|
-| `REDNODE_PAGE` (four links) | REDnode's Nexus mod id |
+| `REDNODE_PAGE` (three links) | REDnode's Nexus mod id |
 | `REDNODE_VERSION` (two places) | The REDnode the pack needs, from `packs/admin-tools/pack.json` (`>=0.37.0`, so 0.37.0) |
 | `Screenshot 1` to `Screenshot 3` (cyan italics) | Upload each picture to the page's Images tab, then replace its line with `[img]<the image's Nexus URL>[/img]` and a one-line caption. Pictures from the mock game are in `docs/assets/admin-tools/` until there are pictures from the game |
 
