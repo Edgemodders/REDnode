@@ -1120,7 +1120,7 @@ Photo mode and the wardrobe preview (`gameuiWardrobeSetPreviewGameController`) h
 
 ## H2c World objects: plan
 
-Proposed on 2026-10-23, **not yet agreed**. H2c finishes H2 for things in the world. The owner's aim (2026-10-22): scenes built and stored in EDGEbuilder, with NPCs, props and the rest, load into the game from EDGEbuilder, and a swapped archive shows on them as it does on what V wears. EDGEquest needs the same pieces for quest NPCs and places (EDGEbuilder's [#3](https://github.com/Edgemodders/EDGEbuilder/issues/3)).
+Proposed and **agreed with the owner on 2026-10-23**, with the three recommendations below. H2c finishes H2 for things in the world. The owner's aim (2026-10-22): scenes built and stored in EDGEbuilder, with NPCs, props and the rest, load into the game from EDGEbuilder, and a swapped archive shows on them as it does on what V wears. EDGEquest needs the same pieces for quest NPCs and places (EDGEbuilder's [#3](https://github.com/Edgemodders/EDGEbuilder/issues/3)).
 
 **What REDnode has today** (W1): `world.spawn` takes a `template` or a `record`, an appearance and components, through Codeware's DynamicEntitySystem; `move`, `remove`, entity events. Missing:
 
@@ -1150,10 +1150,40 @@ Proposed on 2026-10-23, **not yet agreed**. H2c finishes H2 for things in the wo
 
 **For EDGEbuilder** (its repo, through a note on its issues once agreed): NPCs as a scene kind (`npc`: a `Character.*` record or a template, an appearance), which changes its scene format; and its Rebuild previews through `world.load` once that exists.
 
-**To agree with the owner:**
+**Agreed with the owner (2026-10-23):**
 
-| Question | Recommendation |
+| Question | Decision |
 |---|---|
 | Does REDnode read EDGEbuilder's scene file (`world.load`), or only give EDGEbuilder the pieces? | REDnode reads it. EDGEquest and others can then load a scene without EDGEbuilder running, and the format stays EDGEbuilder's to pin |
 | What does a loaded NPC do? | Stands where it was placed, friendly, idle, until a package says otherwise. Behaviour (walk, talk, fight) is a later phase |
 | Refresh the game's NPCs and props around V after every swap, or only REDnode's spawns by default? | Both, but only entities that use a file in the swapped archive, so an unrelated swap touches nothing. The match compares their components' resource hashes with the archive's file table, which `archive-index.js` already reads; whether components show every file an entity uses (meshes from an `.app`, materials) is for the spike, **unverified** |
+
+### H2c-a: built
+
+Built on 2026-10-23: the **World objects test** app (`packages/overlay/apps/world-objects-test`), through `api` only, so no part of REDnode changed and it runs on REDnode 0.33.0 from its own zip. Needs Codeware and RED Hot Tools (the Edgemodders build for archives with capital letters in their names).
+
+| Section | Buttons | Calls |
+|---|---|---|
+| 1. An NPC | Spawn by record, Spawn by template, Hold and friendly, Where is it; **Keep in saves** | A `DynamicEntitySpec` with `recordID` (default `Character.CitizenRichFemale`), or `templatePath` read from the record's `EntityTemplatePath`, through `REDnodeWorld.Spawn`; `AIHoldPositionCommand` (3600 s) through `GetAIControllerComponent().SendCommand`; `GetAttitudeAgent().SetAttitudeTowards(V's agent, AIA_Friendly)`; the switch sets `persistState` and `persistSpawn`. Where the NPC is 5 s after a spawn and after Hold is logged by itself, and after each load whether what was spawned is still there |
+| 2. Near V | Radius, Entity list, Targeting, Resources | `GameInstance.GetEntityList` filtered by distance (V left out); `TargetingSystem.GetTargetParts` with a `gameTargetSearchQuery` (`Complete`, the radius) and `api.$out`; Codeware's `GetTemplatePath` and `GetComponents`, then each component's `mesh`, `graph` and `resource` as path hashes |
+| 3. Swap and refresh | Spawn a prop (any mesh), Swap, Who uses it, look again for the users, through a missing appearance, everything near V, the spawned NPC; Respawn spawned | `archives.reload` (which refreshes what V wears, as H2b does); the archive's file table read in the mod; `ScheduleAppearanceChange` with the current name, or a missing name then back after 500 ms; remove and spawn again with the same spec |
+
+Checked before the game: every button runs end to end in plain Node against a stand-in `rednode` that answers each call (the scratchpad's `h2c/run.mjs`). **Not checked:** anything the game does with these calls.
+
+### H2c-a test
+
+Before: an archive to swap that changes something you can stand next to. The simplest: two versions of an archive that replaces one prop mesh (a different texture or colour is enough), with the same file name. If you have an NPC appearance mod at hand, two versions of it too (optional). Install version 1 of the archive in `archive\pc\mod` before starting the game, and keep version 2 somewhere else. Install the World objects test from its zip. Pick a quiet open spot outdoors for the save.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. Load the save. F10, Mod Manager: switch on **World objects test**. Its top lines say OK for Codeware, RED Hot Tools and the world API. **Mark**.
+2. Press **Spawn by record**. A woman appears about 3 m in front of V, facing V. Watch her for 10 s: does she stand, walk off, talk, run or fight? The log adds where she is after 5 s. **Mark**.
+3. Press **Hold and friendly**, then walk around her and bump into her. Does she stay put? Does anything change? **Mark**.
+4. Press **Spawn by template**: a second one, from the record's template. Same questions. **Mark**.
+5. Set the radius to 15 and press **Entity list**, then **Targeting**. The log lists what each found and how long it took. Did either one make the game stutter? **Mark**.
+6. Press **Resources**. **Mark**.
+7. In the mesh field, type the path of the mesh your test archive replaces, and press **Spawn a prop**. The prop shows version 1. In the archive field, type the full path of version 2 and press **Swap**. Did the prop change by itself? Press **Who uses it**. **Mark**.
+8. Press **Users: look again**. Did the prop change? **Mark**.
+9. Press **Respawn spawned**. Did it change now? **Mark**.
+10. Optional, with an NPC appearance mod: stand near an NPC it changes, press **Entity list**, swap its other version, then **Users: look again** and **Users: through missing**. Say what showed after each. **Mark**.
+11. Switch **Keep in saves** on, press **Spawn by record**, save the game, then load that save. The log says 3 s and 10 s after the load what is still there. Then load an older save. **Mark**.
+12. Press **Remove spawned**. Quit the game. Send `rednode-mods.log` and `rednode-overlay.log`.

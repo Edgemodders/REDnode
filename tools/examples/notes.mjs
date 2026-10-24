@@ -314,6 +314,19 @@ export const NOTES = {
     tryThis: ['Load a save and press Roots, then HUD text.', 'Open the pause menu, close the overlay, and click the Ink button.'],
     preview: 'The preview has no game UI: the buttons log the calls they would make, and most of them fail with the simulated game\'s answer.',
   },
+  'world-objects-test': {
+    group: 'tests',
+    summary: 'Spawn an NPC, list what is near V with the files it names, swap an archive and try each way to show the new version on things in the world.',
+    teaches: ['api.$new', 'api.$static', 'api.$out', 'GameInstance.GetEntityList', 'TargetingSystem', 'AIHoldPositionCommand', 'archives.reload', 'world.entity', 'ui.list'],
+    how: [
+      'The spike of H2c, world objects: everything goes through `api`, so it runs on a released REDnode and each button logs what it called and how long it took.',
+      'An NPC: a `DynamicEntitySpec` with a `Character` record, or the template that record names, spawned through REDnode\'s world script. **Hold and friendly** sends an `AIHoldPositionCommand` to its AI and sets its attitude towards V to friendly. **Keep in saves** sets the spec\'s `persistState` and `persistSpawn`; after a load the log says what came back.',
+      'Near V: the game\'s whole entity list filtered by distance, or the targeting system\'s search with `api.$out` for its out parameter. **Resources** reads each entity\'s template and its components\' meshes, as path hashes.',
+      'After a swap, the archive\'s own file table (read in the mod with `node:fs`) says which entities near V name one of its files; the refresh buttons apply their appearance again, go through a missing one and back, or respawn what this app spawned.',
+    ],
+    tryThis: ['Press Spawn by record, then Hold and friendly, then Where is it.', 'Press Entity list, then Resources.'],
+    preview: 'The preview\'s game answers few of these calls, so most buttons log a failure here: the app is meant for the game.',
+  },
   'refresh-test': {
     group: 'tests',
     summary: 'Swap an archive, then try each way the game offers to load again what is already in the world: V\'s clothes, what V looks at, a spawned object.',
