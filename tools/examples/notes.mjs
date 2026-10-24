@@ -314,6 +314,30 @@ export const NOTES = {
     tryThis: ['Load a save and press Roots, then HUD text.', 'Open the pause menu, close the overlay, and click the Ink button.'],
     preview: 'The preview has no game UI: the buttons log the calls they would make, and most of them fail with the simulated game\'s answer.',
   },
+  'counter-service': {
+    group: 'mods',
+    summary: 'A service with no window: other packages read and change its count through REDnode\'s mod services.',
+    teaches: ['service file', 'service.emit', 'service.caller', 'service.signal', 'JSDoc'],
+    how: [
+      'Its rednode-app.json names a service file, `"service": "service.mjs"`, and no `main`: the service is the whole package. Every function `service.mjs` exports can be called by other packages, by this package\'s id, through the REDnode host.',
+      '`service.emit("changed", ...)` tells every package that connected. `service.caller()` says who is calling, and `service.signal()` aborts when the caller gives up, which `wait` uses.',
+      'The JSDoc on each function is its description: from SV2 the host reads it, and functions marked `@tool` become tools an AI assistant can call.',
+    ],
+    tryThis: ['Open Counter panel\'s page: it runs this service beside it.'],
+    preview: 'In the game this package has no window. Here the preview lists the functions it offers.',
+  },
+  'counter-panel': {
+    group: 'mods',
+    summary: 'Calls Counter service through REDnode\'s mod services, hears its events, and tries a timeout, Stop, an error and an unknown function.',
+    teaches: ['service.connect', '$on', '$with', 'requires'],
+    how: [
+      '`service.connect("counter-service")` finds the other package by its id and answers what it offers; each of its functions is then a method that returns a promise.',
+      '`counter.$on("changed", ...)` hears the service\'s events. `counter.$with({ timeoutMs, signal })` gives calls a timeout or an AbortSignal.',
+      'Its rednode-app.json lists `"counter-service": ">=0.1"` in `requires`, so the Mod Manager shows it as missing before the panel runs.',
+    ],
+    tryThis: ['Press +1 and +10: the count and the log follow the service\'s events.', 'Press Wait, then Stop, then Stop.', 'Press Fail and Unknown function.'],
+    preview: 'Here the service runs in the same preview; in the game it is a package of its own, and the host carries each call.',
+  },
   'world-objects-test': {
     group: 'tests',
     summary: 'Spawn an NPC, list what is near V with the files it names, swap an archive and try each way to show the new version on things in the world.',

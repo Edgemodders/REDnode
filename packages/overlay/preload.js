@@ -126,6 +126,14 @@ contextBridge.exposeInMainWorld('rednode', {
   },
   /** Questions to the AI assistant; used by `agent` in the rednode package. Answers arrive as {event: 'agent'}. */
   agent: (msg) => ipcRenderer.send('rednode:agent', msg),
+  /** Other packages' services (SV1); used by `service` in the rednode package. Events arrive as {event: 'service', provider, name, data}. */
+  service: (msg) => ipcRenderer.invoke('rednode:service', msg),
+  /** The Task Manager's calls: every running package's costs, End task, Restart. Built-in apps only. */
+  tasks: {
+    list: () => ipcRenderer.invoke('rednode:tasks:list'),
+    end: (id) => ipcRenderer.invoke('rednode:tasks:end', id),
+    restart: (id) => ipcRenderer.invoke('rednode:tasks:restart', id),
+  },
   /** For the host's builder page, which shows windows built by Node mods. Other pages get an error. */
   builder: {
     spec: () => ipcRenderer.invoke('rednode:builder:spec'),

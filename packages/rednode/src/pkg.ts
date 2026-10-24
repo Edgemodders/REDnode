@@ -155,8 +155,8 @@ export interface Requirement {
   installed: boolean;
   /** Whether it is installed in a version the range allows. */
   ok: boolean;
-  /** What it is: a RED4ext plugin, a redscript module, a Cyber Engine Tweaks mod, or a framework. */
-  kind: "red4ext" | "redscript" | "cet" | "framework" | null;
+  /** What it is: a RED4ext plugin, a redscript module, a Cyber Engine Tweaks mod, a framework, or another REDnode package (REDnode 0.34.0 or later). */
+  kind: "red4ext" | "redscript" | "cet" | "framework" | "tool" | "package" | null;
   /** Why it is not ok, such as "not installed", or a note such as "its version is unknown". */
   note: string;
 }

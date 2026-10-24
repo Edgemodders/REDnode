@@ -153,4 +153,53 @@ Each phase raises REDnode's version and ends with an in-game test, as every phas
 | A package's tools shown to assistants by default? | Yes, with every change asked first. The player switches tools off in the Tools Manager |
 | Start a provider on demand when it is switched off? | Not in SV1. A clear error first; decide after real use |
 | Companion apps | The Task Manager in SV1, the Tools Manager in SV3 |
+
+## SV1: built
+
+Built on 2026-10-24 in **REDnode 0.34.0**, while the owner was away (agreed: the three phases built back to back, each tested in game in order afterwards).
+
+| Piece | Where |
+|---|---|
+| The router: connect, call, cancel, emit, waiting for a starting provider, timeouts, counters | `packages/overlay/services.js` |
+| The service file in the mod worker: loaded after `main`, each call run with its caller and an `AbortSignal` in an `AsyncLocalStorage` | `packages/overlay/runtime/worker.js` |
+| Messages between workers and the router; `end` (End task), `stats`, `toWorker`, `state` | `packages/overlay/mods.js`, `runtime/runner.js` (each thread's event loop load, heap and CPU time, read from outside it so a stuck mod still answers) |
+| `"service"` in the manifest; a package with only a service runs as a Node mod; REDnode package ids in `requires` (kind `package`); pages' calls (`rednode:service`); game calls counted per package; the Task Manager's calls | `packages/overlay/main.js`, `preload.js` |
+| `service.connect`, `caller`, `signal`, `emit`; the handle's `$info`, `$call`, `$with`, `$on` | `packages/rednode/src/service.ts` |
+| The Task Manager | `packages/overlay/tasks` (built in, `taskmanager`) |
+| Samples | `apps/counter-service` (a service and nothing else), `apps/counter-panel` |
+| Docs | [Overlay apps: Calling other packages](overlay-apps.md#calling-other-packages) and [The Task Manager](overlay-apps.md#the-task-manager); the examples' previews run the provider's service file beside the caller |
+
+What changed from the plan while building:
+
+| Plan | Built | Why |
+|---|---|---|
+| `on(name)` on the handle, `service.abortable` | `$on`, `$with({ timeoutMs, signal })`, `$call` | A provider may export a function called `on`; the handle's own names start with `$`, so every other name is a call |
+| Calls and errors in the Mod log | Connections and failed calls in the caller's Mod log; each call counted, not logged | A panel calling 60 times a second would flood the log. SV3 logs each assistant's call |
+| Game calls' time on the game thread, per package | Game calls a second and their round trip from the host, per package | The game-thread time is measured by the plugin for all packages together; per package needs a plugin change, left for later |
+| — | A package with a service and no `main` | The plan allowed it; the Counter service sample is one |
+
+Checked before the game, in the mock game with two scratch packages:
+
+| Check | Result |
+|---|---|
+| 17 service cases (connect, calls, events with the caller's name, `$call`, a timeout, an abort, the provider's error, an unknown function, a bad argument, a package with no service, one not installed, connecting to oneself, `caller()` outside a call, `requires` naming a package) | All passed |
+| A call while the provider hot-reloads | It waited for the provider and answered |
+| End task on a mod stuck in an endless loop in the shared process | Stopped in under a second; the two other mods in that process kept running; Restart brought it back; a built-in app is refused |
+| The Task Manager's table | Shows each package's CPU, memory, thread load (the stuck mod at 100 %), heap and calls |
+
+## SV1 test
+
+Before: REDnode 0.34.0 deployed. Load a save.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. F10, Mod Manager: switch on **Counter service** and **Counter panel**. Counter panel's log says "Connected to Counter service 0.1.0: add, fail, get, reset, wait", and Counter service has no window. **Mark**.
+2. Press **+1** three times and **+10** once: the count reads 13 and the log shows a `changed` event after each. **Mark**.
+3. Press **Wait 3 s**: the answer comes after about 3 s. Press **Wait 40 s**: after 30 s it fails with "did not answer wait within 30 s". **Mark**.
+4. Press **Wait, then Stop**, then **Stop** within 20 s: the call fails with "Stopped", and the Mod log has Counter service's line "wait(20000) stopped: the caller gave up". **Mark**.
+5. Press **Fail** and **Unknown function**: each fails with its reason. **Mark**.
+6. In the Mod Manager, switch **Counter service** off, then press **Read** in Counter panel: it fails with "Counter service is off: switch it on in the Mod Manager". Switch it on again and press **Reconnect**, then **Read**: 0 (a new start). **Mark**.
+7. Open the **Task Manager** from the launcher. Counter panel and Counter service are listed with CPU, memory, Thread, Heap and Up. Press **+1** a few times quickly: the Service column shows calls in and out. **Mark**.
+8. Switch on **Crash mod** in the Mod Manager, and press its **Hang forever**. In the Task Manager its Thread reads about 100 %. Select it and press **End task**: it stops within 2 s and its window closes, and the game and other mods go on. **Mark**.
+9. Select Crash mod again and press **Restart**: it runs again with its window. **Mark**.
+10. Quit the game. Send `rednode-mods.log` and `rednode-overlay.log`.
 {% endraw %}

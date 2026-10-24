@@ -1,0 +1,15 @@
+{
+  "id": "taskmanager",
+  "name": "Task Manager",
+  "version": "0.34.0",
+  "author": "Edgemodders",
+  "description": "Every running package and what it costs: CPU, memory, its thread's load, game calls and service calls. End task stops one that misbehaves; Restart starts it again.",
+  "entry": "index.html",
+  "kind": "window",
+  "width": 900,
+  "height": 520,
+  "anchor": "center",
+  "x": 0,
+  "y": 0,
+  "open": false
+}

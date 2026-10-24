@@ -26,7 +26,8 @@ const net = require('node:net');
 const path = require('node:path');
 const { createMods } = require('./mods');
 const { createMcp } = require('./mcp');
-const { scanGame, checkRequires, validRange } = require('./gamefiles');
+const { createServices } = require('./services');
+const { scanGame, checkRequires, validRange, key: gamefilesKey } = require('./gamefiles');
 const { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED } = require('./redbridge');
 const bridgeInstall = require('./bridge-install');
 const { createLookup } = require('./gameapi-lookup');
@@ -63,6 +64,8 @@ const BUILTIN_ROOTS = [
   { dir: path.join(__dirname, 'launcher'), single: true, builtin: true, pinned: true },
   { dir: path.join(__dirname, 'modlog'), single: true, builtin: true },
   { dir: path.join(__dirname, 'manager'), single: true, builtin: true, manager: true },
+  // The Task Manager (SV1): what each package costs, End task. "admin": it may manage packages.
+  { dir: path.join(__dirname, 'tasks'), single: true, builtin: true, admin: true },
   // The Welcome window: opened at the first start, until the player closes it once.
   { dir: path.join(__dirname, 'welcome'), single: true, builtin: true },
 ];
@@ -241,6 +244,7 @@ let lastStateJson = '';
 
 /** Node mods (mods.js), created when the app is ready. */
 let mods = null;
+let services = null; // the service router (SV1), services.js
 /** The kernel MCP server (mcp.js), created when the app is ready. */
 let mcp = null;
 /** The plugin's newest perf report, for the MCP perf tool. */
@@ -317,12 +321,18 @@ function readManifest(dir) {
   }
   const problems = [];
   if (typeof m.id !== 'string' || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(m.id)) problems.push('id must be lowercase letters, digits, - or _');
-  if (m.entry === undefined && m.main === undefined) problems.push('needs "entry" (an HTML page), "main" (Node code) or both');
+  if (m.entry === undefined && m.main === undefined && m.service === undefined) {
+    problems.push('needs "entry" (an HTML page), "main" (Node code), "service" (functions for other packages) or more than one');
+  }
   if (m.entry !== undefined && (typeof m.entry !== 'string' || !fs.existsSync(path.join(dir, m.entry)))) {
     problems.push(`entry "${m.entry}" not found`);
   }
   if (m.main !== undefined && (typeof m.main !== 'string' || !fs.existsSync(path.join(dir, m.main)))) {
     problems.push(`main "${m.main}" not found`);
+  }
+  if (m.service !== undefined) {
+    if (typeof m.service !== 'string' || !fs.existsSync(path.join(dir, m.service))) problems.push(`service "${m.service}" not found`);
+    else if (!/\.(mjs|js)$/i.test(m.service)) problems.push('service must be a .mjs or .js module');
   }
   if (m.entry !== undefined) {
     for (const k of ['width', 'height']) {
@@ -371,6 +381,7 @@ function readManifest(dir) {
     description: typeof m.description === 'string' ? m.description : '',
     entry: m.entry ?? null,
     main: m.main ?? null,
+    service: m.service ?? null,
     isolation: m.isolation ?? 'any',
     permissions: m.permissions ?? [],
     provides: m.provides ?? [],
@@ -386,6 +397,9 @@ function readManifest(dir) {
     open: m.open !== false,
   };
 }
+
+/** Whether a package runs a Node mod: it has a main, a service file (SV1) or both. */
+const isMod = (m) => !!(m.main || m.service);
 
 // ---------- what the game has installed (W2: "requires") ----------
 
@@ -533,7 +547,15 @@ function installedNow() {
 function requirementsOf(id) {
   const entry = apps.get(id);
   if (!entry || !Object.keys(entry.manifest.requires ?? {}).length) return [];
-  return checkRequires(entry.manifest.requires, installedNow());
+  // Other REDnode packages count too (SV1), by id, with their manifest's version; a game
+  // mod of the same name wins.
+  const known = new Map(installedNow());
+  known.leftovers = installedNow().leftovers;
+  for (const [pid, a] of apps) {
+    const k = gamefilesKey(pid);
+    if (!known.has(k)) known.set(k, { name: a.manifest.name, kind: 'package', version: a.manifest.version || null, path: a.dir });
+  }
+  return checkRequires(entry.manifest.requires, known);
 }
 
 /** Whether a manifest's "requires" names REDbridge. */
@@ -559,7 +581,7 @@ function discoverApps() {
           noteHidden(manifest.id, dir, apps.get(manifest.id).dir);
           continue;
         }
-        apps.set(manifest.id, { manifest, dir, builtin: !!root.builtin, pinned: !!root.pinned, manager: !!root.manager, dev: !!root.dev });
+        apps.set(manifest.id, { manifest, dir, builtin: !!root.builtin, pinned: !!root.pinned, manager: !!root.manager, admin: !!root.admin, dev: !!root.dev });
       } catch (err) {
         log(`Skipped an app: ${err.message}`);
       }
@@ -861,7 +883,7 @@ function markSeen(ids) {
 function startPackage(entry) {
   if (hotReload && !entry.builtin) watchPackage(entry);
   if (shouldOpen(entry)) openApp(entry);
-  if (entry.manifest.main) mods.add(entry, { enabled: shouldOpen(entry), shared: settings.apps[entry.manifest.id]?.shared });
+  if (isMod(entry.manifest)) mods.add(entry, { enabled: shouldOpen(entry), shared: settings.apps[entry.manifest.id]?.shared });
 }
 
 function stopPackage(id) {
@@ -1507,7 +1529,24 @@ function hostState() {
 const tweakJournal = new Map(); // package id -> Map(path -> { type, value } before its first change, or null)
 const undoing = new Map(); // package id -> the promise of its undo in progress
 
+// Game calls per package, counted for the Task Manager: id -> { calls, ms } since the last sample.
+const gameCounts = new Map();
+
 async function packageCall(id, method, params) {
+  const started = performance.now();
+  try {
+    return await packageCallNow(id, method, params);
+  } finally {
+    if (id) {
+      const c = gameCounts.get(id) ?? { calls: 0, ms: 0 };
+      c.calls += 1;
+      c.ms += performance.now() - started;
+      gameCounts.set(id, c);
+    }
+  }
+}
+
+async function packageCallNow(id, method, params) {
   // A restarted package waits until its old changes are undone, so it never saves a
   // half-restored value as the original.
   if (id && undoing.has(id)) await undoing.get(id);
@@ -2430,7 +2469,7 @@ ipcMain.on('rednode:drag-regions', (event, regions) => {
 
 function fromLauncher(event) {
   const w = windowFor(event.sender);
-  if (!w?.app.pinned && !w?.app.manager) throw new Error('Only the REDnode launcher and Mod Manager can manage apps');
+  if (!w?.app.pinned && !w?.app.manager && !w?.app.admin) throw new Error('Only the REDnode launcher, Mod Manager and Task Manager can manage apps');
 }
 
 function isEnabled(entry) {
@@ -2464,7 +2503,9 @@ function appList() {
         manager: !!entry.manager,
         // In the tool layer (the front permission): its windows show in every space.
         tool: isGranted(m.id, 'front'),
-        mod: m.main ? mods.info(m.id, metrics) : null,
+        mod: isMod(m) ? mods.info(m.id, metrics) : null,
+        // Its service (SV1): the functions it offers other packages, once its service file has loaded.
+        service: m.service ? { file: m.service, functions: services.offer(m.id)?.functions ?? null } : null,
         closedWindows: [...playerClosed.values()].filter((c) => c.modId === m.id).map((c) => c.win),
         hasWindow: windowsOfPackage(m.id).length > 0,
         // Its space: set for the package, else the one its open windows share, else null.
@@ -2504,7 +2545,8 @@ function setPackageOpen(id, open) {
     if (open) openApp(entry);
     else closeApp(id);
   }
-  if (entry.manifest.main) mods.setEnabled(id, !!open);
+  if (isMod(entry.manifest)) mods.setEnabled(id, !!open);
+  if (!open) services?.removed(id);
 }
 
 ipcMain.handle('rednode:apps:set-open', (event, id, open) => {
@@ -3052,6 +3094,174 @@ ipcMain.on('rednode:agent', (event, msg) => {
   });
 });
 
+// ---------- services: packages calling each other (SV1, docs/services.md) ----------
+//
+// From a package's Node mod (through mods.js) or its pages (rednode:service):
+//   { op: 'connect', provider }                    -> { id, name, version, functions }
+//   { op: 'call', provider, fn, args, cid, timeoutMs } -> the result
+//   { op: 'cancel', cid }                           a caller's AbortSignal fired
+//   { op: 'emit', name, data }                      a provider's event (Node mods only)
+// The router lives in services.js; this ties it to packages.
+
+const callsByCid = new Map(); // `${caller}:${cid}` -> the router's sid, so a caller can cancel
+
+function onService(id, msg) {
+  const entry = apps.get(id);
+  if (!entry) throw new Error('Unknown package');
+  const caller = { id, name: entry.manifest.name };
+  switch (msg?.op) {
+    case 'connect':
+      return services.connect(id, String(msg.provider ?? ''));
+    case 'call': {
+      const key = `${id}:${msg.cid}`;
+      return services
+        .call(caller, String(msg.provider ?? ''), msg.fn, msg.args, {
+          timeoutMs: msg.timeoutMs,
+          onSid: (sid) => callsByCid.set(key, sid),
+        })
+        .finally(() => callsByCid.delete(key));
+    }
+    case 'cancel': {
+      const sid = callsByCid.get(`${id}:${msg.cid}`);
+      if (sid) services.cancel(sid);
+      return null;
+    }
+    case 'emit':
+      services.emit(id, msg.name, msg.data);
+      return null;
+    default:
+      throw new Error(`Unknown service request "${msg?.op}"`);
+  }
+}
+
+// Pages call services too; only a Node mod can offer one (emit is refused here).
+ipcMain.handle('rednode:service', async (event, msg) => {
+  const id = packageOf(event);
+  if (msg?.op === 'emit') throw new Error('Only a package\'s Node mod can send service events: emit from its service file or main');
+  try {
+    return await onService(id, msg);
+  } catch (err) {
+    throw new Error(err.message); // without Electron's remote-method wrapper, which cleanError strips anyway
+  }
+});
+
+// ---------- the Task Manager (SV1) ----------
+//
+// Rates are sampled every second over the last 5 seconds, so any number of Task Manager
+// windows read the same numbers: game calls and their round trip per package, and
+// service calls in and out.
+
+const RATE_SECONDS = 5;
+const rateRing = []; // the last RATE_SECONDS samples: { game: { id: { calls, ms } }, svc: { id: { in, out, errors, ms } } }
+setInterval(() => {
+  rateRing.push({ game: Object.fromEntries(gameCounts), svc: services ? services.takeCounters() : {} });
+  gameCounts.clear();
+  if (rateRing.length > RATE_SECONDS) rateRing.shift();
+}, 1000);
+
+function ratesOf(id) {
+  const n = rateRing.length || 1;
+  let calls = 0, ms = 0, sin = 0, sout = 0, errors = 0, sms = 0;
+  for (const r of rateRing) {
+    calls += r.game[id]?.calls ?? 0;
+    ms += r.game[id]?.ms ?? 0;
+    sin += r.svc[id]?.in ?? 0;
+    sout += r.svc[id]?.out ?? 0;
+    errors += r.svc[id]?.errors ?? 0;
+    sms += r.svc[id]?.ms ?? 0;
+  }
+  return {
+    gameCallsPerSec: Math.round((calls / n) * 10) / 10,
+    gameCallMs: calls ? Math.round((ms / calls) * 10) / 10 : null,
+    serviceInPerSec: Math.round((sin / n) * 10) / 10,
+    serviceOutPerSec: Math.round((sout / n) * 10) / 10,
+    serviceErrors: errors,
+    serviceMs: sin ? Math.round((sms / sin) * 10) / 10 : null,
+  };
+}
+
+/** One row per running package: its mod (if any), its windows, its calls. */
+async function taskList() {
+  const metrics = app.getAppMetrics();
+  const byPid = new Map(metrics.map((x) => [x.pid, x]));
+  const modRows = new Map((await mods.stats(metrics)).map((r) => [r.id, r]));
+  const rows = [];
+  for (const entry of apps.values()) {
+    const m = entry.manifest;
+    if (entry.pinned) continue; // the launcher
+    const mod = modRows.get(m.id) ?? null;
+    const wins = windowsOfPackage(m.id).map((w) => {
+      let pid = null;
+      try {
+        pid = w.win.webContents.getOSProcessId();
+      } catch {
+        // a closing window
+      }
+      const x = pid && byPid.get(pid);
+      return {
+        key: w.app.manifest.id,
+        title: w.app.manifest.name,
+        cpuPercent: x ? Math.round(x.cpu.percentCPUUsage * 10) / 10 : null,
+        memoryMB: x ? Math.round(x.memory.workingSetSize / 1024) : null,
+      };
+    });
+    const running = mod?.process || wins.length;
+    if (!running && !(mod && (mod.ended || mod.status === 'crashed' || mod.status === 'not-responding'))) continue;
+    rows.push({
+      id: m.id,
+      name: m.name,
+      version: m.version,
+      builtin: entry.builtin,
+      mod,
+      windows: wins,
+      service: m.service ? { functions: services.offer(m.id)?.functions ?? null } : null,
+      ...ratesOf(m.id),
+    });
+  }
+  const host = metrics.filter((x) => x.type === 'Browser' || x.type === 'GPU' || x.type === 'Utility' && !rows.some((r) => r.mod?.pid === x.pid));
+  return {
+    at: Date.now(),
+    rows,
+    total: {
+      cpuPercent: Math.round(metrics.reduce((n, x) => n + (x.cpu?.percentCPUUsage ?? 0), 0) * 10) / 10,
+      memoryMB: Math.round(metrics.reduce((n, x) => n + (x.memory?.workingSetSize ?? 0), 0) / 1024),
+      processes: metrics.length,
+      hostMB: Math.round(host.reduce((n, x) => n + (x.memory?.workingSetSize ?? 0), 0) / 1024),
+    },
+  };
+}
+
+ipcMain.handle('rednode:tasks:list', async (event) => {
+  fromLauncher(event);
+  return taskList();
+});
+
+ipcMain.handle('rednode:tasks:end', (event, id) => {
+  fromLauncher(event);
+  const entry = apps.get(id);
+  if (!entry || entry.pinned) throw new Error(`No package "${id}"`);
+  if (entry.builtin) throw new Error(`${entry.manifest.name} is part of REDnode: close its window instead`);
+  log(`End task: ${id}`);
+  const ended = isMod(entry.manifest) ? mods.end(id) : false;
+  services.removed(id);
+  // A page app's window closes; a mod's windows close as it stops (not as the player's
+  // closes, so they open again with it).
+  if (entry.manifest.entry) closeApp(id);
+  return ended || true;
+});
+
+ipcMain.handle('rednode:tasks:restart', (event, id) => {
+  fromLauncher(event);
+  const entry = apps.get(id);
+  if (!entry || entry.pinned) throw new Error(`No package "${id}"`);
+  if (isMod(entry.manifest)) {
+    if (!mods.isEnabled(id)) throw new Error(`${entry.manifest.name} is switched off: switch it on in the Mod Manager`);
+    mods.restart(id, 'Restarted from the Task Manager');
+  }
+  if (entry.manifest.entry && settings.apps[id]?.open !== false) openApp(entry);
+  return true;
+});
+
 // The channel between a package's pages and its own Node mod (channel in the rednode package).
 ipcMain.on('rednode:pkg:post', (event, data) => {
   let id;
@@ -3432,14 +3642,14 @@ function watchPackage(entry) {
   let timer = null;
   try {
     const watcher = fs.watch(entry.dir, { recursive: true }, (_type, file) => {
-      if (file && /(^|[\\/])node_modules([\\/]|$)/.test(file) && !entry.manifest.main) return;
+      if (file && /(^|[\\/])node_modules([\\/]|$)/.test(file) && !isMod(entry.manifest)) return;
       if (file && /(^|[\\/])\./.test(file)) return; // dot folders and files belong to tools, not to the package
       if (file && /(^|[\\/])rednode-app\.json$/.test(file)) return; // a manifest change: rescanApps applies it
       clearTimeout(timer);
       timer = setTimeout(() => {
         if (watchers.get(id) !== watcher || apps.get(id) !== entry) return; // the package was removed or replaced
         log(`Changed: ${id}${file ? ` (${file})` : ''}. Reloading.`);
-        if (entry.manifest.main && mods.has(id)) mods.restart(id);
+        if (isMod(entry.manifest) && mods.has(id)) mods.restart(id);
         const w = windowOfApp(id);
         if (w && !w.win.isDestroyed()) w.win.webContents.reloadIgnoringCache();
       }, 400);
@@ -3577,9 +3787,21 @@ app.whenReady().then(() => {
   mcp = createMcp(mcpHost());
   mcp.configure(mcpConfig());
   // Mods start below; one may ask for the kernel's tools at once (mcpFor).
+  services = createServices({
+    entry: (id) => apps.get(id),
+    modState: (id) => mods.state(id),
+    toWorker: (id, message) => mods.toWorker(id, message),
+    toPackage: (id, message) => {
+      mods.toMod(id, message);
+      for (const w of windowsOfPackage(id)) toPage(w, message);
+    },
+    modLog: (id, level, text) => mods.log(id, level, text),
+  });
   mods = createMods({
     app,
     utilityProcess,
+    services,
+    service: (id, msg) => onService(id, msg),
     log,
     logFile: modLogFile(),
     runner: path.join(RUNTIME_DIR, 'runner.js'),
@@ -3607,6 +3829,7 @@ app.whenReady().then(() => {
     // A mod's TweakDB changes are undone each time it stops, restarts and hot reloads included.
     // Its sounds stop too.
     stopped: (id) => {
+      services.gone(id);
       undoTweaks(id, 'the mod stopped');
       stopSounds(id);
       clearInk(id);
@@ -3619,7 +3842,7 @@ app.whenReady().then(() => {
   }
   for (const entry of apps.values()) {
     if (shouldOpen(entry)) openApp(entry);
-    if (entry.manifest.main) mods.add(entry, { enabled: shouldOpen(entry), shared: settings.apps[entry.manifest.id]?.shared });
+    if (isMod(entry.manifest)) mods.add(entry, { enabled: shouldOpen(entry), shared: settings.apps[entry.manifest.id]?.shared });
   }
   setHotReload(hotReloadArg ? hotReloadArg !== 'off' : app.isPackaged ? !!settings.hotReload : true);
   watchAppRoots();

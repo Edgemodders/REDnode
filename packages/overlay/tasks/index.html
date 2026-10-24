@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Task Manager</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<style>
+  html, body { margin: 0; width: 900px; height: 520px; overflow: hidden; background: transparent; }
+  rn-window { position: absolute; inset: 0; }
+  [hidden] { display: none !important; }
+  .status { font: 11px var(--rn-mono); letter-spacing: .08em; color: var(--rn-dim); }
+  .bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .chip { font: 600 11px var(--rn-mono); letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+    padding: 4px 8px; color: var(--rn-dim); border: 1px solid var(--rn-line); background: transparent; }
+  .chip:hover { color: var(--rn-fg); }
+  .chip.on { color: var(--rn-on-accent); background: var(--rn-accent); border-color: var(--rn-accent); }
+  .spacer { flex: 1; }
+  .totals { font: 11px var(--rn-mono); color: var(--rn-dim); }
+  .totals b { color: var(--rn-fg); font-weight: 600; }
+  rn-button::part(button) { min-height: 24px; padding: 2px 9px; font-size: 11px; }
+
+  .table-wrap { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; border: 1px solid var(--rn-line); background: var(--rn-panel); }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
+  th { position: sticky; top: 0; z-index: 1; background: var(--rn-panel-2); text-align: left; padding: 6px 8px;
+    font: 600 10px var(--rn-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--rn-dim);
+    border-bottom: 1px solid var(--rn-line); white-space: nowrap; cursor: pointer; user-select: none; }
+  th.num, td.num { text-align: right; }
+  th.sorted { color: var(--rn-accent); }
+  th.nosort { cursor: default; }
+  td { padding: 5px 8px; border-bottom: 1px solid color-mix(in srgb, var(--rn-line) 60%, transparent);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  td.mono, td.num { font: 12px var(--rn-mono); }
+  tr { cursor: pointer; }
+  tbody tr:hover td { background: color-mix(in srgb, var(--rn-accent-2) 6%, transparent); }
+  tr.selected td { background: color-mix(in srgb, var(--rn-accent) 12%, transparent); }
+  .dim { color: var(--rn-dim); }
+  .hot { color: var(--rn-danger); }
+  .warm { color: var(--rn-accent-2); }
+  .st-running { color: var(--rn-ok); }
+  .st-crashed, .st-not-responding { color: var(--rn-danger); }
+  .st-starting { color: var(--rn-accent-2); }
+  .st-stopped, .st-ended { color: var(--rn-dim); }
+  .empty { padding: 16px; color: var(--rn-dim); }
+
+  .details { display: flex; gap: 12px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--rn-line);
+    background: var(--rn-panel); font: 11px var(--rn-mono); color: var(--rn-dim); min-height: 52px; }
+  .details .what { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; overflow-wrap: anywhere; }
+  .details .what b { color: var(--rn-fg); font: 700 13px var(--rn-display); letter-spacing: .06em; text-transform: uppercase; }
+  .details .acts { display: flex; gap: 6px; flex: none; }
+</style>
+</head>
+<body>
+  <rn-window title="Task Manager" draggable closable>
+    <span class="status" slot="status" id="count">0 RUNNING</span>
+    <div class="bar">
+      <span class="totals" id="totals"></span>
+      <span class="spacer"></span>
+      <span class="dim status">REFRESH</span>
+      <button class="chip on" data-every="1000">1 s</button>
+      <button class="chip" data-every="5000">5 s</button>
+      <button class="chip" id="pause">Pause</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <colgroup>
+          <col style="width: 23%"><col style="width: 11%"><col style="width: 8%"><col style="width: 9%"><col style="width: 9%">
+          <col style="width: 8%"><col style="width: 11%"><col style="width: 11%"><col style="width: 10%">
+        </colgroup>
+        <thead><tr id="head"></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty" hidden>Nothing is running.</div>
+    </div>
+    <div class="details" id="details">
+      <div class="what" id="what">Select a row to see more, or to end it.</div>
+      <div class="acts">
+        <rn-button id="restart" variant="ghost" hidden>Restart</rn-button>
+        <rn-button id="end" variant="danger" hidden>End task</rn-button>
+      </div>
+    </div>
+  </rn-window>
+<script src="app.js"></script>
+</body>
+</html>

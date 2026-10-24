@@ -1,0 +1,12 @@
+{
+  "id": "counter-panel",
+  "name": "Counter panel",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "Calls Counter service through REDnode's mod services: reads and changes its count, hears its events, and tries a timeout, Stop, an error and an unknown function.",
+  "main": "mod.mjs",
+  "open": false,
+  "requires": {
+    "counter-service": ">=0.1"
+  }
+}

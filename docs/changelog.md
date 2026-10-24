@@ -14,11 +14,18 @@ How to keep it:
 **New**
 
 - **Development folders**: in the launcher's Settings drawer, with Developer mode on, add folders from your own projects. Their packages run from there, with hot reload, instead of their installed copies, so a mod can be developed outside the game folder. The Mod Manager marks such a package **DEV** and names the copy it hides. A folder can be one package or hold several. See [Development folders](https://edgemodders.github.io/REDnode/overlay-apps.html#development-folders).
+- **Mod services**: a package names a service file in its manifest (`"service": "service.mjs"`), and every function it exports can be called by other packages through REDnode with `service.connect("<package id>")`, with timeouts, Stop, the caller's name and events (`service.emit`, `$on`). Overlay pages can call too. `requires` takes other REDnode packages by id. Samples: **Counter service** and **Counter panel**. See [Calling other packages](https://edgemodders.github.io/REDnode/overlay-apps.html#calling-other-packages).
+- **Task Manager**, built in: every running package with its CPU, memory, its thread's load and heap, game calls and service calls; **End task** stops one, even one stuck in an endless loop, and **Restart** starts it again.
 - The UI kit's `rn-window` takes `drawer`: a panel that belongs to the page's main window, such as a settings drawer beside it. It has no title-bar actions but close, which only hides it, and the main window keeps its space, pin and reset actions.
 
 **Changed**
 
+- A package can be a Node mod with only a service file and no `main`.
 - The launcher's settings (GPU sharing, Hot reload, MCP server, Developer mode, Open at start, Tooltips) moved to a **Settings** drawer beside it, opened with the gear at the right of the Theme row, one setting a row with a line on what it does. The launcher's title is now just **REDNODE**, so it no longer gets cut off. Its version line reads "Version 0.32.3" rather than repeating the name.
+
+**Fixed**
+
+- The docs site's example previews load again: since 0.32.0 every preview stopped at a script error.
 
 ## 0.32.1 (2026-10-23)
 

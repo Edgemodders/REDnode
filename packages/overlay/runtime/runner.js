@@ -9,11 +9,13 @@
 //   { t: 'stop', id }                            stop a mod
 //   { t: 'to-mod', id, message }                 a reply or event for one mod
 //   { t: 'broadcast', message }                  an event for every mod
+//   { t: 'stats', rid }                          each mod's thread: event loop load, heap (Task Manager)
 // Runner -> host:
 //   { t: 'from-mod', id, message }               a call, state request or UI message
 //   { t: 'log', id, level, text }                a line the mod printed
 //   { t: 'status', id, gen, status, error? }     running, crashed, not-responding, stopped; gen is the start's number
 //   { t: 'inspector', id, gen, url }             a debugged mod opened Node's inspector
+//   { t: 'stats', rid, mods: { id: { load, heapMB, heapLimitMB, cpuMs } } }
 
 'use strict';
 
@@ -55,7 +57,7 @@ function start(mod, sdk) {
     stderr: true,
     name: `rednode mod ${mod.id}`,
   });
-  const entry = { worker, lastPong: Date.now(), hung: false, stopping: false, gen: mod.gen };
+  const entry = { worker, lastPong: Date.now(), hung: false, stopping: false, gen: mod.gen, elu: null, cpu: null };
   mods.set(mod.id, entry);
   pipeLines(worker.stdout, mod.id, 'info');
   pipeLines(worker.stderr, mod.id, 'error');
@@ -118,10 +120,50 @@ port.on('message', ({ data: m }) => {
     case 'broadcast':
       for (const entry of mods.values()) entry.worker.postMessage({ t: 'event', message: m.message });
       break;
+    case 'stats':
+      stats(m.rid);
+      break;
     default:
       break;
   }
 });
+
+// What each mod's thread costs, measured from outside it, so a mod stuck in a loop still
+// answers: how busy its event loop was since the last read (0 to 1, about one core), its
+// JavaScript heap, and its CPU time where Node can tell (worker.cpuUsage, newer Node only).
+async function stats(rid) {
+  const out = {};
+  for (const [id, entry] of mods) {
+    const w = entry.worker;
+    const s = {};
+    try {
+      const now = w.performance.eventLoopUtilization();
+      s.load = entry.elu ? w.performance.eventLoopUtilization(now, entry.elu).utilization : now.utilization;
+      entry.elu = now;
+    } catch {
+      s.load = null;
+    }
+    try {
+      if (typeof w.getHeapStatistics === 'function') {
+        const h = await w.getHeapStatistics();
+        s.heapMB = Math.round(h.used_heap_size / 1048576);
+        s.heapLimitMB = Math.round(h.heap_size_limit / 1048576);
+      }
+    } catch {
+      // not available, or the worker is ending
+    }
+    try {
+      if (typeof w.cpuUsage === 'function') {
+        const c = await w.cpuUsage();
+        s.cpuMs = Math.round((c.user + c.system) / 1000);
+      }
+    } catch {
+      // not available
+    }
+    out[id] = s;
+  }
+  send({ t: 'stats', rid, mods: out });
+}
 
 // A mod that stops answering is reported, so the launcher can offer a restart.
 setInterval(() => {

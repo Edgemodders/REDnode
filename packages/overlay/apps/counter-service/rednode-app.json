@@ -1,0 +1,9 @@
+{
+  "id": "counter-service",
+  "name": "Counter service",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "A service with no window: a count other packages read and change through REDnode's mod services. Its functions are in service.mjs. Counter panel uses it.",
+  "service": "service.mjs",
+  "open": false
+}

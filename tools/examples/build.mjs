@@ -74,7 +74,7 @@ function order(f) {
 function readApp({ id, root }) {
   const dir = join(root.dir, id);
   const manifest = JSON.parse(readFileSync(join(dir, 'rednode-app.json'), 'utf8'));
-  const kind = manifest.main ? 'mod' : manifest.kind === 'hud' ? 'hud' : 'window';
+  const kind = manifest.main || manifest.service ? 'mod' : manifest.kind === 'hud' ? 'hud' : 'window';
   const files = filesOf(dir).map((f) => ({ path: f, text: TEXT.has(extname(f)) ? readFileSync(join(dir, f), 'utf8').replace(/\r\n/g, '\n') : null }));
   const github = `${GITHUB}/${root.path}/${id}`;
   return { id, dir, github, pack: root.pack, manifest, kind, files, note: NOTES[id] ?? { group: 'tests', summary: manifest.description ?? '' } };
@@ -143,7 +143,29 @@ function copyForPreview(app) {
       // Served as .js: module workers need a JavaScript MIME type, and not every host knows .mjs.
       to = join(dest, 'mod.js');
       writeFileSync(to, f.text.replace(/from\s+(['"])rednode\1/g, `from '${SIM}/worker.js'`));
+    } else if (f.path === app.manifest.service) {
+      // A service file: other previews load it as ../<id>/service.js (the sim's service.connect).
+      writeFileSync(join(dest, 'service.js'), f.text.replace(/from\s+(['"])rednode\1/g, `from '${SIM}/worker.js'`));
     } else cpSync(from, to);
+  }
+  // A package with a service and no main has no window: its preview lists what it offers.
+  if (app.manifest.service && !app.manifest.main) {
+    writeFileSync(
+      join(dest, 'mod.js'),
+      `import * as offered from './service.js';
+import { ui } from '${SIM}/worker.js';
+const names = Object.keys(offered).filter((k) => typeof offered[k] === 'function');
+ui.window({
+  title: ${JSON.stringify(app.manifest.name)},
+  width: 420,
+  height: 200,
+  children: [
+    ui.text("This package has no window. Through REDnode's mod services it offers other packages these functions:", { tone: "dim" }),
+    ui.text(names.join(', ')),
+  ],
+});
+`,
+    );
   }
   if (app.kind === 'mod') writeFileSync(join(dest, 'index.html'), runnerPage(app));
 }

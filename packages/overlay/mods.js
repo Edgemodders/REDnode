@@ -37,6 +37,8 @@ const RESTARTS = 3; // a mod process that crashes more often than this in a minu
  * @param {(id: string, on: boolean) => void} host.soloFor  a mod asks for solo mode, or ends it
  * @param {(id: string) => void} [host.stopped]               a mod stopped or crashed, even when it starts again at once
  * @param {(entry: object) => void} host.onLog               a mod printed a line: { time, id, level, text }
+ * @param {object} host.services                            the service router (services.js): connect, call, cancel, ready, reply, emit
+ * @param {(id: string, msg: object) => Promise<unknown>} host.service   a service request from a mod (connect, call, cancel, emit)
  */
 function createMods(host) {
   /** Mods by id: { entry, enabled, status, error, log: string[], process: key | null, restartedAt } */
@@ -46,6 +48,8 @@ function createMods(host) {
   /** The newest lines of every mod, oldest first, for the Mod log app. */
   const recent = [];
   let starts = 0; // numbers each start of a mod, so late messages from an earlier start are ignored
+  let nextStats = 1;
+  const statsWanted = new Map(); // rid -> resolve, for each process's answer to 'stats'
   let logSeq = 0; // numbers every line, so a page that also gets the history can skip repeats
 
   // ---------- the mod log ----------
@@ -129,6 +133,12 @@ function createMods(host) {
       m.stopping = false;
       host.ui.closeAll(id);
       host.stopped?.(id);
+      if (m.ended) {
+        // End task ended the process for this mod: not a crash, and it stays stopped.
+        modLog(id, 'info', 'Ended by the player (its process was ended)');
+        setStatus(id, 'stopped');
+        continue;
+      }
       modLog(id, 'error', `crashed: ${where} ended (code ${code}). Mods in it: ${names.join(', ')}`);
       setStatus(id, 'crashed', `${where} ended (code ${code}). Mods in it: ${names.join(', ')}`);
     }
@@ -155,6 +165,10 @@ function createMods(host) {
         return;
       case 'from-mod':
         onModMessage(p, msg.id, msg.message);
+        return;
+      case 'stats':
+        statsWanted.get(msg.rid)?.(msg.mods ?? {});
+        statsWanted.delete(msg.rid);
         return;
       case 'inspector': {
         // A debugged mod's worker opened Node's inspector: its address, for DevTools or VS Code.
@@ -243,6 +257,20 @@ function createMods(host) {
       case 'agent':
         host.agent(id, msg.msg);
         return;
+      case 'service':
+        Promise.resolve()
+          .then(() => host.service(id, msg.msg))
+          .then(
+            (result) => reply(p, id, msg.rid, result),
+            (err) => reply(p, id, msg.rid, undefined, err?.message || String(err)),
+          );
+        return;
+      case 'service-ready':
+        if (mods.get(id)?.process === p.key) host.services.ready(id, msg.functions);
+        return;
+      case 'service-reply':
+        host.services.reply(id, msg.sid, msg.result, msg.error);
+        return;
       case 'bridge':
         Promise.resolve()
           .then(() => host.bridgeFor(id, msg.op, msg.method, msg.params))
@@ -299,14 +327,17 @@ function createMods(host) {
     m.gen = ++starts;
     m.log.length = 0;
     m.inspector = null;
-    modLog(id, 'info', `Starting ${m.entry.manifest.main} in ${key === SHARED ? 'the shared process' : 'its own process'}`);
+    m.ended = false;
+    m.startedAt = Date.now();
+    const files = [m.entry.manifest.main, m.entry.manifest.service].filter(Boolean).join(' and ');
+    modLog(id, 'info', `Starting ${files} in ${key === SHARED ? 'the shared process' : 'its own process'}`);
     const missing = host.missingOf(id);
     if (missing) modLog(id, 'error', `Missing what its rednode-app.json requires: ${missing}`);
     setStatus(id, 'starting');
     const { manifest } = m.entry;
     p.proc.postMessage({
       t: 'start',
-      mod: { id, gen: m.gen, dir: m.entry.dir, main: manifest.main, dataDir: host.dataDir(id), appsDirs: host.appsDirs, debug: m.debug },
+      mod: { id, gen: m.gen, dir: m.entry.dir, main: manifest.main, service: manifest.service, dataDir: host.dataDir(id), appsDirs: host.appsDirs, debug: m.debug },
       sdk: host.sdk,
     });
   }
@@ -335,6 +366,7 @@ function createMods(host) {
   function restart(id, why = 'Restarting') {
     const m = mods.get(id);
     if (!m || !m.enabled) return;
+    m.ended = false;
     modLog(id, 'info', why);
     if (m.process) stop(id, true);
     else start(id);
@@ -388,8 +420,17 @@ function createMods(host) {
 
     setEnabled(id, enabled) {
       const m = mods.get(id);
-      if (!m || m.enabled === enabled) return;
+      if (!m) return;
+      if (m.enabled === enabled) {
+        // Switched on again after End task: start it.
+        if (enabled && m.ended && !m.process) {
+          m.ended = false;
+          start(id);
+        }
+        return;
+      }
       m.enabled = enabled;
+      m.ended = false;
       if (enabled) start(id);
       else stop(id);
     },
@@ -408,6 +449,88 @@ function createMods(host) {
     /** Sends an event (a game event or a state change) to every running mod. */
     broadcast(message) {
       for (const p of processes.values()) p.proc.postMessage({ t: 'broadcast', message });
+    },
+
+    /**
+     * End task (the Task Manager): stops a mod now, and keeps it stopped until the player
+     * starts it again; it stays switched on, so the next start of the game runs it. A mod
+     * that has not stopped within 2 s has its process ended; other mods in that process
+     * restart, as after a crash.
+     */
+    end(id) {
+      const m = mods.get(id);
+      if (!m || !m.process) return false;
+      m.ended = true;
+      modLog(id, 'info', 'End task');
+      const gen = m.gen;
+      const key = m.process;
+      stop(id);
+      setTimeout(() => {
+        const p = processes.get(key);
+        if (!p || m.gen !== gen || m.process !== key) return; // it stopped
+        host.log(`${id} did not stop within 2 s: ending its process (${key})`);
+        p.proc.kill();
+      }, 2000);
+      return true;
+    },
+
+    /** Posts a message straight to a running mod's worker. False when it is not running. */
+    toWorker(id, message) {
+      const m = mods.get(id);
+      const p = m?.process && processes.get(m.process);
+      if (!p || m.stopping) return false;
+      p.proc.postMessage({ t: 'to-mod', id, message });
+      return true;
+    },
+
+    /** A mod's switch and status, for the service router. */
+    state(id) {
+      const m = mods.get(id);
+      return m ? { enabled: m.enabled && !m.ended, status: m.status } : null;
+    },
+
+    /**
+     * What every mod costs now, for the Task Manager: one row per mod, with its process's
+     * CPU and memory (from Electron's metrics) and its own thread's load and heap (asked of
+     * its process). Waits at most 500 ms for the processes' answers.
+     */
+    async stats(metrics) {
+      const asked = [];
+      for (const p of processes.values()) {
+        const rid = nextStats++;
+        asked.push(
+          new Promise((resolve) => {
+            statsWanted.set(rid, (ms) => resolve(ms));
+            setTimeout(() => {
+              if (statsWanted.delete(rid)) resolve({});
+            }, 500);
+            p.proc.postMessage({ t: 'stats', rid });
+          }),
+        );
+      }
+      const threads = {};
+      for (const ms of await Promise.all(asked)) Object.assign(threads, ms);
+      const rows = [];
+      for (const [id, m] of mods) {
+        const p = m.process && processes.get(m.process);
+        const proc = p && metrics.find((x) => x.pid === p.proc.pid);
+        rows.push({
+          id,
+          name: m.entry.manifest.name,
+          enabled: m.enabled,
+          ended: !!m.ended,
+          status: m.status,
+          error: m.error,
+          process: p ? (p.key === SHARED ? 'shared' : p.key.startsWith('debug:') ? 'debug' : 'own') : null,
+          processMods: p ? [...p.mods] : [],
+          pid: p?.proc.pid ?? null,
+          cpuPercent: proc ? Math.round(proc.cpu.percentCPUUsage * 10) / 10 : null,
+          memoryMB: proc ? Math.round(proc.memory.workingSetSize / 1024) : null,
+          uptimeMs: p && m.startedAt ? Date.now() - m.startedAt : null,
+          ...threads[id],
+        });
+      }
+      return rows;
     },
 
     /** Sends an event to one mod. */
@@ -432,6 +555,7 @@ function createMods(host) {
         processMods: p ? p.mods.size : 0,
         log: m.log.slice(-5),
         debug: m.debug,
+        ended: !!m.ended,
         // The inspector's WebSocket address while the mod runs with the debugger.
         inspector: (m.debug && m.process && m.inspector) || null,
       };

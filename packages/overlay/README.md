@@ -75,6 +75,7 @@ Every folder in the apps folder with a `rednode-app.json` is a package: an overl
 | `name`, `version`, `author`, `description` | Shown in the launcher |
 | `entry` | An overlay app: the page to load, relative to the folder |
 | `main` | A Node mod: the file to run, relative to the folder. Use `.mjs` for `import` syntax |
+| `service` | Functions other packages may call (REDnode 0.34.0 and later): a `.mjs` or `.js` file whose exported functions are the package's service. It runs in the package's Node mod, after `main`; a package may have a service and no `main`. See [Mod services](../../docs/overlay-apps.md#calling-other-packages) |
 | `isolation` | Node mods: `process` makes the mod always run in its own process, so the player cannot put it in the shared group. Use it for mods with native addons |
 | `permissions` | Powers the package asks for, which the player allows in the launcher. Today `mcp`: the kernel MCP server's tools, through `kernel.mcp()` |
 | `width`, `height` | Window size in page pixels, 1 to 4096. Needed with `entry` |

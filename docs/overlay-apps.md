@@ -542,6 +542,65 @@ await ui.solo(false);
 
 Solo ends when the package turns it off, stops or crashes, another package takes it, or the player presses **End** beside the launcher tab, which shows "SOLO" and the package's name. `ui.onSolo` hears every end, so a package can keep its own button in step. The [Layers test](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/layers-test) sample shows both.
 
+## Calling other packages
+
+A package can offer functions to every other package, and call theirs: a quest mod asks a world builder for a scene's places, a HUD widget asks a stats mod for its numbers. REDnode 0.34.0 and later; the plan, with what comes next (descriptions from JSDoc, AI assistants calling them as tools), is on the [Mod services](services.md) page.
+
+To offer some, name a **service file** in the manifest. Every function it exports can be called by other packages, by your package's id:
+
+```json
+{ "id": "counter-service", "name": "Counter service", "version": "0.1.0", "service": "service.mjs" }
+```
+
+```js
+// service.mjs
+import { service } from 'rednode';
+
+let count = 0;
+
+/**
+ * Adds to the count, and tells every connected package.
+ * @param {number} [by=1] How much to add.
+ * @returns {number} The new count.
+ */
+export function add(by = 1) {
+  count += by;
+  service.emit('changed', { count, from: service.caller()?.name });
+  return count;
+}
+```
+
+To call one, connect by the package's id; each function it exports is then a method that returns a promise:
+
+```js
+import { service } from 'rednode';
+
+const counter = await service.connect('counter-service');
+await counter.add(5);                                        // 5
+counter.$on('changed', (e) => console.log(e.count));         // its events
+await counter.$with({ timeoutMs: 60000 }).add(1);            // a longer timeout, or { signal }
+```
+
+| Rule | Detail |
+|---|---|
+| Where it runs | The service file runs in your package's Node mod, after `main`, so the two share their state (import one from the other). A package with a service and no `main` is fine |
+| What crosses | Plain JSON-like values: numbers, strings, booleans, arrays, plain objects, entity ids. Not game references: each package's references are its own |
+| Errors | What your function throws reaches the caller as an error with your message. A call fails at once when the package is not installed, offers no service, is switched off or crashed, or has no such function, with that reason |
+| Waiting | `connect` and calls wait up to 10 seconds for a package that is starting or hot-reloading. A call times out after 30 seconds; `$with({ timeoutMs })` changes it |
+| Who calls | Inside your function, `service.caller()` is `{ id, name }` of the calling package. Refuse callers you do not want by throwing |
+| Stopping | `$with({ signal })` gives a call an `AbortSignal`. Inside your function, `service.signal()` aborts when the caller gives up or the call times out: pass it on to long work |
+| Events | `service.emit(name, data)` reaches every package that connected to yours, its Node mod and its pages; `$on(name, handler)` hears them |
+| Names | Methods starting with `$` belong to the handle. Call a function with such a name, or one known only at run time, with `$call(name, ...args)` |
+| Pages | An overlay page can connect and call too. Only a Node mod offers a service |
+| Requirements | Add the other package to `requires` with a version range, such as `"requires": { "counter-service": ">=0.1" }`: the Mod Manager shows it as missing before your package runs |
+| Cost | The Task Manager shows each package's service calls a second, in and out |
+
+The [Counter service](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/counter-service) and [Counter panel](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/counter-panel) samples show both sides, with a timeout, Stop and errors.
+
+## The Task Manager
+
+The built-in **Task Manager** (in the launcher) lists every running package and what it costs, refreshed every second or five: CPU and memory (a Node mod's process with its windows), how busy the mod's own thread is and its heap, game calls a second with their round trip, and service calls in and out. A mod in the shared process shows the whole process's CPU and memory, since Windows sees no finer; its Thread and Heap columns are its own. **End task** stops a package now, also one stuck in an endless loop, and closes its windows; it stays switched on, so it runs again with the next game or with **Restart**.
+
 ## Asking the AI assistant
 
 A package can ask the AI assistant (REDagent) a question and show the answer: a build suggestion, an explanation of an error, a summary of the game state. Add `"permissions": ["agent"]` to the manifest; the player allows it in the launcher or the Mod Manager, and REDagent must be installed and on.

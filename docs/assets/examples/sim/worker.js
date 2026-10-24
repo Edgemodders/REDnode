@@ -374,6 +374,70 @@ export const tweakdb = path(['tweakdb'], {
   learn() {},
 });
 
+// Mod services: in a preview the provider's service file runs in this same worker (the
+// docs build copies it beside its own preview as service.js), so a panel and its service
+// work together. In the game each runs in its own mod, and the host carries the calls.
+const serviceHandlers = new Map(); // event name -> Set of handlers
+let serviceCall = null; // { caller, signal } while a service function starts
+export const service = {
+  async connect(id) {
+    let exported;
+    try {
+      exported = await import(new URL(`../${id}/service.js`, self.name).href);
+    } catch {
+      throw new Error(`No package "${id}" in this preview: in the game it must be installed and switched on`);
+    }
+    const functions = Object.keys(exported).filter((k) => typeof exported[k] === 'function' && k !== 'default');
+    const info = { id, name: id, version: 'preview', functions };
+    const handle = (options) => {
+      const run = async (fn, args) => {
+        if (!functions.includes(fn)) throw new Error(`${id} has no function "${fn}". It offers: ${functions.join(', ')}`);
+        const controller = new AbortController();
+        options.signal?.addEventListener('abort', () => controller.abort());
+        const timeoutMs = options.timeoutMs ?? 30000;
+        serviceCall = { caller: { id: 'preview', name: 'This preview' }, signal: controller.signal };
+        let started;
+        try {
+          started = Promise.resolve(exported[fn](...JSON.parse(JSON.stringify(args))));
+        } finally {
+          serviceCall = null;
+        }
+        return Promise.race([
+          started.then((r) => (r === undefined ? r : JSON.parse(JSON.stringify(r)))),
+          new Promise((_, reject) => {
+            setTimeout(() => {
+              controller.abort();
+              reject(new Error(`${id} did not answer ${fn} within ${timeoutMs / 1000} s`));
+            }, timeoutMs);
+            options.signal?.addEventListener('abort', () => reject(new Error('Stopped')));
+          }),
+        ]);
+      };
+      const own = {
+        $info: info,
+        $call: (fn, ...args) => run(fn, args),
+        $with: (more) => handle({ ...options, ...more }),
+        $on(name, h) {
+          const set = serviceHandlers.get(name) ?? new Set();
+          set.add(h);
+          serviceHandlers.set(name, set);
+          return () => set.delete(h);
+        },
+      };
+      return new Proxy(own, {
+        get: (t, k) => (typeof k !== 'string' || k === 'then' ? undefined : k in t ? t[k] : k.startsWith('$') ? undefined : (...args) => run(k, args)),
+      });
+    };
+    return handle({});
+  },
+  caller: () => serviceCall?.caller ?? null,
+  signal: () => serviceCall?.signal ?? null,
+  emit(name, data) {
+    const copy = data === undefined ? data : JSON.parse(JSON.stringify(data));
+    for (const h of serviceHandlers.get(name) ?? []) setTimeout(() => h(copy), 0);
+  },
+};
+
 export const agent = {
   ask(question, options = {}) {
     const id = nextCall++;
