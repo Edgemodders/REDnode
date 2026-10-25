@@ -14,6 +14,7 @@ How to keep it:
 **Changed**
 
 - REDnode moves to game version 2.5: it needs RED4ext 1.31 or later and no longer loads on 2.31 (REDnode 0.37.0 is the last for 2.31).
+- On 2.5, sound archive swaps and the Sound Tracer find the game's audio code again (the Tracer's hook on Wwise's PostEvent needed a new pattern).
 
 ## 0.37.0 (2026-10-24)
 

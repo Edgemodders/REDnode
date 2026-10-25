@@ -105,9 +105,11 @@ constexpr const char* UnregisterStart = "40 55 56 57 48 83 EC 30 48 8B F9 8B F2"
 constexpr uint32_t AudioFrameEnd = 0x40;
 constexpr uint16_t RetiredPak = 0xFFFE;
 // The Sound Tracer (SP1). Wwise's PostEvent by id: its prologue, then cmp byte ptr [initialized],0;
-// mov r15,r9; mov r12d,r8d; mov r13,rdx; mov ebp,ecx; je (0x1AC8E70 in 2.31).
+// mov r15,r9; mov r12d,r8d; mov r13,rdx. The event id's move comes next and changed register with
+// 2.5 (mov ebp,ecx in 2.31, mov r14d,ecx in 2.5), so the pattern stops before it. One match in
+// each: 0x1AC8E70 in 2.31, 0x1B30E90 in 2.5.
 constexpr const char* PostEventPattern = "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 41 54 41 55 41 56 41 57 "
-                                         "48 83 EC 30 80 3D ?? ?? ?? ?? 00 4D 8B F9 45 8B E0 4C 8B EA 8B E9 0F 84";
+                                         "48 83 EC 30 80 3D ?? ?? ?? ?? 00 4D 8B F9 45 8B E0 4C 8B EA";
 // A sound's lookup: its prologue, then movzx r15d,[index count] (0x279890 in 2.31).
 constexpr const char* LookupPattern = "48 89 5C 24 08 48 89 54 24 10 55 56 57 41 54 41 55 41 56 41 57 "
                                       "48 8D 6C 24 D9 48 81 EC 90 00 00 00 44 0F B7 3D ?? ?? ?? ??";
