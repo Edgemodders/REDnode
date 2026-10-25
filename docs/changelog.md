@@ -11,6 +11,10 @@ How to keep it:
 
 ## Unreleased
 
+**Changed**
+
+- REDnode moves to game version 2.5: it needs RED4ext 1.31 or later and no longer loads on 2.31 (REDnode 0.37.0 is the last for 2.31).
+
 ## 0.37.0 (2026-10-24)
 
 **The last release for game version 2.31.** Game version 2.5 is not supported yet: RED4ext will not load this REDnode on 2.5. The next release moves REDnode to 2.5, as soon as RED4ext, redscript and Codeware support it.

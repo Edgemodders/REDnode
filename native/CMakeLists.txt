@@ -11,13 +11,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
-# RED4ext.SDK (MIT), pinned to the revision studied in P0.
+# RED4ext.SDK (MIT), pinned to its game 2.5 revision (types for patch 2.5, 2026-10-24).
+# REDnode 0.37.0 and earlier used ad7277714ad30d6885d7050c5ba24fa0102f6920 (game 2.31).
 # Header-only, so the plugin builds from a single translation unit.
 set(RED4EXT_HEADER_ONLY ON CACHE BOOL "" FORCE)
 FetchContent_Declare(
   red4ext_sdk
   GIT_REPOSITORY https://github.com/WopsS/RED4ext.SDK.git
-  GIT_TAG ad7277714ad30d6885d7050c5ba24fa0102f6920
+  GIT_TAG 5246e659d783e5834cc08a90e56c8932c9ed3449
   SYSTEM
 )
 FetchContent_MakeAvailable(red4ext_sdk)
