@@ -18,6 +18,10 @@ How to keep it:
 - The `api` types and the [game API reference](https://edgemodders.github.io/REDnode/game/) now come from game 2.5. 2.5 adds optional parameters to some functions (such as `EquipmentSystem.GetActiveItem`, for dual wielding) and renumbers some enums, which `api` passes by name, so calls written for 2.31 keep working.
 - Hot swaps of archives (`archives.reload`, the MCP tool `archives_reload`, the Hot swap app) wait for a RED Hot Tools release for 2.5.
 
+**Fixed**
+
+- UI kit: typing in an `rn-input` or moving an `rn-slider` sent a page two `input` events, one of them the browser's own with no `detail`, so handlers reading `e.detail.value` threw (seen in Sound Tracer and Sound Search).
+
 ## 0.37.0 (2026-10-24)
 
 **The last release for game version 2.31.** Game version 2.5 is not supported yet: RED4ext will not load this REDnode on 2.5. The next release moves REDnode to 2.5, as soon as RED4ext, redscript and Codeware support it.

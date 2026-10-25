@@ -11,7 +11,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [Unit tests](#unit-tests) | Automated | All | Every build | 0.24.2 | Pass |
 | [Build and type check](#build-and-type-check) | Automated | All | Every build | 0.24.2 | Pass |
 | [Mock game](#mock-game) | Automated, by hand | All | 2026-10-16 | 0.24.2 | Pass |
-| [G1 REDnode on game 2.5](#g1-rednode-on-game-25) | In the game | Game 2.5 | Not run | 0.38.0 | Awaiting its run (laptop, then the dev PC). The dump run on 2026-10-25 already showed REDnode loading on 2.5 |
+| [G1 REDnode on game 2.5](#g1-rednode-on-game-25) | In the game | Game 2.5 | 2026-10-25 | 0.38.0 | **Pass** (dev PC, 2.5): every step; two errors found, neither from 2.5, both fixed for the next build: the World test crashed when Remove came during Spin, and the UI kit's inputs let the browser's own `input` event through to pages ([results](#g1-results)). The laptop run is next |
 | [P1 probe](#p1-probe) | In the game | P1 | 2026-10-11 | 0.1.0 | Pass |
 | [Overlay proof of concept](#overlay-proof-of-concept) | In the game | Overlay | 2026-10-11 | 0.3.0 | Pass |
 | [O1 Windows](#o1-windows) | In the game | O1 | 2026-10-11 | 0.4.0 | Pass |
@@ -735,6 +735,26 @@ Already seen on 2026-10-25 (the dev PC's 2.5 dump run, base game): RED4ext 1.31.
 13. Load the save again: the Ink apps come back. Quit to the desktop: no crash.
 
 Expected: every step as written; in the plugin log no `fault`, no `not found` for a pattern, and the Sound Tracer's hook attached; no REDnode errors in `r6/logs/redscript_rCURRENT.log`.
+
+#### G1 results
+
+**Pass** on the dev PC on 2026-10-25 (REDnode 0.38.0; game 2.5 at 3840 x 2160 SDR; RED4ext 1.31.0 with ArchiveXL 1.28.0, Codeware 1.21.0 and TweakXL 1.12.0; REDagent 0.3.1 installed). The player: "It all seemed to work". A mark for each step from 1 to 11.
+
+| Part | What the logs showed |
+|---|---|
+| Load | The four plugins loaded; REDnode's four scripts compiled with no errors |
+| Main menu | Read on (IsPreGame true) and off; the language read as en-us |
+| Ink | Ink Coords (3 widgets) and Ink vitals (15) built on the HUD; 5 bindings at about 58 us a frame (2.2 ms in the first second, while the sources are found); after the reload of step 13 both rebuilt, 3 of 3 and 15 of 15 |
+| Sound | The sound pak tables found in 93 ms; the Sound Tracer's hooks attached on 2.5 (PostEvent at `+0x1b30e90`, the sound lookup at `+0x78bde8`); 924 posts, 890 loads, none dropped |
+| REDbridge | 0.10.0 (WolvenKit 9.1.0, built for 2.31) read 2.5's 57 archives and gave 17,586 event names, so Sound Search found results |
+| MCP (step 12) | `game_state`, `perf` (68 fps; the overlay about 0.1 ms CPU and 0.03 ms GPU a frame), `game_image` (4K with the overlay), `api_read` (a system, then a TweakDB record's method), `tweakdb` (a record, 1,384 vehicle records) and `gameapi_lookup` (2.5's signatures) |
+| Quit | The pump stopped, the audio output stopped, the host disconnected, REDnode unloaded; no fault log |
+
+Errors seen, neither from 2.5:
+
+- **World test** crashed at 11:54:59: Remove was pressed while Spin ran, and the next move read the removed box. World test 0.1.1 ends a spin when its box is removed.
+- **Sound Tracer** and **Sound Search** logged `Cannot read properties of undefined (reading 'trim')` while typing. The browser's own `input` event from the box inside `rn-input` (and `rn-slider`) crossed the shadow root, so a page's `input` handler ran twice, once with no `detail`. The search still worked through the kit's event. The UI kit now stops the browser's event at the box.
+
 
 ## Adding a test
 
