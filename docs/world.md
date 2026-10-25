@@ -1187,3 +1187,27 @@ Before: an archive to swap that changes something you can stand next to. The sim
 10. Optional, with an NPC appearance mod: stand near an NPC it changes, press **Entity list**, swap its other version, then **Users: look again** and **Users: through missing**. Say what showed after each. **Mark**.
 11. Switch **Keep in saves** on, press **Spawn by record**, save the game, then load that save. The log says 3 s and 10 s after the load what is still there. Then load an older save. **Mark**.
 12. Press **Remove spawned**. Quit the game. Send `rednode-mods.log` and `rednode-overlay.log`.
+
+### H2c-a test: first run, game 2.5
+
+Run on the dev PC on 2026-10-25: game 2.5, REDnode 0.38.1, Codeware 1.21.0, World objects test 0.1.0. RED Hot Tools has no 2.5 build, so the swap steps (7 to 10 above) were left out: this run covered spawning, holding, the lists near V and saves, with the steps renumbered (spawn a prop became step 7, Keep in saves step 8, Remove step 9). The app logged RED Hot Tools as missing and ran the rest. A mark for each step.
+
+| Step | Result |
+|---|---|
+| Spawn by record | `Character.CitizenRichFemale` in the world after 180 ms (254 ms in all), 3.0 m from V. She stayed on her spot (0.00 m moved after 5 s) and chatted; attitude to V neutral; a random appearance (`citizen__rich_wa_rich_04`) |
+| Hold and friendly | `AIHoldPositionCommand` for 3600 s and `SetAttitudeTowards(AIA_Friendly)` in 182 ms. She stayed put when walked round and bumped (0.00 m moved), now friendly; nothing else changed |
+| Spawn by template | From the record's template in 190 ms (300 ms). Stayed put and talked; another random appearance (`rich_21`) |
+| Entity list | `GetEntityList` gave 1,077 entities in 22 ms; reading each one's position, name and appearance took about 400 ms more (10 within 15 m: NPCs, lights, an item). No stutter |
+| Targeting | `GetTargetParts` answered true with 15 parts, but none led to an entity (0 found). The entity list is the way to find what is near V |
+| Resources | Not read: Targeting's empty list replaced the entity list, so Resources had nothing to read. World objects test 0.1.1 keeps the last list when one comes back empty |
+| Spawn a prop | A `base` cardboard box mesh as a prop in 253 ms; it showed |
+| Keep in saves | Only the kept NPC came back after loading the save made with it, 8 s after the load, with the same entity id; none of the others did. In an older save it was not there. Remove found and removed it (80 ms) |
+
+What it decides for H2c-b:
+
+- A spawned NPC from a character record stands still and acts as a crowd NPC (chats when bumped) with no command at all. The hold command and a friendly attitude work through `api` and keep her in place.
+- A record spawn and a template spawn behave the same; both pick a random appearance unless one is given.
+- To find what is near V, use `GetEntityList` and filter by distance (about 0.4 s for 15 m, spread over chunks of 128, no stutter). Leave targeting out.
+- Keep in saves works: a kept spawn comes back in its own save with its id, about 8 s after the load, and nowhere else.
+
+Still open, for a run with RED Hot Tools on 2.5: Resources (which files the entities near V name), Who uses it, and the refresh after a swap (steps 7 to 10 above).

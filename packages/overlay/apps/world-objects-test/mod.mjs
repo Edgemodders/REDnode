@@ -204,10 +204,13 @@ async function inChunks(list, size, fn) {
 }
 
 function report(found, how, total, ms) {
-  near = found.sort((a, b) => a.distance - b.distance);
-  for (const e of near.slice(0, 40)) say(`  ${e.distance.toFixed(1)} m  ${e.type}  ${e.name || '(no name)'}  ${e.look || ''}`);
-  if (near.length > 40) say(`  ... and ${near.length - 40} more`);
-  return `${how}: ${total} looked at, ${near.length} within ${radius} m, listed in ${ms} ms`;
+  found.sort((a, b) => a.distance - b.distance);
+  for (const e of found.slice(0, 40)) say(`  ${e.distance.toFixed(1)} m  ${e.type}  ${e.name || '(no name)'}  ${e.look || ''}`);
+  if (found.length > 40) say(`  ... and ${found.length - 40} more`);
+  // An empty list keeps the last one, so Resources still has what the other way found.
+  if (found.length) near = found;
+  else if (near.length) say(`  (kept the last list of ${near.length} for Resources)`);
+  return `${how}: ${total} looked at, ${found.length} within ${radius} m, listed in ${ms} ms`;
 }
 
 const listByEntityList = () =>

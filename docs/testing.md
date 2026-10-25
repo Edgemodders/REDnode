@@ -57,7 +57,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [SV2 Service descriptions](services.md#sv2-test) | In the game | SV2 | 2026-10-24 | 0.36.0 | **Pass**: the Mod Manager's Service section, Describe, a bad call refused by the host ([results](services.md#sv2-test-results)) |
 | [SV3 Mods' tools and the Tools Manager](services.md#sv3-test) | In the game | SV3 | 2026-10-24 | 0.36.0, REDagent 0.3.1 | **Pass** (second run for steps 3 and 5): the Tools Manager, reads without asking, Claude Code and REDagent asking before a change, the switch ([results](services.md#sv3-test-second-run-steps-3-and-5)) |
 | [Admin Tools pack](admin-tools.md#admin-tools-test) | In the game | Admin Tools | 2026-10-24 | 0.37.0 + pack 0.1.0 | **Pass** (2.31 backup folder): the managers as a pack, refused before their grants, End task and Restart, a tool switched, permissions withdrawn and allowed, pinned ([results](admin-tools.md#admin-tools-test-results)). Checked first in the mock game: 16 cases (refused before the grant, with the reason in the window; a package without the permission refused; each app's own grant; tasks, End task's refusal, tools and switches after it; the Mod Manager's warning; withdrawn, refused again) |
-| [H2c-a World objects test](world.md#h2c-a-test) | In the game | H2c | Not run | 0.33.0 + World objects test 0.1.0 | Awaiting its run |
+| [H2c-a World objects test](world.md#h2c-a-test) | In the game | H2c | 2026-10-25 | 0.38.1 + World objects test 0.1.0, game 2.5 | Partly run, passed: spawn, hold, entity list, Keep in saves. Resources missed (fixed in 0.1.1); the swap steps wait for RED Hot Tools on 2.5 |
 | [Development folders](#development-folders) | In the game | #16 | 2026-10-23 | 0.33.0 | **Pass** (2.31 backup folder): a folder added in the launcher, its Hello mod copy ran instead of the installed one with the DEV tag, two edits hot-reloaded it, Remove brought the installed copy back, bad paths refused ([results](#development-folders-results)) |
 | [Launcher settings drawer](#launcher-settings-drawer) | In the game | Launcher | 2026-10-23 | 0.32.2 | **Pass** (laptop): the player: "It looks perfect". 0.32.3 then shows the version line as "Version 0.32.3" |
 | [Q-A Quest API](quests.md#q-a-test) | In the game | Q-A | 2026-10-23 | 0.32.0 | **Pass** (laptop): facts read and set, the watcher heard each change and kept working after a load, the tracked entry read, V teleported back, the MCP tools read without asking and asked to set ([results](quests.md#q-a-test-results)) |
@@ -596,6 +596,8 @@ Before: make a folder outside the game, for example `E:\Modding\DevTest`, and co
 ### H2c-a World objects test
 
 [Source](world.md#h2c-a-test). Built 2026-10-23: the spike of H2c, the **World objects test** app over REDnode 0.33.0. Needs Codeware, RED Hot Tools and two versions of an archive that replaces a prop mesh. The steps are on the source page.
+
+First run 2026-10-25 on game 2.5 (REDnode 0.38.1, app 0.1.0), without RED Hot Tools (no 2.5 build), so without the swap steps: **pass** for spawn by record and by template, hold and friendly, the entity list, a prop, and Keep in saves. Targeting found nothing, and its empty list left Resources nothing to read (app 0.1.1 keeps the last list). Results: [H2c-a test: first run, game 2.5](world.md#h2c-a-test-first-run-game-25).
 
 ### W1 World API
 
