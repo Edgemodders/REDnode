@@ -11,7 +11,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [Unit tests](#unit-tests) | Automated | All | Every build | 0.24.2 | Pass |
 | [Build and type check](#build-and-type-check) | Automated | All | Every build | 0.24.2 | Pass |
 | [Mock game](#mock-game) | Automated, by hand | All | 2026-10-16 | 0.24.2 | Pass |
-| [G1 REDnode on game 2.5](#g1-rednode-on-game-25) | In the game | Game 2.5 | 2026-10-25 | 0.38.0 | **Pass** (dev PC, 2.5): every step; two errors found, neither from 2.5, both fixed for the next build: the World test crashed when Remove came during Spin, and the UI kit's inputs let the browser's own `input` event through to pages ([results](#g1-results)). The laptop run is next |
+| [G1 REDnode on game 2.5](#g1-rednode-on-game-25) | In the game | Game 2.5 | 2026-10-25 | 0.38.0 | **Pass** (dev PC, 2.5): every step; two errors found, neither from 2.5, both fixed in 0.38.1: the World test crashed when Remove came during Spin, and the UI kit's inputs let the browser's own `input` event through to pages ([results](#g1-results)). 0.38.1's retest passed the same day ([results](#g1-retest-0381-results)). The laptop run was dropped by the player (its game needs a reinstall) |
 | [P1 probe](#p1-probe) | In the game | P1 | 2026-10-11 | 0.1.0 | Pass |
 | [Overlay proof of concept](#overlay-proof-of-concept) | In the game | Overlay | 2026-10-11 | 0.3.0 | Pass |
 | [O1 Windows](#o1-windows) | In the game | O1 | 2026-10-11 | 0.4.0 | Pass |
@@ -754,6 +754,10 @@ Errors seen, neither from 2.5:
 
 - **World test** crashed at 11:54:59: Remove was pressed while Spin ran, and the next move read the removed box. World test 0.1.1 ends a spin when its box is removed.
 - **Sound Tracer** and **Sound Search** logged `Cannot read properties of undefined (reading 'trim')` while typing. The browser's own `input` event from the box inside `rn-input` (and `rn-slider`) crossed the shadow root, so a page's `input` handler ran twice, once with no `detail`. The search still worked through the kit's event. The UI kit now stops the browser's event at the box.
+
+#### G1 retest, 0.38.1: results
+
+**Pass** on the dev PC on 2026-10-25 (REDnode 0.38.1, same setup), a mark for each step. Steps: the version in the launcher's Settings drawer; type `katana` in Sound Search letter by letter; start a Sound Tracer trace and type in its filter; World test: Spawn box, Spin 10 s, Remove during the spin; quit. The host logged no page errors; the World test logged `Spin stopped: the box was removed` and kept running; the game quit cleanly, with no fault log.
 
 
 ## Adding a test
