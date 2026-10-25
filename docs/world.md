@@ -1210,4 +1210,17 @@ What it decides for H2c-b:
 - To find what is near V, use `GetEntityList` and filter by distance (about 0.4 s for 15 m, spread over chunks of 128, no stutter). Leave targeting out.
 - Keep in saves works: a kept spawn comes back in its own save with its id, about 8 s after the load, and nowhere else.
 
-Still open, for a run with RED Hot Tools on 2.5: Resources (which files the entities near V name), Who uses it, and the refresh after a swap (steps 7 to 10 above).
+**Resources retest** (same session's game, a restart of the host; the player pressed Entity list then Resources, then spawned a record NPC and a template NPC again and ran both once more):
+
+| Run | Result |
+|---|---|
+| 10 entities near V (2 lights, 7 NPCs, an item) | 166 files named, none with no files; 26 s, with presses made while it ran |
+| 12 entities, with the two new spawns | 217 files named; one item had no components on the second read (0 files); 11.6 s |
+| Per entity | A light: 4 components, 2 files. An NPC: 122 to 143 components, 20 to 29 files (meshes and the template; `mesh`, `graph`, `resource` read on each component) |
+
+What it decides:
+
+- Components name the files the match needs: each NPC names 20 to 29 meshes and its template, each light and item its own. Whether they name every file an entity uses (the `.app`, materials, textures inside a mesh) is still **unverified**: a swap that changes only a texture would be missed if the match reads meshes alone.
+- Reading it through `api` costs about 1 s an NPC (some 130 property reads, one bridge call each). H2c-b reads components in the plugin in one call, as H2a's slot scan showed for TweakDB.
+
+Still open, for a run with RED Hot Tools on 2.5: Who uses it, and the refresh after a swap (steps 7 to 10 above).
