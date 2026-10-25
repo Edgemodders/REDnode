@@ -4,9 +4,9 @@
 
 <p align="center">
   <a href="https://edgemodders.github.io/REDnode/"><img src="docs/assets/brand/badges/docs.svg" alt="docs: read the docs"></a>
-  <img src="docs/assets/brand/badges/status.svg" alt="status: 0.37.0 released">
-  <img src="docs/assets/brand/badges/game.svg" alt="game: 2.31">
-  <img src="docs/assets/brand/badges/red4ext.svg" alt="RED4ext: 1.30">
+  <img src="docs/assets/brand/badges/status.svg" alt="status: 0.38.1 released">
+  <img src="docs/assets/brand/badges/game.svg" alt="game: 2.5">
+  <img src="docs/assets/brand/badges/red4ext.svg" alt="RED4ext: 1.31">
   <img src="docs/assets/brand/badges/node.svg" alt="Node: 24">
   <a href="LICENSE"><img src="docs/assets/brand/badges/license.svg" alt="license: MIT"></a>
 </p>
@@ -18,7 +18,7 @@ REDnode attaches to the game through RED4ext and exposes the game's reflection (
 **[Read the docs](https://edgemodders.github.io/REDnode/)** &middot; [API reference](https://edgemodders.github.io/REDnode/api/) &middot; [Design](https://edgemodders.github.io/REDnode/design.html)
 
 > [!NOTE]
-> **Status: 0.37.0 released on 2026-10-24, for game 2.31 only** (the next release moves to 2.5). Download it from [Nexus Mods](https://www.nexusmods.com/cyberpunk2077/mods/35419) or [GitHub releases](https://github.com/Edgemodders/REDnode/releases). Optional packs: [Admin Tools](https://www.nexusmods.com/cyberpunk2077/mods/35793) and Sound Tools (on the GitHub release). The in-game assistant [REDagent](https://www.nexusmods.com/cyberpunk2077/mods/35670) runs on it. The current work and the roadmap are on the [docs home page](https://edgemodders.github.io/REDnode/).
+> **Status: 0.38.1 released on 2026-10-25, for game 2.5** (for game 2.31, use 0.37.0). Hot swaps of archives wait for a RED Hot Tools release for 2.5. Download it from [Nexus Mods](https://www.nexusmods.com/cyberpunk2077/mods/35419) or [GitHub releases](https://github.com/Edgemodders/REDnode/releases). Optional packs: [Admin Tools](https://www.nexusmods.com/cyberpunk2077/mods/35793) and Sound Tools (on the GitHub release). The in-game assistant [REDagent](https://www.nexusmods.com/cyberpunk2077/mods/35670) runs on it. The current work and the roadmap are on the [docs home page](https://edgemodders.github.io/REDnode/).
 
 ## How it works
 
