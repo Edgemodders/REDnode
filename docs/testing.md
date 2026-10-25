@@ -11,6 +11,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [Unit tests](#unit-tests) | Automated | All | Every build | 0.24.2 | Pass |
 | [Build and type check](#build-and-type-check) | Automated | All | Every build | 0.24.2 | Pass |
 | [Mock game](#mock-game) | Automated, by hand | All | 2026-10-16 | 0.24.2 | Pass |
+| [G1 REDnode on game 2.5](#g1-rednode-on-game-25) | In the game | Game 2.5 | Not run | 0.38.0 | Awaiting its run (laptop, then the dev PC). The dump run on 2026-10-25 already showed REDnode loading on 2.5 |
 | [P1 probe](#p1-probe) | In the game | P1 | 2026-10-11 | 0.1.0 | Pass |
 | [Overlay proof of concept](#overlay-proof-of-concept) | In the game | Overlay | 2026-10-11 | 0.3.0 | Pass |
 | [O1 Windows](#o1-windows) | In the game | O1 | 2026-10-11 | 0.4.0 | Pass |
@@ -708,6 +709,32 @@ Showed: pan did nothing on the 8-channel HDMI device (miniaudio pans only a ster
 3. Hold the scanner: note "V's dilation".
 
 Showed: the volume reads follow each slider. Step 3: the scanner did not slow time in that run.
+
+## Game 2.5
+
+### G1 REDnode on game 2.5
+
+Built 2026-10-25: REDnode 0.38.0, the first build for game 2.5 (RED4ext.SDK at its 2.5 revision, the sound patterns checked on the 2.5 exe, the game API from a 2.5 dump). One pass over every part, on the laptop and then on the dev PC.
+
+Before: the game at 2.5, with RED4ext 1.31.0, redscript 0.5.32, Codeware 1.21.0, TweakXL 1.12.0 and ArchiveXL 1.28.0 (Cyber Engine Tweaks 1.38.0 if wanted). No RED Hot Tools: it has no 2.5 build, so hot swaps are left out of this test. The sample apps are all in the deploy; the Sound Tools pack's apps are copied in beside them.
+
+Already seen on 2026-10-25 (the dev PC's 2.5 dump run, base game): RED4ext 1.31.0 loaded REDnode 0.38.0, the host connected, Present was hooked on a 3840 x 2160 SDR swapchain, the main menu and the language were read.
+
+1. Start the game. At the main menu, F10: the launcher shows; its Settings drawer shows Version 0.38.0. The Mod Manager opens.
+2. Load a save. Switch on **Vitals** and **Coords**: health and the position show and change as V moves.
+3. Switch on **Ink Coords** and **Ink vitals**: the game draws them on its HUD. Open the inventory and close it: they hide with the HUD and come back.
+4. **Quest test**: **Read**, then **Set +1**: the watcher logs the change. **Tracked** reads the tracked quest entry.
+5. **TweakDB test**: **Read**, then **Change**; switch it off: the change is undone.
+6. **World test**: **Spawn box** near V, **Spin 10 s**, **Remove**.
+7. **Sound test**: **Chime left**, **Chime right**, **Music (OGG)**, **Stop all**.
+8. **Sound Tracer** (Sound Tools): start a trace, walk and fire a weapon: rows come in. ▶ on a row with recordings plays it; G posts it through the game.
+9. **Sound Search** (Sound Tools): search `katana`, play a result. The names come from REDbridge (0.10.0, built for 2.31): if it cannot read 2.5's files, the search finds nothing, which is a REDbridge finding, not a REDnode failure.
+10. **Counter service** and **Counter panel** on: **+1**, **Read**, **Wait 3 s**.
+11. **Pointer lock test**: lock, move the mouse, Esc ends it.
+12. Tell Claude: it checks the MCP tools against the running game (`game_state`, `game_image`, `api_read`, `tweakdb`, `gameapi_lookup`).
+13. Load the save again: the Ink apps come back. Quit to the desktop: no crash.
+
+Expected: every step as written; in the plugin log no `fault`, no `not found` for a pattern, and the Sound Tracer's hook attached; no REDnode errors in `r6/logs/redscript_rCURRENT.log`.
 
 ## Adding a test
 
