@@ -1,6 +1,6 @@
 # Admin Tools
 
-**REDnode Admin Tools** is an optional app pack for players and modders who want to manage REDnode itself: see what every mod costs, stop one that misbehaves, and decide which tools AI assistants may use. It is its own download, beside REDnode, and its source lives in this repo at [`packs/admin-tools/`](https://github.com/Edgemodders/REDnode/tree/main/packs/admin-tools).
+**REDnode Admin Tools** is an optional app pack for players and modders who want to manage REDnode itself: see what every mod costs, stop one that misbehaves, and decide which tools AI assistants may use. It is its own download on [Nexus Mods](https://www.nexusmods.com/cyberpunk2077/mods/35793) and the GitHub release, beside REDnode, and its source lives in this repo at [`packs/admin-tools/`](https://github.com/Edgemodders/REDnode/tree/main/packs/admin-tools).
 
 | App | What it does |
 |---|---|
@@ -13,7 +13,7 @@ Both were built into REDnode 0.34.0 to 0.36.0. From REDnode 0.37.0 they are in t
 
 | Needs | Why |
 |---|---|
-| [REDnode](https://github.com/Edgemodders/REDnode/releases/latest) 0.37.0 or later | The pack's apps ask for it, so the Mod Manager says so when REDnode is too old |
+| REDnode 0.37.0 or later ([Nexus](https://www.nexusmods.com/cyberpunk2077/mods/35419), [GitHub](https://github.com/Edgemodders/REDnode/releases/latest)) | The pack's apps ask for it, so the Mod Manager says so when REDnode is too old |
 | Game version 2.31 | As REDnode |
 
 1. Install the zip with Vortex, or extract it into the game folder: the two apps land in `red4ext/plugins/REDnode/apps/` (`taskmanager`, `toolsmanager`).

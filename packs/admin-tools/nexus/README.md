@@ -1,6 +1,6 @@
 # REDnode Admin Tools on Nexus Mods
 
-The source of the Admin Tools pack's own Nexus Mods page, beside REDnode's (`nexus/` at the repo root) and the Sound Tools pack's. Not on Nexus yet. Its in-game test passed on 2026-10-24 (docs/admin-tools.md, "Admin Tools test: results"); it needs a released REDnode 0.37.0 first.
+The source of the Admin Tools pack's own Nexus Mods page, beside REDnode's (`nexus/` at the repo root) and the Sound Tools pack's. **Live at [mod 35793](https://www.nexusmods.com/cyberpunk2077/mods/35793)** since 2026-10-24 (0.1.0, with REDnode 0.37.0). Its in-game test passed on 2026-10-24 (docs/admin-tools.md, "Admin Tools test: results").
 
 | File | What it is |
 |---|---|
@@ -16,8 +16,7 @@ The source of the Admin Tools pack's own Nexus Mods page, beside REDnode's (`nex
 
 | In `description.bbcode` | Replace with |
 |---|---|
-| `REDNODE_PAGE` (three links) | REDnode's Nexus mod id |
-| `REDNODE_VERSION` (two places) | The REDnode the pack needs, from `packs/admin-tools/pack.json` (`>=0.37.0`, so 0.37.0) |
+| `REDNODE_VERSION` (two places, now 0.37.0) | The REDnode the pack needs, from `packs/admin-tools/pack.json`, when it changes |
 | `Screenshot 1` to `Screenshot 3` (cyan italics) | Upload each picture to the page's Images tab, then replace its line with `[img]<the image's Nexus URL>[/img]` and a one-line caption. Pictures from the mock game are in `docs/assets/admin-tools/` until there are pictures from the game |
 
 ## The Nexus form

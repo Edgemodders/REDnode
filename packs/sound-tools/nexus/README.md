@@ -1,6 +1,6 @@
 # REDnode Sound Tools on Nexus Mods
 
-The source of the Sound Tools pack's own Nexus Mods page, beside REDnode's (`nexus/` at the repo root). Not on Nexus yet. Everything the page needs has passed in game: SP4 on 2026-10-20, over the released REDnode 0.26.15, which carries the APIs the apps use (docs/sound.md, "SP4 test: results").
+The source of the Sound Tools pack's own Nexus Mods page, beside REDnode's (`nexus/` at the repo root). Not on Nexus yet (REDnode's page is [mod 35419](https://www.nexusmods.com/cyberpunk2077/mods/35419); the links to it are filled in). Everything the page needs has passed in game: SP4 on 2026-10-20, over the released REDnode 0.26.15, which carries the APIs the apps use (docs/sound.md, "SP4 test: results").
 
 | File | What it is |
 |---|---|
@@ -16,7 +16,6 @@ The source of the Sound Tools pack's own Nexus Mods page, beside REDnode's (`nex
 
 | In `description.bbcode` | Replace with |
 |---|---|
-| `REDNODE_PAGE` (three links) | REDnode's Nexus mod id, once its page is up again |
 | `Screenshot 1` to `Screenshot 4` (cyan italics) | Upload each picture to the page's Images tab, then replace its line with `[img]<the image's Nexus URL>[/img]` and a one-line caption |
 
 ## The Nexus form
