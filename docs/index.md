@@ -19,7 +19,7 @@ REDnode is a Node.js API for scripting Cyberpunk 2077 (PC, single-player). These
 | Document | What it covers |
 |---|---|
 | [API reference](api/) | The `rednode` package: every function, interface and type, generated from the source |
-| [Game API](game/) | Every class, struct, enum and global function in the base game (2.31), with REDnode's notes |
+| [Game API](game/) | Every class, struct, enum and global function in the base game (2.5), with REDnode's notes |
 | [Design](design.html) | Architecture: the two tiers, the native bridge, the API sketch, safety rails, risks and roadmap |
 | [MCP server](mcp.md) | The kernel's tools for AI agents: Claude Code can read mod logs, see overlay windows, look up game types and call the game |
 | [Overlay apps](overlay-apps.md) | Guide with tested examples: your first app, UI kit windows, a native-looking button, and playing game sounds |
