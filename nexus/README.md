@@ -62,21 +62,34 @@ npm run release:zip      # native\build\release\REDnode-<version>.zip
 
 ### File description on Nexus
 
-> REDnode &lt;version&gt;: the plugin, the overlay host and six samples. Install with Vortex or EDGEdeck, or extract into the game folder. Needs RED4ext and redscript.
+The release workflow sets it from `upload.description` in `nexus.json` ({version} is replaced):
+
+> REDnode {version} for game 2.5: the plugin, the overlay host and ten samples. Install with Vortex or EDGEdeck, or extract into the game folder. Needs RED4ext and redscript.
 
 ## Updating the page
 
-1. First take in any edit made on Nexus itself (pictures added by hand, for example): `npm run nexus:pull` writes the live description into `description.bbcode` and the page's ids and the description's hash into `nexus.json`. `npm run nexus:status` shows the page's version, its main file's versions, and whether the description changed on Nexus since the last pull. Both read through Nexus's v3 API with the owner's key (see `tools/nexus/api.mjs`; on the dev PC an encrypted file in `%APPDATA%\Edgemodders`, in CI the organization's `NEXUS_KEY` secret). Commit what the pull changed.
-2. Edit `description.bbcode` here, commit, push.
-3. Check it: `node tools/check-bbcode.mjs nexus/description.bbcode`.
-4. Paste the whole file into the description field on Nexus and save. Then pull again, so `nexus.json` holds the hash of what is live.
+The page is kept through Nexus's v3 API (`tools/nexus/nexus.mjs`, on top of `tools/nexus/api.mjs`) with the owner's key: on the dev PC a file in `%APPDATA%\Edgemodders` that Windows encrypts for the owner's user (made once, see `api.mjs`), in CI the organization's `NEXUS_KEY` secret. `nexus.json` holds the page number, the internal mod id, the main file's id, how a new version is uploaded (`upload`: main file, primary, mod manager download on, the old version archived) and the hash of the description last pulled.
 
-Nexus stores the description with an HTML `<br />` on each line, a few characters as entities, and no newline after a block such as `[/list]`; the pull turns it back into plain BBCode, and the hash ignores whitespace.
-5. For a new version, first the release gate: every in-game test of the builds since the last release has passed (docs/testing.md). Untested or failed means no release. Then:
-   1. In `docs/changelog.md`, rename **Unreleased** to `## <version> (<date>)`, start a new empty **Unreleased** above it, commit and push.
-   2. Run the workflow with **Make a release** ticked. The GitHub release takes its notes from that section.
-   3. Download the zip from the release, and upload it on Nexus as the main file with the version from `VERSION`. Archive the old file.
-   4. In the page's changelog for that version (Manage files, or the Changelogs tab), paste the lines from `npm run release:notes -- --nexus`, one entry per line.
+| Command | What it does |
+|---|---|
+| `npm run nexus:pull` | Writes the live description into `description.bbcode` (with any edit made on Nexus itself, such as pictures added by hand) and the ids and hash into `nexus.json`. Read only on Nexus |
+| `npm run nexus:status` | The page's version, the main file's versions, and whether the description changed on Nexus since the last pull |
+| `node tools/nexus/nexus.mjs check --version <v>` | What a release would do, and whether it may |
+| `node tools/nexus/nexus.mjs release --version <v> --zip <zip> --notes <file> [--dry-run]` | What the workflow runs: the upload, the changelog and the description. It skips the upload and changelog when the version is already on Nexus |
+
+To change the description:
+
+1. `npm run nexus:pull` first, and commit what it changed, so an edit made on Nexus is not lost.
+2. Edit `description.bbcode`, check it with `node tools/check-bbcode.mjs nexus/description.bbcode`, commit, push.
+3. The next release pushes it. To publish it sooner, paste the file into the description field on Nexus, then pull again.
+
+The release pushes the description only when the live one is the one last pulled, or the one the previous release pushed (`description.bbcode` at the previous `v*` tag). Otherwise it stops before building anything: pull, check the diff, commit, run again. Nexus stores the description with an HTML `<br />` on each line, a few characters as entities, and no newline after a block such as `[/list]`; the pull turns it back into plain BBCode, and the hash ignores whitespace.
+
+For a new version, first the release gate: every in-game test of the builds since the last release has passed (docs/testing.md). Untested or failed means no release. Then:
+
+1. In `docs/changelog.md`, rename **Unreleased** to `## <version> (<date>)`, start a new empty **Unreleased** above it, commit and push.
+2. Run the **Release zip** workflow with **Make a release** and **Update Nexus Mods** ticked. It checks the page first, builds, makes the GitHub release, then uploads the zip to Nexus as the main file's new version (the old one archived, the page's version set), adds that version's changelog from `npm run release:notes -- --nexus`, and pushes the description.
+3. If the Nexus step fails after the GitHub release, download the release's zip and run `node tools/nexus/nexus.mjs release --version <v> --zip <zip> --notes <file>` on the dev PC (the notes from `npm run release:notes -- --nexus --out <file>`).
 
 Under the tagline, a line links the latest GitHub release and the changelog page. It names no version, so it never needs updating.
 

@@ -8,8 +8,9 @@
 // printed, never on a command line.
 
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { basename, join } from 'node:path';
 
 export const BASE = process.env.NEXUS_API_BASE || 'https://api.nexusmods.com/v3';
 export const GAME = 'cyberpunk2077';
@@ -64,3 +65,59 @@ export async function api(method, path, body) {
 
 /** A mod by the number in its page URL (35419), with its internal id, description and version. */
 export const modByPage = (pageId) => api('GET', `/games/${GAME}/mods/${pageId}`);
+
+const MiB = 1024 * 1024;
+
+/**
+ * Uploads an archive and returns its upload id once Nexus has it ready (state "available"), to be
+ * made a mod file version. Up to 100 MiB in one PUT with its MD5; larger files in parts, as S3's
+ * multipart upload, which Nexus requires above 100 MiB.
+ */
+export async function uploadArchive(file, log = console.log) {
+  const data = readFileSync(file);
+  const filename = basename(file);
+  let upload;
+  if (data.length <= 100 * MiB) {
+    const md5 = createHash('md5').update(data);
+    const hex = md5.copy().digest('hex');
+    upload = await api('POST', '/uploads', { size_bytes: data.length, filename, md5: hex });
+    const res = await fetch(upload.presigned_url, {
+      method: 'PUT',
+      headers: {
+        'content-md5': md5.digest('base64'),
+        'content-disposition': `attachment; filename="${filename}"`,
+        'content-length': String(data.length),
+      },
+      body: data,
+    });
+    if (!res.ok) throw new Error(`Upload of ${filename}: ${res.status} ${(await res.text()).slice(0, 300)}`);
+    log(`Uploaded ${filename} (${(data.length / MiB).toFixed(1)} MiB) in one part`);
+  } else {
+    upload = await api('POST', '/uploads/multipart', { size_bytes: data.length, filename });
+    const size = upload.part_size_bytes;
+    const etags = [];
+    for (let i = 0; i < upload.part_presigned_urls.length; i++) {
+      const part = data.subarray(i * size, Math.min((i + 1) * size, data.length));
+      const res = await fetch(upload.part_presigned_urls[i], { method: 'PUT', headers: { 'content-length': String(part.length) }, body: part });
+      if (!res.ok) throw new Error(`Upload of ${filename}, part ${i + 1}: ${res.status} ${(await res.text()).slice(0, 300)}`);
+      etags.push(res.headers.get('etag'));
+    }
+    const xml =
+      '<CompleteMultipartUpload>' +
+      etags.map((tag, i) => `<Part><PartNumber>${i + 1}</PartNumber><ETag>${tag}</ETag></Part>`).join('') +
+      '</CompleteMultipartUpload>';
+    const done = await fetch(upload.complete_presigned_url, { method: 'POST', headers: { 'content-type': 'application/xml' }, body: xml });
+    if (!done.ok) throw new Error(`Completing the upload of ${filename}: ${done.status} ${(await done.text()).slice(0, 300)}`);
+    log(`Uploaded ${filename} (${(data.length / MiB).toFixed(1)} MiB) in ${etags.length} parts`);
+  }
+  await api('POST', `/uploads/${upload.id}/finalise`);
+  // Nexus checks the archive before it can become a version: wait for "available", up to 10 minutes.
+  for (let waited = 0; ; waited += 5) {
+    const { state } = await api('GET', `/uploads/${upload.id}`);
+    if (state === 'available') break;
+    if (waited >= 600) throw new Error(`Upload ${upload.id} still "${state}" after 10 minutes`);
+    await new Promise((r) => setTimeout(r, 5000));
+  }
+  log(`Upload ${upload.id} is available`);
+  return upload.id;
+}

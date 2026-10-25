@@ -11,6 +11,17 @@
 #                                               tag exists (raise VERSION with tools/version.mjs)
 #                                               or docs/changelog.md has no section for VERSION
 #                                               (the release notes, tools/release/notes.mjs)
+#   ... and "Update Nexus Mods" ticked          also, after the GitHub release, uploads the zip to
+#                                               the Nexus page as the main file's new version (the
+#                                               old one archived), adds its changelog and pushes
+#                                               nexus/description.bbcode (tools/nexus/nexus.mjs,
+#                                               the organization's NEXUS_KEY secret). It checks the
+#                                               page first and stops before building if the
+#                                               description changed on Nexus since the last pull
+#                                               (npm run nexus:pull, commit, run again). If the
+#                                               upload fails after the GitHub release, run
+#                                               tools/nexus/nexus.mjs release on the dev PC with the
+#                                               release's zip: it skips what is already done.
 #
 # Release gate: make a release only after every in-game test of the builds since the last
 # release has passed (docs/testing.md). Untested or failed means no release.
@@ -21,6 +32,10 @@ on:
     inputs:
       release:
         description: Make a release (tags this commit v<VERSION>). Only after every in-game test has passed
+        type: boolean
+        default: false
+      nexus:
+        description: Update Nexus Mods (with Make a release) - upload the zip, its changelog and the page's description
         type: boolean
         default: false
 
@@ -36,6 +51,8 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the tags: the Nexus check compares with the previous release's description
 
       - uses: actions/setup-node@v4
         with:
@@ -57,7 +74,17 @@ jobs:
 
       - name: Release notes from docs/changelog.md
         if: inputs.release
-        run: node tools/release/notes.mjs --out "$env:RUNNER_TEMP/notes.md"
+        run: |
+          node tools/release/notes.mjs --out "$env:RUNNER_TEMP/notes.md"
+          node tools/release/notes.mjs --nexus --out "$env:RUNNER_TEMP/nexus-notes.txt"
+
+      - name: Nexus Mods can take this release
+        if: inputs.release && inputs.nexus
+        env:
+          NEXUS_KEY: ${{ secrets.NEXUS_KEY }}
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          node tools/nexus/nexus.mjs check --version $version
 
       - name: Install dependencies
         run: npm ci
@@ -91,3 +118,11 @@ jobs:
           # @(...) keeps it a list: one pack would be a single string, which splatting splits into characters.
           $packs = @(Get-ChildItem native/build/release -Filter '*.zip' | Where-Object Name -ne "REDnode-$version.zip" | ForEach-Object FullName)
           gh release create "v$version" "native/build/release/REDnode-$version.zip" @packs --target $env:GITHUB_SHA --title "REDnode $version" --notes-file "$env:RUNNER_TEMP/notes.md" --generate-notes
+
+      - name: Nexus Mods
+        if: inputs.release && inputs.nexus
+        env:
+          NEXUS_KEY: ${{ secrets.NEXUS_KEY }}
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          node tools/nexus/nexus.mjs release --version $version --zip "native/build/release/REDnode-$version.zip" --notes "$env:RUNNER_TEMP/nexus-notes.txt"
