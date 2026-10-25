@@ -103,8 +103,7 @@ writeFileSync(
   [
     `REDnode ${version}: a Node.js modding framework for Cyberpunk 2077 (PC, single-player).`,
     '',
-    'For game version 2.31 only. Game version 2.5 is not supported yet: REDnode moves to it once',
-    'RED4ext, redscript and Codeware support 2.5.',
+    'For game version 2.5 (RED4ext 1.31 or later). For game 2.31, use REDnode 0.37.0.',
     '',
     'Needs: RED4ext and redscript. Some packages also need Codeware, TweakXL or ArchiveXL;',
     'the Mod Manager says which.',
