@@ -653,7 +653,9 @@ input:focus-visible { outline: 2px solid var(--rn-accent-2); outline-offset: 2px
         `<div class="top"><span class="label"></span><span class="value"></span></div><input type="range" part="input">`,
       );
       const input = this.$('input');
-      input.addEventListener('input', () => {
+      // The browser's own input event crosses the shadow root with no detail; pages get the kit's.
+      input.addEventListener('input', (e) => {
+        e.stopPropagation();
         this.setAttribute('value', input.value);
         this.emit('input', { value: this.value });
       });
@@ -698,7 +700,11 @@ input::placeholder { color: var(--rn-dim); }`,
         `<label><span class="label"></span><input part="input" spellcheck="false" autocomplete="off"></label>`,
       );
       const input = this.$('input');
-      input.addEventListener('input', () => this.emit('input', { value: input.value }));
+      // The browser's own input event crosses the shadow root with no detail; pages get the kit's.
+      input.addEventListener('input', (e) => {
+        e.stopPropagation();
+        this.emit('input', { value: input.value });
+      });
       input.addEventListener('change', () => this.emit('change', { value: input.value }));
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') this.emit('submit', { value: input.value });
