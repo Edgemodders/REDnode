@@ -64,7 +64,7 @@ async function mainFile(modId, fileId) {
   throw new Error('No primary file on the page, and more than one file: set "file" in nexus.json');
 }
 
-/** description.bbcode as the previous release (the newest v* tag that is not this version) had it, or null. */
+/** description.bbcode as the previous release (the newest v* tag that is not this version; any, with no version) had it, or null. */
 function previousReleaseDescription(version) {
   try {
     const git = (...a) => execFileSync('git', a, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -109,7 +109,14 @@ async function status() {
   const live = sha(fromNexus(mod.description));
   console.log(`${mod.name}: page ${config.page}, mod ${mod.id}, version ${mod.version}`);
   console.log(`Main file ${file.id}: ${versions.map((v) => `${v.version}${v.is_primary ? ' (primary)' : ''}${v.category !== 'main' ? ` (${v.category})` : ''}`).join(', ')}`);
-  console.log(`Description: live ${live === config.pulled?.sha256 ? 'unchanged since the last pull' : 'CHANGED on Nexus since the last pull'}; repo ${sha(repoDescription()) === live ? 'same as live' : 'differs from live'}`);
+  const prev = previousReleaseDescription();
+  const seen =
+    live === config.pulled?.sha256
+      ? 'the one last pulled'
+      : prev && live === sha(prev.text)
+        ? `the one ${prev.tag} pushed`
+        : 'CHANGED on Nexus since the last pull and the last release (pull before the next release)';
+  console.log(`Description: live is ${seen}; repo ${sha(repoDescription()) === live ? 'same as live' : 'differs from live'}`);
 }
 
 /** Reads the page and says what a release of <version> would do; throws if it may not. */
