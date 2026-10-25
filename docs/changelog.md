@@ -15,6 +15,8 @@ How to keep it:
 
 - REDnode moves to game version 2.5: it needs RED4ext 1.31 or later and no longer loads on 2.31 (REDnode 0.37.0 is the last for 2.31).
 - On 2.5, sound archive swaps and the Sound Tracer find the game's audio code again (the Tracer's hook on Wwise's PostEvent needed a new pattern).
+- The `api` types and the [game API reference](https://edgemodders.github.io/REDnode/game/) now come from game 2.5. 2.5 adds optional parameters to some functions (such as `EquipmentSystem.GetActiveItem`, for dual wielding) and renumbers some enums, which `api` passes by name, so calls written for 2.31 keep working.
+- Hot swaps of archives (`archives.reload`, the MCP tool `archives_reload`, the Hot swap app) wait for a RED Hot Tools release for 2.5.
 
 ## 0.37.0 (2026-10-24)
 

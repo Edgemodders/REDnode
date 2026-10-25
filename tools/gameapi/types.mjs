@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const versions = readdirSync(join(repo, 'gameapi'))
   .filter((d) => /^\d/.test(d) && statSync(join(repo, 'gameapi', d)).isDirectory())
-  .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  .sort((a, b) => Number(a) - Number(b)); // game versions read as decimals: 2.31 comes before 2.5
 const version = versions.at(-1);
 const data = JSON.parse(readFileSync(join(repo, 'gameapi', version, 'rtti.json'), 'utf8'));
 const outFile = join(repo, 'packages', 'rednode', 'src', 'generated', 'game.d.ts');

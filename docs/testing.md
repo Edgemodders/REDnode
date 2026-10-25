@@ -108,7 +108,7 @@ npm run typecheck
 npm run docs:game
 ```
 
-Expected: no errors. The `rednode` package's build generates its game types from `gameapi/2.31/rtti.json` (15,830 classes, 1,524 enums, 802 global functions, about 9 MB). `docs:game` builds the game API reference into `docs/game` in about a minute. The site's workflow runs the same on every push.
+Expected: no errors. The `rednode` package's build generates its game types from the newest `gameapi/<version>/rtti.json`, now 2.5 (16,140 classes, 1,554 enums, 822 global functions, about 9.5 MB). `docs:game` builds the game API reference into `docs/game` in about a minute. The site's workflow runs the same on every push.
 
 ### Mock game
 

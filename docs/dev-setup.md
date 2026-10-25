@@ -200,7 +200,7 @@ Do this once per game patch. The dump must contain only the base game, so every 
 6. Import the dump, giving the game's product version from the RED4ext log:
 
    ```powershell
-   npm run gameapi:import -- '<game folder>\red4ext\plugins\REDnode\rtti-dump.json' --game 2.31
+   npm run gameapi:import -- '<game folder>\red4ext\plugins\REDnode\rtti-dump.json' --game 2.5
    ```
 
 7. Set `ignored = []` back in `red4ext/config.ini`, and switch Vortex back to your normal profile.

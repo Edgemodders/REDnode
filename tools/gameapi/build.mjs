@@ -19,7 +19,7 @@ const outDir = join(repo, 'docs', 'game');
 
 const versions = readdirSync(join(repo, 'gameapi'))
   .filter((d) => existsSync(join(repo, 'gameapi', d, 'rtti.json')))
-  .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  .sort((a, b) => Number(a) - Number(b)); // game versions read as decimals: 2.31 comes before 2.5
 const game = process.argv[2] ?? versions.at(-1);
 if (!game) throw new Error('no gameapi/<version>/rtti.json found');
 const data = JSON.parse(readFileSync(join(repo, 'gameapi', game, 'rtti.json'), 'utf8'));
