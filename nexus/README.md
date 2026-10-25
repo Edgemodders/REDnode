@@ -66,10 +66,13 @@ npm run release:zip      # native\build\release\REDnode-<version>.zip
 
 ## Updating the page
 
-1. Edit `description.bbcode` here, commit, push.
-2. Check it: `node tools/check-bbcode.mjs nexus/description.bbcode`.
-3. Paste the whole file into the description field on Nexus and save.
-4. For a new version, first the release gate: every in-game test of the builds since the last release has passed (docs/testing.md). Untested or failed means no release. Then:
+1. First take in any edit made on Nexus itself (pictures added by hand, for example): `npm run nexus:pull` writes the live description into `description.bbcode` and the page's ids and the description's hash into `nexus.json`. `npm run nexus:status` shows the page's version, its main file's versions, and whether the description changed on Nexus since the last pull. Both read through Nexus's v3 API with the owner's key (see `tools/nexus/api.mjs`; on the dev PC an encrypted file in `%APPDATA%\Edgemodders`, in CI the organization's `NEXUS_KEY` secret). Commit what the pull changed.
+2. Edit `description.bbcode` here, commit, push.
+3. Check it: `node tools/check-bbcode.mjs nexus/description.bbcode`.
+4. Paste the whole file into the description field on Nexus and save. Then pull again, so `nexus.json` holds the hash of what is live.
+
+Nexus stores the description with an HTML `<br />` on each line, a few characters as entities, and no newline after a block such as `[/list]`; the pull turns it back into plain BBCode, and the hash ignores whitespace.
+5. For a new version, first the release gate: every in-game test of the builds since the last release has passed (docs/testing.md). Untested or failed means no release. Then:
    1. In `docs/changelog.md`, rename **Unreleased** to `## <version> (<date>)`, start a new empty **Unreleased** above it, commit and push.
    2. Run the workflow with **Make a release** ticked. The GitHub release takes its notes from that section.
    3. Download the zip from the release, and upload it on Nexus as the main file with the version from `VERSION`. Archive the old file.

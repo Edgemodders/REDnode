@@ -18,6 +18,8 @@
     "overlay:package": "node tools/overlay/package-host.mjs",
     "release:zip": "node tools/release/player-zip.mjs",
     "release:notes": "node tools/release/notes.mjs",
+    "nexus:pull": "node tools/nexus/nexus.mjs pull",
+    "nexus:status": "node tools/nexus/nexus.mjs status",
     "release:pack": "node tools/release/pack-zip.mjs",
     "release": "gh workflow run release.yml --ref main -f release=true"
   },
