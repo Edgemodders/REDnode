@@ -87,7 +87,7 @@ function descriptionPlan(mod, config, version) {
   if (prev && live === sha(prev.text)) return { push: true, why: `the live description is the one ${prev.tag} pushed` };
   throw new Error(
     'The description on Nexus has changed since the last pull and the last release, so pushing would lose that edit. ' +
-      `Run npm run nexus:pull${dirArg === 'nexus' ? '' : ` -- ${dirArg}`}, check the diff, commit, and run again.`,
+      `Run node tools/nexus/nexus.mjs pull${dirArg === 'nexus' ? '' : ` ${dirArg}`}, check the diff, commit, and run again.`,
   );
 }
 
