@@ -66,15 +66,18 @@ async function spawn() {
 // time, and reports how many moves the game took per second each way.
 async function spin() {
   if (!spawned) return result.set({ text: 'Spawn first' });
+  const box = spawned;
+  // Remove during a spin ends it: spawned changes, the box is gone.
   const run = async (parallel) => {
     let moves = 0;
     const until = Date.now() + 5000;
-    while (Date.now() < until) {
+    while (Date.now() < until && spawned === box) {
       const batch = Array.from({ length: parallel }, (_, k) => {
         const a = (moves + k) / 20;
-        return world.move(spawned.id, { x: spawned.at.x + Math.cos(a), y: spawned.at.y + Math.sin(a), z: spawned.at.z }, undefined, (a * 180) / Math.PI);
+        return world.move(box.id, { x: box.at.x + Math.cos(a), y: box.at.y + Math.sin(a), z: box.at.z }, undefined, (a * 180) / Math.PI);
       });
-      await Promise.all(batch);
+      const done = await Promise.all(batch).then(() => true, () => spawned !== box);
+      if (!done) throw new Error('A move failed');
       moves += parallel;
     }
     return moves / 5;
@@ -82,6 +85,7 @@ async function spin() {
   result.set({ text: 'Spinning...' });
   const one = await run(1);
   const ten = await run(10);
+  if (spawned !== box) return console.log('Spin stopped: the box was removed');
   const text = `${one.toFixed(0)} moves/s one at a time, ${ten.toFixed(0)} moves/s ten at a time`;
   result.set({ text });
   console.log(`Move rate: ${text}`);
