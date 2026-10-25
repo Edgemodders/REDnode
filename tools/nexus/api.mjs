@@ -8,7 +8,6 @@
 // printed, never on a command line.
 
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
@@ -70,46 +69,34 @@ const MiB = 1024 * 1024;
 
 /**
  * Uploads an archive and returns its upload id once Nexus has it ready (state "available"), to be
- * made a mod file version. Up to 100 MiB in one PUT with its MD5; larger files in parts, as S3's
- * multipart upload, which Nexus requires above 100 MiB.
+ * made a mod file version. Always as S3's multipart upload, as Nexus's own upload action does:
+ * required above 100 MiB, and a small file is one part. (The single-part PUT is signed for
+ * content-type and content-md5 values the API does not document; it failed with
+ * SignatureDoesNotMatch on 2026-10-25.)
  */
 export async function uploadArchive(file, log = console.log) {
   const data = readFileSync(file);
   const filename = basename(file);
-  let upload;
-  if (data.length <= 100 * MiB) {
-    const md5 = createHash('md5').update(data);
-    const hex = md5.copy().digest('hex');
-    upload = await api('POST', '/uploads', { size_bytes: data.length, filename, md5: hex });
-    const res = await fetch(upload.presigned_url, {
+  const upload = await api('POST', '/uploads/multipart', { size_bytes: data.length, filename });
+  const size = upload.part_size_bytes;
+  const etags = [];
+  for (let i = 0; i < upload.part_presigned_urls.length; i++) {
+    const part = data.subarray(i * size, Math.min((i + 1) * size, data.length));
+    const res = await fetch(upload.part_presigned_urls[i], {
       method: 'PUT',
-      headers: {
-        'content-md5': md5.digest('base64'),
-        'content-disposition': `attachment; filename="${filename}"`,
-        'content-length': String(data.length),
-      },
-      body: data,
+      headers: { 'content-type': 'application/octet-stream', 'content-length': String(part.length) },
+      body: part,
     });
-    if (!res.ok) throw new Error(`Upload of ${filename}: ${res.status} ${(await res.text()).slice(0, 300)}`);
-    log(`Uploaded ${filename} (${(data.length / MiB).toFixed(1)} MiB) in one part`);
-  } else {
-    upload = await api('POST', '/uploads/multipart', { size_bytes: data.length, filename });
-    const size = upload.part_size_bytes;
-    const etags = [];
-    for (let i = 0; i < upload.part_presigned_urls.length; i++) {
-      const part = data.subarray(i * size, Math.min((i + 1) * size, data.length));
-      const res = await fetch(upload.part_presigned_urls[i], { method: 'PUT', headers: { 'content-length': String(part.length) }, body: part });
-      if (!res.ok) throw new Error(`Upload of ${filename}, part ${i + 1}: ${res.status} ${(await res.text()).slice(0, 300)}`);
-      etags.push(res.headers.get('etag'));
-    }
-    const xml =
-      '<CompleteMultipartUpload>' +
-      etags.map((tag, i) => `<Part><PartNumber>${i + 1}</PartNumber><ETag>${tag}</ETag></Part>`).join('') +
-      '</CompleteMultipartUpload>';
-    const done = await fetch(upload.complete_presigned_url, { method: 'POST', headers: { 'content-type': 'application/xml' }, body: xml });
-    if (!done.ok) throw new Error(`Completing the upload of ${filename}: ${done.status} ${(await done.text()).slice(0, 300)}`);
-    log(`Uploaded ${filename} (${(data.length / MiB).toFixed(1)} MiB) in ${etags.length} parts`);
+    if (!res.ok) throw new Error(`Upload of ${filename}, part ${i + 1}: ${res.status} ${(await res.text()).slice(0, 1500)}`);
+    etags.push(res.headers.get('etag'));
   }
+  const xml =
+    '<CompleteMultipartUpload>' +
+    etags.map((tag, i) => `<Part><PartNumber>${i + 1}</PartNumber><ETag>${tag}</ETag></Part>`).join('') +
+    '</CompleteMultipartUpload>';
+  const done = await fetch(upload.complete_presigned_url, { method: 'POST', headers: { 'content-type': 'application/xml' }, body: xml });
+  if (!done.ok) throw new Error(`Completing the upload of ${filename}: ${done.status} ${(await done.text()).slice(0, 1500)}`);
+  log(`Uploaded ${filename} (${(data.length / MiB).toFixed(1)} MiB) in ${etags.length} part${etags.length === 1 ? '' : 's'}`);
   await api('POST', `/uploads/${upload.id}/finalise`);
   // Nexus checks the archive before it can become a version: wait for "available", up to 10 minutes.
   for (let waited = 0; ; waited += 5) {
