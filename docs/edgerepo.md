@@ -54,6 +54,23 @@ One repo, **EDGErepo** (`Edgemodders/EDGErepo`), with two halves that are used i
 - Repos call a tag (`@v1`), so a change in EDGErepo reaches them only when the tag moves: one place to fix, and no surprise in a release.
 - On the dev PC, `nexus pull` and `nexus status` run from the EDGErepo checkout and are pointed at the repo's `nexus/` folder.
 
+### Game mods and extensions
+
+The EDGE tools ship in two kinds, and Nexus treats them differently:
+
+| Kind | Tools | Nexus file | Other publishing |
+|---|---|---|---|
+| Game mod | REDnode, REDagent, the app packs (Sound Tools, Admin Tools) | A zip laid out as the game folder; **Mod Manager Download on**, so Vortex and EDGEdeck install it | None |
+| Tool outside the game | REDcode, EDGEdeck, EDGEmat, EDGEwave (VS Code extensions), EDGEkit (desktop app) | A zip with the VSIX or installer; **Mod Manager Download off**, since a mod manager would put it in the game folder, where it does nothing | The VS Code Marketplace and Open VSX (`vsce publish`, `ovsx publish`) for the extensions |
+
+The Nexus step is the same for both kinds. What differs is a setting, so it lives in each repo's `nexus/nexus.json`:
+
+- `"kind": "game-mod"` or `"kind": "extension"` (or `"app"`), with no default: a `nexus.json` without it stops the release, so a missing setting can never put an extension on Vortex's button.
+- The kind sets the Nexus upload: `game-mod` turns Mod Manager Download on, the others turn it off. Today the scripts read `upload.modManager` directly; `kind` replaces it.
+- Each repo still builds its own zip, since its contents differ by kind.
+
+Publishing to the marketplaces is a second reusable workflow, `extension.yml`, for the extension repos only: package the VSIX once, publish it to the VS Code Marketplace and Open VSX, and hand the same VSIX to the Nexus step. Today each extension repo has its own copy of those steps (REDcode, EDGEdeck, EDGEmat and EDGEwave all run `vsce publish` and `ovsx publish`). A game mod's release calls only the Nexus workflow; an extension's calls both.
+
 ## Open questions
 
 | Question | Note |
@@ -69,4 +86,4 @@ One repo, **EDGErepo** (`Edgemodders/EDGErepo`), with two halves that are used i
 |---|---|
 | R1 Nexus machinery | EDGErepo with `tools/nexus/` and the reusable Nexus workflow, tagged `v1`. REDnode and REDagent call it and drop their copies. Check with one release of each |
 | R2 Template | The scaffolding, gathered from the newest repos, with placeholders and a short "Start a new tool" page |
-| R3 Other tools | Each tool with a Nexus page moves its release to the shared workflow when it next releases |
+| R3 Other tools | `kind` in `nexus.json`, and `extension.yml` for the marketplaces. Each tool with a Nexus page moves its release to the shared workflows when it next releases, the extensions with Mod Manager Download off |
