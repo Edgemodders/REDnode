@@ -354,13 +354,14 @@ export const NOTES = {
   },
   'refresh-test': {
     group: 'tests',
-    summary: 'Swap an archive, then try each way the game offers to load again what is already in the world: V\'s clothes, what V looks at, a spawned object.',
-    teaches: ['archives.reload', 'api.GameInstance', 'TransactionSystem', 'tweakdb.records', 'TargetingSystem', 'world.spawn', 'world.entity', 'ui.list'],
+    summary: 'Swap an archive, then try each way the game offers to load again what is already in the world: V\'s clothes, the inventory\'s preview of V, what V looks at, a spawned object.',
+    teaches: ['archives.reload', 'api.GameInstance', 'TransactionSystem', 'tweakdb.records', 'TargetingSystem', 'DelaySystem', 'world.spawn', 'world.entity', 'ui.list'],
     how: [
       'A swap replaces an archive, but what is already in the world keeps what it loaded. This is the spike of `world.refresh` (H2): each button calls the game through `api` and logs how long it took.',
       'V\'s clothes: **Scan** lists each attachment slot in TweakDB that holds an item (`tweakdb.records("AttachmentSlot")`, so slots a mod adds count too) and marks the clothing. The buttons then use `RefreshAttachment`, apply the item\'s appearance again, or take the items off and put them back. Type a slot name as Scan shows it to try one at a time.',
       'What V looks at: `TargetingSystem.GetLookAtObject` finds it, then `ScheduleAppearanceChange` applies its appearance again.',
       'A spawned object: spawned again in the same place, or its mesh component switched off and on.',
+      'The inventory preview: a second character the in-game menu controller holds (`GetPuppet("inventory")`, reached through Codeware\'s menu layer). **Reset preview** applies its items\' appearance again; **Game event** sends the event the game\'s wardrobe sends for the same.',
     ],
     tryThis: ['Press Scan, then Re-attach. Type Legs in the slots field and press Off and on.', 'Press Spawn, then Mesh off and on.'],
     preview: 'Nothing changes on screen here: the preview\'s V wears a jacket, trousers and boots, and looks at a vendor, so the log shows the calls each button makes.',

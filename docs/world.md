@@ -1117,6 +1117,57 @@ The fix plan:
 
 Photo mode and the wardrobe preview (`gameuiWardrobeSetPreviewGameController`) have their own copies of V and likely need the same step. Until then: swap outside the inventory, or unequip and equip the item again in the inventory.
 
+This plan is replaced by [H2b preview: plan](#h2b-preview-plan) (2026-10-26): the game's own scripts show a way to the preview that needs no hook.
+
+### H2b preview: plan
+
+Asked for by the owner on 2026-10-26: make the inventory's preview of V show a swapped garment too, with the same logic the refresh uses on V. Proposed the same day, **not yet agreed**. Found by reading the game's scripts (decompiled with redscript-cli into the scratchpad, never committed) and Equipment-EX's scripts (MIT).
+
+**What the game does:**
+
+| Finding | Where |
+|---|---|
+| The preview character belongs to the in-game menu controller, `gameuiInGameMenuGameController`. `GetPuppet(n"inventory")` (native, on `gameuiBaseMenuGameController`) returns it as a strong handle. `OnPuppetReady` dresses it with preview copies of V's items (`GivePreviewItemByItemID`) | The game's `OnPuppetReady` |
+| The game refreshes the preview in two ways. (1) The wardrobe sends `ResetItemAppearanceInSlotDelayEvent { slotID }` to V next frame (`DelayedResetItemAppearanceInSlot`); the in-game menu controller answers by calling `ResetItemAppearance(puppet, item in that slot)`. (2) `EquipmentSystemPlayerData.ResetItemAppearance(area, force)` resets V's item and posts a paperdoll update on the `UI_Equipment.lastModifiedArea` blackboard; the controller's `OnEquipmentChanged` then resets the same item on the preview | The game's `OnResetItemAppearanceInSlotDelayEvent`, `OnEquipmentChanged` |
+| REDnode's refresh calls `TransactionSystem.ResetItemAppearance` on V directly, which sends neither. That is why the preview keeps the old look | `refreshWorn` in main.js |
+| Equipment-EX dresses the preview in the same `OutfitSlots.*` (`AddItemToSlot(puppet, slot, previewID)`), so a reset per slot on the preview covers its items too. Its paperdoll update skips an item already in the slot, so route (2) would not refresh its slots | Equipment-EX's `EquipPuppetParts`, `UpdatePuppetFromBlackboard` |
+| The game's answer to the event does not check that the preview exists. Sent with no preview, it would call the transaction system with an empty game instance (crash unverified) | `OnResetItemAppearanceInSlotDelayEvent` |
+| Codeware's `GameInstance.GetInkSystem().GetLayer(n"inkMenuLayer").GetGameController()` should return the in-game menu controller, so no redscript hook is needed (unverified) | Codeware 1.21's `inkSystem` |
+
+**The approach:** after the refresh resets V's items, `refreshWorn` finds the in-game menu controller through Codeware's menu layer and calls `GetPuppet("inventory")`. When there is a preview, it resets the preview's item in each slot it refreshed on V, skipping `empty_appearance_*` as on V. This is the same step as the game's own event handler, but with a check that the preview exists. The answer gains `preview: { items }`, or a note when there is no preview or no Codeware. Without Codeware the refresh stays as it is today.
+
+**Open questions the spike answers:**
+
+| # | Question | If no |
+|---|---|---|
+| U1 | Is the menu layer's controller the in-game menu controller? | A small redscript wrap of its `OnPuppetReady` that keeps the preview in a REDnode script system (the old plan, moved to this controller) |
+| U2 | Does `GetPuppet("inventory")` return the preview while the inventory is closed, after it was opened once? | The host remembers the slots swapped since the inventory was last open and refreshes the preview the next time it opens |
+| U3 | Does `ResetItemAppearance` on the preview show the swapped version, as it does on V? | Take the item off the preview and put it back (`RemoveItemFromSlot`, `AddItemToSlot`), as an unequip and equip in the inventory does |
+| U4 | Does the game's event (route 1) do the same as the direct call? | Keep the direct call; the event is only a comparison |
+
+**Phases:**
+
+| Phase | What | Where it runs |
+|---|---|---|
+| PV-a Spike | Refresh test 0.3.0, section 5: **Find preview** (the controller's type, the preview, what it wears, and Equipment-EX's preview for comparison), **Reset preview** (the direct call) and **Game event** (route 1, only when a preview exists). Through `api` only, so no REDnode build | Steps 1 to 5 on game 2.5 with REDnode 0.40.1 (no swap). Steps 6 to 9 in the 2.31 backup with REDnode 0.37.0 and RED Hot Tools, the only place a swap works today |
+| PV-b Build | The preview step in `refreshWorn` in the way the spike chose, `preview` in `archives.reload`'s answer, a changelog line | Built on 2.5. Its swap check waits for RED Hot Tools on 2.5; until then, a check that the step runs and finds the preview |
+| Later | Photo mode's copy of V, the wardrobe screen's preview, Equipment-EX's own wardrobe screen | |
+
+### H2b preview: test
+
+**PV-a, Refresh test 0.3.0.** Needs Codeware. Steps 6 to 9 also need RED Hot Tools and two versions of a garment V wears, such as the H2a trouser archives (V1 and V2, the same file list).
+
+0. Switch on the **Test timer** in the launcher and press **Start**. Press **Mark** after each step.
+1. Load a save. In the launcher, switch on **Refresh test** and its **Allowed** switch for swapping archives. Put on the test garment if you are in the 2.31 backup. **Mark**.
+2. Without opening the inventory, press **Scan**, then **Find preview**. Expected: the menu layer controller's type (`gameuiInGameMenuGameController` hoped for), and whether a preview exists yet. **Mark**.
+3. Open the inventory (**I**), press **F10**, press **Find preview**. Expected: a preview, with what it wears. If Equipment-EX is installed, its preview should have the same id. **Mark**.
+4. Close the inventory, press **F10**, press **Find preview**. This answers U2: is the preview still there? **Mark**.
+5. Open the inventory, press **F10**, then press **Reset preview** and **Game event**. Expected: no crash, and the preview keeps its look (nothing was swapped). **Mark**. On game 2.5, stop here.
+6. In the 2.31 backup, with V wearing V1 and the inventory open: press **F10**, type the archive and press **Swap** with V2's file. Expected: V shows V2 (the refresh), the preview still V1 (the bug). **Mark**.
+7. Press **Reset preview**. Look at the preview: V2? (U3) **Mark**.
+8. Swap V1 back, then press **Game event**. Look at the preview: V1? (U4) **Mark**.
+9. Close the inventory. Swap V2, press **Find preview**, and **Reset preview** if it found one. Open the inventory: V2? **Mark**.
+
 
 ## H2c World objects: plan
 
@@ -1130,7 +1181,7 @@ Proposed and **agreed with the owner on 2026-10-23**, with the three recommendat
 | The host does not know what a package spawned | Nothing to refresh after a swap, and spawns outlive a stopped package (EDGEbuilder removes its own) |
 | No way to find the game's entities near a point | Refreshing the props and NPCs around V after a swap; EDGEbuilder's B3b picking needs the same (its probe 1) |
 | A swap refreshes only what V wears | Props, NPCs and placed objects keep the old look |
-| The inventory preview keeps the old look | [Parked](#h2b-limit-the-inventory-preview-keeps-the-old-look-parked) with a fix plan |
+| The inventory preview keeps the old look | [Parked](#h2b-limit-the-inventory-preview-keeps-the-old-look-parked); a plan with no hook since 2026-10-26: [H2b preview](#h2b-preview-plan) |
 | No scene load | Every tool that wants an EDGEbuilder scene in the game would rebuild it object by object |
 
 **Candidates in the game API** (`gameapi/2.31/rtti.json`; all **unverified**):

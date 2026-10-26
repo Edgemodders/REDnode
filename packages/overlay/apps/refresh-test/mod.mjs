@@ -11,6 +11,10 @@
 //                 a missing one and back
 //   Spawned       a box (or any mesh typed in) spawned, then spawned again, or its
 //                 mesh component switched off and on (needs Codeware)
+//   Preview       the inventory's preview of V, a second character: found through the
+//                 in-game menu controller (needs Codeware), its items' appearance applied
+//                 again directly or through the game's own event (docs/world.md, "H2b
+//                 preview: plan")
 
 import { api, archives, game, kernel, tweakdb, ui, world } from 'rednode';
 
@@ -373,6 +377,72 @@ const removeBox = () =>
     return `removed ${ok}`;
   });
 
+// The inventory's preview of V is a second character, dressed with copies of V's items.
+// The in-game menu controller holds it: Codeware's menu layer gives that controller
+// (unverified that it is that one: Find preview logs its type), and GetPuppet("inventory")
+// the character, or nothing when the game has none at the moment.
+async function preview() {
+  const ink = await api.GameInstance.GetInkSystem().catch(() => null);
+  if (!ink) throw new Error('no ink system: the preview steps need Codeware');
+  const layer = await ink.GetLayer('inkMenuLayer');
+  const menu = layer && (await layer.GetGameController());
+  if (!menu) throw new Error('no game controller on the menu layer');
+  const puppet = await menu.GetPuppet('inventory').catch(() => null);
+  return { menu, puppet };
+}
+
+// What the preview wears in V's clothing slots (Scan's, or those typed in).
+async function previewWorn(puppet, ts) {
+  const found = [];
+  for (const slot of await slots()) {
+    const item = await ts.GetItemInSlot(puppet, slot).catch(() => null);
+    if (!item) continue;
+    const itemID = await item.GetItemID();
+    found.push({ slot, itemID, appearance: String((await ts.GetItemAppearance(puppet, itemID).catch(() => '')) ?? '') });
+  }
+  return found;
+}
+
+const findPreview = () =>
+  step('Find preview', async () => {
+    const { menu, puppet } = await preview();
+    // Equipment-EX keeps the preview character too: the same one, if both are found.
+    const container = await api.GameInstance.GetScriptableSystemsContainer(game.instance);
+    const helper = await container.Get('EquipmentEx.PaperdollHelper').catch(() => null);
+    const theirs = helper && (await helper.GetPuppet().catch(() => null));
+    const idOf = async (p) => (p ? String((await p.GetEntityID().catch(() => null))?.hash ?? '?') : 'none');
+    const notes = [`menu layer controller ${menu.$type}`, `preview ${puppet ? `${puppet.$type} ${await idOf(puppet)}` : 'none'}`];
+    if (helper) notes.push(`Equipment-EX's preview ${await idOf(theirs)}`);
+    if (puppet) for (const w of await previewWorn(puppet, await shop())) say(`  ${short(w.slot)}: ${w.appearance || '(no appearance)'}`);
+    return notes.join('; ');
+  });
+
+// Applies the appearance of each item the preview wears again, as the refresh does on V.
+const resetPreview = () =>
+  step('Reset preview', async () => {
+    const { puppet } = await preview();
+    if (!puppet) throw new Error('no preview character now');
+    const ts = await shop();
+    const items = (await previewWorn(puppet, ts)).filter((w) => w.appearance && w.appearance !== 'None' && !w.appearance.startsWith('empty_appearance'));
+    if (!items.length) throw new Error('the preview wears nothing in those slots');
+    for (const w of items) await ts.ResetItemAppearance(puppet, w.itemID);
+    return items.map((w) => `${short(w.slot)} ${w.appearance}`).join('; ');
+  });
+
+// The game's own way, as its wardrobe does: an event to V, next frame, that the in-game
+// menu controller answers by applying the preview's item in that slot again. Sent only
+// when the preview exists: the game's answer does not check for it.
+const previewEvent = () =>
+  step('Game event', async () => {
+    const { puppet } = await preview();
+    if (!puppet) throw new Error('no preview character now');
+    const v = await player();
+    const delay = await api.GameInstance.GetDelaySystem(game.instance);
+    const list = await slots();
+    for (const slot of list) await delay.DelayEventNextFrame(v, await api.$new('ResetItemAppearanceInSlotDelayEvent', { slotID: slot }));
+    return `sent for ${list.map(short).join(', ')}`;
+  });
+
 async function swap() {
   const name = file.trim();
   if (!name) return say('Type an archive first');
@@ -440,6 +510,12 @@ ui.window({
       ui.button('Mesh off and on', toggleMesh, { variant: 'ghost' }),
       ui.button('Remove', removeBox, { variant: 'ghost' }),
     ),
+    ui.heading('5. The inventory preview'),
+    ui.row(
+      ui.button('Find preview', findPreview, { variant: 'ghost' }),
+      ui.button('Reset preview', resetPreview),
+      ui.button('Game event', previewEvent, { variant: 'ghost' }),
+    ),
     log,
   ],
 });
@@ -449,7 +525,7 @@ const codeware = await world.available().catch(() => false);
 requires.set({
   text: [
     ...checked.map((r) => `${r.ok ? 'OK' : 'MISSING'}  ${r.name} ${r.wants}  ${r.found ?? r.note}`),
-    `${codeware ? 'OK' : 'NOT READY'}  world API (Codeware, a loaded save): needed for 4`,
+    `${codeware ? 'OK' : 'NOT READY'}  world API (Codeware, a loaded save): needed for 4 and 5`,
   ].join('\n'),
   tone: checked.every((r) => r.ok) ? 'normal' : 'danger',
 });

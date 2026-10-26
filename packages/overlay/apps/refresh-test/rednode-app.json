@@ -1,9 +1,9 @@
 {
   "id": "refresh-test",
   "name": "Refresh test",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "author": "Edgemodders",
-  "description": "The spike of H2 world.refresh: swaps an archive into the running game, then tries each way the game offers to load again what is already in the world (V's clothes, what V looks at, a spawned object) and logs what each took. Asks for the archives permission.",
+  "description": "The spike of H2 world.refresh: swaps an archive into the running game, then tries each way the game offers to load again what is already in the world (V's clothes, the inventory's preview of V, what V looks at, a spawned object) and logs what each took. Asks for the archives permission.",
   "main": "mod.mjs",
   "open": false,
   "permissions": ["archives"],
