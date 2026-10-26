@@ -1248,3 +1248,21 @@ What it decides so far:
 - Whether the appearance again (`ScheduleAppearanceChange`) shows it without a respawn is still open. That is the only way for the game's own entities, which REDnode cannot respawn.
 
 World objects test 0.1.2 lists what is near V by itself when Who uses it or a refresh button needs it (and again when this app's spawns respawned since), and reads each entity's files only once.
+
+**Appearance-again run** (same night, app 0.1.2, same setup; the player's marks run one step behind the button presses, so the table follows the log):
+
+| Press | Result |
+|---|---|
+| Spawn a prop, Swap to the barrel | 221 ms; swapped in 76 ms. Still a box |
+| Who uses it | Listed 6 entities within 15 m (401 ms), read their files (15 s), and found the one that names the swapped mesh: the spawned box (`entEntity`, appearance `default`, hash `0x061196a51cfabe2c`) |
+| Users: look again | `ScheduleAppearanceChange("default")` in 16 ms: **still a box** |
+| Users: through missing (twice) | A missing appearance, 500 ms, then `default` again: **still a box** |
+| All near: look again | All 6 entities, 175 ms: **still a box** |
+| Respawn spawned | 177 ms: **a barrel** |
+| Faults | None |
+
+What it decides:
+
+- The match works: a swapped archive's file table against the files each entity's components name finds the entity that uses it.
+- An appearance change does not reload a mesh on this prop. But this prop is a bare entity with one mesh component the app added, and no `.app` behind its `default` appearance, so its appearance never chose the mesh. For entities whose meshes come from their appearance (NPCs, most game props and devices), an appearance change may still reload them: **unverified**, and that test needs an archive that changes such an entity.
+- For REDnode's own spawns, H2c-b refreshes by respawning with the same spec (about 200 ms each).
