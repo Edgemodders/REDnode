@@ -28,6 +28,7 @@ let keep = false; // DynamicEntitySpec's persistState and persistSpawn
 let radius = 15;
 let meshPath = BOX;
 let file = '';
+let other = ''; // another appearance, for Users: through another
 let busy = '';
 
 const spawned = []; // { id, kind: 'npc'|'box', spec: {...}, at, label }
@@ -366,7 +367,7 @@ async function appearanceAgain(list, through) {
     }
     const started = performance.now();
     if (through) {
-      await e.ref.ScheduleAppearanceChange('rednode_no_such_appearance');
+      await e.ref.ScheduleAppearanceChange(through === true ? 'rednode_no_such_appearance' : through);
       await sleep(500);
     }
     await e.ref.ScheduleAppearanceChange(look);
@@ -376,7 +377,8 @@ async function appearanceAgain(list, through) {
 }
 
 const refreshUsers = (through) =>
-  step(`Refresh users${through ? ', through a missing appearance' : ''}`, async () => {
+  step(`Refresh users${through === true ? ', through a missing appearance' : through ? `, through ${through}` : ''}`, async () => {
+    if (through === '') throw new Error('type another appearance first');
     const list = await users();
     if (!list.length) return 'nothing near V uses the swapped files';
     const notes = await appearanceAgain(list, through);
@@ -486,6 +488,8 @@ ui.window({
       ui.button('Users: through missing', () => refreshUsers(true), { variant: 'ghost' }),
       ui.button('All near: look again', refreshAllNear, { variant: 'ghost' }),
     ),
+    ui.input({ placeholder: 'Another appearance of the users, for Through another', onChange: (v) => (other = v.trim()), onSubmit: (v) => (other = v.trim()) }),
+    ui.row(ui.button('Users: through another', () => refreshUsers(other), { variant: 'ghost' })),
     ui.row(
       ui.button('NPC: look again', () => refreshNpc(false), { variant: 'ghost' }),
       ui.button('NPC: through missing', () => refreshNpc(true), { variant: 'ghost' }),
