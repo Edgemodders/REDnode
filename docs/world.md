@@ -1121,7 +1121,7 @@ This plan is replaced by [H2b preview: plan](#h2b-preview-plan) (2026-10-26): th
 
 ### H2b preview: plan
 
-Asked for by the owner on 2026-10-26: make the inventory's preview of V show a swapped garment too, with the same logic the refresh uses on V. Proposed the same day, **not yet agreed**. Found by reading the game's scripts (decompiled with redscript-cli into the scratchpad, never committed) and Equipment-EX's scripts (MIT).
+Asked for by the owner on 2026-10-26: make the inventory's preview of V show a swapped garment too, with the same logic the refresh uses on V. Proposed and **agreed with the owner** the same day. Found by reading the game's scripts (decompiled with redscript-cli into the scratchpad, never committed) and Equipment-EX's scripts (MIT).
 
 **What the game does:**
 
@@ -1158,7 +1158,7 @@ Asked for by the owner on 2026-10-26: make the inventory's preview of V show a s
 **PV-a, Refresh test 0.3.0.** Needs Codeware. Steps 6 to 9 also need RED Hot Tools and two versions of a garment V wears, such as the H2a trouser archives (V1 and V2, the same file list).
 
 0. Switch on the **Test timer** in the launcher and press **Start**. Press **Mark** after each step.
-1. Load a save. In the launcher, switch on **Refresh test** and its **Allowed** switch for swapping archives. Put on the test garment if you are in the 2.31 backup. **Mark**.
+1. Load a save. In the launcher, switch on **Refresh test** and its **Allowed** switch for swapping archives. On game 2.5 the launcher says it needs RED Hot Tools: it still runs, and steps 1 to 5 do not swap. Put on the test garment if you are in the 2.31 backup. **Mark**.
 2. Without opening the inventory, press **Scan**, then **Find preview**. Expected: the menu layer controller's type (`gameuiInGameMenuGameController` hoped for), and whether a preview exists yet. **Mark**.
 3. Open the inventory (**I**), press **F10**, press **Find preview**. Expected: a preview, with what it wears. If Equipment-EX is installed, its preview should have the same id. **Mark**.
 4. Close the inventory, press **F10**, press **Find preview**. This answers U2: is the preview still there? **Mark**.
