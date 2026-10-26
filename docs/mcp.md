@@ -104,7 +104,23 @@ Step 8 failed: the browser said "Unknown client". **Revoke** deleted the registr
 - A registration is dropped only when it never connected within a day, or when it has not been used for as long as a refresh token lasts (180 days).
 - A client id REDnode has forgotten (a dropped registration or a lost data file) is taken back when it has REDnode's form and asks for a loopback redirect. Anyone on the PC can register anyway, and the player still allows each sign-in.
 
-The scratch check now also covers a sign-in and a Deny after a revoke, and a forgotten id (30 checks). Steps 8 to 10 are still to run, on 0.40.1.
+The scratch check now also covers a sign-in and a Deny after a revoke, and a forgotten id (30 checks).
+
+### MCP sign-in: retest on 0.40.1 (2026-10-26): passed
+
+Game 2.5, REDnode 0.40.1, dev PC, the same `rednode-signin` entry. Every step passed (log and timer marks agree):
+
+| Step | Log |
+|---|---|
+| Authenticate | Claude Code registered again (it did not reuse the id 0.40.0 had deleted), code MHT-7588 |
+| Deny | "the player denied", the window closed, Claude Code said the sign-in was denied |
+| No answer | the request lapsed after 2 minutes and the window closed |
+| Allow | connected; `game_state` answered |
+| Revoke, then Authenticate | asked to connect with no new registration (the 0.40.0 bug is gone), denied |
+
+Seen: after Revoke, Claude Code's `/mcp` still showed `rednode-signin` as connected until the next question, which then got a 401 and showed it disconnected. Not a bug: the status is Claude Code's last known one, and a stateless HTTP server cannot tell a client its token was revoked; the next request finds out.
+
+**Not checked in game:** taking back a forgotten client id (Claude Code registered again instead); the scratch check covers it.
 
 ## C1 test
 
