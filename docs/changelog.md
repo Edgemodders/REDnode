@@ -11,6 +11,15 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- `world.spawn({ mesh })` spawns a prop from a mesh alone, and a `Character.*` record now stands where it was placed and stays friendly to V. `keep: true` keeps a spawn in the save.
+- `world.load()` and `world.unload()` load an [EDGEbuilder scene file](https://edgemodders.github.io/EDGEbuilder/scene.html) into the running game: its meshes, entities and NPCs (lights not yet).
+- `world.near()` lists the entities near V with the files each one uses, read in the game in one call; `world.files()` reads one entity's files; `world.spawned()` lists your package's spawns.
+- What a package spawns is removed when the package stops.
+- After an archive swap (`archives.reload`), your spawns that use a swapped file are spawned again (`world.onRespawn` tells you their new ID), and the game's entities within 30 m of V that use one switch appearance and back, so they show the new version. The answer lists them in `world`. Untested in game until RED Hot Tools supports game 2.5.
+- MCP tools `world_near` and `world_spawned` (read), and `world_spawn`, `world_remove` and `world_load` (ask first).
+
 **Fixed**
 
 - A Node mod's window with a `ui.list()` log and more controls than fit no longer squeezes the log to nothing: the log keeps at least 160 px and the window scrolls to reach it.

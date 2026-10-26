@@ -329,7 +329,13 @@ export const game = {
 };
 
 export const api = path(['api']);
-export const world = path(['world'], { on: (name, fn) => listen('world', name, fn) });
+export const world = path(['world'], {
+  on: (name, fn) => listen('world', name, fn),
+  // A handler cannot cross to the page; the simulated game never respawns anything.
+  onRespawn: () => () => {},
+  // Answered at once from the page's copy would need a round trip; the list starts empty.
+  spawned: () => [],
+});
 // audio.trace's callback runs here; the page sends it each batch as an event.
 export const audio = path(['audio'], {
   async trace(fn) {

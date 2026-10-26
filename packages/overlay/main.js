@@ -31,7 +31,7 @@ const { scanGame, checkRequires, validRange, key: gamefilesKey } = require('./ga
 const { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED } = require('./redbridge');
 const bridgeInstall = require('./bridge-install');
 const { createLookup } = require('./gameapi-lookup');
-const { soundPaksIn, hotToolsLookupMisses } = require('./archive-index');
+const { soundPaksIn, hotToolsLookupMisses, archiveHashes } = require('./archive-index');
 const { gameSoundWav, eventSounds, soundIndex: gameSoundIndex } = require('./game-sounds');
 const crypto = require('node:crypto');
 
@@ -865,6 +865,7 @@ function endSolo(why) {
 // of a stopped package are undone, and its sounds stopped, at the same moments.
 function checkSolo() {
   checkTweaks();
+  checkSpawns();
   checkSounds();
   checkInk();
   if (!soloOwner) return;
@@ -1589,13 +1590,16 @@ async function packageCallNow(id, method, params) {
     return bridgeCall(method, { ...params, package: id });
   }
   if (method === 'archives.soundState') return bridgeCall('opus.state', { sounds: Array.isArray(params?.sounds) ? params.sounds : [] });
+  if (method === 'world.scene') return readSceneFile(id ? apps.get(id) : null, params?.file);
   if (method === 'tweakdb.set' && id && params?.path) {
     const path = String(params.path);
     if (!tweakJournal.has(id)) tweakJournal.set(id, new Map());
     const journal = tweakJournal.get(id);
     if (!journal.has(path)) journal.set(path, await bridgeCall('tweakdb.get', { path }).catch(() => null));
   }
-  return bridgeCall(method, params);
+  const result = await bridgeCall(method, params);
+  if (method === 'rtti.call' && params?.class === 'REDnodeWorld') noteWorldCall(id, params, result);
+  return result;
 }
 
 function undoTweaks(id, why) {
@@ -1634,6 +1638,235 @@ function packageRunning(id) {
 
 function checkTweaks() {
   for (const id of [...tweakJournal.keys()]) if (!packageRunning(id)) undoTweaks(id, 'the package stopped');
+}
+
+// ---------- world objects per package (H2c-b) ----------
+//
+// The host notes what each package spawns through world.spawn (REDnodeWorld.Spawn, which it
+// routes anyway) and removes it when the package stops, as it undoes TweakDB changes. After
+// an archive swap it refreshes what uses a swapped file: a package's own spawns are spawned
+// again by their package (the "world-refresh" message: the package holds what they were
+// spawned with), and the game's entities near V switch to a missing appearance and back,
+// which loads their files again (docs/world.md, "H2c-a: a game entity").
+
+const worldSpawns = new Map(); // package id -> Set of entity id hashes
+const WORLD_REFRESH_RADIUS = 30;
+const WORLD_REFRESH_WAIT = 500; // ms between the missing appearance and the real one (H2c-a)
+
+function noteWorldCall(id, params, result) {
+  if (!id) return;
+  if (params.fn === 'Spawn' && result?.hash && result.hash !== '0') {
+    if (!worldSpawns.has(id)) worldSpawns.set(id, new Set());
+    worldSpawns.get(id).add(String(result.hash));
+  } else if (params.fn === 'Delete' && params.args?.[0]?.hash) {
+    worldSpawns.get(id)?.delete(String(params.args[0].hash));
+  }
+}
+
+function removeSpawns(id, why) {
+  const ids = worldSpawns.get(id);
+  worldSpawns.delete(id);
+  if (!ids?.size || !connected) return;
+  for (const hash of ids) bridgeCall('rtti.call', { class: 'REDnodeWorld', fn: 'Delete', args: [{ hash }] }).catch(() => {});
+  log(`Removed ${ids.size} entit${ids.size === 1 ? 'y' : 'ies'} ${id} spawned (${why})`);
+}
+
+function checkSpawns() {
+  for (const id of [...worldSpawns.keys()]) if (id !== AGENT && !packageRunning(id)) removeSpawns(id, 'the package stopped');
+}
+
+// Spawns made through the MCP server (world_spawn, world_load) belong to no package: they
+// stay until removed, and the host spawns them again itself after a swap.
+const AGENT = 'mcp';
+const agentSpawns = new Map(); // id hash -> { options, scene }
+const agentScenes = new Map(); // scene name -> id hashes
+const BARE_TEMPLATE = 'base\\gameplay\\loot\\containers\\common_suitcases\\appearances\\suitcase_small_placeholder.ent';
+
+// The rednode package's scene reader (scene.js, an ES module), shared with world.load.
+const sceneReader = import(require('node:url').pathToFileURL(path.join(SDK_DIR, 'scene.js')).href);
+sceneReader.catch((err) => log(`The rednode package's scene reader did not load: ${err.message}`));
+
+async function spawnForAgent(o) {
+  const refs = [];
+  const call = async (method, params) => {
+    const r = await bridgeCall(method, params);
+    if (r && typeof r === 'object' && typeof r.$ref === 'number') refs.push(r.$ref);
+    return r;
+  };
+  try {
+    if ([o.template, o.record, o.mesh].filter(Boolean).length !== 1) throw new Error('Give one of template, record and mesh');
+    let position = o.position;
+    let orientation = o.orientation;
+    const v = await call('rtti.call', { fn: 'GetPlayer', args: [{}] });
+    if (!v?.$ref) throw new Error('No player: load a save first');
+    if (!position) {
+      // 3 m in front of V, facing V.
+      const p = await call('rtti.call', { self: { $ref: v.$ref }, fn: 'GetWorldPosition', args: [] });
+      const f = await call('rtti.call', { self: { $ref: v.$ref }, fn: 'GetWorldForward', args: [] });
+      position = { x: p.X + f.X * 3, y: p.Y + f.Y * 3, z: p.Z };
+      const half = (((Math.atan2(f.Y, f.X) * 180) / Math.PI + 90) * Math.PI) / 360;
+      orientation = { i: 0, j: 0, k: Math.sin(half), r: Math.cos(half) };
+    }
+    const components = [];
+    if (o.mesh) {
+      const s = o.scale ?? { x: 1, y: 1, z: 1 };
+      const props = { name: 'rednode_mesh', mesh: o.mesh, meshAppearance: o.meshAppearance ?? 'default', visualScale: { X: s.x, Y: s.y, Z: s.z } };
+      components.push(await call('rtti.new', { class: 'entMeshComponent', props }));
+    }
+    const spec = await call('rtti.new', {
+      class: 'DynamicEntitySpec',
+      props: {
+        ...(o.record ? { recordID: o.record } : { templatePath: o.template ?? BARE_TEMPLATE }),
+        ...(o.appearance ? { appearanceName: o.appearance } : {}),
+        position: { X: position.x, Y: position.y, Z: position.z, W: 1 },
+        orientation: orientation ?? { i: 0, j: 0, k: 0, r: 1 },
+        spawnInView: true,
+        active: true,
+        tags: [],
+      },
+    });
+    const id = await bridgeCall('rtti.call', { class: 'REDnodeWorld', fn: 'Spawn', args: [{ $ref: spec.$ref }, components.map((c) => ({ $ref: c.$ref }))] });
+    if (!id?.hash || id.hash === '0') throw new Error('No entity was created: REDnode\'s world support needs Codeware and a loaded save');
+    noteWorldCall(AGENT, { fn: 'Spawn' }, id);
+    agentSpawns.set(String(id.hash), { options: { ...o, position, orientation } });
+    let entity = null;
+    for (const until = Date.now() + 10000; !entity && Date.now() < until; ) {
+      entity = await call('rtti.call', { class: 'GameInstance', fn: 'FindEntityByID', args: [{}, id] }).catch(() => null);
+      if (!entity) await new Promise((r) => setTimeout(r, 100));
+    }
+    const person = o.npc !== false && (o.npc || String(o.record ?? '').startsWith('Character.'));
+    if (entity && person) {
+      // Stand still, friendly to V (as world.spawn does).
+      const quiet = (p) => p.catch(() => null);
+      const ai = await quiet(call('rtti.call', { self: { $ref: entity.$ref }, fn: 'GetAIControllerComponent', args: [] }));
+      const hold = await quiet(call('rtti.new', { class: 'AIHoldPositionCommand', props: { duration: 86400 } }));
+      if (ai && hold) await quiet(call('rtti.call', { self: { $ref: ai.$ref }, fn: 'SendCommand', args: [{ $ref: hold.$ref }] }));
+      const agent = await quiet(call('rtti.call', { self: { $ref: entity.$ref }, fn: 'GetAttitudeAgent', args: [] }));
+      const mine = await quiet(call('rtti.call', { self: { $ref: v.$ref }, fn: 'GetAttitudeAgent', args: [] }));
+      if (agent && mine) await quiet(call('rtti.call', { self: { $ref: agent.$ref }, fn: 'SetAttitudeTowards', args: [{ $ref: mine.$ref }, 'AIA_Friendly'] }));
+    }
+    return { id: String(id.hash), inWorld: !!entity, position };
+  } finally {
+    if (refs.length) bridgeCall('rtti.release', { refs }).catch(() => {});
+  }
+}
+
+async function removeForAgent(hash) {
+  const id = String(hash);
+  agentSpawns.delete(id);
+  worldSpawns.get(AGENT)?.delete(id);
+  return (await bridgeCall('rtti.call', { class: 'REDnodeWorld', fn: 'Delete', args: [{ hash: id }] })) === true;
+}
+
+async function loadSceneForAgent(file, name) {
+  const { readScene } = await sceneReader;
+  const read = readScene(readSceneFile(null, file));
+  const scene = name || read.name;
+  if (agentScenes.has(scene)) await unloadSceneForAgent(scene);
+  const ids = [];
+  agentScenes.set(scene, ids);
+  const spawned = [];
+  const skipped = [...read.skipped];
+  for (const plan of read.plans) {
+    try {
+      const { object, kind, ...o } = plan;
+      const r = await spawnForAgent({ ...o, ...(o.mesh && o.appearance ? { meshAppearance: o.appearance, appearance: undefined } : {}) });
+      ids.push(r.id);
+      agentSpawns.get(r.id).scene = scene;
+      spawned.push({ object, kind, id: r.id });
+    } catch (err) {
+      skipped.push({ object: plan.object, why: err.message });
+    }
+  }
+  return { name: scene, spawned, skipped, notes: read.notes };
+}
+
+async function unloadSceneForAgent(name) {
+  const ids = agentScenes.get(name);
+  if (!ids) throw new Error(`No scene "${name}" was loaded through MCP`);
+  agentScenes.delete(name);
+  let removed = 0;
+  for (const id of ids) if (await removeForAgent(id).catch(() => false)) removed += 1;
+  return { name, removed };
+}
+
+// The MCP spawns that use a swapped file: spawned again by the host, keeping their scene.
+async function respawnForAgent(hashes) {
+  for (const old of hashes) {
+    const entry = agentSpawns.get(old);
+    if (!entry) continue;
+    await removeForAgent(old).catch(() => false);
+    const r = await spawnForAgent(entry.options).catch(() => null);
+    if (!r) continue;
+    if (entry.scene) {
+      agentSpawns.get(r.id).scene = entry.scene;
+      const list = agentScenes.get(entry.scene);
+      if (list) list.splice(list.indexOf(old), 1, r.id);
+    }
+  }
+}
+
+function spawnedList() {
+  const out = [];
+  for (const [pkg, ids] of worldSpawns) for (const id of ids) out.push({ package: pkg, id, ...(pkg === AGENT ? { scene: agentSpawns.get(id)?.scene } : {}) });
+  return out;
+}
+
+// A scene file for world.load: a .scene.json path, absolute or in the package's folder.
+function readSceneFile(entry, file) {
+  const name = String(file ?? '').trim().replace(/^"(.*)"$/, '$1');
+  if (!name.toLowerCase().endsWith('.json')) throw new Error(`${name || 'world.load'}: give a scene file (.scene.json)`);
+  const full = path.isAbsolute(name) ? name : entry ? path.resolve(entry.dir, name) : null;
+  if (!full) throw new Error(`${name}: give a full path`);
+  if (!fs.existsSync(full)) throw new Error(`${name} was not found`);
+  try {
+    return JSON.parse(fs.readFileSync(full, 'utf8'));
+  } catch (err) {
+    throw new Error(`${name} is not valid JSON: ${err.message}`);
+  }
+}
+
+const hex = (h) => `0x${h.toString(16).toUpperCase().padStart(16, '0')}`;
+
+// After a swap: everything that uses one of the swapped files shows the new version.
+async function refreshWorld(hashes) {
+  const started = Date.now();
+  const wanted = [...hashes].map(hex);
+  const want = new Set(wanted);
+  const entities = [];
+  // REDnode's spawns, by their packages: spawned again with the same options.
+  const own = new Set();
+  for (const [pkg, ids] of worldSpawns) {
+    const users = [];
+    for (const hash of ids) {
+      own.add(hash);
+      const f = await bridgeCall('world.files', { id: hash }).catch(() => null);
+      if (f?.files?.some((x) => want.has(x))) users.push(hash);
+    }
+    if (!users.length) continue;
+    if (pkg === AGENT) {
+      respawnForAgent(users).catch(() => {});
+    } else {
+      const m = { event: 'world-refresh', entities: users };
+      mods?.toMod(pkg, m);
+      for (const w of windowsOfPackage(pkg)) toPage(w, m);
+    }
+    entities.push(...users.map((e) => ({ entity: e, package: pkg, how: 'respawn' })));
+  }
+  // The game's entities near V: another appearance and back.
+  const near = await bridgeCall('world.near', { radius: WORLD_REFRESH_RADIUS, hashes: wanted });
+  const refs = near.entities.map((e) => e.entity?.$ref).filter((r) => typeof r === 'number');
+  try {
+    const game = near.entities.filter((e) => e.entity && !own.has(String(e.id)) && e.appearance && e.appearance !== 'None');
+    const set = (e, look) => bridgeCall('rtti.call', { self: { $ref: e.entity.$ref }, fn: 'ScheduleAppearanceChange', args: [look] }).catch(() => {});
+    await Promise.all(game.map((e) => set(e, 'rednode_refresh')));
+    if (game.length) await new Promise((r) => setTimeout(r, WORLD_REFRESH_WAIT));
+    await Promise.all(game.map((e) => set(e, e.appearance)));
+    entities.push(...game.map((e) => ({ entity: String(e.id), type: e.type, appearance: e.appearance, distance: e.distance, how: 'appearance' })));
+  } finally {
+    if (refs.length) bridgeCall('rtti.release', { refs }).catch(() => {});
+  }
+  return { entities, looked: near.looked, ms: Date.now() - started };
 }
 
 // ---------- hot-loading archives (#12, H1) ----------
@@ -1772,6 +2005,16 @@ async function swapArchives(caller, params) {
   }
   const who = caller.mcp ? 'an agent (MCP)' : caller.id;
   const files = hotFiles(entry, params?.files);
+  // The files the swap changes, read before RED Hot Tools moves them: what uses one is refreshed.
+  const swapped = new Set();
+  for (const f of files) {
+    if (path.extname(f.file).toLowerCase() !== '.archive') continue;
+    try {
+      for (const h of archiveHashes(f.file)) swapped.add(h);
+    } catch {
+      // not readable: the swap reports it
+    }
+  }
   if (!connected) throw new Error('Not connected to the game');
   if (uiState.mainMenu) throw new Error('Load a save first: REDnode swaps archives only in a loaded game');
   let version;
@@ -1934,6 +2177,18 @@ async function swapArchives(caller, params) {
     } catch (err) {
       answer.refreshed = [];
       log(`Archives: no refresh of what V wears (${err.message})`);
+    }
+    if (swapped.size) {
+      try {
+        const w = await refreshWorld(swapped);
+        answer.world = w.entities;
+        const counts = `${w.entities.filter((e) => e.how === 'respawn').length} spawned again, ${w.entities.filter((e) => e.how === 'appearance').length} by appearance`;
+        log(`Archives: refreshed ${w.entities.length} world entit${w.entities.length === 1 ? 'y' : 'ies'} (${counts}; ${w.looked} looked at) in ${w.ms} ms`);
+        if (caller.id && w.entities.length) mods?.log(caller.id, 'info', `Archives: refreshed ${w.entities.length} entit${w.entities.length === 1 ? 'y' : 'ies'} in the world that use the swapped files (${counts})`);
+      } catch (err) {
+        answer.world = [];
+        log(`Archives: no refresh of the world (${err.message})`);
+      }
     }
   }
   if (sound && reloaded.length) {
@@ -3597,6 +3852,12 @@ function mcpHost() {
     consoleOf: (id) => windowOfApp(id)?.console ?? null,
     call: bridgeCall,
     reloadArchives: (files, refresh) => reloadArchives({ mcp: true }, { files, refresh }),
+    // H2c-b: the world near V, and spawns made by assistants.
+    worldSpawned: spawnedList,
+    worldSpawn: spawnForAgent,
+    worldRemove: removeForAgent,
+    worldLoad: loadSceneForAgent,
+    worldUnload: unloadSceneForAgent,
   };
 }
 
@@ -4045,6 +4306,7 @@ app.whenReady().then(() => {
     stopped: (id) => {
       services.gone(id);
       undoTweaks(id, 'the mod stopped');
+      removeSpawns(id, 'the mod stopped');
       stopSounds(id);
       clearInk(id);
       if (tracers.delete(id) && !tracers.size) Promise.resolve(stopTrace(`${id} stopped`)).catch(() => {});

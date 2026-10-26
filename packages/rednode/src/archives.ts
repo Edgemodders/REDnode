@@ -13,8 +13,10 @@
  *
  * - The new archive replaces the mounted archive of the same name, wherever it is,
  *   and stays installed. One the game has not mounted is added to `archive/pc/mod`.
- * - Objects already in the world keep the old asset until they load it again: respawn
- *   them, or apply their appearance again.
+ * - After the swap, what uses a swapped file shows the new version: the clothing V wears,
+ *   every entity packages spawned with `world.spawn` (spawned again, with a new id; see
+ *   `world.onRespawn`), and the game's entities within 30 m of V (their appearance is
+ *   switched away and back). Entities farther away load it when the game builds them again.
  * - Swap only in a loaded save. A broken archive, or a mod whose other parts are
  *   missing, can crash the game at the swap even if it loaded at start.
  *
@@ -46,14 +48,22 @@ export interface ReloadResult {
    * Equipment-EX's `"OutfitSlots.LegsMiddle"`) and appearance. Absent with `refresh: false`.
    */
   refreshed?: { slot: string; appearance: string }[];
+  /**
+   * The entities in the world refreshed after the swap because they use a swapped file
+   * (REDnode 0.39.0 or later): packages' spawns, spawned again by their package
+   * (`how: "respawn"`), and the game's entities near V (`how: "appearance"`). Absent with
+   * `refresh: false`.
+   */
+  world?: { entity: string; how: "respawn" | "appearance"; package?: string; type?: string; appearance?: string; distance?: number }[];
 }
 
 /** Options for {@link archives.reload}. */
 export interface ReloadOptions {
   /**
-   * After the swap, apply the appearance of the clothing V wears again, so it shows the
-   * swapped version without being taken off (REDnode 0.26.20 or later). Base-game slots and
-   * Equipment-EX's slots; items Equipment-EX hides stay hidden. Default `true`.
+   * After the swap, refresh what uses the swapped files, so it shows the new version: apply
+   * the appearance of the clothing V wears again (REDnode 0.26.20 or later; base-game slots
+   * and Equipment-EX's slots, items Equipment-EX hides stay hidden), and refresh entities in
+   * the world (0.39.0 or later; see {@link ReloadResult.world}). Default `true`.
    */
   refresh?: boolean;
 }

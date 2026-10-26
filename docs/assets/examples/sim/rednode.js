@@ -636,6 +636,39 @@ export const world = {
   async watch() {
     return true;
   },
+  spawned() {
+    return [...entities].map(([hash, options]) => ({ id: { hash }, options }));
+  },
+  onRespawn() {
+    return () => {}; // the simulated game swaps no archives
+  },
+  // What is near V: the simulated game has only what the preview spawned, 2 to 3 m away.
+  async near(options = {}) {
+    if (sim.mainMenu) throw new Error('No player: load a save first');
+    await nextFrame();
+    if (options.uses?.length) return [];
+    return [...entities].map(([hash, o], i) => ({
+      entity: new Remote('entEntity', {}),
+      id: { hash },
+      type: o.record ? 'NPCPuppet' : 'entEntity',
+      distance: 2 + i * 0.5,
+      appearance: 'default',
+      ...(options.files ? { files: [] } : {}),
+    }));
+  },
+  async files() {
+    await nextFrame();
+    return { template: null, components: 1, files: [] };
+  },
+  async load(scene) {
+    if (typeof scene === 'string') throw new Error('The preview cannot read scene files: pass the scene itself');
+    const spawned = [];
+    for (const o of scene.objects ?? []) if (o.kind !== 'light') spawned.push({ object: o.id, id: (await world.spawn({ record: o.record, mesh: o.resource, position: {} })).id });
+    return { name: scene.name, spawned, skipped: [], notes: [], ms: 0 };
+  },
+  async unload() {
+    return 0;
+  },
   async entity(id) {
     const hash = typeof id === 'string' ? id : id?.hash;
     const e = entities.get(hash);

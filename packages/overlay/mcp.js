@@ -27,7 +27,8 @@ REDnode runs overlay apps (web pages drawn on top of the game) and Node mods (No
 - window_text, window_image: what an overlay window shows. window_console: what its page logged.
 - game_image: the game's screen as the player sees it, with or without the overlay.
 - tweakdb: TweakDB flats and records, read from the running game.
-- archives_reload: swaps changed archives into the running game through RED Hot Tools, for seeing an asset change without a restart. Archives that change the game's sound paks are swapped with the game paused and its sound index loaded again; a sound that just played may keep its old version until the game loads it again (for a weapon, equip it again).
+- archives_reload: swaps changed archives into the running game through RED Hot Tools, for seeing an asset change without a restart. Afterwards what V wears, REDnode's spawns and the game's entities within 30 m of V that use a swapped file show the new version. Archives that change the game's sound paks are swapped with the game paused and its sound index loaded again; a sound that just played may keep its old version until the game loads it again (for a weapon, equip it again).
+- world_near, world_spawned: the entities near V (with the files they use), and what REDnode spawned. world_spawn, world_remove and world_load (EDGEbuilder scene files) place things in the world, and ask first.
 - api_read, api_call, api_get: live calls into the game. Game objects come back as {"$ref": n, "$type": "..."}; pass {"$ref": n} back as self. Most functions take the game instance first: pass {}. 64-bit numbers are strings. References die when a save loads.
 For a quest: game_facts and game_journal read facts and journal entries; game_facts_set, game_journal_set and game_teleport change the player's save or move V, and ask first.
 Use api_read for reads: it runs functions named like reads (Get, Is, Has, Can, Find) and a TweakDB record's methods, and refuses the rest. api_call runs any function and can change the player's game, such as their money or health; archives_reload replaces files in the game's mod folder. Both ask the player before every call.
@@ -478,15 +479,16 @@ function createMcp(host) {
           'Swaps archives into the running game, so a changed mesh, material or texture is used without a restart. ' +
           'Each file is a full path to an .archive (or an ArchiveXL .xl or .yaml), which replaces the mounted archive ' +
           'of the same name or is added to archive/pc/mod, or the name of an archive already in archive/pc/mod, ' +
-          'reloaded as it is. Needs RED Hot Tools in the game and a loaded save. Afterwards the clothing V wears applies its ' +
-          'appearance again, so it shows the new version (refresh: false skips it). Other objects already in the world keep ' +
-          'the old asset until they load it again (respawn, or re-apply the appearance). An archive with the game\'s sound paks ' +
+          'reloaded as it is. Needs RED Hot Tools in the game and a loaded save. Afterwards everything that uses a swapped file ' +
+          'shows the new version: the clothing V wears applies its appearance again, REDnode\'s spawns are spawned again (new ids), ' +
+          'and the game\'s entities within 30 m of V switch appearance and back (refresh: false skips all of it). Entities farther ' +
+          'away load the new version when the game builds them again. An archive with the game\'s sound paks ' +
           '(.opuspak, .opusinfo) is swapped with the game paused and its sound index loaded again; a sound that just played ' +
           'may keep its old version until the game loads it again (for a weapon, equip it again). A broken archive can crash the game. ' +
           'The player is asked before every call.',
         inputSchema: {
           files: z.array(z.string()).min(1).describe('Full paths, or names of archives in archive/pc/mod'),
-          refresh: z.boolean().optional().describe('Apply the appearance of what V wears again after the swap. Default true'),
+          refresh: z.boolean().optional().describe('Refresh what uses the swapped files (what V wears, spawns, entities near V). Default true'),
         },
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
         _meta: ASK_FIRST,
@@ -494,6 +496,120 @@ function createMcp(host) {
       async ({ files, refresh }) => {
         try {
           return text(await host.reloadArchives(files, refresh));
+        } catch (err) {
+          return fail(err.message);
+        }
+      },
+    );
+
+    // ---------- the world near V, and spawning (H2c-b) ----------
+
+    const POINT = z.object({ x: z.number(), y: z.number(), z: z.number() });
+
+    mcp.registerTool(
+      'world_near',
+      {
+        title: 'Entities near V',
+        description:
+          'Lists the entities near V, nearest first: their game class, id, distance in metres and appearance. With files, each one\'s files ' +
+          '(template and component resources, as path hashes); with uses, only the entities that use one of those files (depot paths or hashes), ' +
+          'such as the meshes of an archive about to be swapped. The game objects come back as references for api_read.',
+        inputSchema: {
+          radius: z.number().positive().max(200).optional().describe('Metres from V. Default 15'),
+          files: z.boolean().optional(),
+          uses: z.array(z.string()).optional().describe('Depot paths or path hashes'),
+        },
+        annotations: READ,
+      },
+      async ({ radius, files, uses }) => {
+        try {
+          return text(await host.call('world.near', { radius: radius ?? 15, files: !!files, ...(uses ? { hashes: uses } : {}) }));
+        } catch (err) {
+          return fail(err.message);
+        }
+      },
+    );
+
+    mcp.registerTool(
+      'world_spawned',
+      {
+        title: 'What REDnode spawned',
+        description: 'Lists the entities REDnode packages and assistants spawned that are still listed: their package ("mcp" for assistants), id and, for assistants, the scene.',
+        inputSchema: {},
+        annotations: READ,
+      },
+      async () => text(host.worldSpawned()),
+    );
+
+    mcp.registerTool(
+      'world_spawn',
+      {
+        title: 'Spawn in the world',
+        description:
+          'Spawns one entity: a mesh (a prop on its own), an entity template (.ent) or a TweakDB record (a Character.* record is a person, who stands ' +
+          'where placed and stays friendly to V). Without a position it stands 3 m in front of V, facing V. It stays until world_remove, a save load, ' +
+          'or the game closes; after an archive swap that changes a file it uses, it is spawned again (a new id). The player is asked before every call.',
+        inputSchema: {
+          mesh: z.string().optional().describe('A .mesh depot path'),
+          meshAppearance: z.string().optional().describe('The mesh appearance, default "default"'),
+          template: z.string().optional().describe('An .ent depot path'),
+          record: z.string().optional().describe('A TweakDB record, such as Character.CitizenRichFemale'),
+          appearance: z.string().optional().describe('The entity appearance'),
+          position: POINT.optional(),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+        _meta: ASK_FIRST,
+      },
+      async (input) => {
+        try {
+          return text(await host.worldSpawn(input));
+        } catch (err) {
+          return fail(err.message);
+        }
+      },
+    );
+
+    mcp.registerTool(
+      'world_remove',
+      {
+        title: 'Remove a spawn',
+        description: 'Removes an entity an assistant spawned with world_spawn or world_load, by the id it answered. The player is asked before every call.',
+        inputSchema: { id: z.string() },
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        _meta: ASK_FIRST,
+      },
+      async ({ id }) => {
+        try {
+          return text({ removed: await host.worldRemove(id) });
+        } catch (err) {
+          return fail(err.message);
+        }
+      },
+    );
+
+    mcp.registerTool(
+      'world_load',
+      {
+        title: 'Load a scene',
+        description:
+          'Loads an EDGEbuilder scene file (.scene.json, a full path) into the running game: its meshes, entities and npc objects (lights are not spawned yet). ' +
+          'People stand where placed and stay friendly to V. Loading a scene of the same name again replaces it; unload removes it. The player is asked before every call.',
+        inputSchema: {
+          file: z.string().optional().describe('The scene file, a full path. Not needed for unload'),
+          name: z.string().optional().describe('The scene name; default the file\'s own'),
+          unload: z.boolean().optional().describe('Remove the scene of this name instead'),
+        },
+        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+        _meta: ASK_FIRST,
+      },
+      async ({ file, name, unload }) => {
+        try {
+          if (unload) {
+            if (!name) return fail('Give the name of the scene to unload');
+            return text(await host.worldUnload(name));
+          }
+          if (!file) return fail('Give the scene file');
+          return text(await host.worldLoad(file, name));
         } catch (err) {
           return fail(err.message);
         }

@@ -1294,7 +1294,7 @@ What it decides for H2c-b:
 
 ## H2c-b: plan
 
-Proposed 2026-10-26 from H2c-a's results, to agree with the owner before building. One REDnode build (0.39.0), in five parts:
+Proposed 2026-10-26 from H2c-a's results and **agreed with the owner the same day**, with every recommendation: game entities near V refresh by default, the whole build ships now with part 4 unverified until RED Hot Tools supports 2.5, and scenes load meshes, entities and NPCs (no lights yet). One REDnode build (0.39.0), in five parts:
 
 | Part | Builds | Where |
 |---|---|---|
@@ -1309,3 +1309,35 @@ Plus the World objects test 0.2.0 driving each part, and a sample scene file.
 **Testing:** REDnode 0.39.0 runs only on game 2.5, which has no RED Hot Tools yet. Parts 1, 2, 3 and 5 test on 2.5 now. Part 4 (refresh after a swap) can only be checked in game once RED Hot Tools supports 2.5; until then it is checked in the mock game and marked unverified, and the release notes say so.
 
 **Left for later:** the inventory preview's old look ([parked](#h2b-limit-the-inventory-preview-keeps-the-old-look-parked)); light objects in scenes; NPC behaviour beyond idle; why the lamp mesh drew nothing.
+
+### H2c-b: built
+
+Built on 2026-10-26 in REDnode 0.39.0, all five parts of the plan:
+
+| Part | Where |
+|---|---|
+| Spawns per package: noted from the `REDnodeWorld.Spawn` and `Delete` calls the host routes, removed when the package stops; assistants' spawns kept under `mcp` | `main.js` (`worldSpawns`, `noteWorldCall`, `removeSpawns`, `checkSpawns`) |
+| `world.spawn` takes `mesh` (on the bare suitcase placeholder entity), `keep`, and `npc` (on by default for `Character.*`: `AIHoldPositionCommand` for 24 h, `AIA_Friendly` towards V); `world.spawned()`, `world.onRespawn()` | `world.ts` |
+| `world.near` and `world.files` in the plugin: `GetEntityList` filtered by distance from V; every resource reference in each component's own properties (not only `mesh`, `graph`, `resource`), and the template through Codeware's `GetTemplatePath`; `world.files` also by entity id | `reflect.cpp` |
+| After a swap: the swapped archives' file tables are read before the swap; packages' spawns that use one get a `world-refresh` message and their package spawns them again; assistants' spawns are spawned again by the host; the game's entities within 30 m that use one go to the appearance `rednode_refresh` and back after 500 ms. The answer's `world` lists them | `main.js` (`refreshWorld`), `archives.ts` |
+| `world.load` and `world.unload`: EDGEbuilder scenes, format 1 and format 2's `npc`; `.scene.json` files read by the host (absolute, or in the package's folder); lights skipped with a reason, an NPC behaviour other than idle noted | `scene.ts` (pure, shared with the host), `world.ts`, `main.js` (`readSceneFile`, `loadSceneForAgent`) |
+| MCP tools `world_near`, `world_spawned` (read), `world_spawn`, `world_remove`, `world_load` (ask first) | `mcp.js` |
+
+World objects test 0.2.0 drives each part. Checked before the game: the plugin builds and its tests pass, the package compiles, the scene reader on a sample scene (scratchpad `h2c/scene-check.mjs`). **Not checked:** anything in the game; the refresh after a swap waits for RED Hot Tools on game 2.5.
+
+### H2c-b test
+
+Game 2.5, REDnode 0.39.0, Codeware. RED Hot Tools is not needed (no 2.5 build yet): the swap section is left out. Pick a quiet open spot outdoors.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. Load the save. F10, Mod Manager: switch on **World objects test** (its swap permission is already allowed), and open the **Mod log**. Its top lines say OK for REDnode and Codeware, and the world API. **Mark**.
+2. Press **Spawn a person**. A woman appears about 3 m in front of V, facing V. Walk around her and bump into her: she stays put and stays calm. **Mark**.
+3. Press **Spawn a prop**. A cardboard box appears 2 m ahead, to V's right. **Mark**.
+4. Press **Near V**, then **With files**, then **Files of the nearest**. The log lists what is near V with distances and file counts. Did the game stutter? **Mark**.
+5. Paste `base\environment\decoration\containers\packaging\cardboard_box\cardboard_box_a_closed.mesh` into the field above **Using this file**, and press it. The log names the box (and any other box nearby). **Mark**.
+6. Press **Spawned**: it lists the woman and the box. **Mark**.
+7. Press **Load a scene here**. A box and a barrel appear about 4 m ahead, and a second woman 6 m ahead. The log says the lamp was skipped (lights are not spawned yet). **Mark**.
+8. Press **Unload the scene**: the scene's box, barrel and woman go; the first woman and box stay. **Mark**.
+9. In the Mod Manager, switch **World objects test** off. The first woman and box disappear. **Mark**.
+10. Optional, with Claude Code connected: say so, and Claude spawns a prop and lists what is near V through the MCP tools (you approve the spawn). **Mark**.
+11. Quit the game.

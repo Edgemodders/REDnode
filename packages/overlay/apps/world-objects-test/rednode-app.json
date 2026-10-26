@@ -1,14 +1,14 @@
 {
   "id": "world-objects-test",
   "name": "World objects test",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "author": "Edgemodders",
-  "description": "The spike of H2c: spawns an NPC by record or template and tries to hold it in place and make it friendly, lists the entities near V two ways with the files they name, swaps an archive and tries each way to show it on what is near V and on what this app spawned. Asks for the archives permission.",
+  "description": "H2c-b's test: spawns a person (standing still, friendly) and a prop by mesh, lists what is near V with the files each uses, loads an EDGEbuilder scene written around V and unloads it, and swaps an archive to show what its refresh did to the world. Switching it off removes what it spawned. Asks for the archives permission.",
   "main": "mod.mjs",
   "open": false,
   "permissions": ["archives"],
   "requires": {
-    "codeware": ">=1.14",
-    "redhottools": ">=1.3"
+    "rednode": ">=0.39.0",
+    "codeware": ">=1.14"
   }
 }

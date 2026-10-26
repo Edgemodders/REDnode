@@ -57,6 +57,8 @@
 #include <RED4ext/Scripting/Natives/ScriptGameInstance.hpp>
 
 #include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <memory>
@@ -1540,12 +1542,302 @@ void DropRefArg(const json::Value& aRef)
         g_refs.erase(it); // g_refIds is pruned with the rest
 }
 
+// ---------- the world near V (H2c-b) ----------
+//   world.near   {"radius":15, "files":false, "hashes":["0x...", ...]}
+//                -> {"looked":N, "ms":t, "entities":[{"entity":{"$ref":n, "$type":"..."}, "type":"...",
+//                    "id":"...", "distance":d, "appearance":"...", "files":["0x...", ...]}]}
+//                Every entity the game has attached within the radius of V, nearest first, V left
+//                out. With files (or hashes), each one's files as world.files reads them; with
+//                hashes, only the entities that name one of them, and "matches" lists which.
+//   world.files  {"self":{"$ref":n}} or {"id":"<entity id hash>"}
+//                -> {"template":"0x...", "components":n, "files":["0x...", ...]}
+//                The entity's template and every resource its components name directly (meshes,
+//                graphs, appearance resources), as path hashes. Needs Codeware (GetComponents,
+//                GetTemplatePath); through api the same read took about 130 calls an NPC (H2c-a).
+namespace
+{
+Value NullArgs(size_t aCount)
+{
+    Value args;
+    args.kind = Value::Kind::Array;
+    args.items.resize(aCount); // null: a game instance parameter is filled by the slot itself
+    return args;
+}
+
+// Runs a function with no arguments (or only a game instance) and keeps its answer in aRet.
+bool RunPlain(Handle<IScriptable>& aSelf, const char* aClass, const char* aFn, size_t aArgs,
+              std::unique_ptr<Slot>& aRet, std::string& aError)
+{
+    CBaseFunction* fn = FindNative(aSelf, aClass, aFn, aArgs, aError);
+    if (!fn)
+        return false;
+    std::vector<std::unique_ptr<Slot>> slots;
+    std::vector<bool> wanted;
+    return Run(fn, aSelf, NullArgs(aArgs), slots, wanted, aRet, aError) && aRet;
+}
+
+std::string Hex(uint64_t aHash)
+{
+    char buf[24];
+    std::snprintf(buf, sizeof(buf), "0x%016llX", static_cast<unsigned long long>(aHash));
+    return buf;
+}
+
+// The resource hashes an object names in its own properties (not inside structs or arrays).
+void ResourcesOf(const Handle<IScriptable>& aObject, std::vector<uint64_t>& aOut)
+{
+    for (const CClass* c = aObject->GetType(); c; c = c->parent)
+    {
+        for (const CProperty* p : c->props)
+        {
+            const void* mem = reinterpret_cast<const uint8_t*>(aObject.GetPtr()) + p->valueOffset;
+            const auto kind = p->type->GetType();
+            uint64_t hash = 0;
+            if (kind == Kind::ResourceReference || kind == Kind::ResourceAsyncReference)
+                hash = static_cast<const ResourcePath*>(mem)->hash;
+            else if (kind == Kind::Class)
+            {
+                if (const CProperty* res = ResRefResource(static_cast<const CClass*>(p->type)))
+                    hash = reinterpret_cast<const ResourcePath*>(static_cast<const uint8_t*>(mem) + res->valueOffset)->hash;
+            }
+            if (hash && std::find(aOut.begin(), aOut.end(), hash) == aOut.end())
+                aOut.push_back(hash);
+        }
+    }
+}
+
+struct EntityFiles
+{
+    uint64_t templ = 0;
+    uint32_t components = 0;
+    std::vector<uint64_t> files; // the template first, when known
+};
+
+bool FilesOf(Handle<IScriptable>& aEntity, EntityFiles& aOut, std::string& aError)
+{
+    std::unique_ptr<Slot> ret;
+    std::string ignored;
+    if (RunPlain(aEntity, nullptr, "GetTemplatePath", 0, ret, ignored)) // Codeware; optional
+    {
+        const auto* cls = ret->type->GetType() == Kind::Class ? static_cast<const CClass*>(ret->type) : nullptr;
+        if (const CProperty* res = ResRefResource(cls))
+            aOut.templ = reinterpret_cast<const ResourcePath*>(static_cast<const uint8_t*>(ret->mem) + res->valueOffset)->hash;
+        else if (ret->type->GetType() == Kind::ResourceAsyncReference || ret->type->GetType() == Kind::ResourceReference)
+            aOut.templ = static_cast<const ResourcePath*>(ret->mem)->hash;
+        if (aOut.templ)
+            aOut.files.push_back(aOut.templ);
+    }
+    ret.reset();
+    if (!RunPlain(aEntity, nullptr, "GetComponents", 0, ret, aError)) // Codeware
+    {
+        aError = "reading an entity's components needs Codeware: " + aError;
+        return false;
+    }
+    const auto kind = ret->type->GetType();
+    if (kind != Kind::Array && kind != Kind::NativeArray)
+    {
+        aError = "GetComponents answered " + TypeName(ret->type);
+        return false;
+    }
+    const auto* arr = static_cast<const CRTTIBaseArrayType*>(ret->type);
+    const auto inner = arr->GetInnerType()->GetType();
+    const uint32_t n = arr->GetLength(ret->mem);
+    for (uint32_t k = 0; k < n; ++k)
+    {
+        void* el = arr->GetElement(ret->mem, k);
+        Handle<IScriptable> component = inner == Kind::Handle ? *static_cast<Handle<IScriptable>*>(el)
+                                        : inner == Kind::WeakHandle ? static_cast<WeakHandle<IScriptable>*>(el)->Lock()
+                                                                    : Handle<IScriptable>{};
+        if (!component)
+            continue;
+        aOut.components += 1;
+        ResourcesOf(component, aOut.files);
+    }
+    return true;
+}
+
+void FilesJson(const std::vector<uint64_t>& aFiles, std::string& aOut)
+{
+    aOut += "[";
+    for (size_t k = 0; k < aFiles.size(); ++k)
+        aOut += (k ? ",\"" : "\"") + Hex(aFiles[k]) + "\"";
+    aOut += "]";
+}
+
+bool HashList(const Value* aList, std::vector<uint64_t>& aOut, std::string& aError)
+{
+    if (!aList || aList->IsNull())
+        return true;
+    if (aList->kind != Value::Kind::Array)
+    {
+        aError = "hashes must be an array of path hashes or depot paths";
+        return false;
+    }
+    for (const Value& v : aList->items)
+    {
+        if (v.kind == Value::Kind::String)
+            aOut.push_back(ResourceHash(v.text));
+        else if (v.kind == Value::Kind::Number)
+            aOut.push_back(uint64_t(v.number));
+    }
+    return true;
+}
+
+std::string WorldFiles(const Value& aParams, std::string& aError)
+{
+    const Value* self = aParams.Get("self");
+    const Value* id = aParams.Get("id");
+    Handle<IScriptable> entity;
+    if (self)
+    {
+        entity = FromRef(*self, aError);
+    }
+    else if (id && (id->kind == Value::Kind::String || id->kind == Value::Kind::Number))
+    {
+        // By entity id: FindEntityByID(game, {hash}).
+        Value hash;
+        hash.kind = Value::Kind::Object;
+        hash.fields.emplace_back("hash", id->kind == Value::Kind::String ? Text(id->text) : *id);
+        Value args = NullArgs(1);
+        args.items.push_back(std::move(hash));
+        Handle<IScriptable> none;
+        if (CallNative(none, "ScriptGameInstance", "FindEntityByID", args, &entity, aError) && !entity)
+            aError = "no entity with that id is in the world";
+    }
+    else
+    {
+        aError = "self (an entity) or id (an entity id hash) is required";
+    }
+    if (!entity)
+        return {};
+    EntityFiles files;
+    if (!FilesOf(entity, files, aError))
+        return {};
+    std::string out = "{\"template\":" + (files.templ ? "\"" + Hex(files.templ) + "\"" : std::string("null")) +
+                      ",\"components\":" + std::to_string(files.components) + ",\"files\":";
+    FilesJson(files.files, out);
+    return out + "}";
+}
+
+std::string WorldNear(const Value& aParams, std::string& aError)
+{
+    const auto started = std::chrono::steady_clock::now();
+    const Value* radiusArg = aParams.Get("radius");
+    const double radius = radiusArg && radiusArg->kind == Value::Kind::Number ? radiusArg->number : 15.0;
+    std::vector<uint64_t> wanted;
+    if (!HashList(aParams.Get("hashes"), wanted, aError))
+        return {};
+    const Value* filesArg = aParams.Get("files");
+    const bool withFiles = !wanted.empty() || (filesArg && filesArg->kind == Value::Kind::Bool && filesArg->boolean);
+
+    Handle<IScriptable> none;
+    Handle<IScriptable> player;
+    if (!CallNative(none, nullptr, "GetPlayer", NullArgs(1), &player, aError) || !player)
+    {
+        aError = aError.empty() ? "no player: load a save first" : aError;
+        return {};
+    }
+    std::unique_ptr<Slot> pos;
+    if (!RunPlain(player, nullptr, "GetWorldPosition", 0, pos, aError))
+        return {};
+    const auto* v = static_cast<const float*>(pos->mem);
+    const float vx = v[0], vy = v[1], vz = v[2];
+
+    std::unique_ptr<Slot> list;
+    if (!RunPlain(none, "ScriptGameInstance", "GetEntityList", 1, list, aError))
+        return {};
+    const auto* arr = static_cast<const CRTTIBaseArrayType*>(list->type);
+    const uint32_t n = arr->GetLength(list->mem);
+
+    struct Found
+    {
+        Handle<IScriptable> entity;
+        double distance;
+    };
+    std::vector<Found> inRange;
+    for (uint32_t k = 0; k < n; ++k)
+    {
+        Handle<IScriptable> e = *static_cast<Handle<IScriptable>*>(arr->GetElement(list->mem, k));
+        if (!e || e.GetPtr() == player.GetPtr())
+            continue;
+        std::unique_ptr<Slot> at;
+        std::string skip;
+        if (!RunPlain(e, nullptr, "GetWorldPosition", 0, at, skip))
+            continue;
+        const auto* p = static_cast<const float*>(at->mem);
+        const double dx = p[0] - vx, dy = p[1] - vy, dz = p[2] - vz;
+        const double d = std::sqrt(dx * dx + dy * dy + dz * dz);
+        if (d <= radius)
+            inRange.push_back({e, d});
+    }
+    std::sort(inRange.begin(), inRange.end(), [](const Found& a, const Found& b) { return a.distance < b.distance; });
+
+    std::string out = "{\"looked\":" + std::to_string(n) + ",\"entities\":[";
+    bool first = true;
+    for (Found& f : inRange)
+    {
+        EntityFiles files;
+        std::vector<uint64_t> matches;
+        if (withFiles)
+        {
+            std::string skip;
+            FilesOf(f.entity, files, skip);
+            for (uint64_t h : files.files)
+            {
+                if (std::find(wanted.begin(), wanted.end(), h) != wanted.end())
+                    matches.push_back(h);
+            }
+            if (!wanted.empty() && matches.empty())
+                continue;
+        }
+        std::string id = "null", look = "\"\"";
+        std::unique_ptr<Slot> slot;
+        std::string skip;
+        if (RunPlain(f.entity, nullptr, "GetEntityID", 0, slot, skip))
+        {
+            const CProperty* hash = FindProperty(static_cast<const CClass*>(slot->type), "hash");
+            id.clear();
+            if (hash)
+                ToJson(hash->type, static_cast<const uint8_t*>(slot->mem) + hash->valueOffset, id, 0);
+            else
+                id = "null";
+        }
+        slot.reset();
+        if (RunPlain(f.entity, nullptr, "GetCurrentAppearanceName", 0, slot, skip))
+            look = JsonString(Str(*static_cast<const CName*>(slot->mem)));
+        out += first ? "{\"entity\":" : ",{\"entity\":";
+        first = false;
+        HandleToJson(f.entity, out);
+        out += ",\"type\":" + JsonString(Str(f.entity->GetType()->GetName()));
+        char dist[32];
+        std::snprintf(dist, sizeof(dist), "%.2f", f.distance);
+        out += ",\"id\":" + id + ",\"distance\":" + dist + ",\"appearance\":" + look;
+        if (withFiles)
+        {
+            out += ",\"components\":" + std::to_string(files.components) + ",\"files\":";
+            FilesJson(files.files, out);
+            if (!wanted.empty())
+            {
+                out += ",\"matches\":";
+                FilesJson(matches, out);
+            }
+        }
+        out += "}";
+    }
+    const auto ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+    char tail[48];
+    std::snprintf(tail, sizeof(tail), "],\"ms\":%.1f}", ms);
+    return out + tail;
+}
+} // namespace
+
 bool IsReflectMethod(const std::string& aMethod)
 {
     return aMethod == "rtti.call" || aMethod == "rtti.get" || aMethod == "rtti.release" || aMethod == "rtti.new" ||
            aMethod == "rtti.set" || aMethod == "tweakdb.get" || aMethod == "tweakdb.record" ||
            aMethod == "tweakdb.records" || aMethod == "tweakdb.set" || aMethod == "tweakdb.clone" ||
-           aMethod == "tweakdb.create" || aMethod == "tweakdb.update";
+           aMethod == "tweakdb.create" || aMethod == "tweakdb.update" || aMethod == "world.near" ||
+           aMethod == "world.files";
 }
 
 std::string Reflect(const std::string& aMethod, const json::Value& aParams, std::string& aError)
@@ -1572,6 +1864,10 @@ std::string Reflect(const std::string& aMethod, const json::Value& aParams, std:
         return TweakCreate(aParams, aError);
     if (aMethod == "tweakdb.update")
         return TweakUpdate(aParams, aError);
+    if (aMethod == "world.near")
+        return WorldNear(aParams, aError);
+    if (aMethod == "world.files")
+        return WorldFiles(aParams, aError);
     return Release(aParams);
 }
 
