@@ -94,6 +94,18 @@ The test adds a second, header-less server entry, so Claude Code signs in instea
 9. Authenticate again and answer nothing: after two minutes the Connect window closes and the browser says the request lapsed. **Mark**.
 10. Clean up: `claude mcp remove rednode-signin --scope user`. Quit the game.
 
+### MCP sign-in: first run (2026-10-26)
+
+Game 2.5, REDnode 0.40.0, dev PC. Steps 1 to 7 passed: Claude Code registered, the browser and the Connect window showed the same code (KHP-7797), Allow connected it, the launcher listed it, the connection held across a game restart with no new sign-in, and Revoke ended it.
+
+Step 8 failed: the browser said "Unknown client". **Revoke** deleted the registration, but Claude Code keeps the client id it was given and signs in with it again without registering (the log has no new registration after the revoke). REDnode 0.40.1 fixes it:
+
+- Revoke ends the client's tokens and its unused codes, and keeps its registration, so its next sign-in asks the player again.
+- A registration is dropped only when it never connected within a day, or when it has not been used for as long as a refresh token lasts (180 days).
+- A client id REDnode has forgotten (a dropped registration or a lost data file) is taken back when it has REDnode's form and asks for a loopback redirect. Anyone on the PC can register anyway, and the player still allows each sign-in.
+
+The scratch check now also covers a sign-in and a Deny after a revoke, and a forgotten id (30 checks). Steps 8 to 10 are still to run, on 0.40.1.
+
 ## C1 test
 
 Built 2026-10-12, host 0.4.0. Tested against a stand-in for the game with an MCP client that calls every tool (15 checks), packaged and unpackaged, with GPU sharing on and off: the token is required, and every tool answers.

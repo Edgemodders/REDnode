@@ -71,9 +71,14 @@ function createOAuth(host) {
     const now = Date.now();
     const before = store.tokens.length + Object.keys(store.clients).length;
     store.tokens = store.tokens.filter((t) => t.expires > now && store.clients[t.client]);
-    // A registration that never connected goes after a day.
+    // A registration that never connected goes after a day, one unused for as long as a
+    // refresh token lasts goes too. A revoked one stays: its assistant keeps its client id
+    // and signs in with it again.
     const live = new Set(store.tokens.map((t) => t.client));
-    for (const [id, c] of Object.entries(store.clients)) if (!live.has(id) && now - c.created > 24 * 3600 * 1000) delete store.clients[id];
+    for (const [id, c] of Object.entries(store.clients)) {
+      if (live.has(id)) continue;
+      if (c.lastUsed ? now - c.lastUsed > REFRESH_MS : now - c.created > 24 * 3600 * 1000) delete store.clients[id];
+    }
     return store.tokens.length + Object.keys(store.clients).length !== before;
   };
   if (prune()) save();
@@ -186,9 +191,19 @@ h1{margin:0 0 12px;font-size:20px;letter-spacing:.08em;text-transform:uppercase;
     }
     if (p === '/authorize') {
       const q = url.searchParams;
-      const client = store.clients[q.get('client_id') ?? ''];
+      const clientId = q.get('client_id') ?? '';
       const redirectUri = q.get('redirect_uri') ?? '';
-      if (!client) return page(res, 400, 'REDnode', '<h1>Unknown client</h1><p>Connect again from your assistant.</p>'), true;
+      // An assistant keeps the client id it was given. If REDnode has since forgotten it (a
+      // registration that lapsed, or a lost data file), take it back with the loopback
+      // redirect it asks for: anyone on this PC can register anyway, and the player still
+      // allows each sign-in.
+      if (!store.clients[clientId] && /^rn_[A-Za-z0-9_-]{16}$/.test(clientId) && loopbackUri(redirectUri)) {
+        store.clients[clientId] = { name: 'An MCP client', redirectUris: [redirectUri], created: Date.now(), lastUsed: 0 };
+        save();
+        host.log(`MCP sign-in: registered ${clientId} again`);
+      }
+      const client = store.clients[clientId];
+      if (!client) return page(res, 400, 'REDnode', '<h1>Unknown client</h1><p>REDnode does not know this assistant. Remove REDnode from your assistant and add it again.</p>'), true;
       if (!client.redirectUris.includes(redirectUri) || !loopbackUri(redirectUri)) {
         return page(res, 400, 'REDnode', '<h1>Refused</h1><p>That redirect is not one this client registered.</p>'), true;
       }
@@ -321,12 +336,12 @@ h1{margin:0 0 12px;font-size:20px;letter-spacing:.08em;text-transform:uppercase;
         .filter(([id]) => live.has(id))
         .map(([id, c]) => ({ id, name: c.name, created: c.created, lastUsed: c.lastUsed }));
     },
-    /** Removes a client and its tokens. */
+    /** Ends a client's tokens. Its registration stays, so its next sign-in asks the player again. */
     revoke(id) {
       const c = store.clients[id];
       if (!c) return false;
-      delete store.clients[id];
       store.tokens = store.tokens.filter((t) => t.client !== id);
+      for (const [code, x] of codes) if (x.clientId === id) codes.delete(code);
       save();
       host.changed?.();
       host.log(`MCP sign-in: revoked ${c.name}`);
