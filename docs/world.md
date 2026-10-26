@@ -1175,7 +1175,7 @@ Checked before the game: every button runs end to end in plain Node against a st
 Before: an archive to swap that changes something you can stand next to. The simplest: two versions of an archive that replaces one prop mesh (a different texture or colour is enough), with the same file name. If you have an NPC appearance mod at hand, two versions of it too (optional). Install version 1 of the archive in `archive\pc\mod` before starting the game, and keep version 2 somewhere else. Install the World objects test from its zip. Pick a quiet open spot outdoors for the save.
 
 0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
-1. Load the save. F10, Mod Manager: switch on **World objects test**. Its top lines say OK for Codeware, RED Hot Tools and the world API. **Mark**.
+1. Load the save. F10, Mod Manager: switch on **World objects test**, and under it switch on **Allowed** on the line about swapping archives (without it every Swap is refused). Its top lines say OK for Codeware, RED Hot Tools and the world API. **Mark**.
 2. Press **Spawn by record**. A woman appears about 3 m in front of V, facing V. Watch her for 10 s: does she stand, walk off, talk, run or fight? The log adds where she is after 5 s. **Mark**.
 3. Press **Hold and friendly**, then walk around her and bump into her. Does she stay put? Does anything change? **Mark**.
 4. Press **Spawn by template**: a second one, from the record's template. Same questions. **Mark**.
@@ -1224,3 +1224,9 @@ What it decides:
 - Reading it through `api` costs about 1 s an NPC (some 130 property reads, one bridge call each). H2c-b reads components in the plugin in one call, as H2a's slot scan showed for TweakDB.
 
 Still open, for a run with RED Hot Tools on 2.5: Who uses it, and the refresh after a swap (steps 7 to 10 above).
+
+### H2c-a swap run on 2.31: not run
+
+2026-10-26 on the dev PC, in the 2.31 backup (`L:\Backups\Cyberpunk 2077 (2026-10-21)`): REDnode 0.37.0, RED Hot Tools 1.3.0, World objects test 0.1.1. Test archives made with REDbridge from the backup's own files, both named `zzz_rednode_box.archive` (lowercase, so the official RED Hot Tools finds it): version 1 holds `cardboard_box_a_closed.mesh` unchanged, version 2 holds the barrel drum mesh `barrel_drum_h_bound.mesh` at the box's path, so a swap turns the box into a barrel. Version 1 was installed in `archive\pc\mod`; both are kept in `E:\Modding\Cyberpunk 2077\Projects\H2c_swap\v1` and `v2`.
+
+**No swap happened.** Every **Swap** was refused with "Allow "World objects test" to swap archives in the REDnode launcher first": the steps never said to switch on the app's **Allowed** switch for swapping archives, the same gap H1's first run had. So the box stayed a box after Swap, Users: look again, Through missing and Respawn, which says nothing about refreshing. The rest ran: the prop spawned (252 ms), respawns took about 200 ms, Entity list found 7 entities within 15 m in 347 ms, and Resources read 72 files from 7 entities in 23 s (app 0.1.1 kept the list), Remove worked. The steps above now name the switch.
