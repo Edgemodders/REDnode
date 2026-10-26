@@ -1266,3 +1266,46 @@ What it decides:
 - The match works: a swapped archive's file table against the files each entity's components name finds the entity that uses it.
 - An appearance change does not reload a mesh on this prop. But this prop is a bare entity with one mesh component the app added, and no `.app` behind its `default` appearance, so its appearance never chose the mesh. For entities whose meshes come from their appearance (NPCs, most game props and devices), an appearance change may still reload them: **unverified**, and that test needs an archive that changes such an entity.
 - For REDnode's own spawns, H2c-b refreshes by respawning with the same spec (about 200 ms each).
+
+### H2c-a: a game entity (the vending machine)
+
+2026-10-26, the same 2.31 setup, World objects test 0.1.3 (adds **Users: through another**: a real second appearance for 500 ms, then back). The entity: the caged Cirrus vending machine (`VendingMachine`, appearance `vending_machines_b_cirrus_cage` of `vending_machine_1.ent`), whose `.app` appearance `b_cirrus_cage` has an `entMeshComponent` naming `vending_machine_cage_b.mesh` with mesh appearance `device`. Test archives `zzz_rednode_cage.archive`: version 1 the cage unchanged, version 2 another mesh at the cage's path.
+
+The first try used the barrel; its mesh has only a `default` appearance, so the component, which asks for `device`, drew nothing: "no cage" means the new file loaded. The lamp version (`street_lamp_cz.mesh`, its appearance renamed to `device`) also drew nothing; why is open (**unverified**: its materials, or its size for the component's bounds), and it does not change the reading, since cage against no cage tells the versions apart.
+
+| Step (lamp run) | Cage spot |
+|---|---|
+| Swap to version 2 (62 ms) | Cage: the entity keeps what it loaded |
+| Who uses it | Found the vending machine by the cage's hash `0x3e67627d3334300a` (10 entities near V, 28 s to read their files) |
+| Users: look again (the same appearance name) | Cage: no change |
+| Users: through another (`vending_machines_b_cirrus`, then back) | **Nothing**: the new file |
+| Swap back to version 1, Users: through missing | **The cage came back** |
+| Swap to version 2, walk out of sight and back | **Nothing**: the new file |
+| Faults | None, four swaps |
+
+The barrel run (before) agrees: through missing and through another changed the cage, look again did not, and after walking away the new file showed.
+
+What it decides for H2c-b:
+
+- A game entity whose meshes come from its appearance shows a swapped file when its appearance is **changed to another name and back**: a missing name or another real one both work, a call with the same name does nothing. About 0.5 s each (the 500 ms wait), not tuned.
+- An entity built again by the game (streamed out and back) loads the new file.
+- The match (the swapped archive's file table against the files each entity's components name) finds the users. Reading the files through `api` costs 2 to 3 s an NPC: H2c-b reads them in the plugin.
+- A replacement mesh must offer the appearance names the component asks for (`meshAppearance`), or it draws nothing. Worth a check in REDcode or EDGEfab before packing, not in REDnode.
+
+## H2c-b: plan
+
+Proposed 2026-10-26 from H2c-a's results, to agree with the owner before building. One REDnode build (0.39.0), in five parts:
+
+| Part | Builds | Where |
+|---|---|---|
+| 1. Spawns per package | The host notes every entity a package spawns through `world.spawn` (the `REDnodeWorld.Spawn` and `Delete` calls it already routes per package) and removes them when the package stops or restarts, as it stops posted sounds and undoes TweakDB writes. `world.spawned()` lists a package's own | `main.js`, `world.ts` |
+| 2. NPCs | `world.spawn({ record: "Character.…", npc: { hold: true, friendly: true } })`: the hold command and the friendly attitude H2c-a used, in one call; both on by default for a record of a person, as agreed ("stands where placed, friendly, idle") | `world.ts` |
+| 3. The files an entity uses, in the plugin | `world.files(entity)`: the template and every component's `mesh`, `graph` and `resource` as path hashes, read natively in one call instead of about 130 bridge calls an NPC (2 to 3 s through `api`). `world.near(radius)`: `GetEntityList` filtered by distance in the plugin | `reflect.cpp` or a new `world.cpp`, `world.ts` |
+| 4. Refresh after a swap | `archives.reload` refreshes, after what V wears: (a) REDnode's own spawns that use a swapped file, by respawning them with the same spec (new id, reported in the answer and as a `world.respawned` event so their package can follow); (b) game entities within 30 m that use a swapped file, by switching their appearance to a missing name and back (H2c-a's "through missing"). `{ refresh: false }` still skips all of it. The answer's `refreshed` lists each entity and how | `main.js` |
+| 5. Scenes | `world.load(file or scene object, { name })` reads an EDGEbuilder scene (format 1, and format 2's `npc` kind as drafted) and spawns its `mesh`, `entity` and `npc` objects; `world.unload(name)` removes them. Lights wait (no light spawn tried yet). MCP tools: `world_near` and `world_spawned` (read), `world_spawn`, `world_remove`, `world_load` (ask first) | `world.ts`, `mcp.js` |
+
+Plus the World objects test 0.2.0 driving each part, and a sample scene file.
+
+**Testing:** REDnode 0.39.0 runs only on game 2.5, which has no RED Hot Tools yet. Parts 1, 2, 3 and 5 test on 2.5 now. Part 4 (refresh after a swap) can only be checked in game once RED Hot Tools supports 2.5; until then it is checked in the mock game and marked unverified, and the release notes say so.
+
+**Left for later:** the inventory preview's old look ([parked](#h2b-limit-the-inventory-preview-keeps-the-old-look-parked)); light objects in scenes; NPC behaviour beyond idle; why the lamp mesh drew nothing.
