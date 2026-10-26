@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Connect</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<style>
+  html, body { margin: 0; width: 520px; height: 300px; overflow: hidden; background: transparent; }
+  rn-window { position: absolute; inset: 0; }
+  p { margin: 0 0 10px; font-size: 15px; line-height: 1.45; }
+  .code { font: 700 32px var(--rn-mono); letter-spacing: .12em; color: var(--rn-accent-2); margin: 2px 0 8px; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  #left { flex: 1; font: 600 13px var(--rn-mono); color: var(--rn-dim); }
+  kbd { font: 700 12px var(--rn-mono); padding: 1px 6px; border: 1px solid var(--rn-line); color: var(--rn-fg); }
+</style>
+</head>
+<body>
+  <rn-window title="An assistant asks to connect" no-space>
+    <p><b id="client">An assistant</b> asks to use REDnode's tools: read the game, and call the tools that ask you first.</p>
+    <p>Allow only if your browser shows the same code:</p>
+    <div class="code" id="code">----</div>
+    <div class="row">
+      <span id="left">Press <kbd>F10</kbd> to use the mouse here.</span>
+      <rn-button id="deny" variant="ghost">Deny</rn-button>
+      <rn-button id="allow">Allow</rn-button>
+    </div>
+  </rn-window>
+  <script src="app.js"></script>
+</body>
+</html>

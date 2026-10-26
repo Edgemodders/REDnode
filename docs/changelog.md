@@ -19,6 +19,7 @@ How to keep it:
 - What a package spawns is removed when the package stops.
 - After an archive swap (`archives.reload`), your spawns that use a swapped file are spawned again (`world.onRespawn` tells you their new ID), and the game's entities within 30 m of V that use one switch appearance and back, so they show the new version. The answer lists them in `world`. Untested in game until RED Hot Tools supports game 2.5.
 - MCP tools `world_near` and `world_spawned` (read), and `world_spawn`, `world_remove` and `world_load` (ask first).
+- Connect Claude Code (or another MCP client) without copying a token: it asks to connect, your browser shows a code, and REDnode shows the same code in the game with **Allow** and **Deny**. The connection stays across restarts; the launcher lists connected assistants with **Revoke** ([#19](https://github.com/Edgemodders/REDnode/issues/19)). **Copy setup** still works for clients without sign-in.
 
 **Fixed**
 

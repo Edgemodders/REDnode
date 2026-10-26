@@ -134,8 +134,12 @@
       </div>
       <div class="setting">
         <rn-toggle id="mcp" label="MCP server"></rn-toggle>
-        <div class="what">For AI agents on this PC, such as Claude Code.</div>
+        <div class="what">For AI agents on this PC, such as Claude Code. An agent asks to connect, and you allow it in the game.</div>
         <div class="line"><rn-button id="mcp-copy" variant="ghost">Copy setup</rn-button></div>
+        <div class="devdirs" id="mcp-clients" hidden>
+          <div class="sub">Connected assistants</div>
+          <div id="mcp-client-list"></div>
+        </div>
       </div>
       <div class="setting">
         <rn-toggle id="dev" label="Developer mode"></rn-toggle>

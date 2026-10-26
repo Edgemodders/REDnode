@@ -177,6 +177,28 @@ $('mcp-copy').addEventListener('click', async () => {
   RednodeUI.notify('Run the copied command once in a terminal to add REDnode to Claude Code', { title: 'MCP server' });
 });
 
+// Assistants that signed in and were allowed in the game (#19), each with Revoke.
+function showMcpClients(list) {
+  $('mcp-clients').hidden = !list.length;
+  $('mcp-client-list').replaceChildren(
+    ...list.map((c) => {
+      const line = el('div', 'devdir');
+      const name = el('span', 'path', c.name);
+      name.style.direction = 'ltr';
+      name.title = `${c.name}\nConnected ${new Date(c.created).toLocaleString()}${c.lastUsed ? `\nLast used ${new Date(c.lastUsed).toLocaleString()}` : ''}`;
+      const revoke = document.createElement('rn-button');
+      revoke.setAttribute('variant', 'ghost');
+      revoke.textContent = 'Revoke';
+      revoke.addEventListener('click', async () => {
+        showMcpClients(await window.rednode.apps.revokeMcpClient(c.id));
+        RednodeUI.notify(`${c.name} must ask again to connect`, { title: 'MCP server' });
+      });
+      line.append(name, revoke);
+      return line;
+    }),
+  );
+}
+
 // Developer mode: a debug button on every window's title bar, next to close.
 $('dev').addEventListener('change', async (e) => {
   const on = await window.rednode.apps.developer(e.detail.checked);
@@ -260,6 +282,7 @@ async function refresh() {
     $('hot').checked = await window.rednode.apps.hotReload();
     showTheme(await window.rednode.apps.theme());
     $('mcp').checked = await window.rednode.apps.mcp();
+    showMcpClients(await window.rednode.apps.mcpClients().catch(() => []));
     $('dev').checked = await window.rednode.apps.developer();
     $('devdirs').hidden = !$('dev').checked;
     if ($('dev').checked && !drawer.hidden) showDevFolders(await window.rednode.apps.devFolders());

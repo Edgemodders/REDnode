@@ -26,6 +26,7 @@ const net = require('node:net');
 const path = require('node:path');
 const { createMods } = require('./mods');
 const { createMcp } = require('./mcp');
+const { createOAuth } = require('./oauth');
 const { createServices } = require('./services');
 const { scanGame, checkRequires, validRange, key: gamefilesKey } = require('./gamefiles');
 const { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED } = require('./redbridge');
@@ -66,6 +67,8 @@ const BUILTIN_ROOTS = [
   { dir: path.join(__dirname, 'manager'), single: true, builtin: true, manager: true },
   // The Welcome window: opened at the first start, until the player closes it once.
   { dir: path.join(__dirname, 'welcome'), single: true, builtin: true },
+  // The Connect window (#19): open only while an MCP client waits for the player's answer.
+  { dir: path.join(__dirname, 'connect'), single: true, builtin: true, prompt: true },
 ];
 // --apps-dir may list several folders, separated by ";", for example REDnode's
 // examples and another repo's packages during development.
@@ -606,7 +609,7 @@ function discoverApps() {
           noteHidden(manifest.id, dir, apps.get(manifest.id).dir);
           continue;
         }
-        apps.set(manifest.id, { manifest, dir, builtin: !!root.builtin, pinned: !!root.pinned, manager: !!root.manager, dev: !!root.dev });
+        apps.set(manifest.id, { manifest, dir, builtin: !!root.builtin, pinned: !!root.pinned, manager: !!root.manager, prompt: !!root.prompt, dev: !!root.dev });
       } catch (err) {
         log(`Skipped an app: ${err.message}`);
       }
@@ -644,7 +647,7 @@ function ownerOf(w) {
   return apps.get(w.app.manifest.id);
 }
 function windowOnHud(w) {
-  if (w.app.pinned || w.app.manifest.kind === 'hud') return true;
+  if (w.app.pinned || w.app.prompt || w.app.manifest.kind === 'hud') return true;
   const owner = ownerOf(w);
   return owner ? isOnHud(owner) : true;
 }
@@ -654,7 +657,7 @@ function windowOnHud(w) {
 // mode; windows pinned to the HUD, the launcher tab among them, wait for that F10.
 let startHold = false;
 // The Welcome window shows too: it is how a new player learns about F10.
-const shownInPassive = (w) => (startHold ? w.app.manifest.kind === 'hud' || w.app.manifest.id === 'welcome' : windowOnHud(w));
+const shownInPassive = (w) => (startHold ? w.app.manifest.kind === 'hud' || w.app.manifest.id === 'welcome' || w.app.prompt : windowOnHud(w));
 function endStartHold() {
   if (!startHold) return;
   startHold = false;
@@ -1012,6 +1015,7 @@ function rewatchAppRoots() {
 
 function shouldOpen(entry) {
   if (entry.pinned) return true;
+  if (entry.prompt) return !!oauth?.pending();
   if (entry.builtin && entry.manifest.id === 'welcome' && !settings.welcomed) return true; // the first start
   if (chosenApps) return chosenApps.includes(entry.manifest.id);
   return settings.apps[entry.manifest.id]?.open ?? entry.manifest.open;
@@ -2775,7 +2779,7 @@ function isEnabled(entry) {
 function appList() {
   const metrics = app.getAppMetrics();
   return [...apps.values()]
-    .filter((a) => !a.pinned)
+    .filter((a) => !a.pinned && !a.prompt)
     .map((entry) => {
       const m = entry.manifest;
       return {
@@ -3508,7 +3512,7 @@ async function taskList() {
   const rows = [];
   for (const entry of apps.values()) {
     const m = entry.manifest;
-    if (entry.pinned) continue; // the launcher
+    if (entry.pinned || entry.prompt) continue; // the launcher, the Connect window
     const mod = modRows.get(m.id) ?? null;
     const wins = windowsOfPackage(m.id).map((w) => {
       let pid = null;
@@ -3858,6 +3862,8 @@ function mcpHost() {
     worldRemove: removeForAgent,
     worldLoad: loadSceneForAgent,
     worldUnload: unloadSceneForAgent,
+    // #19: OAuth sign-in for MCP clients.
+    oauth: oauthFor(),
   };
 }
 
@@ -3875,6 +3881,54 @@ ipcMain.handle('rednode:host:mcp-command', (event) => {
   fromLauncher(event);
   clipboard.writeText(mcpCommand());
   return true;
+});
+
+// ---------- MCP sign-in (#19) ----------
+//
+// An MCP client signs in through OAuth (oauth.js); while it waits, the built-in Connect
+// window shows its name and code over the game, with Allow and Deny. It shows without F10,
+// so the player sees it; clicking needs F10, as for every window.
+
+let oauth = null;
+function oauthFor() {
+  oauth ??= createOAuth({
+    file: dataFile('mcp-clients.json'),
+    log,
+    changed: () => notifyLauncher(),
+    onPending: (request) => {
+      const entry = apps.get('connect');
+      if (!entry) return;
+      if (request) {
+        openApp(entry);
+        const w = windowOfApp('connect');
+        if (w) toPage(w, { event: 'connect', request });
+      } else {
+        closeApp('connect');
+      }
+    },
+  });
+  return oauth;
+}
+
+ipcMain.handle('rednode:connect:pending', (event) => {
+  if (windowFor(event.sender)?.app.manifest.id !== 'connect' || !windowFor(event.sender)?.app.builtin) throw new Error('Only REDnode\'s Connect window answers sign-ins');
+  return oauthFor().pending();
+});
+
+ipcMain.handle('rednode:connect:answer', (event, allow) => {
+  if (windowFor(event.sender)?.app.manifest.id !== 'connect' || !windowFor(event.sender)?.app.builtin) throw new Error('Only REDnode\'s Connect window answers sign-ins');
+  return oauthFor().answer(allow === true);
+});
+
+ipcMain.handle('rednode:connect:clients', (event) => {
+  fromLauncher(event);
+  return oauthFor().clients();
+});
+
+ipcMain.handle('rednode:connect:revoke', (event, id) => {
+  fromLauncher(event);
+  oauthFor().revoke(String(id));
+  return oauthFor().clients();
 });
 
 ipcMain.handle('rednode:mods:set-shared', (event, id, shared) => {

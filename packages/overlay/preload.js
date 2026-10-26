@@ -109,6 +109,15 @@ contextBridge.exposeInMainWorld('rednode', {
     mcp: (on) => ipcRenderer.invoke('rednode:host:mcp', on),
     /** Copies the command that adds the MCP server to Claude Code. */
     copyMcpCommand: () => ipcRenderer.invoke('rednode:host:mcp-command'),
+    /** MCP clients signed in through OAuth (#19), for the launcher: [{ id, name, lastUsed }]. */
+    mcpClients: () => ipcRenderer.invoke('rednode:connect:clients'),
+    /** Revokes a signed-in MCP client: its tokens stop working. */
+    revokeMcpClient: (id) => ipcRenderer.invoke('rednode:connect:revoke', id),
+  },
+  /** The Connect window (#19): the MCP sign-in waiting for the player, and the answer. Built-in only. */
+  connect: {
+    pending: () => ipcRenderer.invoke('rednode:connect:pending'),
+    answer: (allow) => ipcRenderer.invoke('rednode:connect:answer', allow),
   },
   /** The mod log, for apps built into REDnode. Other apps get an error. New lines arrive as {event: 'mod-log', entries}. */
   logs: {

@@ -6,15 +6,23 @@ Status: **in use since REDnode 0.4.0.** First passed in game on 2026-10-12 (REDa
 
 ## Set it up
 
+Since REDnode 0.40.0 an assistant asks to connect and you allow it in the game: no token to copy (#19, asked for by EDGEchat).
+
 | Step | How |
 |---|---|
 | 1. Turn it on | In the game, open the REDnode launcher (**F10**, then the REDNODE tab), and its settings with the gear at the right of the Theme row. Switch **MCP server** on. For developers running the host from the repo, it is on already |
-| 2. Copy the setup command | Press **Copy setup** in the launcher |
-| 3. Add it to Claude Code, once | Paste the command into a terminal on the same PC and run it. It looks like `claude mcp add --transport http --scope user rednode http://127.0.0.1:41820/mcp --header "Authorization: Bearer ..."` |
-| 4. Check | `claude mcp list` shows `rednode` as connected while the game runs |
-| 5. Use it | Start a new Claude Code session. Ask, for example, "using the rednode tools, what is V's health?" |
+| 2. Add REDnode to Claude Code, once | With the EDGE plugin, it is there already as `plugin:edge:rednode`. Without it: `claude mcp add --transport http --scope user rednode http://127.0.0.1:41820/mcp` |
+| 3. Connect | In Claude Code, `/mcp`, pick `rednode`, then **Authenticate**. Your browser shows "Approve in Cyberpunk 2077" and a code such as `FPZ-4201` |
+| 4. Allow it in the game | REDnode's **Connect** window shows the same code with the assistant's name. Press **F10**, check the codes match, and press **Allow**. The browser goes back to Claude Code, which is now connected |
+| 5. Use it | Ask, for example, "using the rednode tools, what is V's health?" |
 
-The server listens only on `127.0.0.1`, port 41820, and every request needs the token from the setup command. The token is made once and kept in the host's settings, so the setup keeps working. It only answers while the game, and with it the host, is running.
+The connection stays across game restarts: Claude Code keeps its token and renews it. The launcher's settings list **Connected assistants** under the MCP server switch; **Revoke** ends one, and it must ask again.
+
+The server listens only on `127.0.0.1`, port 41820, and every request needs a token. It only answers while the game, and with it the host, is running.
+
+How the sign-in works, for other MCP clients: standard OAuth 2.1 with dynamic client registration. A request without a valid token gets `401` with `WWW-Authenticate: Bearer resource_metadata=".../.well-known/oauth-protected-resource"`; the client registers at `/register` (redirect URIs must be `http://localhost`, `127.0.0.1` or `[::1]`), sends the player's browser to `/authorize` (authorization code with PKCE S256 only), and exchanges the code at `/token`. Access tokens last 24 hours and refresh tokens 180 days, each refresh token working once; REDnode keeps only their SHA-256 hashes, in `mcp-clients.json` in its data folder. Every request must name `127.0.0.1:41820` or `localhost:41820` as its `Host`, and a browser's `Origin` must be the server itself, so a web page cannot start a sign-in. One request waits at a time and lapses after two minutes; a code is good once, for a minute.
+
+**Copy setup** still gives a fixed token for clients without OAuth: run the copied command (`claude mcp add ... --header "Authorization: Bearer ..."`) in a terminal. Don't add it beside the plugin's `rednode`, or you have two.
 
 ## Tools
 
@@ -67,6 +75,24 @@ The game's own `const` flag cannot: in 2.31, 1,865 `const` functions are not get
 Of the 9,504 function names in 2.31 that start like reads, it refuses 7, all `GetOrCreate…` or `GetOrAdd…`. Until REDnode 0.32.1 it refused any name with a change word anywhere after the start, 543 names, most of them reads where the word is a noun (`GetItemInEquipSlot`, `GetStartTime`, `IsOpen`), which then went through `api_call` and asked. A function named like a read could still change something (unverified for most of them). The rule is only in the MCP server: the `rednode` package's `api` is not limited.
 
 The server also gives the agent short instructions: what REDnode is, what each tool is for, and the game API's rules (the game instance is `{}`, 64-bit numbers are strings, references die when a save loads).
+
+## MCP sign-in: test (#19)
+
+Built 2026-10-26 in REDnode 0.40.0: `packages/overlay/oauth.js` (the endpoints and the tokens), the checks in `mcp.js`'s handler (`Host`, `Origin`, the 401 header), the built-in **Connect** window (`packages/overlay/connect`, shown over the game without F10 while a request waits), **Connected assistants** with **Revoke** in the launcher's settings. Checked outside the game with a scratch server running the whole flow as Claude Code does (scratchpad `oauth/check.mjs`, 23 checks: metadata, registration, refused redirects, Origin and Host, one request at a time, the same code in page and game, allow and deny, PKCE, a code used once, refresh rotation, hashed storage, a restart, revoke). **Not checked:** Claude Code's own sign-in against it, and the Connect window in the game.
+
+The test adds a second, header-less server entry, so Claude Code signs in instead of sending the plugin's token. Game 2.5, REDnode 0.40.0.
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. Load a save. Launcher settings: **MCP server** is on. In a terminal: `claude mcp add --transport http --scope user rednode-signin http://127.0.0.1:41820/mcp`. **Mark**.
+2. In a Claude Code session, `/mcp`, pick `rednode-signin`: it says it needs authentication. Pick **Authenticate**. The browser shows "Approve in Cyberpunk 2077" and a code. **Mark**.
+3. In the game, without pressing anything, the **Connect** window shows the same code and "Claude Code (rednode-signin)" or similar. **Mark**.
+4. **F10**, press **Allow**. The browser goes back to Claude Code, and `/mcp` shows `rednode-signin` connected. Ask Claude "with rednode-signin, what does game_state say?" **Mark**.
+5. Launcher settings: **Connected assistants** lists it. **Mark**.
+6. Quit the game, start it again, load a save. Ask the same question: it works with no new sign-in. **Mark**.
+7. Press **Revoke** beside it. Ask again: Claude Code says it needs authentication. **Mark**.
+8. Authenticate again, and press **Deny** in the game: Claude Code says the sign-in was denied. **Mark**.
+9. Authenticate again and answer nothing: after two minutes the Connect window closes and the browser says the request lapsed. **Mark**.
+10. Clean up: `claude mcp remove rednode-signin --scope user`. Quit the game.
 
 ## C1 test
 

@@ -3,7 +3,9 @@
 // REDagent, the in-game assistant, will use the same tools.
 //
 //   http://127.0.0.1:41820/mcp   Streamable HTTP, stateless; every request needs
-//                                Authorization: Bearer <token> (see the launcher)
+//                                Authorization: Bearer <token>: one an MCP client got by
+//                                signing in with OAuth, the player allowing it in the game
+//                                (oauth.js, #19), or the launcher's Copy setup token
 //
 // Tools: logs, apps, game_state, perf, gameapi_lookup, window_text, window_image,
 // window_console, game_image, api_read, api_call, api_get, tweakdb, archives_reload,
@@ -932,16 +934,35 @@ function createMcp(host) {
 
   async function handle(req, res) {
     const url = new URL(req.url, 'http://localhost');
+    // Every request must name this server, and a browser's Origin too: a web page cannot
+    // reach it, DNS rebinding included (#19).
+    const here = [`127.0.0.1:${current.port}`, `localhost:${current.port}`];
+    const origin = req.headers.origin;
+    if (!here.includes(req.headers.host ?? '') || (origin && origin !== 'null' && !here.some((h) => origin === `http://${h}`))) {
+      res.writeHead(403).end();
+      return;
+    }
+    const base = `http://${req.headers.host}`;
+    // OAuth (#19): an MCP client signs in and the player allows it in the game.
+    if (current.external && host.oauth && (await host.oauth.route(req, res, url, base))) return;
     if (url.pathname !== '/mcp') {
       res.writeHead(404).end();
       return;
     }
     const auth = req.headers.authorization ?? '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    const ok = (current.external && token === current.token) || current.internal?.has(token);
+    const signedIn = current.external && host.oauth ? host.oauth.check(token) : null;
+    const ok = (current.external && token === current.token) || current.internal?.has(token) || !!signedIn;
     if (!token || !ok) {
-      res.writeHead(401, { 'content-type': 'application/json' }).end(JSON.stringify({ error: 'A valid token is required' }));
+      const headers = { 'content-type': 'application/json' };
+      if (current.external && host.oauth) headers['www-authenticate'] = `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource"`;
+      res.writeHead(401, headers).end(JSON.stringify({ error: 'A valid token is required' }));
       return;
+    }
+    // A signed-in client is named by its registration, such as "Claude Code (plugin:edge:rednode)".
+    if (signedIn) {
+      host.oauth.used(signedIn.client);
+      host.seen?.(token, signedIn.name);
     }
     if (req.method !== 'POST') {
       res.writeHead(405, { allow: 'POST' }).end(); // stateless: no server-sent stream, no sessions
@@ -958,7 +979,7 @@ function createMcp(host) {
       return;
     }
     for (const m of Array.isArray(body) ? body : [body]) {
-      if (m?.method === 'initialize') host.seen?.(token, m.params?.clientInfo?.name ?? null);
+      if (m?.method === 'initialize' && !signedIn) host.seen?.(token, m.params?.clientInfo?.name ?? null);
     }
     const who = host.seen?.(token) ?? { name: 'An assistant', kind: 'unknown' };
     const mcp = build(who);

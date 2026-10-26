@@ -1327,7 +1327,7 @@ World objects test 0.2.0 drives each part. Checked before the game: the plugin b
 
 ### H2c-b test
 
-Game 2.5, REDnode 0.39.0, Codeware. RED Hot Tools is not needed (no 2.5 build yet): the swap section is left out. Pick a quiet open spot outdoors.
+Game 2.5, REDnode 0.40.0 (built as 0.39.0), Codeware. RED Hot Tools is not needed (no 2.5 build yet): the swap section is left out. Pick a quiet open spot outdoors.
 
 0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
 1. Load the save. F10, Mod Manager: switch on **World objects test** (its swap permission is already allowed), and open the **Mod log**. Its top lines say OK for REDnode and Codeware, and the world API. **Mark**.
