@@ -57,6 +57,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [SV2 Service descriptions](services.md#sv2-test) | In the game | SV2 | 2026-10-24 | 0.36.0 | **Pass**: the Mod Manager's Service section, Describe, a bad call refused by the host ([results](services.md#sv2-test-results)) |
 | [SV3 Mods' tools and the Tools Manager](services.md#sv3-test) | In the game | SV3 | 2026-10-24 | 0.36.0, REDagent 0.3.1 | **Pass** (second run for steps 3 and 5): the Tools Manager, reads without asking, Claude Code and REDagent asking before a change, the switch ([results](services.md#sv3-test-second-run-steps-3-and-5)) |
 | [Admin Tools pack](admin-tools.md#admin-tools-test) | In the game | Admin Tools | 2026-10-24 | 0.37.0 + pack 0.1.0 | **Pass** (2.31 backup folder): the managers as a pack, refused before their grants, End task and Restart, a tool switched, permissions withdrawn and allowed, pinned ([results](admin-tools.md#admin-tools-test-results)). Checked first in the mock game: 16 cases (refused before the grant, with the reason in the window; a package without the permission refused; each app's own grant; tasks, End task's refusal, tools and switches after it; the Mod Manager's warning; withdrawn, refused again) |
+| [Builder window scroll](#builder-window-scroll-0382) | In the game | O6a | | 0.38.2 | Not run |
 | [H2c-a World objects test](world.md#h2c-a-test) | In the game | H2c | 2026-10-25 | 0.38.1 + World objects test 0.1.0, game 2.5 | Partly run, passed: spawn, hold, entity list, Keep in saves, Resources (retest). The swap steps: a 2.31 run on 2026-10-26 was refused (the app was not allowed to swap archives); to run again |
 | [Development folders](#development-folders) | In the game | #16 | 2026-10-23 | 0.33.0 | **Pass** (2.31 backup folder): a folder added in the launcher, its Hello mod copy ran instead of the installed one with the DEV tag, two edits hot-reloaded it, Remove brought the installed copy back, bad paths refused ([results](#development-folders-results)) |
 | [Launcher settings drawer](#launcher-settings-drawer) | In the game | Launcher | 2026-10-23 | 0.32.2 | **Pass** (laptop): the player: "It looks perfect". 0.32.3 then shows the version line as "Version 0.32.3" |
@@ -598,6 +599,20 @@ Before: make a folder outside the game, for example `E:\Modding\DevTest`, and co
 [Source](world.md#h2c-a-test). Built 2026-10-23: the spike of H2c, the **World objects test** app over REDnode 0.33.0. Needs Codeware, RED Hot Tools and two versions of an archive that replaces a prop mesh. The steps are on the source page.
 
 First run 2026-10-25 on game 2.5 (REDnode 0.38.1, app 0.1.0), without RED Hot Tools (no 2.5 build), so without the swap steps: **pass** for spawn by record and by template, hold and friendly, the entity list, a prop, and Keep in saves. Targeting found nothing, and its empty list left Resources nothing to read (app 0.1.1 keeps the last list); a retest with Entity list then Resources passed: 12 entities, 217 files, about 1 s an NPC through `api`. Results: [H2c-a test: first run, game 2.5](world.md#h2c-a-test-first-run-game-25).
+
+### Builder window scroll (0.38.2)
+
+Built 2026-10-26 after the H2c-a swap run, where the World objects test's log (a `ui.list` with no height) was squeezed to nothing under its controls and could not be seen. REDnode 0.38.2 keeps such a list at least 160 px tall and lets the window scroll to reach it (`packages/overlay/builder/index.html`). Checked outside the game on a copy of that window: at 560 px tall the old CSS left the log 8 px, the new one 168 px with the window scrolling. Runs on game 2.5 (no RED Hot Tools needed).
+
+0. Switch on **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. Load a save. F10, Mod Manager: switch on **World objects test**. Its log shows at the bottom of its window, with "World objects test ready". **Mark**.
+2. Press **Entity list** a few times. New lines show in the log and it follows the newest. **Mark**.
+3. Scroll the window (wheel over the buttons) and the log (wheel over the log). Both move. **Mark**.
+4. Open the Live log mod sample, if installed: its log fills its window as before, with no window scrollbar. **Mark**.
+
+Not run yet.
+
+### H2c-a World objects test: the 2.31 swap run
 
 Swap run 2026-10-26 in the 2.31 backup (REDnode 0.37.0, RED Hot Tools 1.3.0, app 0.1.1, a box archive and a barrel at the box's path): **not run**. Every Swap was refused because the steps never said to allow the app to swap archives; they do now. The rest passed again (prop, respawn, entity list, Resources after Targeting). Results: [H2c-a swap run on 2.31: not run](world.md#h2c-a-swap-run-on-231-not-run).
 

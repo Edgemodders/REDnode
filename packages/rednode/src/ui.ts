@@ -94,7 +94,7 @@ export interface ListProps {
   lines: string[];
   /** How many lines the list keeps; older ones drop off the top. 1 to 5,000; 500 by default. */
   keep?: number;
-  /** A fixed height in pixels. Without it the list fills the window's free height, so the window itself never scrolls. */
+  /** A fixed height in pixels. Without it the list fills the window's free height, at least 160 px (the window scrolls when the other nodes leave less). */
   height?: number;
   /** Scroll to each new line while the player is at the bottom (`true`, the default). Scrolled up, the list stays put either way. */
   follow?: boolean;
@@ -316,8 +316,8 @@ export const ui = {
   /**
    * A list of lines that scrolls on its own, for a log or a live feed. It keeps the newest
    * lines only (`keep`, 500 by default), follows the newest line unless the player has
-   * scrolled up, and without a `height` fills the window's free height, so the window
-   * itself never scrolls.
+   * scrolled up, and without a `height` fills the window's free height. It keeps at least
+   * 160 px: when the other nodes leave less, the window scrolls.
    *
    * @example
    * ```ts

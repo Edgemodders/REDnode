@@ -118,7 +118,8 @@ ${FONTS}
     color: var(--rn-fg); background: color-mix(in srgb, var(--rn-panel-2) 55%, transparent); border: 1px solid var(--rn-line); }
   .list .line { white-space: pre-wrap; overflow-wrap: anywhere; }
   .list .line:nth-child(even) { background: color-mix(in srgb, var(--rn-panel-2) 45%, transparent); }
-  rn-window:has(.list.fill) .content, .column:has(.list.fill), .content > .list.fill, .column > .list.fill { flex: 1; min-height: 0; }
+  rn-window:has(.list.fill) .content, .column:has(.list.fill) { flex: 1 0 auto; }
+  .content > .list.fill, .column > .list.fill { flex: 1 1 0; min-height: 160px; }
   .empty { width: 360px; padding: 18px; border: 1px dashed var(--rn-line); color: var(--rn-dim);
     font: 13px var(--rn-mono); background: color-mix(in srgb, var(--rn-bg) 70%, transparent); }
 </style>

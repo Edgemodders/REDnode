@@ -11,6 +11,10 @@ How to keep it:
 
 ## Unreleased
 
+**Fixed**
+
+- A Node mod's window with a `ui.list()` log and more controls than fit no longer squeezes the log to nothing: the log keeps at least 160 px and the window scrolls to reach it.
+
 ## 0.38.1 (2026-10-25)
 
 **The first release for game version 2.5.** It needs RED4ext 1.31 or later. For game 2.31, use REDnode 0.37.0.
