@@ -11,6 +11,8 @@ How to keep it:
 
 ## Unreleased
 
+## 0.40.1 (2026-10-26)
+
 **New**
 
 - `world.spawn({ mesh })` spawns a prop from a mesh alone, and a `Character.*` record now stands where it was placed and stays friendly to V. `keep: true` keeps a spawn in the save.

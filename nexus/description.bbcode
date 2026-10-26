@@ -48,7 +48,7 @@ const player = await api.GetPlayer(game.instance);
 const shop = await api.GameInstance.GetTransactionSystem(game.instance);
 await shop.GiveItem(player, await api.MarketSystem.Money(), 100); // 100 eddies[/code][size=4][b][color=#19f3ff]REDagent: an AI modder in the game[/color][/b][/size]
 REDagent, powered by Claude, is a chat window in the game that writes REDnode mods with you, starts them, reads their logs, looks at the screen, and fixes what went wrong, while you play. Other mods can ask it questions too. It is a separate download from its [url=https://github.com/Edgemodders/REDagent]repo[/url] and uses your own Anthropic API key.
-REDnode also has an MCP server, so Claude Code on your desktop can read your mods' logs, see the overlay's windows, look up game types and call the game.
+REDnode also has an MCP server, so Claude Code on your desktop can read your mods' logs, see the overlay's windows, look up game types and call the game. To connect it, there is no token to copy: Claude Code asks, the game shows a code, and you press Allow.
 
 Get [url=https://www.nexusmods.com/cyberpunk2077/mods/35670]REDagent[/url] separately.
 [img]https://staticdelivery.nexusmods.com/mods/3333/images/35355/35355-1792183544-1962604485.png[/img]
@@ -75,7 +75,7 @@ Play WAV, OGG, MP3 and FLAC files from your mod, with no soundbank and no REDmod
 Read any record from the running game, and change it through TweakXL, the community standard, so your changes sit beside every other TweakXL mod. When your mod stops, its changes are undone.
 
 [size=4][b][color=#19f3ff]Things in the world[/color][/b][/size]
-Spawn entities with meshes and components, move them and remove them, and hear when they attach and detach (with Codeware). This is what EDGEbuilder, a world builder in the game, is made from.
+Spawn props, entities and people who stand still and stay friendly, move them and remove them, and hear when they attach and detach (with Codeware). Load a whole EDGEbuilder scene into the running game, and list what is around V with the files each thing uses. What a mod spawns goes away when the mod stops. This is what EDGEbuilder, a world builder in the game, is made from.
 
 [size=4][b][color=#19f3ff]A debugger in the game[/color][/b][/size]
 Turn on Developer mode and open Chromium's DevTools on any window or Node mod, as a window in the game: breakpoints, the console, the network, the page.
