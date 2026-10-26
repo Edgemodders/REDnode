@@ -1360,3 +1360,17 @@ Game 2.5, REDnode 0.40.1, World objects test 0.2.0, dev PC, Dogtown.
 | 10 | Passed through the MCP server over HTTP (Claude Code's `/mcp` could not reconnect the plugin's server to load the new tools, so its own ask prompt was not shown; the player approved in chat): `world_near` 1,074 looked at in 1.2 ms, `world_spawn` put the box 3 m in front of V (seen with `game_image`), `world_spawned` listed it under `mcp` |
 
 World objects test 0.2.1 writes the scene into `pkg.dataDir` and checks the world API every 5 s. Steps 1, 7, 8 and 9 to run again with it.
+
+### H2c-b test: retest with World objects test 0.2.1 (2026-10-26): passed
+
+Same game and REDnode 0.40.1. Every step passed:
+
+| Step | Log |
+|---|---|
+| App switched on after the load | world API OK |
+| Spawn a person, a prop | 317 ms, 184 ms |
+| Load a scene here | box, barrel and person spawned, the lamp skipped, 717 ms; they stayed |
+| Unload the scene | 3 removed in 54 ms; the first woman and box stayed |
+| Switch the app off | "Removed 2 entities world-objects-test spawned (the mod stopped)" |
+
+**H2c-b passed in game**, except the refresh after an archive swap, which waits for RED Hot Tools on game 2.5 (agreed to ship unverified).
