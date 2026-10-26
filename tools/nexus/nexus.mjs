@@ -5,8 +5,9 @@
 //   node tools/nexus/nexus.mjs check  [dir] --version <v>
 //         what a release would do, and whether it may: stops when the description changed on Nexus
 //   node tools/nexus/nexus.mjs release [dir] --version <v> --zip <file> [--notes <file>] [--dry-run]
-//         uploads the zip as the main file's new version (the old one archived), adds the version's
-//         changelog, and pushes description.bbcode when it differs from the live one
+//         uploads the zip as the main file's new version (the old one archived), or as the main
+//         file itself on a page with no files yet, adds the version's changelog, and pushes
+//         description.bbcode when it differs from the live one
 //
 // <dir> is the folder with nexus.json (default: nexus). nexus.json names the page ("page": 35419)
 // and how the file is uploaded ("upload"); pull adds the internal mod id, the main file's id and
@@ -61,6 +62,8 @@ async function mainFile(modId, fileId) {
     if (versions.some((v) => v.is_primary)) return { file: f, versions };
   }
   if (active.length === 1) return { file: active[0], versions: (await api('GET', `/mod-files/${active[0].id}/versions`)).versions };
+  // A new page: the first release creates its main file.
+  if (!active.length) return { file: null, versions: [] };
   throw new Error('No primary file on the page, and more than one file: set "file" in nexus.json');
 }
 
@@ -97,7 +100,7 @@ async function pull() {
   const { file } = await mainFile(mod.id, config.file);
   const description = fromNexus(mod.description);
   writeFileSync(descFile, description.endsWith('\n') ? description : description + '\n');
-  const next = { ...config, mod: mod.id, file: Number(file.id), pulled: { sha256: sha(description), at: new Date().toISOString(), version: mod.version } };
+  const next = { ...config, mod: mod.id, ...(file ? { file: Number(file.id) } : {}), pulled: { sha256: sha(description), at: new Date().toISOString(), version: mod.version } };
   writeFileSync(configFile, JSON.stringify(next, null, 2) + '\n');
   console.log(`Pulled ${mod.name} (page ${config.page}, version ${mod.version}): ${description.length} characters into ${descFile}`);
 }
@@ -108,7 +111,11 @@ async function status() {
   const { file, versions } = await mainFile(mod.id, config.file);
   const live = sha(fromNexus(mod.description));
   console.log(`${mod.name}: page ${config.page}, mod ${mod.id}, version ${mod.version}`);
-  console.log(`Main file ${file.id}: ${versions.map((v) => `${v.version}${v.is_primary ? ' (primary)' : ''}${v.category !== 'main' ? ` (${v.category})` : ''}`).join(', ')}`);
+  console.log(
+    file
+      ? `Main file ${file.id}: ${versions.map((v) => `${v.version}${v.is_primary ? ' (primary)' : ''}${v.category !== 'main' ? ` (${v.category})` : ''}`).join(', ')}`
+      : 'No files yet: the first release creates the main file',
+  );
   const prev = previousReleaseDescription();
   const seen =
     live === config.pulled?.sha256
@@ -129,11 +136,13 @@ async function plan(version) {
   const already = versions.find((v) => v.version === version);
   const previous = versions.find((v) => v.is_primary) ?? null;
   const description = descriptionPlan(mod, config, version);
-  console.log(`${mod.name} on Nexus (page ${config.page}): version ${mod.version}, main file ${file.id}`);
+  console.log(`${mod.name} on Nexus (page ${config.page}): version ${mod.version}, ${file ? `main file ${file.id}` : 'no files yet'}`);
   console.log(
     already
       ? `File: ${version} is already on Nexus (version ${already.id}); no upload and no changelog`
-      : `File: upload ${version} as the main file's new version${previous ? `, replacing ${previous.version}${config.upload.archivePrevious ? ' (archived)' : ''}` : ''}; mod manager download ${config.upload.modManager ? 'on' : 'off'}; the page's version becomes ${version}`,
+      : !file
+        ? `File: create the main file with ${version}; mod manager download ${config.upload.modManager ? 'on' : 'off'}; the page's version becomes ${version}`
+        : `File: upload ${version} as the main file's new version${previous ? `, replacing ${previous.version}${config.upload.archivePrevious ? ' (archived)' : ''}` : ''}; mod manager download ${config.upload.modManager ? 'on' : 'off'}; the page's version becomes ${version}`,
   );
   console.log(`Description: ${description.push ? 'push' : 'no push'} (${description.why})`);
   return { config, mod, file, already, previous, description };
@@ -152,7 +161,22 @@ async function release() {
   if (dryRun) return console.log('Dry run: nothing changed on Nexus');
   const up = p.config.upload;
 
-  if (!p.already) {
+  if (!p.already && !p.file) {
+    // A new page: create its main file from the upload (later releases add versions to it).
+    const uploadId = await uploadArchive(zip);
+    const created = await api('POST', '/mod-files', {
+      upload_id: uploadId,
+      mod_id: p.mod.id,
+      name: up.name,
+      description: up.description ? up.description.replaceAll('{version}', version) : null,
+      version,
+      file_category: up.category ?? 'main',
+      primary_mod_manager_download: !!up.primary,
+      allow_mod_manager_download: !!up.modManager,
+      update_mod_version: true,
+    });
+    console.log(`Created the main file ${created.id ?? created.mod_file?.id} with ${version}`);
+  } else if (!p.already) {
     const uploadId = await uploadArchive(zip);
     const created = await api('POST', `/mod-files/${p.file.id}/versions`, {
       upload_id: uploadId,
@@ -167,6 +191,9 @@ async function release() {
       previous_version_id: p.previous?.id ?? null,
     });
     console.log(`Made version ${version} of file ${p.file.id} (${created.version?.id})`);
+  }
+
+  if (!p.already) {
     // Changelogs only add: posted once, with the version it belongs to, so a rerun never doubles it.
     const notes = notesFile ? readFileSync(notesFile, 'utf8').trim() : '';
     if (notes) {
