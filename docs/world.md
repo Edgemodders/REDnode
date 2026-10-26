@@ -1230,3 +1230,21 @@ Still open, for a run with RED Hot Tools on 2.5: Who uses it, and the refresh af
 2026-10-26 on the dev PC, in the 2.31 backup (`L:\Backups\Cyberpunk 2077 (2026-10-21)`): REDnode 0.37.0, RED Hot Tools 1.3.0, World objects test 0.1.1. Test archives made with REDbridge from the backup's own files, both named `zzz_rednode_box.archive` (lowercase, so the official RED Hot Tools finds it): version 1 holds `cardboard_box_a_closed.mesh` unchanged, version 2 holds the barrel drum mesh `barrel_drum_h_bound.mesh` at the box's path, so a swap turns the box into a barrel. Version 1 was installed in `archive\pc\mod`; both are kept in `E:\Modding\Cyberpunk 2077\Projects\H2c_swap\v1` and `v2`.
 
 **No swap happened.** Every **Swap** was refused with "Allow "World objects test" to swap archives in the REDnode launcher first": the steps never said to switch on the app's **Allowed** switch for swapping archives, the same gap H1's first run had. So the box stayed a box after Swap, Users: look again, Through missing and Respawn, which says nothing about refreshing. The rest ran: the prop spawned (252 ms), respawns took about 200 ms, Entity list found 7 entities within 15 m in 347 ms, and Resources read 72 files from 7 entities in 23 s (app 0.1.1 kept the list), Remove worked. The steps above now name the switch.
+
+**Rerun the same night** (same setup, the app allowed to swap archives):
+
+| Step | Result |
+|---|---|
+| Spawn a prop | The box, 244 ms |
+| Swap to version 2 (the barrel) | 1 swapped in 77 ms (523 ms in all); RED Hot Tools took it. The spawned box **stayed a box** |
+| Who uses it, Users: look again, Users: through missing | **Not run**: each answered "list what is near V first". They look for users among the entities near V, and the steps never said to press Entity list first |
+| Respawn spawned | Removed and spawned again in 191 ms: **now a barrel** |
+| Swap back to version 1 | 71 ms. Look again not run (same reason), still a barrel. Respawn spawned (179 ms): **a box again** |
+| Faults | None; the game quit cleanly |
+
+What it decides so far:
+
+- A swapped mesh shows on a spawned prop only when it is spawned again: the existing entity keeps the mesh it loaded. Removing and spawning with the same spec shows the new file both ways, in about 200 ms, so H2c-b can refresh REDnode's own spawns this way.
+- Whether the appearance again (`ScheduleAppearanceChange`) shows it without a respawn is still open. That is the only way for the game's own entities, which REDnode cannot respawn.
+
+World objects test 0.1.2 lists what is near V by itself when Who uses it or a refresh button needs it (and again when this app's spawns respawned since), and reads each entity's files only once.

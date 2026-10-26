@@ -31,7 +31,8 @@ let file = '';
 let busy = '';
 
 const spawned = []; // { id, kind: 'npc'|'box', spec: {...}, at, label }
-let near = []; // { ref, type, distance, name, look, hashes: Set<bigint> | null }
+let near = []; // { ref, id, type, distance, name, look, hashes: Set<bigint> | null }
+const hashesById = new Map(); // entity id -> the files it names, read once (about 1 s an NPC)
 let swappedHashes = null; // the file table of the last archive swapped
 
 const requires = ui.text('Checking requirements...', { tone: 'dim' });
@@ -194,7 +195,8 @@ async function describe(ref, from) {
   if (d > radius) return null;
   const name = await ref.GetDisplayName().catch(() => '');
   const look = await ref.GetCurrentAppearanceName().catch(() => '');
-  return { ref, type: ref.$type, distance: d, name, look, hashes: null };
+  const id = String((await ref.GetEntityID().catch(() => null))?.hash ?? '');
+  return { ref, id, type: ref.$type, distance: d, name, look, hashes: hashesById.get(id) ?? null };
 }
 
 async function inChunks(list, size, fn) {
@@ -213,16 +215,17 @@ function report(found, how, total, ms) {
   return `${how}: ${total} looked at, ${found.length} within ${radius} m, listed in ${ms} ms`;
 }
 
-const listByEntityList = () =>
-  step('Near V (entity list)', async () => {
-    const v = await player();
-    const from = await v.GetWorldPosition();
-    const started = performance.now();
-    const all = (await api.GameInstance.GetEntityList(game.instance)) ?? [];
-    const listed = performance.now() - started;
-    const found = (await inChunks(all, 128, (e) => describe(e, from).catch(() => null))).filter(Boolean);
-    return report(found, `GetEntityList (${listed.toFixed(0)} ms for the list)`, all.length, (performance.now() - started).toFixed(0));
-  });
+async function listNear() {
+  const v = await player();
+  const from = await v.GetWorldPosition();
+  const started = performance.now();
+  const all = (await api.GameInstance.GetEntityList(game.instance)) ?? [];
+  const listed = performance.now() - started;
+  const found = (await inChunks(all, 128, (e) => describe(e, from).catch(() => null))).filter(Boolean);
+  return report(found, `GetEntityList (${listed.toFixed(0)} ms for the list)`, all.length, (performance.now() - started).toFixed(0));
+}
+
+const listByEntityList = () => step('Near V (entity list)', listNear);
 
 const listByTargeting = () =>
   step('Near V (targeting)', async () => {
@@ -277,6 +280,7 @@ const listResources = () =>
     for (const e of near) {
       const { hashes, components } = await resourcesOf(e.ref).catch(() => ({ hashes: new Set(), components: 0 }));
       e.hashes = hashes;
+      if (e.id) hashesById.set(e.id, hashes);
       total += hashes.size;
       if (!hashes.size) none++;
       if (near.indexOf(e) < 15) say(`  ${e.type} ${e.name || ''}: ${components} components, ${hashes.size} files`);
@@ -330,9 +334,15 @@ const swap = () =>
 
 async function users() {
   if (!swappedHashes) throw new Error('swap an archive first');
-  if (!near.length) throw new Error('list what is near V first');
+  // No list yet, or this app's spawns respawned since: list what is near V now.
+  const ids = new Set(near.map((e) => e.id));
+  if (!near.length || spawned.some((s) => !ids.has(String(s.id.hash)))) say(`  ${await listNear()}`);
   if (near.some((e) => !e.hashes)) say('Resources near V: not read yet, reading them now');
-  for (const e of near) if (!e.hashes) e.hashes = (await resourcesOf(e.ref).catch(() => ({ hashes: new Set() }))).hashes;
+  for (const e of near) {
+    if (e.hashes) continue;
+    e.hashes = (await resourcesOf(e.ref).catch(() => ({ hashes: new Set() }))).hashes;
+    if (e.id) hashesById.set(e.id, e.hashes);
+  }
   return near.filter((e) => [...e.hashes].some((h) => swappedHashes.has(h)));
 }
 
@@ -376,7 +386,7 @@ const refreshUsers = (through) =>
 
 const refreshAllNear = () =>
   step('Refresh everything near V', async () => {
-    if (!near.length) throw new Error('list what is near V first');
+    if (!near.length) say(`  ${await listNear()}`);
     const notes = await appearanceAgain(near, false);
     return `${notes.length} entities`;
   });

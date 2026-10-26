@@ -1,7 +1,7 @@
 {
   "id": "world-objects-test",
   "name": "World objects test",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "Edgemodders",
   "description": "The spike of H2c: spawns an NPC by record or template and tries to hold it in place and make it friendly, lists the entities near V two ways with the files they name, swaps an archive and tries each way to show it on what is near V and on what this app spawned. Asks for the archives permission.",
   "main": "mod.mjs",
