@@ -152,7 +152,9 @@ async function writeScene() {
       { id: 'lamp', kind: 'light', transform: t(c), props: { type: 'point', color: [255, 200, 120], intensity: 800, radius: 8 } },
     ],
   };
-  const out = path.join(pkg.dir, 'world_objects_test.scene.json');
+  // In the data folder: a file written into pkg.dir would hot reload the app, which removes
+  // everything it spawned (0.2.0 did that).
+  const out = path.join(pkg.dataDir, 'world_objects_test.scene.json');
   fs.writeFileSync(out, JSON.stringify(scene, null, 2));
   return out;
 }
@@ -240,12 +242,20 @@ ui.window({
 });
 
 const checked = await kernel.requirements();
-const codeware = await world.available().catch(() => false);
-requires.set({
-  text: [
-    ...checked.map((r) => `${r.ok ? 'OK' : 'MISSING'}  ${r.name} ${r.wants}  ${r.found ?? r.note}`),
-    `${codeware ? 'OK' : 'NOT READY'}  world API (Codeware, a loaded save)`,
-  ].join('\n'),
-  tone: checked.every((r) => r.ok) ? 'normal' : 'danger',
-});
+let ready = null;
+// Checked again every 5 s, since the app may start before a save is loaded (0.2.0 checked once).
+async function checkWorld() {
+  const now = await world.available().catch(() => false);
+  if (now === ready) return;
+  ready = now;
+  requires.set({
+    text: [
+      ...checked.map((r) => `${r.ok ? 'OK' : 'MISSING'}  ${r.name} ${r.wants}  ${r.found ?? r.note}`),
+      `${ready ? 'OK' : 'NOT READY'}  world API (Codeware, a loaded save)`,
+    ].join('\n'),
+    tone: checked.every((r) => r.ok) ? 'normal' : 'danger',
+  });
+}
+await checkWorld();
+setInterval(checkWorld, 5000);
 say('World objects test ready');

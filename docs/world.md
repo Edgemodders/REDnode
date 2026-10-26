@@ -1341,3 +1341,22 @@ Game 2.5, REDnode 0.40.0 (built as 0.39.0), Codeware. RED Hot Tools is not neede
 9. In the Mod Manager, switch **World objects test** off. The first woman and box disappear. **Mark**.
 10. Optional, with Claude Code connected: say so, and Claude spawns a prop and lists what is near V through the MCP tools (you approve the spawn). **Mark**.
 11. Quit the game.
+
+### H2c-b test: first run (2026-10-26)
+
+Game 2.5, REDnode 0.40.1, World objects test 0.2.0, dev PC, Dogtown.
+
+| Step | Result |
+|---|---|
+| 1 | The world API line said NOT READY: the app checked once, at 09:57:10, before the save loaded (09:58:15). Switching the app off and on made it OK. A test app fault, not REDnode's |
+| 2 | Passed: the woman spawned by record (302 ms) |
+| 3 | Passed: the box spawned by mesh (188 ms) |
+| 4 | Passed, no stutter: `world.near` 9 within 15 m in 21 ms, with files in 19 ms (H2c-a's `api` loop took 11 to 26 s); files of the nearest in 33 ms |
+| 5 | Passed: only the spawned box uses the box mesh (17 ms) |
+| 6 | Passed: both spawns listed |
+| 7 | Failed through the test app: the scene's objects appeared, then went. The app wrote the scene file into its own folder, hot reload restarted it ("Changed: world-objects-test (world_objects_test.scene.json). Reloading."), and the restart removed all 5 of its spawns, as it should |
+| 8 | Failed for the same reason: the restarted app had no scene to unload, and the first woman and box were already gone |
+| 9 | Nothing left to remove |
+| 10 | Passed through the MCP server over HTTP (Claude Code's `/mcp` could not reconnect the plugin's server to load the new tools, so its own ask prompt was not shown; the player approved in chat): `world_near` 1,074 looked at in 1.2 ms, `world_spawn` put the box 3 m in front of V (seen with `game_image`), `world_spawned` listed it under `mcp` |
+
+World objects test 0.2.1 writes the scene into `pkg.dataDir` and checks the world API every 5 s. Steps 1, 7, 8 and 9 to run again with it.
