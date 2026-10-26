@@ -57,7 +57,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [SV2 Service descriptions](services.md#sv2-test) | In the game | SV2 | 2026-10-24 | 0.36.0 | **Pass**: the Mod Manager's Service section, Describe, a bad call refused by the host ([results](services.md#sv2-test-results)) |
 | [SV3 Mods' tools and the Tools Manager](services.md#sv3-test) | In the game | SV3 | 2026-10-24 | 0.36.0, REDagent 0.3.1 | **Pass** (second run for steps 3 and 5): the Tools Manager, reads without asking, Claude Code and REDagent asking before a change, the switch ([results](services.md#sv3-test-second-run-steps-3-and-5)) |
 | [Admin Tools pack](admin-tools.md#admin-tools-test) | In the game | Admin Tools | 2026-10-24 | 0.37.0 + pack 0.1.0 | **Pass** (2.31 backup folder): the managers as a pack, refused before their grants, End task and Restart, a tool switched, permissions withdrawn and allowed, pinned ([results](admin-tools.md#admin-tools-test-results)). Checked first in the mock game: 16 cases (refused before the grant, with the reason in the window; a package without the permission refused; each app's own grant; tasks, End task's refusal, tools and switches after it; the Mod Manager's warning; withdrawn, refused again) |
-| [Builder window scroll](#builder-window-scroll-0382) | In the game | O6a | | 0.38.2 (in 0.40.0) | Not run |
+| [Builder window scroll](#builder-window-scroll-0382) | In the game | O6a | 2026-10-26 | 0.38.2 (in 0.40.1), game 2.5 | **Pass**: the World objects test's window scrolls down to its log (Live log step not run, not installed) |
 | [MCP sign-in (#19)](mcp.md#mcp-sign-in-test-19) | In the game | MCP | 2026-10-26 | 0.40.0 and 0.40.1, game 2.5 | **Pass**: on 0.40.0 steps 1 to 7 passed and step 8 failed ("Unknown client": Revoke deleted the registration Claude Code reuses); 0.40.1's retest passed every step: deny, lapse, allow, sign-in after a revoke ([results](mcp.md#mcp-sign-in-retest-on-0401-2026-10-26-passed)) |
 | [H2c-b World objects](world.md#h2c-b-test) | In the game | H2c | 2026-10-26 | 0.40.1 + World objects test 0.2.0 and 0.2.1, game 2.5 | **Pass**: spawns, `world.near` (about 20 ms), the file match, the MCP world tools; the scene steps failed through test app 0.2.0 (it wrote its scene into its own folder and hot reload restarted it) and passed with 0.2.1 ([results](world.md#h2c-b-test-retest-with-world-objects-test-021-2026-10-26-passed)). The refresh after a swap is unverified until RED Hot Tools supports 2.5 |
 | [H2c-a World objects test](world.md#h2c-a-test) | In the game | H2c | 2026-10-25 | 0.38.1 + World objects test 0.1.0, game 2.5 | Partly run, passed: spawn, hold, entity list, Keep in saves, Resources (retest). The swap steps on 2.31 (2026-10-26): the match finds the user; respawn refreshes REDnode's spawns; a game entity refreshes through another appearance and back. **Done** |
@@ -612,7 +612,7 @@ Built 2026-10-26 after the H2c-a swap run, where the World objects test's log (a
 3. Scroll the window (wheel over the buttons) and the log (wheel over the log). Both move. **Mark**.
 4. Open the Live log mod sample, if installed: its log fills its window as before, with no window scrollbar. **Mark**.
 
-Not run yet.
+Run 2026-10-26 (game 2.5, REDnode 0.40.1), folded into the H2c-b test's step 1 with World objects test 0.2.0 and 0.2.1: **passed**. The window scrolls down to the log and the log shows its lines (the player's word; no timer mark). Step 4 was not run: the Live log mod is not installed.
 
 ### H2c-a World objects test: the 2.31 swap run
 
