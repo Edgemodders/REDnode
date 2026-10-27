@@ -1205,7 +1205,7 @@ Built on 2026-10-27. After `refreshWorn` resets V's items, `refreshPreview` in m
 
 ## H3 REDnode's own hot loader: plan
 
-Asked for by the owner on 2026-10-27: RED Hot Tools has no build for game 2.5 (upstream unchanged since 2026-10-20), so every swap feature (H1 to H2c) is untestable on 2.5. REDnode swaps archives itself, with the game's own functions, and no longer needs RED Hot Tools. This is the fallback agreed on 2026-10-17 ("try RED Hot Tools first and make our own if it gives trouble"). **Proposed, not yet agreed in detail.**
+Asked for by the owner on 2026-10-27: RED Hot Tools has no build for game 2.5 (upstream unchanged since 2026-10-20), so every swap feature (H1 to H2c) is untestable on 2.5. REDnode swaps archives itself, with the game's own functions, and no longer needs RED Hot Tools. This is the fallback agreed on 2026-10-17 ("try RED Hot Tools first and make our own if it gives trouble"). **Agreed with the owner on 2026-10-27**, with the name REDswap and the plugin shipped beside REDnode's; H3a is built ([H3a: built](#h3a-built-rednode-0410)).
 
 **What the static reading of the 2.5 exe found** (2026-10-27; `dumpbin` and Python helpers in the scratchpad, game code never committed):
 
@@ -1216,14 +1216,14 @@ Asked for by the owner on 2026-10-27: RED Hot Tools has no build for game 2.5 (u
 | The structures did not change | `Archive` is still 0x50 bytes (`DestructArchives` steps by 0x50 in both); RED4ext.SDK's 2.5 update (5246e65, by psiberx) changed only the mod group's scope number (4 to 6) |
 | Every other function a swap uses is in 2.5's address list | The async file handle cache, the resource loader and bank, `DestructArchive(s)`, `RequestResource` |
 
-**The approach:** port RED Hot Tools' archive swap (MIT, by psiberx; credited, with its license notice beside the code) into a small RED4ext plugin of its own, **REDnode Hot Load**, built from this repo (`native/hotload/`) beside REDnode's plugin and installed with it, as an adjacent file in the same build and player zip (`red4ext/plugins/REDnodeHotLoad/REDnodeHotLoad.dll`; the owner's choice, 2026-10-27). It registers a native class, `REDnodeHotLoad`, with static functions the game's scripts and REDnode's `api` can call, as RED Hot Tools' `RedHotTools.ReloadArchives()` was, so the host keeps calling it through `rtti.call` and other tools could call it too. Its swap:
+**The approach:** port RED Hot Tools' archive swap (MIT, by psiberx; credited, with its license notice beside the code) into a small RED4ext plugin of its own, **REDswap**, built from this repo (`native/redswap/`) beside REDnode's plugin and installed with it, as an adjacent file in the same build and player zip (`red4ext/plugins/REDswap/REDswap.dll`; the owner's choice, 2026-10-27). It registers global native functions, `REDswap_Version`, `REDswap_Check` and `REDswap_Swap`, that the game's scripts and REDnode's `api` can call, as RED Hot Tools' `RedHotTools.ReloadArchives()` was, so the host keeps calling it through `rtti.call` and other tools could call it too. Its swap:
 
 1. On the game thread, find the depot's mod groups (scope `Mod`).
-2. Close the system handles of the archives being replaced, move the new files into `archive/pc/mod` (same name: replace; new name: add), reopen the handles, and call the loader into a temporary group, then merge it into the mod group by exact path (our lookup fix, HP0).
+2. Close the system handles of the archives being replaced, copy the new files into `archive/pc/mod` (same name: replace; new name: add), reopen the handles, and call the loader into a temporary group, then merge it into the mod group by exact path (our lookup fix, HP0).
 3. Drop the loaded resource paths from the resource loader and bank, so the next request reads the new file.
-4. Move `.xl`, `.yaml` and `.yml` files too, and call `ArchiveXL.Reload` when ArchiveXL is there.
+4. Copy `.xl`, `.yaml` and `.yml` files too, and call `ArchiveXL.Reload` when ArchiveXL is there.
 
-The host's `archives.reload` then calls `REDnodeHotLoad` instead of RED Hot Tools: the same answer, the same checks (H1b's refusal list, the sound hold and index reload of H1d, the refresh of V, the preview and the world after it). The `archives` permission, the MCP tool and the apps do not change. RED Hot Tools stops being a requirement; when it is installed too, its folder watcher could swap the same file, so REDnode's swaps never touch `archive/pc/hot`.
+The host's `archives.reload` then calls `REDswap` instead of RED Hot Tools: the same answer, the same checks (H1b's refusal list, the sound hold and index reload of H1d, the refresh of V, the preview and the world after it). The `archives` permission, the MCP tool and the apps do not change. RED Hot Tools stops being a requirement; when it is installed too, its folder watcher could swap the same file, so REDnode's swaps never touch `archive/pc/hot`.
 
 **Not ported:** RED Hot Tools' ink widget library merge (it keeps live ink widget resources and fills them with the new data next frame). REDnode drops those too; an open ink screen using a swapped widget keeps the old one until it is built again (unverified).
 
@@ -1231,11 +1231,40 @@ The host's `archives.reload` then calls `REDnodeHotLoad` instead of RED Hot Tool
 
 | Phase | What | Test |
 |---|---|---|
-| H3a Loader | The REDnode Hot Load plugin (the swap, addresses by hash through RED4ext, a refusal when an address is missing, its own log in `red4ext/logs`), built and deployed with REDnode and added to the player zip; the host switched to it; a version raise (the plugin shares REDnode's version) | On 2.5: a plain archive swapped in a loaded save (new and replaced), then the test garment with V's refresh and the preview (PV-b), each with the fault watch |
+| H3a Loader | The REDswap plugin (the swap, addresses by hash through RED4ext, a refusal when an address is missing, its own log in `red4ext/logs`), built and deployed with REDnode and added to the player zip; the host switched to it; a version raise (the plugin shares REDnode's version) | On 2.5: a plain archive swapped in a loaded save (new and replaced), then the test garment with V's refresh and the preview (PV-b), each with the fault watch |
 | H3b The rest on 2.5 | The swap paths that waited for RED Hot Tools: H2c-b's world refresh (spawns and entities near V) and a sound pak swap (H1d) | On 2.5, steps from their earlier tests |
 | Later | REDcode #11 and Sound Tools' Hot swap through REDnode only; the docs and Nexus page without RED Hot Tools | |
 
 **Risks:** the swap runs inside the game's resource code with no RED Hot Tools to compare against on 2.5; a wrong guess crashes the game (the fault watch and the exit hooks of HP0 log where). 2.31 keeps RED Hot Tools: REDnode 0.40.x runs only on 2.5.
+
+### H3a: built (REDnode 0.41.0)
+
+Built on 2026-10-27, not yet run in the game.
+
+| Part | What |
+|---|---|
+| `native/redswap/` | `main.cpp` (the plugin: `REDswap_Version`, `REDswap_Check`, `REDswap_Swap(files)` with paths separated by a bar, answering JSON; a line at the first frame saying whether it can swap), `swap.cpp` (the port), `LICENSE-RedHotTools.txt` |
+| Checks before anything changes | Each game function is looked up through `RED4ext_ResolveAddress` itself, so a missing one refuses the swap instead of closing the game; the loader's first bytes must be 2.5's; the file cache must hold each replaced archive under its own path at its handle (the cache's layout check) |
+| Differences from RED Hot Tools | Files are copied, not moved, so the source stays; a replaced archive is found by its exact path; live ink widget resources are dropped, not refilled |
+| The host | `archives.reload` calls REDswap when it is loaded (`via: "redswap"`), RED Hot Tools otherwise; `"swapWith": "redhottools"` in the host's settings.json forces RED Hot Tools. No hot folder with REDswap |
+| Build and install | `native/CMakeLists.txt` builds `REDswap.dll` and stages it in `dist/red4ext/plugins/REDswap`; `tools/deploy-native.ps1` and the player zip install it beside REDnode, with RED Hot Tools' license and a line in THIRD-PARTY-NOTICES.txt |
+| Also | Refresh test 0.3.1 no longer requires RED Hot Tools; a function name that is one overload's full name picks it (Game event failed on `DelayEventNextFrame` in the preview spike) |
+
+Only the build is checked: both plugins compile with no warnings and the native tests pass. The loader's first bytes and the file cache's paths table were checked against the 2.5 exe by reading it; nothing ran in the game.
+
+### H3a test
+
+Game 2.5 with REDnode 0.41.0 from the test zip (`REDnode-0.41.0-H3-test.zip`: the player zip plus Refresh test 0.3.1). Needs Codeware and the test garment's two versions (V1 and V2 of `EDGEmatA.archive`, the same file list), V1 installed in `archive/pc/mod` and worn. RED Hot Tools is not needed; leave it out.
+
+0. Switch on the **Test timer** in the launcher and press **Start**. Press **Mark** after each step.
+1. At the main menu, before loading: nothing to do; REDswap writes whether it can swap to `red4ext/logs/redswap-*.log`. Load a save. In the launcher, switch on **Refresh test** and its **Allowed** switch for swapping archives. Put on the V1 trousers. **Mark**.
+2. Press **Scan** and wait for its line (about 9 s). **Mark**.
+3. Swap V2 (type V2's full path, **Swap**) with the inventory closed. Expected: no crash; the Mod log says the archive was reloaded and V's slots refreshed; V shows V2. **Mark**.
+4. Open the inventory (**I**). Expected: the preview shows V2 (the inventory builds it fresh or REDnode refreshed it). **Mark**.
+5. With the inventory open, swap V1 back. Expected: V and the preview both show V1 with no button pressed (PV-b). **Mark**.
+6. Close the inventory, swap V2 again, open the inventory. Expected: V2 on V and the preview. **Mark**.
+7. Swap an archive that is not installed yet (any small mod archive not in `archive/pc/mod`, by full path). Expected: added, no crash. **Mark**.
+8. Quit the game. Send `red4ext/logs/redswap-*.log`, `rednode-mods.log`, `rednode-overlay.log`, the newest `rednode-*.log` and `rednode-faults.log` if there is one.
 
 ## H2c World objects: plan
 

@@ -793,6 +793,14 @@ CBaseFunction* Pick(std::vector<CBaseFunction*>& aCandidates, size_t aArgs, cons
     }
     if (fit.size() == 1)
         return fit[0];
+    // A name that is one overload's full name picks it. The first overload's full name is
+    // often the short name itself (DelayEventNextFrame beside DelayEventNextFrame;inkGame...),
+    // so the error's advice to call one by its full name could not reach it.
+    for (auto* f : fit)
+    {
+        if (Str(f->fullName) == aName)
+            return f;
+    }
     if (aCandidates.empty())
     {
         aError = "no game function \"" + aName + "\"";

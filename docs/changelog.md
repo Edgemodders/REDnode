@@ -11,8 +11,13 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- REDswap, a plugin installed with REDnode (`red4ext/plugins/REDswap`), swaps archives into the running game on game 2.5, so `archives.reload` and the MCP tool `archives_reload` no longer need RED Hot Tools, which has no 2.5 build. Its swap is ported from RED Hot Tools (MIT, by psiberx). The answer says `via: "redswap"`. RED Hot Tools is still used when REDswap is not loaded.
+
 **Fixed**
 
+- A game function with overloads of the same name can be called by the plain name when that is one overload's full name (such as `DelaySystem.DelayEventNextFrame`); it was refused as ambiguous, though the error said to use the full name.
 - After an archive swap, the inventory's preview of V now shows the new version of what V wears too, with the inventory open or closed (it kept the old look until the item was put on again). The answer of `archives.reload` lists it in `preview`. Needs Codeware.
 
 ## 0.40.1 (2026-10-26)
