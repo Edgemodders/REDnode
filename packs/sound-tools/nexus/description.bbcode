@@ -4,16 +4,13 @@
 
 [center][size=3]REDnode Sound Tools is an app pack for sound modders: three windows over the game that show every sound Cyberpunk 2077 plays as it plays it, search all of its sound events, play any recording on the spot, and swap a sound mod into the running game without a restart.[/size][/center]
 
-[center][size=3]What changed in each version: [url=https://github.com/Edgemodders/REDnode/blob/main/packs/sound-tools/changelog.md]the pack's changelog[/url] · Guide: [url=https://edgemodders.github.io/REDnode/sound-tools.html]Sound Tools docs[/url][/size][/center]
-
 [line]
 
 [quote][size=4][b][color=#fcee0a]STATUS: PREVIEW[/color][/b][/size]
 Built in the open and tested in the game on game version 2.31; 0.1.1 is for game 2.5, where sound swaps and Sound Tracer are untested so far. It runs on [url=https://www.nexusmods.com/cyberpunk2077/mods/35419]REDnode[/url], which you need first.
-[b]Sound modders:[/b] this is for you. [b]Players:[/b] you do not need it to play sound mods.[/quote]
-[line]
+[b]Sound modders:[/b] this is for you. [b]Players:[/b] you do not need it to play sound mods.[/quote][line]
 
-[color=#19f3ff][i]Screenshot 1: the Sound Tracer over the game, both columns full, a named event playing[/i][/color]
+[img]https://staticdelivery.nexusmods.com/mods/3333/images/35537/35537-1792510038-529163682.png[/img]
 
 [size=5][b][color=#fcee0a]What is in the pack[/color][/b][/size]
 
@@ -25,20 +22,20 @@ Start a trace and play. [b]Played[/b] lists every sound event the game sends to 
 [*]Filter, pause, copy any name or id, Stop and Stop all.[/*]
 [*]A box that plays whatever you paste: an event name, an event id or a sound id.[/*]
 [*]Every row is also written to [i]red4ext/logs/rednode-sound-trace.log[/i], so nothing is lost when the list scrolls on.[/*]
-[/list]
-[color=#19f3ff][i]Screenshot 2: the Tracer's Played column with the filter set to "katana"[/i][/color]
+[/list][img]https://staticdelivery.nexusmods.com/mods/3333/images/35537/35537-1792523382-1774960424.png[/img]
+
 
 [size=4][b][color=#19f3ff]Sound Search[/color][/b][/size]
-Search the game's sound events, over 23,000 of them, by words of their name or tags, by event id or by sound id. Each result shows the event's recordings: play the event, or one recording on its own. Save what you find to the [b]Scratch[/b] tab to come back to later; it is kept between game sessions.
+Search the game's 20,569 sound events by name, event id or sound id. Each result shows the event's recordings: play the event, or one recording on its own. Save what you find to the [b]Scratch[/b] tab to come back to later; it is kept between game sessions.
 Names come from WolvenKit's list of the game's events (through REDbridge); events newer than that list show as ids. Recordings come from the game's own sound index, so a sound you swapped in shows up as soon as it is in the game.
 
-[color=#19f3ff][i]Screenshot 3: Sound Search with results for "footsteps" and a few saved to Scratch[/i][/color]
+[img]https://staticdelivery.nexusmods.com/mods/3333/images/35537/35537-1792510518-130940620.png[/img]
 
 [size=4][b][color=#19f3ff]Hot swap[/color][/b][/size]
 Swap an archive into the running game: type its name or path, press Swap, and the game loads it. That includes sound mods: REDnode pauses the game for a moment, holds its audio, loads the game's sound index again and lets it go, so your new sounds play without a restart.
 [b]One limit:[/b] a sound that played just before the swap can keep its old version until the game loads it again (for a weapon, equip it again).
 
-[color=#19f3ff][i]Screenshot 4: the Hot swap window after swapping a sound archive[/i][/color]
+[img width=474]https://staticdelivery.nexusmods.com/mods/3333/images/35537/35537-1792523268-1183143616.png[/img]
 
 [size=5][b][color=#fcee0a]A sound modding loop[/color][/b][/size]
 
@@ -47,22 +44,19 @@ Swap an archive into the running game: type its name or path, press Swap, and th
 [*]Search: open that event in Sound Search and play its recordings to find the one you want.[/*]
 [*]Make your version, for example with [url=https://github.com/Edgemodders/EDGEwave]EDGEwave[/url], and pack it as an archive.[/*]
 [*]Hot swap: swap the archive in and hear it in the game, without leaving it.[/*]
-[/list]
-[size=5][b][color=#fcee0a]Requirements[/color][/b][/size]
+[/list][size=5][b][color=#fcee0a]Requirements[/color][/b][/size]
 
 [list]
 [*][url=https://www.nexusmods.com/cyberpunk2077/mods/35419]REDnode[/url] 0.41.0 or later, with what it needs (RED4ext, redscript).[/*]
 [*]Nothing more for Hot swap: it swaps through [url=https://www.nexusmods.com/cyberpunk2077/mods/36172]REDswap[/url], which REDnode 0.41.0 installs. (Pack 0.1.0, for game 2.31, needs RED Hot Tools 1.3 or later.)[/*]
 [*]Optional: REDbridge, for event names. Without it, events show as ids. REDnode's Mod Manager has a [b]Get REDbridge[/b] button that installs it, with no admin rights.[/*]
 [*]Cyberpunk 2077 on PC, game version 2.5. For game 2.31, use pack 0.1.0 with REDnode 0.37.0. On a game version REDnode does not know, sound swaps are refused.[/*]
-[/list]
-[size=5][b][color=#fcee0a]Install[/color][/b][/size]
+[/list][size=5][b][color=#fcee0a]Install[/color][/b][/size]
 
 [list]
 [*][b]Vortex:[/b] Mod Manager Download, then enable and deploy.[/*]
 [*][b]By hand:[/b] extract the zip into the game folder, so the apps land in [i]red4ext/plugins/REDnode/apps/[/i].[/*]
-[/list]
-In the game, press [b]F10[/b] and open the [b]Mod Manager[/b] from the launcher (the [b]REDNODE[/b] tab at the lower left). Switch on the apps you want; they start switched off. Hot swap asks to change the game's archives: allow it there.
+[/list]In the game, press [b]F10[/b] and open the [b]Mod Manager[/b] from the launcher (the [b]REDNODE[/b] tab at the lower left). Switch on the apps you want; they start switched off. Hot swap asks to change the game's archives: allow it there.
 
 [b]Uninstall:[/b] remove it in your mod manager, or delete the three app folders ([i]sound-tracer[/i], [i]sound-search[/i], [i]hot-swap[/i]) from [i]red4ext/plugins/REDnode/apps/[/i]. REDnode itself stays.
 
@@ -93,13 +87,10 @@ Yes, and open source under the MIT license, in [url=https://github.com/Edgemodde
 [*]Source and issues: [url=https://github.com/Edgemodders/REDnode]github.com/Edgemodders/REDnode[/url][/*]
 [*]EDGEmodders: [url=https://edgemodders.ai/]edgemodders.ai[/url][/*]
 [*]Community Discord: [url=https://discord.gg/63qP3Erw43]discord.gg/63qP3Erw43[/url][/*]
-[/list]
-[size=5][b][color=#fcee0a]Credits[/color][/b][/size]
-
+[/list][size=5][b][color=#fcee0a]Credits[/color][/b][/size]
 [list]
 [*][b]RED Hot Tools[/b] by psiberx: REDswap's swap is ported from it, and pack 0.1.0's swaps ran through it.[/*]
 [*][b]WolvenKit[/b] and its team: the names of the game's sound events, and the libraries REDbridge runs.[/*]
 [*][b]opus-decoder[/b] by Ethan Halsall (MIT), with [b]libopus[/b] (BSD): how REDnode plays the game's recordings.[/*]
 [*]The Cyberpunk 2077 modding community, whose research into the game's sound this builds on.[/*]
-[/list]
-[size=2]REDnode Sound Tools is not affiliated with CD PROJEKT RED or Audiokinetic. Cyberpunk 2077 is a trademark of CD PROJEKT. Wwise is a trademark of Audiokinetic.[/size]
+[/list][size=2]REDnode Sound Tools is not affiliated with CD PROJEKT RED or Audiokinetic. Cyberpunk 2077 is a trademark of CD PROJEKT. Wwise is a trademark of Audiokinetic.[/size]

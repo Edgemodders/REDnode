@@ -1,6 +1,6 @@
 # REDnode Sound Tools on Nexus Mods
 
-The source of the Sound Tools pack's own Nexus Mods page, beside REDnode's (`nexus/` at the repo root). Not on Nexus yet (REDnode's page is [mod 35419](https://www.nexusmods.com/cyberpunk2077/mods/35419); the links to it are filled in). Everything the page needs has passed in game: SP4 on 2026-10-20, over the released REDnode 0.26.15, which carries the APIs the apps use (docs/sound.md, "SP4 test: results").
+The source of the Sound Tools pack's own Nexus Mods page, beside REDnode's (`nexus/` at the repo root). **Live at [mod 35537](https://www.nexusmods.com/cyberpunk2077/mods/35537)** (0.1.0, posted by hand). Since 2026-10-27 REDnode's Release zip workflow keeps it, through `nexus.json` here (see [Updating the page](#updating-the-page)). Everything the page needs has passed in game: SP4 on 2026-10-20, over the released REDnode 0.26.15, which carries the APIs the apps use (docs/sound.md, "SP4 test: results").
 
 | File | What it is |
 |---|---|
@@ -65,7 +65,10 @@ The fonts come from Google Fonts, so drawing needs the internet. The facts on th
 
 ## Updating the page
 
-1. Edit `description.bbcode` here, commit, push.
-2. Check it: `node tools/check-bbcode.mjs packs/sound-tools/nexus/description.bbcode`.
-3. Paste the whole file into the description field on Nexus and save.
-4. For a new version: the release gate first (every in-game test of what goes in has passed, docs/testing.md), then raise `version` in `pack.json` (and `rednode` with each app's `requires`, if the pack needs a newer REDnode), rename **Unreleased** in the pack's changelog to `## <version> (<date>)`, run `npm run release:pack`, upload the zip as the main file, paste that changelog section into the page's changelog for the version, and the next REDnode release carries the zip on GitHub: the Release zip workflow builds every pack (`npm run release:pack -- --all`), attaches each zip and adds a line to the notes from `pack.json` (`summary`, `guide`). It stops when the pack's changelog has changes under **Unreleased**, so release the pack's changelog before REDnode's. 0.1.0 was attached by hand to v0.26.15.
+The **Release zip** workflow releases the pack with REDnode, as it does REDswap's page: every app pack whose `nexus/` has a `nexus.json` gets the same.
+
+1. For a new version: the release gate first (every in-game test of what goes in has passed, docs/testing.md), then raise `version` in `pack.json` (and `rednode` with each app's `requires`, if the pack needs a newer REDnode), and rename **Unreleased** in the pack's changelog to `## <version> (<date>)`.
+2. Run the workflow with **Make a release** and **Update Nexus Mods**. It builds the zip (`npm run release:pack -- --all`), attaches it to REDnode's GitHub release, then on Nexus uploads it as the main file's new version (the old one archived), adds the changelog section, and pushes `description.bbcode` when it changed. A version already on Nexus gets no upload, only the description.
+3. Before building it checks the page: if the description was edited on Nexus since the last pull, it stops. Then `node tools/nexus/nexus.mjs pull packs/sound-tools/nexus`, check the diff, commit, and run it again. Images added on Nexus are part of the description, so pull after adding one.
+
+To change only the description: edit `description.bbcode`, commit, and the next release pushes it. `node tools/check-bbcode.mjs packs/sound-tools/nexus/description.bbcode` checks it; `node tools/nexus/nexus.mjs status packs/sound-tools/nexus` shows the page's state. 0.1.0 was attached by hand to v0.26.15 and posted by hand.

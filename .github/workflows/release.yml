@@ -27,6 +27,9 @@
 #                                               native/redswap/redswap.json has a version not on
 #                                               Nexus yet (else no upload), its changelog section,
 #                                               and its description when it changed.
+#                                               So does every app pack with a Nexus page
+#                                               (packs/<id>/nexus/nexus.json: Sound Tools, 35537),
+#                                               with the version in its pack.json.
 #
 # REDswap, the archive swap plugin, is in REDnode's zip and also gets its own zip
 # (tools/release/redswap-zip.mjs), attached to the GitHub release. It has its own version and
@@ -88,6 +91,14 @@ jobs:
           node tools/release/notes.mjs --nexus --out "$env:RUNNER_TEMP/nexus-notes.txt"
           $redswap = (Get-Content native/redswap/redswap.json -Raw | ConvertFrom-Json).version
           node tools/release/notes.mjs $redswap --nexus --changelog native/redswap/changelog.md --out "$env:RUNNER_TEMP/redswap-nexus-notes.txt"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          # Each app pack with a Nexus page (packs/<id>/nexus/nexus.json): its changelog section.
+          foreach ($page in Get-ChildItem packs/*/nexus/nexus.json) {
+            $id = $page.Directory.Parent.Name
+            $pack = Get-Content "packs/$id/pack.json" -Raw | ConvertFrom-Json
+            node tools/release/notes.mjs $pack.version --nexus --changelog "packs/$id/changelog.md" --out "$env:RUNNER_TEMP/$id-nexus-notes.txt"
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }
 
       - name: Nexus Mods can take this release
         if: inputs.release && inputs.nexus
@@ -99,6 +110,13 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $redswap = (Get-Content native/redswap/redswap.json -Raw | ConvertFrom-Json).version
           node tools/nexus/nexus.mjs check native/redswap/nexus --version $redswap
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          foreach ($page in Get-ChildItem packs/*/nexus/nexus.json) {
+            $id = $page.Directory.Parent.Name
+            $pack = Get-Content "packs/$id/pack.json" -Raw | ConvertFrom-Json
+            node tools/nexus/nexus.mjs check "packs/$id/nexus" --version $pack.version
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }
 
       - name: Install dependencies
         run: npm ci
@@ -153,3 +171,18 @@ jobs:
         run: |
           $redswap = (Get-Content native/redswap/redswap.json -Raw | ConvertFrom-Json).version
           node tools/nexus/nexus.mjs release native/redswap/nexus --version $redswap --zip "native/build/release/REDswap-$redswap.zip" --notes "$env:RUNNER_TEMP/redswap-nexus-notes.txt"
+
+      - name: Nexus Mods (app packs)
+        if: inputs.release && inputs.nexus
+        env:
+          NEXUS_KEY: ${{ secrets.NEXUS_KEY }}
+        run: |
+          # Each app pack with a Nexus page (packs/<id>/nexus/nexus.json). A pack whose version is
+          # already on Nexus gets no upload, only its description when that changed.
+          foreach ($page in Get-ChildItem packs/*/nexus/nexus.json) {
+            $id = $page.Directory.Parent.Name
+            $pack = Get-Content "packs/$id/pack.json" -Raw | ConvertFrom-Json
+            $zip = "native/build/release/$($pack.name -replace '\s+', '-')-$($pack.version).zip"
+            node tools/nexus/nexus.mjs release "packs/$id/nexus" --version $pack.version --zip $zip --notes "$env:RUNNER_TEMP/$id-nexus-notes.txt"
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }

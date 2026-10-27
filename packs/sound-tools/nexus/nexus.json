@@ -1,0 +1,18 @@
+{
+  "page": 35537,
+  "upload": {
+    "name": "REDnode Sound Tools",
+    "category": "main",
+    "primary": true,
+    "modManager": true,
+    "archivePrevious": true,
+    "description": "REDnode Sound Tools {version}: Sound Tracer, Sound Search and Hot swap. Needs REDnode 0.41.0 or later, on game 2.5."
+  },
+  "mod": "14315126033105",
+  "file": 8199690,
+  "pulled": {
+    "sha256": "8191017752006674ece63ae6a18839344e13a9fedac05c9878a64c6e933531c5",
+    "at": "2026-10-27T17:13:38.398Z",
+    "version": "0.1.0"
+  }
+}
