@@ -73,18 +73,26 @@ add_custom_command(
 )
 
 # REDswap: swaps archives into the running game (docs/world.md, "H3"). Its own RED4ext
-# plugin, shipped beside REDnode: red4ext/plugins/REDswap/REDswap.dll. It shares REDnode's
-# version. Its swap is ported from RED Hot Tools (MIT); the license is staged with it.
+# plugin, shipped beside REDnode: red4ext/plugins/REDswap/REDswap.dll. It has its own version,
+# in redswap/redswap.json, and its own Nexus page (redswap/nexus). Its swap is ported from
+# RED Hot Tools (MIT); the license is staged with it.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/redswap/redswap.json")
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/redswap/redswap.json" REDSWAP_JSON)
+string(JSON REDSWAP_VERSION GET "${REDSWAP_JSON}" version)
+string(REPLACE "." ";" REDSWAP_PARTS "${REDSWAP_VERSION}")
+list(GET REDSWAP_PARTS 0 REDSWAP_MAJOR)
+list(GET REDSWAP_PARTS 1 REDSWAP_MINOR)
+list(GET REDSWAP_PARTS 2 REDSWAP_PATCH)
 add_library(REDswap SHARED
   redswap/main.cpp
   redswap/swap.cpp
 )
 target_link_libraries(REDswap PRIVATE RED4ext::SDK)
 target_compile_definitions(REDswap PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX
-  REDSWAP_VERSION="${PROJECT_VERSION}"
-  REDSWAP_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
-  REDSWAP_VERSION_MINOR=${PROJECT_VERSION_MINOR}
-  REDSWAP_VERSION_PATCH=${PROJECT_VERSION_PATCH})
+  REDSWAP_VERSION="${REDSWAP_VERSION}"
+  REDSWAP_VERSION_MAJOR=${REDSWAP_MAJOR}
+  REDSWAP_VERSION_MINOR=${REDSWAP_MINOR}
+  REDSWAP_VERSION_PATCH=${REDSWAP_PATCH})
 target_compile_options(REDswap PRIVATE /W4 /utf-8 /MP)
 
 set(REDSWAP_STAGE_DIR "${CMAKE_BINARY_DIR}/dist/red4ext/plugins/REDswap")

@@ -22,6 +22,15 @@
 #                                               upload fails after the GitHub release, run
 #                                               tools/nexus/nexus.mjs release on the dev PC with the
 #                                               release's zip: it skips what is already done.
+#                                               REDswap's own page (native/redswap/nexus, mod 36172)
+#                                               gets the same: its zip as a new version when
+#                                               native/redswap/redswap.json has a version not on
+#                                               Nexus yet (else no upload), its changelog section,
+#                                               and its description when it changed.
+#
+# REDswap, the archive swap plugin, is in REDnode's zip and also gets its own zip
+# (tools/release/redswap-zip.mjs), attached to the GitHub release. It has its own version and
+# changelog (native/redswap/); changes under Unreleased there stop the run, as for a pack.
 #
 # Release gate: make a release only after every in-game test of the builds since the last
 # release has passed (docs/testing.md). Untested or failed means no release.
@@ -77,6 +86,8 @@ jobs:
         run: |
           node tools/release/notes.mjs --out "$env:RUNNER_TEMP/notes.md"
           node tools/release/notes.mjs --nexus --out "$env:RUNNER_TEMP/nexus-notes.txt"
+          $redswap = (Get-Content native/redswap/redswap.json -Raw | ConvertFrom-Json).version
+          node tools/release/notes.mjs $redswap --nexus --changelog native/redswap/changelog.md --out "$env:RUNNER_TEMP/redswap-nexus-notes.txt"
 
       - name: Nexus Mods can take this release
         if: inputs.release && inputs.nexus
@@ -85,6 +96,9 @@ jobs:
         run: |
           $version = (Get-Content VERSION -Raw).Trim()
           node tools/nexus/nexus.mjs check --version $version
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $redswap = (Get-Content native/redswap/redswap.json -Raw | ConvertFrom-Json).version
+          node tools/nexus/nexus.mjs check native/redswap/nexus --version $redswap
 
       - name: Install dependencies
         run: npm ci
@@ -103,10 +117,15 @@ jobs:
       - name: Build the app packs' zips
         run: npm run release:pack -- --all
 
+      - name: Build REDswap's own zip
+        run: npm run release:redswap
+
       - uses: actions/upload-artifact@v4
         with:
           name: REDnode-zip
-          path: native/build/release/REDnode-*.zip
+          path: |
+            native/build/release/REDnode-*.zip
+            native/build/release/REDswap-*.zip
           if-no-files-found: error
 
       - name: GitHub release
@@ -126,3 +145,11 @@ jobs:
         run: |
           $version = (Get-Content VERSION -Raw).Trim()
           node tools/nexus/nexus.mjs release --version $version --zip "native/build/release/REDnode-$version.zip" --notes "$env:RUNNER_TEMP/nexus-notes.txt"
+
+      - name: Nexus Mods (REDswap)
+        if: inputs.release && inputs.nexus
+        env:
+          NEXUS_KEY: ${{ secrets.NEXUS_KEY }}
+        run: |
+          $redswap = (Get-Content native/redswap/redswap.json -Raw | ConvertFrom-Json).version
+          node tools/nexus/nexus.mjs release native/redswap/nexus --version $redswap --zip "native/build/release/REDswap-$redswap.zip" --notes "$env:RUNNER_TEMP/redswap-nexus-notes.txt"

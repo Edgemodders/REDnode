@@ -1,0 +1,6 @@
+{
+  "name": "REDswap",
+  "version": "1.0.0",
+  "summary": "A RED4ext plugin that swaps archives into the running game (game 2.5), so a new mesh, material or texture shows without a restart. REDnode installs it and uses it for archives.reload; other tools can call it too.",
+  "guide": "https://edgemodders.github.io/REDnode/overlay-apps.html#swapping-archives-in-the-running-game"
+}

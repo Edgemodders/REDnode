@@ -21,6 +21,7 @@
     "nexus:pull": "node tools/nexus/nexus.mjs pull",
     "nexus:status": "node tools/nexus/nexus.mjs status",
     "release:pack": "node tools/release/pack-zip.mjs",
+    "release:redswap": "node tools/release/redswap-zip.mjs",
     "release": "gh workflow run release.yml --ref main -f release=true"
   },
   "devDependencies": {
