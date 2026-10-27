@@ -11,6 +11,19 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- `api.$null` passes no object on purpose, for an object parameter the game does not mark optional (MCP: `{"$null": true}`).
+
+**Changed**
+
+- A plain `null` for an object parameter the game does not mark optional is refused with an error naming the parameter, instead of being passed as an empty object: many game functions use such a parameter without checking it, and `GetItemName` with a null item data crashed the game (https://github.com/Edgemodders/REDnode/issues/18). The game API's types no longer allow `null` there.
+
+**Fixed**
+
+- A static function's full name now works with `class` (`api.$static("UIItemsHelper", "GetItemName;TweakDBIDgameItemData", ...)`, or the MCP tools' `class` and `fn`), with or without the class in front.
+- The MCP tool `api_read` accepts a full name that starts with its class, such as `gameUIItemsHelper::GetItemName;TweakDBIDgameItemData`.
+
 ## 0.41.0 (2026-10-27)
 
 **New**

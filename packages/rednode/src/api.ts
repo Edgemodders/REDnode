@@ -199,6 +199,19 @@ export interface ApiExtras {
    * ```
    */
   readonly $out: never;
+  /**
+   * Put in place of an object argument to pass none on purpose. A plain `null` is
+   * refused for an object parameter the game does not mark optional, since many
+   * game functions use one without checking it and an empty one can crash the game.
+   * Pass real data where you can: the game's own scripts usually do.
+   *
+   * @example
+   * ```ts
+   * // The game's scripts pass the item's data here; this passes none.
+   * const name = await api.$static("UIItemsHelper", "GetItemName;TweakDBIDgameItemData", "Items.Vest_24_rich_01", api.$null);
+   * ```
+   */
+  readonly $null: never;
 }
 
 /**
@@ -215,7 +228,7 @@ export interface ApiExtras {
  * | TweakDBID | `"0x..."`; a record path such as `"Items.money"` also works as an argument |
  * | enums | the member's name, such as `"Health"` |
  * | structs | plain objects; as arguments, missing properties keep their default, and `null` is the default value |
- * | objects (handles) | {@link GameRef} proxies, or `null` |
+ * | objects (handles) | {@link GameRef} proxies; `null` only where the game marks the parameter optional, otherwise {@link ApiExtras.$null | api.$null} |
  * | arrays | arrays |
  * | resource references (`rRef`, `raRef`, `ResRef`) | a depot path such as `"base\...\crate_a.mesh"`, or its hash as a string; read back as the hash |
  *
@@ -238,6 +251,7 @@ export const api: GameApi & ApiExtras = new Proxy({} as GameApi & ApiExtras, {
   get(_t, k) {
     if (typeof k !== "string" || k === "then") return undefined;
     if (k === "$out") return { $out: true };
+    if (k === "$null") return { $null: true };
     if (k === "$call") return (fn: string, ...args: unknown[]) => invoke("rtti.call", { fn, args });
     if (k === "$new") {
       return (cls: string, props?: Record<string, unknown>) => invoke("rtti.new", { class: cls, props: props ?? null });

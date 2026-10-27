@@ -1,14 +1,14 @@
 {
   "id": "world-objects-test",
   "name": "World objects test",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "author": "Edgemodders",
   "description": "H2c-b's test: spawns a person (standing still, friendly) and a prop by mesh, lists what is near V with the files each uses, loads an EDGEbuilder scene written around V and unloads it, and swaps an archive to show what its refresh did to the world. Switching it off removes what it spawned. Asks for the archives permission.",
   "main": "mod.mjs",
   "open": false,
   "permissions": ["archives"],
   "requires": {
-    "rednode": ">=0.39.0",
+    "rednode": ">=0.41.0",
     "codeware": ">=1.14"
   }
 }

@@ -705,6 +705,8 @@ await shop.GiveItem(player, await api.MarketSystem.Money(), 100);   // a change:
 | `api.GameInstance.GetStatsSystem(...)` | A static function, under its class's script name |
 | `player.GetEntityID()` | A method of a game object |
 | `api.$call('Cast;EntityID;StatsObjectID', ...)` | A global function by its full name: operators, and overloads that share a name |
+| `api.$static('UIItemsHelper', 'GetItemName;TweakDBIDgameItemData', ...)` | A static function by its full name, with or without the class in front |
+| `api.$null` | No object, on purpose, for an object parameter the game does not mark optional (see Game objects below) |
 | `obj.$get('propertyName')` | A property of a game object |
 | `obj.$set('propertyName', value)` | Writes a property, with the same type checks as arguments |
 | `api.$new('entMeshComponent', { ... })` | Builds a game object by class name, with properties set first. Nothing in the game holds it yet, so its reference keeps it alive until released (or a save loads). A struct comes back as its value |
@@ -719,7 +721,7 @@ await shop.GiveItem(player, await api.MarketSystem.Money(), 100);   // a change:
 | Variant | `{ "$type": "Float", "value": 1.5 }`: a value with its type's name, such as `Int32`, `CName` or `array:CName` |
 | Enums | The member's name, such as `"Health"` |
 | Structs, such as Vector4 or ItemID | Plain objects. As arguments, missing properties keep their default, and `null` is the default value |
-| Game objects | References: call their methods with `await`. `null` when there is none |
+| Game objects | References: call their methods with `await`. `null` when there is none. As an argument, `null` works only where the game marks the parameter optional: many functions use an object without checking it, and an empty one can crash the game, so REDnode refuses it. Pass real data, as the game's scripts do, or `api.$null` to pass none on purpose (from REDnode 0.41.1) |
 | Arrays | Arrays |
 | Resource references (`rRef`, `raRef`, `ResRef`) | A depot path such as `"base\\environment\\ld_kit\\marker.mesh"`, or its hash as a string. Read back as the hash: turning a hash into a path needs an asset index, such as REDbridge's |
 

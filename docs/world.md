@@ -1285,6 +1285,32 @@ The loader answered 0 in every swap, as the game's own callers expect when nothi
 
 **What it decides:** REDswap replaces RED Hot Tools on game 2.5. Its own page: [REDswap](redswap.md). PV-b (the inventory preview) is verified on 2.5 with a real swap, open and closed. Next: H3b, the world refresh (a spawn and a game entity using a swapped file, H2c-b's steps) and a sound pak swap (H1d), on 2.5.
 
+### H3b test
+
+Game 2.5 on the dev PC with REDnode 0.41.1 and REDswap 1.0.0 (deployed by `deploy-native.ps1`), Codeware, World objects test 0.2.2 and Sound Tools' Hot swap. No RED Hot Tools. The same run checks 0.41.1's fix for [#18](https://github.com/Edgemodders/REDnode/issues/18) (step 9).
+
+Files:
+
+| File | What |
+|---|---|
+| `E:\Modding\Cyberpunk 2077\Projects\H2c_swap\v2\zzz_rednode_box.archive` | The cardboard box's mesh path holding a barrel drum (H2c-a's, made from 2.31's files; unverified on 2.5) |
+| `...\H2c_swap\v1\zzz_rednode_box.archive` | The box unchanged |
+| A sound override made in EDGEwave from the **2.5** game, such as the katana's draw sound | Not the laptop's `EDGEwaveTest.archive`: it holds 2.31's sound index, and 2.5's sound archive changed (8.83 GB to 8.90 GB). Make it in EDGEwave, don't install it, and keep its path |
+
+Before the game starts: no `zzz_rednode_box.archive` in `archive\pc\mod`, and no `soundPakSwap`, `swapPause` or `swapWith` in `%APPDATA%\@rednode\overlay\settings.json`.
+
+0. Switch on the **Test timer** in the launcher and press **Start**. Press **Mark** after each step.
+1. Load a save in a quiet open spot outdoors. In the launcher, switch on **World objects test** and its **Allowed** switch for swapping archives, and open the **Mod log**. Its top lines say OK for REDnode, Codeware and the world API. **Mark**.
+2. Press **Spawn a prop**: a cardboard box appears 2 m ahead. **Mark**.
+3. In **4. Swap**, paste v2's full path and press **Swap**. Expected: "1 swapped", the Mod log says 1 world entity refreshed (spawned again), and **the box is now a barrel**, with no button pressed. **Mark**.
+4. Swap v1's full path (the same name, so a replace). Expected: **a box again**. **Mark**.
+5. Press **Near V**, then **With files**. Note whether any game entity near V uses the box mesh (most spots have none; the swap refreshes only those that do). **Mark**.
+6. Optional, if you know a spot with cardboard boxes placed by the game: go there, swap v2, and say whether the game's boxes became barrels, then swap v1. **Mark**.
+7. In the launcher, switch on **Hot swap** (Sound Tools) and its **Allowed** switch for swapping archives. Put the katana in V's inventory, not equipped. Swap the EDGEwave override by its full path. Expected: the game pauses for a moment; the Mod log says "sound index reloaded ... the old index freed". **Mark**.
+8. Equip and draw the katana: EDGEwave's sound expected. Then play for a minute (other weapons, the map, a menu) and note any sound missing or wrong. **Mark**.
+9. Tell Claude you are at step 9. Claude checks #18 through the MCP tools: a `null` for an object parameter is refused without touching the game, a full overload name works with `class` and with `api_read`, and V's health is set to what it is with no instigator (`{"$null": true}`). Approve the one `api_call` it asks for. **Mark**.
+10. Switch **World objects test** off (its spawns go), then quit the game. Remove `zzz_rednode_box.archive` and the sound override from `archive\pc\mod`.
+
 ## H2c World objects: plan
 
 Proposed and **agreed with the owner on 2026-10-23**, with the three recommendations below. H2c finishes H2 for things in the world. The owner's aim (2026-10-22): scenes built and stored in EDGEbuilder, with NPCs, props and the rest, load into the game from EDGEbuilder, and a swapped archive shows on them as it does on what V wears. EDGEquest needs the same pieces for quest NPCs and places (EDGEbuilder's [#3](https://github.com/Edgemodders/EDGEbuilder/issues/3)).

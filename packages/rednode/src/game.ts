@@ -327,7 +327,7 @@ export const game: Game = {
     },
     async setHealth(value: number) {
       const pools = await api.GameInstance.GetStatPoolsSystem(instance);
-      await pools!.RequestSettingStatPoolValue(await playerStatsId(), "Health", value, null, false);
+      await pools!.RequestSettingStatPoolValue(await playerStatsId(), "Health", value, api.$null, false); // no instigator, as the game's scripts do
     },
     async teleport(to) {
       const facility = (await api.GameInstance.GetTeleportationFacility(instance)) as unknown as Record<

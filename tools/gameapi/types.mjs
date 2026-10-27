@@ -105,7 +105,9 @@ function signature(f) {
   let optional = false;
   const params = f.params.map((p, i) => {
     optional ||= p.flags.includes('optional') || p.flags.includes('out');
-    const t = p.type.startsWith('script_ref:') ? 'unknown' : tsType(p.type, true);
+    let t = p.type.startsWith('script_ref:') ? 'unknown' : tsType(p.type, true);
+    // The plugin refuses null for an object parameter the game does not mark optional (#18).
+    if (/^w?handle:/.test(p.type) && !p.flags.includes('optional')) t = t.replace(/ \| null$/, '');
     return `${paramName(p.name, i)}${optional ? '?' : ''}: ${t}`;
   });
   let ret = f.returns ? tsType(f.returns) : 'void';

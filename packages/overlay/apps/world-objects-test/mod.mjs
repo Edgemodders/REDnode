@@ -8,7 +8,7 @@
 //               in one call; only those that use a given file
 //   3 Scene     writes an EDGEbuilder scene around V into this app's folder, loads it with
 //               world.load, unloads it
-//   4 Swap      archives.reload, and what its refresh did to the world (needs RED Hot Tools)
+//   4 Swap      archives.reload, and what its refresh did to the world (through REDswap on 2.5)
 //
 // Switching the app off removes everything it spawned (the host does it).
 
@@ -227,7 +227,7 @@ ui.window({
       ui.button('Load a scene here', loadScene),
       ui.button('Unload the scene', unloadScene, { variant: 'ghost' }),
     ),
-    ui.heading('4. Swap (RED Hot Tools)'),
+    ui.heading('4. Swap'),
     ui.input({
       placeholder: 'MyMod.archive in archive/pc/mod, or a full path (Enter swaps)',
       onChange: (v) => (file = v),

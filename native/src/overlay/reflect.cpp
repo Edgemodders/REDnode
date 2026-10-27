@@ -754,9 +754,18 @@ struct Slot
 
 // ---------- finding a function ----------
 
+// A full name without its "Class::": static functions of script classes are registered as
+// globals named "Class::Name;Args", and with class given the caller names them without it.
+std::string Local(const std::string& aFull)
+{
+    const size_t at = aFull.rfind("::", aFull.find(';'));
+    return at == std::string::npos ? aFull : aFull.substr(at + 2);
+}
+
 bool Matches(const CBaseFunction* aFn, const std::string& aName)
 {
-    return Str(aFn->shortName) == aName || Str(aFn->fullName) == aName;
+    const std::string full = Str(aFn->fullName);
+    return Str(aFn->shortName) == aName || full == aName || Local(full) == aName;
 }
 
 uint32_t Required(const CBaseFunction* aFn)
@@ -798,7 +807,7 @@ CBaseFunction* Pick(std::vector<CBaseFunction*>& aCandidates, size_t aArgs, cons
     // so the error's advice to call one by its full name could not reach it.
     for (auto* f : fit)
     {
-        if (Str(f->fullName) == aName)
+        if (Str(f->fullName) == aName || Local(Str(f->fullName)) == aName)
             return f;
     }
     if (aCandidates.empty())
@@ -877,7 +886,7 @@ CBaseFunction* Resolve(const Value& aParams, Handle<IScriptable>& aSelf, size_t 
                 [&](const CName&, CGlobalFunction*& aFunc)
                 {
                     const std::string full = Str(aFunc->fullName);
-                    if ((full.starts_with(native) || full.starts_with(script)) && Str(aFunc->shortName) == name)
+                    if ((full.starts_with(native) || full.starts_with(script)) && Matches(aFunc, name))
                         candidates.push_back(aFunc);
                 });
         }
@@ -957,12 +966,28 @@ bool Run(CBaseFunction* fn, Handle<IScriptable>& self, const Value& aArgs, std::
     {
         const CProperty* p = fn->params[k];
         auto slot = std::make_unique<Slot>(p->type);
-        const Value* outFlag = k < args->items.size() ? args->items[k].Get("$out") : nullptr;
+        const Value* arg = k < args->items.size() ? &args->items[k] : nullptr;
+        const Value* outFlag = arg ? arg->Get("$out") : nullptr;
+        const Value* nullFlag = arg ? arg->Get("$null") : nullptr;
+        const Kind kind = p->type->GetType();
         if (outFlag && outFlag->kind == Value::Kind::Bool && outFlag->boolean)
         {
             wanted[k] = true;
         }
-        else if (k < args->items.size() && !args->items[k].IsNull())
+        else if (nullFlag && nullFlag->kind == Value::Kind::Bool && nullFlag->boolean)
+        {
+            // {"$null": true}: an empty value, on purpose
+        }
+        else if (arg && arg->IsNull() && (kind == Kind::Handle || kind == Kind::WeakHandle) && !p->flags.isOptional)
+        {
+            // Many game functions use an object parameter without checking it, and an empty
+            // one crashed the game (#18). Only parameters the game marks optional take null.
+            aError = "argument " + std::to_string(k + 1) + " (" + Str(p->name) + ", " + TypeName(p->type) +
+                     ") is an object the game may use without checking, so null can crash the game: pass a "
+                     "reference, or {\"$null\": true} to pass none on purpose";
+            return false;
+        }
+        else if (arg && !arg->IsNull())
         {
             if (!FromJson(p->type, slot->mem, args->items[k], aError, 0))
             {

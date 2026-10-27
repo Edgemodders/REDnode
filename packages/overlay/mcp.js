@@ -57,7 +57,7 @@ const RECORD_TYPE = /^gamedata\w*_Record$/;
 
 /** Whether api_read may run fn; selfType is the $type of self when known. */
 function isRead(fn, selfType) {
-  const name = String(fn).split(';')[0];
+  const name = String(fn).split(';')[0].replace(/^.*::/, ''); // a full name starts with its class
   if (selfType && RECORD_TYPE.test(selfType)) return true;
   const m = READ_START.exec(name);
   return !!m && !CHANGE_WORDS.test(name.slice(m[0].length));
@@ -154,7 +154,7 @@ function createMcp(host) {
     fn: z.string().describe('The function name, or its full name for overloads, such as "Cast;EntityID;StatsObjectID"'),
     class: z.string().optional().describe('For a static function: the class, such as "GameInstance"'),
     self: z.number().int().optional().describe('For a method: the object reference number ($ref)'),
-    args: z.array(z.unknown()).optional().describe('The arguments. The game instance is {}; 64-bit numbers are strings; enums are member names'),
+    args: z.array(z.unknown()).optional().describe('The arguments. The game instance is {}; 64-bit numbers are strings; enums are member names. null for an object is refused unless the parameter is optional (the game may use it unchecked and crash): pass real data, or {"$null": true} for none on purpose'),
   };
 
   // who: the assistant making this request, { name, kind }, from its token (SV3). With
