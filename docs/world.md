@@ -1254,7 +1254,7 @@ Only the build is checked: both plugins compile with no warnings and the native 
 
 ### H3a test
 
-Game 2.5 with REDnode 0.41.0 from the test zip (`REDnode-0.41.0-H3-test.zip`: the player zip plus Refresh test 0.3.1). Needs Codeware and the test garment's two versions (V1 and V2 of `EDGEmatA.archive`, the same file list), V1 installed in `archive/pc/mod` and worn. RED Hot Tools is not needed; leave it out.
+Game 2.5 with REDnode 0.41.0: the update zip `REDnode-0.41.0-H3-update.zip` (REDnode.dll, the host's app.asar, sdk and runtime, `red4ext/plugins/REDswap`, Refresh test 0.3.1) extracted over REDnode 0.40.1. Needs Codeware and the test garment's two versions (V1 and V2 of `EDGEmatA.archive`, the same file list), V1 installed in `archive/pc/mod` and worn. RED Hot Tools is not needed; leave it out.
 
 0. Switch on the **Test timer** in the launcher and press **Start**. Press **Mark** after each step.
 1. At the main menu, before loading: nothing to do; REDswap writes whether it can swap to `red4ext/logs/redswap-*.log`. Load a save. In the launcher, switch on **Refresh test** and its **Allowed** switch for swapping archives. Put on the V1 trousers. **Mark**.
