@@ -2,9 +2,9 @@
  * Archives: swapping a changed `.archive` into the running game, so a new mesh,
  * material or texture shows without restarting it (hot-loading).
  *
- * [RED Hot Tools](https://github.com/psiberx/cp2077-red-hot-tools) does the swap,
- * so the player needs it installed; list it in your manifest with
- * `"requires": { "redhottools": ">=1.3" }` so the Mod Manager shows the need. Swapping
+ * REDswap, a plugin installed with REDnode (REDnode 0.41.0 or later), does the swap with
+ * the game's own archive loader; before it, [RED Hot Tools](https://github.com/psiberx/cp2077-red-hot-tools)
+ * did, and REDnode still uses it when REDswap is not loaded. Swapping
  * replaces files in the game's mod folder, so the package must also ask for the
  * `archives` permission (`"permissions": ["archives"]` in `rednode-app.json`), and the
  * player allows it in the launcher.
@@ -166,7 +166,7 @@ export const archives = {
    * Other things already in the world keep the old version until they load it again.
    *
    * Throws when the package lacks the `archives` permission, at the main menu, when
-   * RED Hot Tools is not loaded, or when a file is missing; also for a sound archive on a
+   * neither REDswap nor RED Hot Tools is loaded, or when a file is missing; also for a sound archive on a
    * game version whose sound tables REDnode does not know (install it and restart
    * instead). A file that could not be swapped is in `failed`, not thrown.
    *

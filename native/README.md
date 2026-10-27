@@ -30,11 +30,16 @@ Installed layout:
 red4ext/plugins/REDnode/
   REDnode.dll
   Scripts/REDnode.reds
+red4ext/plugins/REDswap/
+  REDswap.dll
+  LICENSE-RedHotTools.txt
 ```
+
+REDswap (`native/redswap/`, since 0.41.0) is a second plugin that swaps archives into the running game; REDnode's host calls it for `archives.reload` (docs/world.md, "H3").
 
 ## Expected log after loading a save
 
-`red4ext/logs/red4ext-*.log` should list `REDnode (version: 0.40.2, author(s): Edgemodders) has been loaded`. The plugin's own lines go to its log in `red4ext/plugins/REDnode/` or the RED4ext log:
+`red4ext/logs/red4ext-*.log` should list `REDnode (version: 0.41.0, author(s): Edgemodders) has been loaded`. The plugin's own lines go to its log in `red4ext/plugins/REDnode/` or the RED4ext log:
 
 ```
 REDnode <version> loading
@@ -45,6 +50,8 @@ Pump heartbeat: 3600 frames
 ```
 
 When a package plays its first sound (or an app plays a test tone), the plugin adds `Audio: output started on "<device>", <rate> Hz, <n> channels, mixed in stereo to the front pair (miniaudio 0.11.25)`, and the overlay log has `Sound: the game's volumes are master <n>, effects <n>, dialogue <n>, music <n> (<why>)`. Since 0.24.2 that line also comes 5 seconds after each save load, `(a save loaded)`.
+
+REDswap's log, `red4ext/logs/redswap-*.log`, has `REDswap <version> loading` and, at the first frame, `Ready: the game's archive loader and file cache were found` (or `Cannot swap in this game: <why>`). Each swap adds `Swap of <n> file(s) asked for`, `Loaded <n> archive(s) holding <n> resource(s)`, a line per file and `Swap done in <n> ms`.
 
 `= 42` confirms the synchronous call returned its value to the script. The frame number confirms the event was handled on the game thread.
 

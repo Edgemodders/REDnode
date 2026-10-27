@@ -12,6 +12,7 @@
 //   red4ext/plugins/REDnode/host/                 the overlay host, with its own Electron
 //   red4ext/plugins/REDnode/apps/<id>/            the samples listed in SAMPLES, all off at first
 //   red4ext/plugins/REDnode/LICENSE.txt, THIRD-PARTY-NOTICES.txt, README.txt
+//   red4ext/plugins/REDswap/REDswap.dll           the archive swap plugin (H3), with RED Hot Tools' license
 //
 // REDbridge is not in it: REDnode runs without it, and packages that use kernel.bridge()
 // get it with the Mod Manager's Get REDbridge, or find the copy EDGEdeck or REDcode
@@ -24,10 +25,12 @@ import { fileURLToPath } from 'node:url';
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const version = readFileSync(join(repo, 'VERSION'), 'utf8').trim();
 const plugin = join(repo, 'native', 'build', 'dist', 'red4ext', 'plugins', 'REDnode');
+const redswap = join(repo, 'native', 'build', 'dist', 'red4ext', 'plugins', 'REDswap');
 const deps = join(repo, 'native', 'build', '_deps');
 const out = join(repo, 'native', 'build', 'release');
 const stage = join(out, 'stage');
 const target = join(stage, 'red4ext', 'plugins', 'REDnode');
+const swapTarget = join(stage, 'red4ext', 'plugins', 'REDswap');
 const zip = join(out, `REDnode-${version}.zip`);
 
 // The samples players get. Each starts off; the player switches it on in the launcher.
@@ -40,12 +43,15 @@ for (const need of ['REDnode.dll', 'Scripts', join('host', 'REDnode-overlay.exe'
   }
 }
 
+if (!existsSync(join(redswap, 'REDswap.dll'))) throw new Error('REDswap.dll is not staged. Run .\\tools\\build-native.ps1 first.');
+
 rmSync(out, { recursive: true, force: true });
 mkdirSync(target, { recursive: true });
 
 cpSync(join(plugin, 'REDnode.dll'), join(target, 'REDnode.dll'));
 cpSync(join(plugin, 'Scripts'), join(target, 'Scripts'), { recursive: true });
 cpSync(join(plugin, 'host'), join(target, 'host'), { recursive: true });
+cpSync(redswap, swapTarget, { recursive: true });
 
 for (const id of SAMPLES) {
   const from = join(repo, 'packages', 'overlay', 'apps', id);
@@ -79,6 +85,11 @@ writeFileSync(
     '  RED4ext.SDK (MIT), https://github.com/WopsS/RED4ext.SDK',
     '  miniaudio 0.11.25 (public domain or MIT No Attribution), https://github.com/mackron/miniaudio',
     '',
+    'In red4ext/plugins/REDswap/REDswap.dll:',
+    '  RED4ext.SDK (MIT), as above',
+    '  Code ported from RED Hot Tools (MIT, Copyright (c) 2022 Pavel Siberx),',
+    '  https://github.com/psiberx/cp2077-red-hot-tools; its license is in REDswap/LICENSE-RedHotTools.txt',
+    '',
     'In host/:',
     '  Electron and Chromium: see host/LICENSE and host/LICENSES.chromium.html',
     '  The host\'s npm packages (the MCP SDK, zod and theirs): their licenses are in host/resources/app.asar',
@@ -111,6 +122,8 @@ writeFileSync(
     'Packages that read the game\'s archives also need REDbridge. The Mod Manager shows a',
     'Get REDbridge button on such a package: it downloads REDbridge from GitHub, and .NET 10',
     'for your Windows user if missing, with no admin rights. A copy EDGEdeck or REDcode fetched works too.',
+    '',
+    'red4ext/plugins/REDswap is part of REDnode: it swaps archives into the running game.',
     '',
     'Press F10 in the game to open the overlay. The samples are switched off: turn them on in the Mod Manager (in the launcher).',
     'Install REDnode packages into red4ext/plugins/REDnode/apps/<package>/.',

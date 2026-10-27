@@ -49,3 +49,4 @@ if ($LASTEXITCODE) { throw 'Capture unit tests failed.' }
 if ($LASTEXITCODE) { throw 'Audio unit tests failed.' }
 
 Write-Output "Staged plugin: $build\dist\red4ext\plugins\REDnode"
+Write-Output "Staged REDswap: $build\dist\red4ext\plugins\REDswap"

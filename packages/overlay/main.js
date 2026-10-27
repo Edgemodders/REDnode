@@ -164,7 +164,7 @@ const PERMISSIONS = {
   bridge: "REDbridge, WolvenKit's engine: reads the game's archives and files, and can write files where the package asks",
   front: "staying above other packages' windows, with REDnode's own tools",
   solo: "hiding every other package's windows while it asks (solo mode)",
-  archives: "swapping archives in the game's mod folder while the game runs (hot-loading, through RED Hot Tools)",
+  archives: "swapping archives in the game's mod folder while the game runs (hot-loading)",
   // The Admin Tools pack (Task Manager, Tools Manager) and other admin packages: the
   // host's tasks and tools calls (fromAdmin). The Mod Manager and launcher show a warning under it.
   admin: "managing REDnode: what every package costs, ending or restarting any package, and switching AI assistants' tools on and off",
@@ -1876,12 +1876,14 @@ async function refreshWorld(hashes) {
 // ---------- hot-loading archives (#12, H1) ----------
 //
 // A package with the "archives" permission, or an agent through the MCP server, swaps
-// archives in the running game. RED Hot Tools does the swap: the host copies the files
-// into archive/pc/hot and calls RedHotTools.ReloadArchives() on the game thread. That
-// unloads the archives of the same name, moves the new files over them, loads them,
-// drops their cached resources and reloads ArchiveXL's extensions, then returns, so the
-// answer says what happened. RED Hot Tools' own folder watcher may start the same swap
-// first; the two share a lock, and the call returns once both are done. One swap at a time.
+// archives in the running game. REDswap does the swap (H3; native/redswap, a plugin
+// installed with REDnode): the host calls REDswap_Swap with the files' paths on the game
+// thread. It closes the archives of the same name, copies the new files over them, loads
+// them with the game's loader, drops their cached resources and reloads ArchiveXL's
+// extensions, then answers what it did. Without REDswap, RED Hot Tools does it as before
+// 0.41.0: the host copies the files into archive/pc/hot and calls
+// RedHotTools.ReloadArchives(); its folder watcher may start the same swap first (the two
+// share a lock). One swap at a time.
 
 // Archives with the game's sound paks (.opuspak, .opusinfo) crashed the game when swapped in
 // plainly, and the game kept playing its old sound index (docs/world.md, H1b to H1c-3). So a
@@ -1904,6 +1906,7 @@ const SOUND_SWAP_NOTE =
   'A sound that played just before the swap may keep its old version until the game loads it again (for a weapon, equip it again).';
 const HOT_TIMEOUT = 60000;
 const HOT_LOG = 'its log in red4ext/plugins/RedHotTools';
+const SWAP_LOG = 'red4ext/logs/redswap-*.log';
 let hotQueue = Promise.resolve();
 
 // H2b: what V wears shows a swapped archive's version once its appearance is applied again
@@ -2014,7 +2017,7 @@ function hotFiles(entry, files) {
     else if (path.isAbsolute(name)) file = name;
     else if (entry) file = path.resolve(entry.dir, name);
     else throw new Error(`${name}: give a full path, or the name of an archive in archive/pc/mod`);
-    if (!HOT_TYPES.has(path.extname(file).toLowerCase())) throw new Error(`${name}: RED Hot Tools swaps .archive, .xl and .yaml files, not "${path.extname(file) || 'no extension'}"`);
+    if (!HOT_TYPES.has(path.extname(file).toLowerCase())) throw new Error(`${name}: REDnode swaps .archive, .xl and .yaml files, not "${path.extname(file) || 'no extension'}"`);
     if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`${name} was not found${bare ? ' in archive/pc/mod' : ''}`);
     const base = path.basename(file).toLowerCase();
     if (seen.has(base)) throw new Error(`Two files are named ${path.basename(file)}: the game knows an archive by its name`);
@@ -2037,7 +2040,7 @@ async function swapArchives(caller, params) {
   }
   const who = caller.mcp ? 'an agent (MCP)' : caller.id;
   const files = hotFiles(entry, params?.files);
-  // The files the swap changes, read before RED Hot Tools moves them: what uses one is refreshed.
+  // The files the swap changes, read before the swap: what uses one is refreshed.
   const swapped = new Set();
   for (const f of files) {
     if (path.extname(f.file).toLowerCase() !== '.archive') continue;
@@ -2049,18 +2052,34 @@ async function swapArchives(caller, params) {
   }
   if (!connected) throw new Error('Not connected to the game');
   if (uiState.mainMenu) throw new Error('Load a save first: REDnode swaps archives only in a loaded game');
-  let version;
-  try {
-    version = await bridgeCall('rtti.call', { class: 'RedHotTools', fn: 'Version', args: [] });
-  } catch (err) {
-    throw new Error(
-      'RED Hot Tools is not loaded in the game, and it does the swap: install it from ' +
-        `https://github.com/psiberx/cp2077-red-hot-tools/releases and restart the game (${err.message})`,
-    );
+  // REDswap (installed with REDnode, H3) does the swap; RED Hot Tools only when REDswap is
+  // not loaded, or when settings.json says "swapWith": "redhottools".
+  let redswap = null;
+  if (settings.swapWith !== 'redhottools') {
+    try {
+      redswap = String(await bridgeCall('rtti.call', { fn: 'REDswap_Version', args: [] }));
+    } catch {
+      // not loaded: RED Hot Tools, if it is there
+    }
+  }
+  if (redswap) {
+    const why = String(await bridgeCall('rtti.call', { fn: 'REDswap_Check', args: [] }));
+    if (why) throw new Error(`REDswap ${redswap} cannot swap archives in this game: ${why}`);
+  }
+  let version = redswap;
+  if (!redswap) {
+    try {
+      version = await bridgeCall('rtti.call', { class: 'RedHotTools', fn: 'Version', args: [] });
+    } catch (err) {
+      throw new Error(
+        'REDswap, which REDnode installs in red4ext/plugins/REDswap to do the swap, is not loaded in the game: ' +
+          `install REDnode again and restart the game (${err.message})`,
+      );
+    }
   }
 
   // RED Hot Tools before the Edgemodders build can miss a replaced archive and end the game.
-  if (!String(version).includes('+edgemodders') && settings.hotToolsLookupCheck !== 'off') {
+  if (!redswap && !String(version).includes('+edgemodders') && settings.hotToolsLookupCheck !== 'off') {
     const modDir = path.join(GAME_DIR, 'archive', 'pc', 'mod');
     let names = [];
     try {
@@ -2123,9 +2142,9 @@ async function swapArchives(caller, params) {
   }
 
   const hotDir = path.join(GAME_DIR, 'archive', 'pc', 'hot');
-  fs.mkdirSync(hotDir, { recursive: true });
+  if (!redswap) fs.mkdirSync(hotDir, { recursive: true });
   const names = files.map((f) => f.name).join(', ');
-  log(`Archives: ${who} swaps ${names} (RED Hot Tools ${version})`);
+  log(`Archives: ${who} swaps ${names} (${redswap ? `REDswap ${redswap}` : `RED Hot Tools ${version}`})`);
   try {
     await bridgeCall('faults.watch', { seconds: 15, label: `swap of ${names}` });
   } catch (err) {
@@ -2142,32 +2161,50 @@ async function swapArchives(caller, params) {
     if (pause) await pauseGame(false);
     throw new Error(`${names} was not swapped: the game's audio thread did not wait for the swap (see the host log)`);
   }
-  // Copied only now, so RED Hot Tools' folder watcher cannot start the swap before the pause
-  // and the wait; and under another name first, so it never sees half a file.
-  for (const f of files) {
-    const into = path.join(hotDir, f.name);
-    const part = `${into}.rednode-part`;
-    fs.copyFileSync(f.file, part);
-    fs.renameSync(part, into);
-  }
   const started = Date.now();
   let error = null;
-  try {
-    await bridgeCall('rtti.call', { class: 'RedHotTools', fn: 'ReloadArchives', args: [] }, HOT_TIMEOUT);
-  } catch (err) {
-    // RED Hot Tools' folder watcher swaps the files on its own within a second: wait for it.
-    error = err.message;
-    log(`Archives: RedHotTools.ReloadArchives failed (${error}); waiting for its folder watcher`);
-    const waitUntil = Date.now() + 10000;
-    while (Date.now() < waitUntil && files.some((f) => fs.existsSync(path.join(hotDir, f.name)))) {
-      await new Promise((resolve) => setTimeout(resolve, 200));
+  // What REDswap answered for each file, by its path.
+  const swapDone = new Map();
+  const swapFailed = new Map();
+  if (redswap) {
+    // REDswap copies each file into the game folder itself and answers what it did.
+    let answer = null;
+    try {
+      answer = JSON.parse(String(await bridgeCall('rtti.call', { fn: 'REDswap_Swap', args: [files.map((f) => f.file).join('|')] }, HOT_TIMEOUT)));
+    } catch (err) {
+      error = err.message;
+    }
+    if (answer?.error) error = answer.error;
+    for (const d of answer?.done ?? []) swapDone.set(path.resolve(d.file).toLowerCase(), d);
+    for (const d of answer?.failed ?? []) swapFailed.set(path.resolve(d.file).toLowerCase(), d.why);
+    if (answer) log(`Archives: REDswap swapped ${answer.done.length}, failed ${answer.failed.length}; ${answer.resources} resources, ${answer.invalidated} dropped from the loader; ArchiveXL reload ${answer.extensions ? 'ran' : 'not run'}`);
+  } else {
+    // Copied only now, so RED Hot Tools' folder watcher cannot start the swap before the pause
+    // and the wait; and under another name first, so it never sees half a file.
+    for (const f of files) {
+      const into = path.join(hotDir, f.name);
+      const part = `${into}.rednode-part`;
+      fs.copyFileSync(f.file, part);
+      fs.renameSync(part, into);
+    }
+    try {
+      await bridgeCall('rtti.call', { class: 'RedHotTools', fn: 'ReloadArchives', args: [] }, HOT_TIMEOUT);
+    } catch (err) {
+      // RED Hot Tools' folder watcher swaps the files on its own within a second: wait for it.
+      error = err.message;
+      log(`Archives: RedHotTools.ReloadArchives failed (${error}); waiting for its folder watcher`);
+      const waitUntil = Date.now() + 10000;
+      while (Date.now() < waitUntil && files.some((f) => fs.existsSync(path.join(hotDir, f.name)))) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
     }
   }
+  const wasSwapped = (f) => (redswap ? swapDone.has(path.resolve(f.file).toLowerCase()) : !fs.existsSync(path.join(hotDir, f.name)));
   const ms = Date.now() - started;
   if (sound) await logSoundState('after the swap', caller);
   let soundIndex = null; // 'reloaded' or 'failed', for the answer
   if (reloadSound) {
-    if (files.some((f) => !fs.existsSync(path.join(hotDir, f.name)))) {
+    if (files.some(wasSwapped)) {
       soundIndex = await reloadSoundIndex(caller);
       await logSoundState('after the reload', caller);
     } else {
@@ -2179,12 +2216,16 @@ async function swapArchives(caller, params) {
   const reloaded = [];
   const failed = [];
   for (const f of files) {
-    const left = path.join(hotDir, f.name);
-    if (!fs.existsSync(left)) {
+    if (wasSwapped(f)) {
       reloaded.push(f.given);
       continue;
     }
+    if (redswap) {
+      failed.push({ file: f.given, why: swapFailed.get(path.resolve(f.file).toLowerCase()) ?? error ?? `REDswap did not take it; see ${SWAP_LOG}` });
+      continue;
+    }
     // Left behind: removed, so RED Hot Tools does not swap it later on its own.
+    const left = path.join(hotDir, f.name);
     try {
       fs.rmSync(left);
     } catch {
@@ -2199,7 +2240,7 @@ async function swapArchives(caller, params) {
     mods?.log(caller.id, failed.length ? 'error' : 'info', `Archives: ${names}: ${summary}${why}`);
     if (soundIndex === 'reloaded') mods?.log(caller.id, 'info', `Archives: ${SOUND_SWAP_NOTE}`);
   }
-  const answer = { reloaded, failed, via: 'red-hot-tools', ms };
+  const answer = { reloaded, failed, via: redswap ? 'redswap' : 'red-hot-tools', ms };
   if (reloaded.length && params?.refresh !== false) {
     try {
       const r = await refreshWorn();

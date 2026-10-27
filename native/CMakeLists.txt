@@ -72,6 +72,29 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/scripts" "${REDNODE_STAGE_DIR}/Scripts"
 )
 
+# REDswap: swaps archives into the running game (docs/world.md, "H3"). Its own RED4ext
+# plugin, shipped beside REDnode: red4ext/plugins/REDswap/REDswap.dll. It shares REDnode's
+# version. Its swap is ported from RED Hot Tools (MIT); the license is staged with it.
+add_library(REDswap SHARED
+  redswap/main.cpp
+  redswap/swap.cpp
+)
+target_link_libraries(REDswap PRIVATE RED4ext::SDK)
+target_compile_definitions(REDswap PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX
+  REDSWAP_VERSION="${PROJECT_VERSION}"
+  REDSWAP_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+  REDSWAP_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+  REDSWAP_VERSION_PATCH=${PROJECT_VERSION_PATCH})
+target_compile_options(REDswap PRIVATE /W4 /utf-8 /MP)
+
+set(REDSWAP_STAGE_DIR "${CMAKE_BINARY_DIR}/dist/red4ext/plugins/REDswap")
+add_custom_command(
+  TARGET REDswap POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${REDSWAP_STAGE_DIR}"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:REDswap>" "${REDSWAP_STAGE_DIR}/"
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/redswap/LICENSE-RedHotTools.txt" "${REDSWAP_STAGE_DIR}/"
+)
+
 # Unit tests for code that does not need the game. Run by tools/build-native.ps1.
 add_executable(REDnode_tests tests/windows_test.cpp src/overlay/windows.cpp)
 target_link_libraries(REDnode_tests PRIVATE RED4ext::SDK)
