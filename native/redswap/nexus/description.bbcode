@@ -10,8 +10,7 @@
 
 [quote][size=4][b][color=#fcee0a]STATUS: PREVIEW[/color][/b][/size]
 Built in the open and tested in the game, on game version 2.5.
-[b]Have REDnode?[/b] Then you have REDswap already: REDnode 0.41.0 and later install it. This page is for tools and players who want REDswap on its own.[/quote]
-[line]
+[b]Have REDnode?[/b] Then you have REDswap already: REDnode 0.41.0 and later install it. This page is for tools and players who want REDswap on its own.[/quote][line]
 
 [size=5][b][color=#fcee0a]What it does[/color][/b][/size]
 
@@ -20,8 +19,7 @@ Built in the open and tested in the game, on game version 2.5.
 [*][b]Drops what the old archive held[/b] from the game's resource loader, so whatever loads it next gets your new version.[/*]
 [*][b]ArchiveXL files too:[/b] .xl and .yaml files are swapped beside the archive, and ArchiveXL is asked to reload.[/*]
 [*][b]Copies, never moves:[/b] the file you built stays where it is.[/*]
-[/list]
-With [url=https://www.nexusmods.com/cyberpunk2077/mods/35419]REDnode[/url], a swap also refreshes what is already in the world: the clothes V wears (Equipment-EX's slots included) and the inventory's preview of V, open or closed, with no button to press.
+[/list]With [url=https://www.nexusmods.com/cyberpunk2077/mods/35419]REDnode[/url], a swap also refreshes what is already in the world: the clothes V wears (Equipment-EX's slots included) and the inventory's preview of V, open or closed, with no button to press.
 
 [size=5][b][color=#fcee0a]Safe by design[/color][/b][/size]
 
@@ -30,29 +28,25 @@ Before it touches anything, REDswap checks the game:
 [*]every game function it needs is in RED4ext's address list for your game version,[/*]
 [*]the game's archive loader looks the way REDswap knows it,[/*]
 [*]and the game's file cache holds each archive being replaced where expected.[/*]
-[/list]
-If any check fails, the swap is refused with a reason in [i]red4ext/logs/redswap-*.log[/i], instead of crashing the game. After a game patch, REDswap says it cannot swap until it is updated.
+[/list]If any check fails, the swap is refused with a reason in [i]red4ext/logs/redswap-*.log[/i], instead of crashing the game. After a game patch, REDswap says it cannot swap until it is updated.
 
 [size=5][b][color=#fcee0a]Who it is for[/color][/b][/size]
 
 [list]
 [*][b]Modders[/b] who edit a mesh, material or texture and want to see it in the game at once: through [url=https://www.nexusmods.com/cyberpunk2077/mods/35419]REDnode[/url], its apps, or an AI assistant connected to REDnode.[/*]
 [*][b]Tool makers:[/b] call [i]REDswap_Swap[/i] from redscript or your own RED4ext plugin. Examples are in the [url=https://edgemodders.github.io/REDnode/redswap.html]REDswap docs[/url].[/*]
-[/list]
-[size=5][b][color=#fcee0a]Requirements[/color][/b][/size]
+[/list][size=5][b][color=#fcee0a]Requirements[/color][/b][/size]
 
 [list]
 [*]Cyberpunk 2077 on PC, game version 2.5.[/*]
 [*][url=https://www.nexusmods.com/cyberpunk2077/mods/2380]RED4ext[/url] 1.31 or later.[/*]
 [*]Optional: ArchiveXL, for .xl and .yaml files.[/*]
-[/list]
-[size=5][b][color=#fcee0a]Install[/color][/b][/size]
+[/list][size=5][b][color=#fcee0a]Install[/color][/b][/size]
 
 [list]
 [*][b]Vortex or EDGEdeck:[/b] Mod Manager Download, then enable and deploy.[/*]
 [*][b]By hand:[/b] extract the zip into the game folder, so the plugin lands in [i]red4ext/plugins/REDswap/[/i].[/*]
-[/list]
-[b]With REDnode too:[/b] both carry the same files. If your mod manager shows a conflict, either copy works; let the newer one win.
+[/list][b]With REDnode too:[/b] both carry the same files. If your mod manager shows a conflict, either copy works; let the newer one win.
 
 [b]Uninstall:[/b] remove it in your mod manager, or delete [i]red4ext/plugins/REDswap/[/i]. REDnode needs it for archive swaps, so keep it if you use REDnode.
 
@@ -63,8 +57,7 @@ Three global functions, callable from redscript and from other plugins on the ga
 [*][i]REDswap_Version() -> String[/i][/*]
 [*][i]REDswap_Check() -> String[/i]: empty when REDswap can swap in this game, or why not.[/*]
 [*][i]REDswap_Swap(files: String) -> String[/i]: absolute paths joined by "|"; answers JSON with what each file became.[/*]
-[/list]
-See [url=https://edgemodders.github.io/REDnode/redswap.html]the REDswap docs[/url] for examples in redscript, C++ and REDnode's JavaScript.
+[/list]See [url=https://edgemodders.github.io/REDnode/redswap.html]the REDswap docs[/url] for examples in redscript, C++ and REDnode's JavaScript.
 
 [size=5][b][color=#fcee0a]Questions[/color][/b][/size]
 
@@ -94,5 +87,4 @@ REDswap's swap is ported from [url=https://github.com/psiberx/cp2077-red-hot-too
 [*]Source and issues: [url=https://github.com/Edgemodders/REDnode]github.com/Edgemodders/REDnode[/url][/*]
 [*]EDGEmodders: [url=https://edgemodders.ai/]edgemodders.ai[/url][/*]
 [*]Community Discord: [url=https://discord.gg/63qP3Erw43]discord.gg/63qP3Erw43[/url][/*]
-[/list]
-[size=2]REDswap is not affiliated with CD PROJEKT RED. Cyberpunk 2077 is a trademark of CD PROJEKT.[/size]
+[/list][size=2]REDswap is not affiliated with CD PROJEKT RED. Cyberpunk 2077 is a trademark of CD PROJEKT.[/size]
