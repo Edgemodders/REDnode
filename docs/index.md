@@ -13,8 +13,9 @@ REDnode is a Node.js API for scripting Cyberpunk 2077 (PC, single-player). These
 | **`rednode` package** | The API mods and apps import: `game`, `api` (typed from the game's own data), `ui`, `world`, `agent`, `pkg`, `secrets`, `kernel`, `channel` | `packages/rednode/` | `host/resources/sdk/` |
 | **UI kit** | Web components and themes for overlay apps | `packages/ui/` | Inside the host, served as `rednode://ui/` |
 | **Sample packages** | Example apps and mods (Hello mod, Ask mod, World test, Test timer...). Each has its own version | `packages/overlay/apps/` | `red4ext/plugins/REDnode/apps/` |
+| **[REDswap](redswap.md)** (`REDswap.dll`) | A second RED4ext plugin that swaps archives into the running game; `archives.reload` uses it. Its own version, changelog and Nexus page, and also in REDnode's zip | `native/redswap/` | `red4ext/plugins/REDswap/` |
 
-**Versions.** REDnode has one version, shared by every part above except the samples. It is in `VERSION` at the root of the repo: the plugin's build reads it, and `node tools/version.mjs <version>` copies it into the host, the package, the UI kit and the built-in apps. `tools/build-native.ps1` stops if any part differs. The plugin's log says `REDnode <version> loading`, the host's log `REDnode overlay host <version>`, and the launcher shows it. Releases will ship the parts together as one REDnode bundle.
+**Versions.** REDnode has one version, shared by every part above except the samples and REDswap. It is in `VERSION` at the root of the repo: the plugin's build reads it, and `node tools/version.mjs <version>` copies it into the host, the package, the UI kit and the built-in apps. `tools/build-native.ps1` stops if any part differs. The plugin's log says `REDnode <version> loading`, the host's log `REDnode overlay host <version>`, and the launcher shows it. Releases will ship the parts together as one REDnode bundle.
 
 | Document | What it covers |
 |---|---|
@@ -25,6 +26,7 @@ REDnode is a Node.js API for scripting Cyberpunk 2077 (PC, single-player). These
 | [Overlay apps](overlay-apps.md) | Guide with tested examples: your first app, UI kit windows, a native-looking button, and playing game sounds |
 | [World API](world.md) | The plan for building and placing objects in the game from a package: `$new`, `$set`, resource references, entity events, `api.spawn`, `requires` and `kernel.bridge()` |
 | [TweakDB API](tweakdb.md) | The plan for reading and changing TweakDB, the game's tuning database, from a package |
+| [REDswap](redswap.md) | The archive swap plugin: what a swap does, its checks, and calling it from a package, an AI assistant, redscript or a RED4ext plugin, with examples |
 | [Hot swap research](hot-swap-research.md) | Research toward a swap that every user of an archive's files picks up at once, worn clothing included: what a swap does today, the crashes of 2026-10-22, the engine's pieces, phases HP0 to HP5 |
 | [Sound API](sound.md) | The plan for REDnode's own audio engine: a package's audio files in the game, following its volume and pause, on entities |
 | [HTML overlay](overlay.md) | Design of the overlay: how it works, in-game test results, and the plan for phases O1 to O9 |

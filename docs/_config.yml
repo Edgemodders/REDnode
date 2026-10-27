@@ -41,6 +41,8 @@ nav:
     url: /mcp.html
   - title: World API
     url: /world.html
+  - title: REDswap
+    url: /redswap.html
   - title: Hot swap research
     url: /hot-swap-research.html
   - title: TweakDB API

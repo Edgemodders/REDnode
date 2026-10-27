@@ -1231,7 +1231,7 @@ The host's `archives.reload` then calls `REDswap` instead of RED Hot Tools: the 
 
 | Phase | What | Test |
 |---|---|---|
-| H3a Loader | The REDswap plugin (the swap, addresses by hash through RED4ext, a refusal when an address is missing, its own log in `red4ext/logs`), built and deployed with REDnode and added to the player zip; the host switched to it; a version raise (the plugin shares REDnode's version) | On 2.5: a plain archive swapped in a loaded save (new and replaced), then the test garment with V's refresh and the preview (PV-b), each with the fault watch |
+| H3a Loader | The REDswap plugin (the swap, addresses by hash through RED4ext, a refusal when an address is missing, its own log in `red4ext/logs`), built and deployed with REDnode and added to the player zip; the host switched to it; a version raise (REDswap got its own version, 1.0.0, and its own Nexus page on 2026-10-27: [REDswap](redswap.md)) | On 2.5: a plain archive swapped in a loaded save (new and replaced), then the test garment with V's refresh and the preview (PV-b), each with the fault watch |
 | H3b The rest on 2.5 | The swap paths that waited for RED Hot Tools: H2c-b's world refresh (spawns and entities near V) and a sound pak swap (H1d) | On 2.5, steps from their earlier tests |
 | Later | REDcode #11 and Sound Tools' Hot swap through REDnode only; the docs and Nexus page without RED Hot Tools | |
 
@@ -1283,7 +1283,7 @@ Run on the dev PC's fresh 2.5 install, deployed from EDGEdeck (RED4ext 1.31.0, r
 
 The loader answered 0 in every swap, as the game's own callers expect when nothing failed (unverified: what a 1 means). The swap itself takes 52 to 59 ms on the game thread, about what RED Hot Tools took on 2.31 (50 ms); the refresh of V and the preview adds 250 to 340 ms. The world refresh looked at about 1,072 entities near V in 8 to 21 ms and found none using the swapped files (no test entity: H3b).
 
-**What it decides:** REDswap replaces RED Hot Tools on game 2.5. PV-b (the inventory preview) is verified on 2.5 with a real swap, open and closed. Next: H3b, the world refresh (a spawn and a game entity using a swapped file, H2c-b's steps) and a sound pak swap (H1d), on 2.5.
+**What it decides:** REDswap replaces RED Hot Tools on game 2.5. Its own page: [REDswap](redswap.md). PV-b (the inventory preview) is verified on 2.5 with a real swap, open and closed. Next: H3b, the world refresh (a spawn and a game entity using a swapped file, H2c-b's steps) and a sound pak swap (H1d), on 2.5.
 
 ## H2c World objects: plan
 

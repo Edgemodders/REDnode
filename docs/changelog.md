@@ -13,7 +13,7 @@ How to keep it:
 
 **New**
 
-- REDswap, a plugin installed with REDnode (`red4ext/plugins/REDswap`), swaps archives into the running game on game 2.5, so `archives.reload` and the MCP tool `archives_reload` no longer need RED Hot Tools, which has no 2.5 build. Its swap is ported from RED Hot Tools (MIT, by psiberx). The answer says `via: "redswap"`. RED Hot Tools is still used when REDswap is not loaded.
+- REDswap, a plugin installed with REDnode (`red4ext/plugins/REDswap`), swaps archives into the running game on game 2.5, so `archives.reload` and the MCP tool `archives_reload` no longer need RED Hot Tools, which has no 2.5 build. Its swap is ported from RED Hot Tools (MIT, by psiberx). The answer says `via: "redswap"`. RED Hot Tools is still used when REDswap is not loaded. REDswap has its own version (1.0.0), changelog, docs page (https://edgemodders.github.io/REDnode/redswap.html) and Nexus page (https://www.nexusmods.com/cyberpunk2077/mods/36172), and its own zip beside REDnode's in each release.
 
 **Fixed**
 
