@@ -15,7 +15,7 @@ For REDnode 0.41.0 on game version 2.5. On game 2.31, keep 0.1.0 with REDnode 0.
 
 **Other**
 
-- Sound swaps (archives with the game's sound) and Sound Tracer are untested on game 2.5 so far.
+- Sound Search, Sound Tracer and Hot swap passed a check on game 2.5 on 2026-10-27. Sound swaps (archives with the game's sound) are untested on 2.5 so far.
 
 ## 0.1.0 (2026-10-20)
 

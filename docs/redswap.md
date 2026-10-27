@@ -168,4 +168,5 @@ std::string SwapThroughREDswap(const std::string& aFiles)
 
 | Test | Result |
 |---|---|
+| Sound Tools 0.1.1 check (2026-10-27, game 2.5, REDnode 0.41.0, REDswap 1.0.0) | Passed: Hot swap swapped through REDswap seven times, 49 to 61 ms each, no faults |
 | [H3a REDswap](world.md#h3a-test) (2026-10-27, game 2.5, REDnode 0.41.0) | Passed: three replaces and one new archive, 52 to 59 ms each, no faults; V and the inventory preview refreshed with no button, inventory open or closed |

@@ -17,7 +17,7 @@ The pictures below are the apps running in the docs' simulation; pictures from t
 | [REDnode](https://github.com/Edgemodders/REDnode/releases/latest) 0.41.0 or later (pack 0.1.1; pack 0.1.0 needs 0.26.15) | Everything runs on it. Each app's manifest asks for it, so the Mod Manager says so when REDnode is too old |
 | Nothing more for Hot swap | It swaps through [REDswap](redswap.md), which REDnode 0.41.0 installs. Pack 0.1.0 needed [RED Hot Tools](https://github.com/psiberx/cp2077-red-hot-tools/releases) 1.3 or later |
 | REDbridge (optional) | Event names. Without it, events show as ids. The Mod Manager's **Get REDbridge** button installs it, with no admin rights |
-| Game version 2.5 (pack 0.1.1) or 2.31 (pack 0.1.0 with REDnode 0.37.0) | Sound swaps need REDnode to know the game version's sound tables; on another version they are refused. Sound swaps and Sound Tracer are untested on 2.5 so far |
+| Game version 2.5 (pack 0.1.1) or 2.31 (pack 0.1.0 with REDnode 0.37.0) | Sound swaps need REDnode to know the game version's sound tables; on another version they are refused. On 2.5, Sound Search, Sound Tracer and Hot swap passed a check on 2026-10-27; sound swaps are untested there so far |
 
 1. Install the zip with Vortex, or extract it into the game folder: the three apps land in `red4ext/plugins/REDnode/apps/` (`sound-tracer`, `sound-search`, `hot-swap`).
 2. In the game, press **F10** and open the **Mod Manager** from the launcher. Switch on the apps you want; they start off.
