@@ -1239,7 +1239,7 @@ The host's `archives.reload` then calls `REDswap` instead of RED Hot Tools: the 
 
 ### H3a: built (REDnode 0.41.0)
 
-Built on 2026-10-27, not yet run in the game.
+Built on 2026-10-27; passed in game the same day ([results](#h3a-test-results-2026-10-27-passed)).
 
 | Part | What |
 |---|---|
@@ -1265,6 +1265,25 @@ Game 2.5 with REDnode 0.41.0: the update zip `REDnode-0.41.0-H3-update.zip` (RED
 6. Close the inventory, swap V2 again, open the inventory. Expected: V2 on V and the preview. **Mark**.
 7. Swap an archive that is not installed yet (any small mod archive not in `archive/pc/mod`, by full path). Expected: added, no crash. **Mark**.
 8. Quit the game. Send `red4ext/logs/redswap-*.log`, `rednode-mods.log`, `rednode-overlay.log`, the newest `rednode-*.log` and `rednode-faults.log` if there is one.
+
+### H3a test: results (2026-10-27, passed)
+
+Run on the dev PC's fresh 2.5 install, deployed from EDGEdeck (RED4ext 1.31.0, redscript 0.5.32, ArchiveXL 1.28.0, Codeware 1.21.1, TweakXL 1.12.0, Equipment-EX 1.2.10; no RED Hot Tools, no CET), with REDnode 0.41.0 and REDswap deployed by `deploy-native.ps1`. The trousers (`Items.Pants_01_basic_01`, appearance `l1_pants_01_basic_01_`) worn in Equipment-EX's `OutfitSlots.LegsMiddle`; V1 and V2 of `EDGEmatA.archive` from `E:\Gallery\Files\EDGEmat A` and `EDGEmat B`. The owner: everything worked as expected.
+
+| Step | What the logs say |
+|---|---|
+| Start | REDswap at the first frame: "Ready: the game's archive loader and file cache were found" (the address lookup, the loader's first bytes and the cache all passed on 2.5) |
+| 2 Scan | 356 slots, 15 holding an item, 12 clothing, in 6.1 s |
+| 3 V2, inventory closed | REDswap replaced `archive\pc\mod\EDGEmatA.archive` in 57 ms: 9 resources, 1 dropped from the loader, ArchiveXL reloaded. V's 5 `OutfitSlots.*` items refreshed (340 ms) and the preview's 5 too |
+| 4 Inventory opened | The preview showed V2 |
+| 5 V1, inventory open | Replaced in 52 ms (4 resources dropped); V and the preview both refreshed, with no button |
+| 6 V2, inventory closed, then opened | Replaced in 52 ms; V2 on V and the preview |
+| 7 A new archive | `EvilClown.archive` (a REDmod's packed archive, not installed) added in 59 ms: 48 resources, none loaded yet so none dropped |
+| Faults | 0 faults in each of the four 15 s watches; the game quit cleanly |
+
+The loader answered 0 in every swap, as the game's own callers expect when nothing failed (unverified: what a 1 means). The swap itself takes 52 to 59 ms on the game thread, about what RED Hot Tools took on 2.31 (50 ms); the refresh of V and the preview adds 250 to 340 ms. The world refresh looked at about 1,072 entities near V in 8 to 21 ms and found none using the swapped files (no test entity: H3b).
+
+**What it decides:** REDswap replaces RED Hot Tools on game 2.5. PV-b (the inventory preview) is verified on 2.5 with a real swap, open and closed. Next: H3b, the world refresh (a spawn and a game entity using a swapped file, H2c-b's steps) and a sound pak swap (H1d), on 2.5.
 
 ## H2c World objects: plan
 
