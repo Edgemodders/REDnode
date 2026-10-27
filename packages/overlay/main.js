@@ -1957,10 +1957,38 @@ async function refreshWorn() {
       .filter((w) => !(outfit && w.slot.startsWith('AttachmentSlots.')))
       .filter((w) => w.itemID && w.appearance && w.appearance !== 'None' && !w.appearance.startsWith('empty_appearance'));
     await Promise.all(shown.map((w) => quiet(call({ self, fn: 'ResetItemAppearance', args: [v, w.itemID] }))));
-    return { items: shown.map((w) => ({ slot: w.slot, appearance: w.appearance })), ms: Date.now() - started };
+    const items = shown.map((w) => ({ slot: w.slot, appearance: w.appearance }));
+    const preview = shown.length ? await refreshPreview(call, self, shown.map((w) => w.slot)) : { items: [] };
+    return { items, preview, ms: Date.now() - started };
   } finally {
     if (refs.length) bridgeCall('rtti.release', { refs }).catch(() => {});
   }
+}
+
+// The inventory's preview of V is a second character that wears preview copies of V's
+// items, so it keeps the old look when only V's are reset (docs/world.md, "H2b preview").
+// It belongs to the in-game menu controller, found on Codeware's menu layer, and outlives
+// the closed menu. Its items in the slots refreshed on V are reset the same way. Without
+// Codeware, or before the inventory has made a preview, there is nothing to do.
+async function refreshPreview(call, self, slots) {
+  const quiet = (p) => p.catch(() => null);
+  const ink = await quiet(call({ class: 'GameInstance', fn: 'GetInkSystem', args: [] }));
+  if (!ink?.$ref) return { items: [], note: 'no ink system (Codeware is not installed)' };
+  const layer = await quiet(call({ self: { $ref: ink.$ref }, fn: 'GetLayer', args: ['inkMenuLayer'] }));
+  const menu = layer?.$ref ? await quiet(call({ self: { $ref: layer.$ref }, fn: 'GetGameController', args: [] })) : null;
+  const puppet = menu?.$ref ? await quiet(call({ self: { $ref: menu.$ref }, fn: 'GetPuppet', args: ['inventory'] })) : null;
+  if (!puppet?.$ref) return { items: [], note: 'no preview yet (the inventory makes one when it opens)' };
+  const p = { $ref: puppet.$ref };
+  const held = (await Promise.all(
+    slots.map((slot) => quiet(call({ self, fn: 'GetItemInSlot', args: [p, slot] })).then((item) => (item?.$ref ? { slot, item } : null))),
+  )).filter(Boolean);
+  const ids = await Promise.all(held.map((w) => quiet(call({ self: { $ref: w.item.$ref }, fn: 'GetItemID', args: [] }))));
+  const looks = await Promise.all(held.map((w, i) => (ids[i] ? quiet(call({ self, fn: 'GetItemAppearance', args: [p, ids[i]] })) : null)));
+  const shown = held
+    .map((w, i) => ({ slot: w.slot, itemID: ids[i], appearance: String(looks[i] ?? '') }))
+    .filter((w) => w.itemID && w.appearance && w.appearance !== 'None' && !w.appearance.startsWith('empty_appearance'));
+  await Promise.all(shown.map((w) => quiet(call({ self, fn: 'ResetItemAppearance', args: [p, w.itemID] }))));
+  return { items: shown.map((w) => ({ slot: w.slot, appearance: w.appearance })) };
 }
 
 function reloadArchives(caller, params) {
@@ -2178,6 +2206,12 @@ async function swapArchives(caller, params) {
       answer.refreshed = r.items;
       log(`Archives: refreshed ${r.items.length} worn item${r.items.length === 1 ? '' : 's'} in ${r.ms} ms${r.items.length ? `: ${r.items.map((w) => w.slot).join(', ')}` : ''}`);
       if (caller.id && r.items.length) mods?.log(caller.id, 'info', `Archives: refreshed what V wears (${r.items.map((w) => w.slot).join(', ')})`);
+      if (r.preview) {
+        answer.preview = r.preview;
+        const n = r.preview.items.length;
+        log(`Archives: the inventory's preview of V: ${r.preview.note ?? `refreshed ${n} item${n === 1 ? '' : 's'}`}`);
+        if (caller.id && n) mods?.log(caller.id, 'info', `Archives: refreshed the inventory's preview of V (${r.preview.items.map((w) => w.slot).join(', ')})`);
+      }
     } catch (err) {
       answer.refreshed = [];
       log(`Archives: no refresh of what V wears (${err.message})`);

@@ -49,6 +49,13 @@ export interface ReloadResult {
    */
   refreshed?: { slot: string; appearance: string }[];
   /**
+   * The inventory's preview of V, refreshed in the same slots as V (REDnode 0.40.2 or later),
+   * so the inventory shows the new version too, open or closed. `note` says why nothing was
+   * refreshed: no preview yet (the inventory makes one when it opens), or no Codeware.
+   * Absent with `refresh: false`, or when nothing V wears was refreshed.
+   */
+  preview?: { items: { slot: string; appearance: string }[]; note?: string };
+  /**
    * The entities in the world refreshed after the swap because they use a swapped file
    * (REDnode 0.39.0 or later): packages' spawns, spawned again by their package
    * (`how: "respawn"`), and the game's entities near V (`how: "appearance"`). Absent with
@@ -155,6 +162,7 @@ export const archives = {
    *
    * Then the clothing V wears applies its appearance again, so it shows the new version
    * while staying worn (`refreshed` in the answer lists it; `{ refresh: false }` skips it).
+   * The inventory's preview of V is refreshed in the same slots (`preview` in the answer).
    * Other things already in the world keep the old version until they load it again.
    *
    * Throws when the package lacks the `archives` permission, at the main menu, when

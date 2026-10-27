@@ -11,6 +11,10 @@ How to keep it:
 
 ## Unreleased
 
+**Fixed**
+
+- After an archive swap, the inventory's preview of V now shows the new version of what V wears too, with the inventory open or closed (it kept the old look until the item was put on again). The answer of `archives.reload` lists it in `preview`. Needs Codeware.
+
 ## 0.40.1 (2026-10-26)
 
 **New**

@@ -482,7 +482,7 @@ function createMcp(host) {
           'Each file is a full path to an .archive (or an ArchiveXL .xl or .yaml), which replaces the mounted archive ' +
           'of the same name or is added to archive/pc/mod, or the name of an archive already in archive/pc/mod, ' +
           'reloaded as it is. Needs RED Hot Tools in the game and a loaded save. Afterwards everything that uses a swapped file ' +
-          'shows the new version: the clothing V wears applies its appearance again, REDnode\'s spawns are spawned again (new ids), ' +
+          'shows the new version: the clothing V wears and the inventory\'s preview of V apply their appearance again, REDnode\'s spawns are spawned again (new ids), ' +
           'and the game\'s entities within 30 m of V switch appearance and back (refresh: false skips all of it). Entities farther ' +
           'away load the new version when the game builds them again. An archive with the game\'s sound paks ' +
           '(.opuspak, .opusinfo) is swapped with the game paused and its sound index loaded again; a sound that just played ' +

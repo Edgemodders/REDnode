@@ -1121,7 +1121,7 @@ This plan is replaced by [H2b preview: plan](#h2b-preview-plan) (2026-10-26): th
 
 ### H2b preview: plan
 
-Asked for by the owner on 2026-10-26: make the inventory's preview of V show a swapped garment too, with the same logic the refresh uses on V. Proposed and **agreed with the owner** the same day. Found by reading the game's scripts (decompiled with redscript-cli into the scratchpad, never committed) and Equipment-EX's scripts (MIT).
+Asked for by the owner on 2026-10-26: make the inventory's preview of V show a swapped garment too, with the same logic the refresh uses on V. Proposed and **agreed with the owner** the same day. The spike passed on 2026-10-27 ([results](#h2b-preview-test-results-2026-10-27-passed)). Found by reading the game's scripts (decompiled with redscript-cli into the scratchpad, never committed) and Equipment-EX's scripts (MIT).
 
 **What the game does:**
 
@@ -1167,6 +1167,40 @@ Asked for by the owner on 2026-10-26: make the inventory's preview of V show a s
 7. Press **Reset preview**. Look at the preview: V2? (U3) **Mark**.
 8. Swap V1 back, then press **Game event**. Look at the preview: V1? (U4) **Mark**.
 9. Close the inventory. Swap V2, press **Find preview**, and **Reset preview** if it found one. Open the inventory: V2? **Mark**.
+
+### H2b preview: test results (2026-10-27, passed)
+
+Run on the laptop's 2.31 game (`Cyberpunk 2077 - Copy`) with REDnode 0.37.0, RED Hot Tools 1.3.0+edgemodders.1, Codeware and Equipment-EX; the swapped archive was `EDGEmatA.archive` (versions A and B). Times from the Test timer's marks; menu open and close read from the plugin's `REDnodeInk.root` events (4 roots kept with the menu open, 3 without).
+
+| Step | What happened |
+|---|---|
+| 2 | Not answered: **Find preview** was pressed while **Scan** was still running (8.5 s for 354 slots), and the app refused it. Whether a preview exists before the inventory was first opened is still unknown |
+| 3 | Menu open: the menu layer's controller is `gameuiInGameMenuGameController` (U1 yes); the preview is an `NPCPuppet` (entity 11431816) wearing the same six `OutfitSlots.*` items as V, in their third-person appearances (`&TPP` where V's are `&FPP`). Equipment-EX's own `PaperdollHelper.GetPuppet()` answered none |
+| 4 | Menu closed (root count back to 3 at 07:19:51), **Find preview** at 07:20:05 found the same preview, entity 11431816 (U2 yes: it outlives the menu) |
+| 5 | **Reset preview** reset the six items in 601 ms with no fault and no visible change. **Game event** failed before sending anything: `DelaySystem.DelayEventNextFrame` has three overloads, and `api` asks for the full name |
+| 6 | Swap to B with the menu open: 74 ms; REDnode's refresh reset V's six `OutfitSlots.*` items; V showed B and the preview kept A (the bug, as expected) |
+| 7 | **Reset preview** (517 ms): the preview showed B (U3 yes) |
+| 8 | Swap back to A, then **Game event**: it failed again on the overload, so the preview kept B ("No"). U4 not answered; not needed, since the direct call works |
+| 9 | Menu closed (07:24:14), swap to B, **Find preview** found the same preview, **Reset preview** (637 ms), then the inventory opened on B ("yes") |
+
+Three swaps, 0 faults in each watch, a clean quit.
+
+**What it decides for PV-b:**
+
+| Question | Answer | For the build |
+|---|---|---|
+| U1 Reach | Codeware's `inkMenuLayer` controller is the in-game menu controller | No redscript hook |
+| U2 Lifetime | The preview outlives the closed menu, same entity | Reset it whether the menu is open or closed |
+| U3 Reset | `ResetItemAppearance` on the preview shows the swapped version | The direct call, the same as on V |
+| U4 Game event | Not run (overload) | Not used |
+| Time | About 100 ms an item through `api`, one call at a time | Do it in the host after V's resets, inside the same refresh; the preview's items are read per slot from the preview itself, since its item ids differ from V's |
+| No preview yet | Unknown (step 2) | Skip with a note when `GetPuppet` answers none; the inventory dresses a fresh preview when it opens |
+
+### H2b preview: built (PV-b, REDnode 0.40.2)
+
+Built on 2026-10-27. After `refreshWorn` resets V's items, `refreshPreview` in main.js finds the preview (Codeware's `inkMenuLayer`, its game controller, `GetPuppet("inventory")`) and resets the preview's items in the slots refreshed on V, skipping `empty_appearance_*`. Each step's calls go out at once, as for V, so it costs a few frames, not the spike's 100 ms an item. `archives.reload` answers `preview: { items, note? }`; the host log and the Mod log say what was refreshed. Checked against a stand-in bridge (scratchpad `paperdoll/check.mjs`: a preview, none, no Codeware).
+
+**Its check waits for RED Hot Tools on game 2.5:** REDnode 0.40.2 runs only on 2.5, and on 2.5 nothing swaps yet. Until then, Refresh test 0.3.0's steps 2 to 4 on 2.5 with 0.40.1 or 0.40.2 show whether 2.5 finds the preview the same way (unverified on 2.5). Then, once RED Hot Tools supports 2.5: swap a worn garment with the inventory open and with it closed, with no button pressed; the preview should show the new version, and the Mod log should say "refreshed the inventory's preview of V".
 
 
 ## H2c World objects: plan
