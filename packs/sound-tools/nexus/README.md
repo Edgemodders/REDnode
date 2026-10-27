@@ -29,7 +29,7 @@ The source of the Sound Tools pack's own Nexus Mods page, beside REDnode's (`nex
 | Author | Edgemodders |
 | Language | English |
 | Primary image | `brand/nexus.png`. The banner is already at the top of the description |
-| Requirements | REDnode (its Nexus page; note: "the version named on this page or later"). RED Hot Tools (note: "For Hot swap only"). Optional, noted as such: REDbridge has no Nexus page; the description explains REDnode's Get REDbridge button |
+| Requirements | REDnode (its Nexus page; note: "the version named on this page or later"). From 0.1.1, no RED Hot Tools: Hot swap uses REDswap, part of REDnode 0.41.0 (REDswap's page may be listed as optional). Optional, noted as such: REDbridge has no Nexus page; the description explains REDnode's Get REDbridge button |
 | Permissions | MIT, as REDnode |
 | Tags | Modders resource, utility, audio |
 
@@ -48,7 +48,7 @@ Each app's manifest asks for `"requires": { "rednode": ">=<version>" }`, the RED
 
 ### File description on Nexus
 
-> REDnode Sound Tools &lt;version&gt;: Sound Tracer, Sound Search and Hot swap. Needs REDnode &lt;version&gt; or later; Hot swap needs RED Hot Tools.
+> REDnode Sound Tools &lt;version&gt;: Sound Tracer, Sound Search and Hot swap. Needs REDnode &lt;version&gt; or later.
 
 ## The images
 

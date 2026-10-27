@@ -1030,14 +1030,14 @@ async function swapArchives(files, options = {}) {
   }
   for (const name of list.map((f) => String(f).trim().replace(/^"(.*)"$/, '$1').trim())) {
     const bare = !/[\\/]/.test(name);
-    if (!/\.(archive|xl|ya?ml)$/i.test(name)) throw new Error(`${name}: RED Hot Tools swaps .archive, .xl and .yaml files`);
+    if (!/\.(archive|xl|ya?ml)$/i.test(name)) throw new Error(`${name}: REDnode swaps .archive, .xl and .yaml files`);
     if (bare && !MOD_ARCHIVES.includes(name)) throw new Error(`${name} was not found in archive/pc/mod`);
   }
   if (sim.mainMenu) throw new Error('Load a save first: REDnode swaps archives only in a loaded game');
   const ms = 280 + Math.round(Math.random() * 60);
   await new Promise((resolve) => setTimeout(resolve, ms));
-  log('info', `archives.reload: the docs page pretends to swap ${list.join(', ')}; in the game RED Hot Tools swaps them in. The page's archive/pc/mod holds ${MOD_ARCHIVES.join(' and ')}`, 'sim');
-  const answer = { reloaded: list.map(String), failed: [], via: 'red-hot-tools', ms };
+  log('info', `archives.reload: the docs page pretends to swap ${list.join(', ')}; in the game REDswap swaps them in. The page's archive/pc/mod holds ${MOD_ARCHIVES.join(' and ')}`, 'sim');
+  const answer = { reloaded: list.map(String), failed: [], via: 'redswap', ms };
   if (options.refresh !== false) answer.refreshed = [{ slot: 'AttachmentSlots.Torso', appearance: 'default' }];
   return answer;
 }

@@ -1,7 +1,7 @@
 {
   "id": "hot-swap",
   "name": "Hot swap",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Edgemodders",
   "description": "Swap an archive into the running game, sound mods included: type its name or path and press Swap. Keeps your recent swaps to swap again in one press. Part of REDnode Sound Tools.",
   "entry": "index.html",
@@ -12,9 +12,10 @@
   "x": 160,
   "y": 130,
   "open": false,
-  "permissions": ["archives"],
+  "permissions": [
+    "archives"
+  ],
   "requires": {
-    "rednode": ">=0.26.15",
-    "redhottools": ">=1.3"
+    "rednode": ">=0.41.0"
   }
 }

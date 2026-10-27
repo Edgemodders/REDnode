@@ -14,10 +14,10 @@ The pictures below are the apps running in the docs' simulation; pictures from t
 
 | Needs | Why |
 |---|---|
-| [REDnode](https://github.com/Edgemodders/REDnode/releases/latest) 0.26.15 or later | Everything runs on it. Each app's manifest asks for it, so the Mod Manager says so when REDnode is too old |
-| [RED Hot Tools](https://github.com/psiberx/cp2077-red-hot-tools/releases) 1.3 or later | Hot swap only |
+| [REDnode](https://github.com/Edgemodders/REDnode/releases/latest) 0.41.0 or later (pack 0.1.1; pack 0.1.0 needs 0.26.15) | Everything runs on it. Each app's manifest asks for it, so the Mod Manager says so when REDnode is too old |
+| Nothing more for Hot swap | It swaps through [REDswap](redswap.md), which REDnode 0.41.0 installs. Pack 0.1.0 needed [RED Hot Tools](https://github.com/psiberx/cp2077-red-hot-tools/releases) 1.3 or later |
 | REDbridge (optional) | Event names. Without it, events show as ids. The Mod Manager's **Get REDbridge** button installs it, with no admin rights |
-| Game version 2.31 | Sound swaps need REDnode to know the game version's sound tables; on another version they are refused |
+| Game version 2.5 (pack 0.1.1) or 2.31 (pack 0.1.0 with REDnode 0.37.0) | Sound swaps need REDnode to know the game version's sound tables; on another version they are refused. Sound swaps and Sound Tracer are untested on 2.5 so far |
 
 1. Install the zip with Vortex, or extract it into the game folder: the three apps land in `red4ext/plugins/REDnode/apps/` (`sound-tracer`, `sound-search`, `hot-swap`).
 2. In the game, press **F10** and open the **Mod Manager** from the launcher. Switch on the apps you want; they start off.
@@ -68,7 +68,7 @@ Each result shows the event's name, id, tags and how many recordings it has. **â
 
 > **Picture from the game to come:** Hot swap after swapping a sound archive.
 
-Type an archive's name (one in `archive/pc/mod`) or its full path, and press **Swap** or Enter. A path from Windows' **Copy as path**, quotes and all, works. RED Hot Tools swaps it in; the answer says what was swapped, how long it took, and why anything was not.
+Type an archive's name (one in `archive/pc/mod`) or its full path, and press **Swap** or Enter. A path from Windows' **Copy as path**, quotes and all, works. REDswap swaps it in (RED Hot Tools with pack 0.1.0); the answer says what was swapped, how long it took, and why anything was not.
 
 For a sound archive (one with the game's `.opuspak` or `.opusinfo`), REDnode pauses the game for a moment, holds its audio, has the archive swapped, loads the game's sound index again and lets the audio go, so the new sounds play without a restart. A sound that played just before the swap can keep its old version until the game loads it again: for a weapon, equip it again.
 

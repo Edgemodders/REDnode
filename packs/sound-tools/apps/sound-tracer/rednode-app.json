@@ -13,6 +13,6 @@
   "y": 110,
   "open": false,
   "requires": {
-    "rednode": ">=0.26.15"
+    "rednode": ">=0.41.0"
   }
 }

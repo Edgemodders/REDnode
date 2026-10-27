@@ -6,7 +6,7 @@
 <script src="rednode://ui/rednode-ui.js"></script>
 <script type="importmap">{ "imports": { "rednode": "rednode://sdk/index.js" } }</script>
 <style>
-  /* Hot swap (REDnode Sound Tools): an archive into the running game through RED Hot Tools,
+  /* Hot swap (REDnode Sound Tools): an archive into the running game through REDnode (REDswap),
      sound archives included; recent swaps kept to swap again. The window never scrolls. */
   html, body { margin: 0; width: 680px; height: 520px; overflow: hidden; background: transparent; }
   rn-window { position: absolute; inset: 6px; }
@@ -63,14 +63,14 @@
   const clean = (s) => String(s).trim().replace(/^"(.*)"$/, '$1');
   const baseName = (p) => p.split(/[\\/]/).pop();
 
-  // ---- what it needs: RED Hot Tools, and REDnode new enough ----
+  // ---- what it needs: REDnode new enough (0.41.0 installs REDswap, which swaps) ----
 
   (async () => {
     try {
       const missing = (await kernel.requirements()).filter((r) => !r.ok);
       $('needs').textContent = missing.length
         ? `Missing: ${missing.map((r) => `${r.name} ${r.wants} (${r.note || r.found || 'not installed'})`).join(', ')}`
-        : 'Ready: RED Hot Tools is installed.';
+        : 'Ready: REDnode swaps through REDswap.';
       $('needs').className = missing.length ? 'line bad' : 'line';
     } catch (err) {
       $('needs').textContent = err.message;

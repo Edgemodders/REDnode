@@ -4,6 +4,19 @@ What changed in each release of the Sound Tools pack, for its Nexus page and its
 
 ## Unreleased
 
+## 0.1.1 (2026-10-27)
+
+For REDnode 0.41.0 on game version 2.5. On game 2.31, keep 0.1.0 with REDnode 0.37.0.
+
+**Changed**
+
+- **Hot swap** no longer needs RED Hot Tools: it swaps through REDswap, which REDnode 0.41.0 installs (RED Hot Tools has no build for game 2.5). REDswap's own page: https://www.nexusmods.com/cyberpunk2077/mods/36172
+- The pack needs REDnode 0.41.0 or later.
+
+**Other**
+
+- Sound swaps (archives with the game's sound) and Sound Tracer are untested on game 2.5 so far.
+
 ## 0.1.0 (2026-10-20)
 
 **New**

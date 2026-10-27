@@ -289,9 +289,9 @@ export const NOTES = {
     summary: 'Swap an archive into the running game, sound mods included: type its name or path, press Swap, and swap it again from the list next time you build it.',
     teaches: ['archives.reload', '"archives" permission', 'requires', 'kernel.requirements', 'localStorage in an app'],
     how: [
-      'RED Hot Tools does the swap. REDnode copies the file into its hot folder, has it swap the archive in, and answers with what was swapped and what failed.',
+      'REDswap, which REDnode 0.41.0 installs, does the swap. REDnode hands it the file, and answers with what was swapped and what failed.',
       'An archive with the game\'s sound paks swaps too: REDnode pauses the game, holds its audio, and loads the game\'s sound index again afterwards. A sound that just played may keep its old version until the game loads it again.',
-      'Swapping changes the game\'s archives, so the package asks for the `archives` permission and the player allows it in the Mod Manager. Its manifest also requires RED Hot Tools and a REDnode new enough, and the window says what is missing.',
+      'Swapping changes the game\'s archives, so the package asks for the `archives` permission and the player allows it in the Mod Manager. Its manifest also requires a REDnode new enough, and the window says what is missing.',
       'Recent swaps are kept in the window\'s local storage, so ↻ swaps the same file again after your next build, in this session or the next.',
       'Part of REDnode Sound Tools.',
     ],

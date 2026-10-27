@@ -9,7 +9,7 @@
 [line]
 
 [quote][size=4][b][color=#fcee0a]STATUS: PREVIEW[/color][/b][/size]
-Built in the open and tested in the game, on game version 2.31. It runs on [url=https://www.nexusmods.com/cyberpunk2077/mods/35419]REDnode[/url], which you need first.
+Built in the open and tested in the game on game version 2.31; 0.1.1 is for game 2.5, where sound swaps and Sound Tracer are untested so far. It runs on [url=https://www.nexusmods.com/cyberpunk2077/mods/35419]REDnode[/url], which you need first.
 [b]Sound modders:[/b] this is for you. [b]Players:[/b] you do not need it to play sound mods.[/quote]
 [line]
 
@@ -51,10 +51,10 @@ Swap an archive into the running game: type its name or path, press Swap, and th
 [size=5][b][color=#fcee0a]Requirements[/color][/b][/size]
 
 [list]
-[*][url=https://www.nexusmods.com/cyberpunk2077/mods/35419]REDnode[/url] 0.26.15 or later, with what it needs (RED4ext, redscript).[/*]
-[*][url=https://github.com/psiberx/cp2077-red-hot-tools/releases]RED Hot Tools[/url] 1.3 or later: for Hot swap only. The Mod Manager tells you when it is missing.[/*]
+[*][url=https://www.nexusmods.com/cyberpunk2077/mods/35419]REDnode[/url] 0.41.0 or later, with what it needs (RED4ext, redscript).[/*]
+[*]Nothing more for Hot swap: it swaps through [url=https://www.nexusmods.com/cyberpunk2077/mods/36172]REDswap[/url], which REDnode 0.41.0 installs. (Pack 0.1.0, for game 2.31, needs RED Hot Tools 1.3 or later.)[/*]
 [*]Optional: REDbridge, for event names. Without it, events show as ids. REDnode's Mod Manager has a [b]Get REDbridge[/b] button that installs it, with no admin rights.[/*]
-[*]Cyberpunk 2077 on PC, game version 2.31. On another game version, sound swaps are refused until REDnode knows that version.[/*]
+[*]Cyberpunk 2077 on PC, game version 2.5. For game 2.31, use pack 0.1.0 with REDnode 0.37.0. On a game version REDnode does not know, sound swaps are refused.[/*]
 [/list]
 [size=5][b][color=#fcee0a]Install[/color][/b][/size]
 
@@ -97,7 +97,7 @@ Yes, and open source under the MIT license, in [url=https://github.com/Edgemodde
 [size=5][b][color=#fcee0a]Credits[/color][/b][/size]
 
 [list]
-[*][b]RED Hot Tools[/b] by psiberx: the archive swaps run through it.[/*]
+[*][b]RED Hot Tools[/b] by psiberx: REDswap's swap is ported from it, and pack 0.1.0's swaps ran through it.[/*]
 [*][b]WolvenKit[/b] and its team: the names of the game's sound events, and the libraries REDbridge runs.[/*]
 [*][b]opus-decoder[/b] by Ethan Halsall (MIT), with [b]libopus[/b] (BSD): how REDnode plays the game's recordings.[/*]
 [*]The Cyberpunk 2077 modding community, whose research into the game's sound this builds on.[/*]
