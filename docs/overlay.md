@@ -689,8 +689,8 @@ REDnode 0.42.0, on game 2.5.
 
 0. Switch on the **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
 1. Load a save. Press F10, and in the launcher switch on **Console**. Its window opens at the top with a welcome line. Mark.
-2. Type `addItem("Items.slim_fit_pants")` and press Enter: the answer says it was added. Open the inventory: the trousers are there. Close it. Mark.
-3. Type `addItem("Items.slim_fit_pantz")` (a typo): a red error says there is no such record. Mark.
+2. Type `addItem("Items.Pants_01_basic_01")` and press Enter: the answer says it was added. Open the inventory: the trousers are there. Close it. Mark.
+3. Type `addItem("Items.Pants_01_basic_09")` (a typo): a red error says there is no such record. Mark.
 4. Type `addItem("Items.money", 1000)`: V's eddies go up by 1,000. Mark.
 5. Type `pos()`: V's position shows. Click it to fold it open. Then `await api.GetPlayer(game.instance)` shows `PlayerPuppet #...`, and `await $_.GetDisplayName()` answers (any text). Mark.
 6. Press Up twice: the entries come back. Type `help()`: the shortcuts are listed. Type `game.pl` and press Tab: it becomes `game.player`. Clear the line. Mark.

@@ -28,7 +28,7 @@ for (const [k, v] of Object.entries(rednode)) if (!(k in globalThis)) globalThis
 
 // Shortcuts for routine jobs, listed by help().
 const HELP = [
-  ['addItem(id, count?)', 'puts items in V\'s inventory: addItem("Items.slim_fit_pants")'],
+  ['addItem(id, count?)', 'puts items in V\'s inventory: addItem("Items.Pants_01_basic_01")'],
   ['removeItem(id, count?)', 'takes items out of V\'s inventory'],
   ['pos()', "V's position"],
   ['tp(x, y, z)', 'moves V there'],
@@ -291,4 +291,4 @@ channel.on((m) => {
 });
 
 channel.post({ type: 'ready' });
-info('REDnode Console. Type JavaScript and press Enter: try addItem("Items.slim_fit_pants"), or help() for more.');
+info('REDnode Console. Type JavaScript and press Enter: try addItem("Items.Pants_01_basic_01"), or help() for more.');

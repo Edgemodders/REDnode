@@ -525,8 +525,8 @@ Built 2026-10-20 in REDnode 0.26.13: `ui.list` in the UI builder, sample **Live 
 
 0. Test timer: Start, Mark after each step.
 1. Load a save, F10, switch on **Console** in the launcher: it opens at the top with a welcome line.
-2. `addItem("Items.slim_fit_pants")`: added; the trousers are in the inventory.
-3. `addItem("Items.slim_fit_pantz")`: a red error, no such record.
+2. `addItem("Items.Pants_01_basic_01")`: added; the trousers are in the inventory.
+3. `addItem("Items.Pants_01_basic_09")`: a red error, no such record.
 4. `addItem("Items.money", 1000)`: eddies up by 1,000.
 5. `pos()`, fold it open; `await api.GetPlayer(game.instance)` shows `PlayerPuppet #...`; `await $_.GetDisplayName()` answers.
 6. Up twice brings entries back; `help()` lists the shortcuts; `game.pl` + Tab gives `game.player`.

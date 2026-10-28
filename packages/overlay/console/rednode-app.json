@@ -3,7 +3,7 @@
   "name": "Console",
   "version": "0.42.0",
   "author": "Edgemodders",
-  "description": "A command line for the game, like a browser's developer console: type JavaScript with the whole rednode package ready, such as addItem(\"Items.slim_fit_pants\"). help() lists the shortcuts.",
+  "description": "A command line for the game, like a browser's developer console: type JavaScript with the whole rednode package ready, such as addItem(\"Items.Pants_01_basic_01\"). help() lists the shortcuts.",
   "entry": "index.html",
   "main": "mod.mjs",
   "kind": "window",

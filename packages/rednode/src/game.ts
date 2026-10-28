@@ -120,12 +120,12 @@ export interface Player {
    * `Game.AddToInventory` does. Built on the transaction system's `GiveItemByTDBID`.
    * Rejects when there is no such record, so a typo is not given as an empty item.
    *
-   * @param id - The item's record, such as `"Items.slim_fit_pants"`.
+   * @param id - The item's record, such as `"Items.Pants_01_basic_01"`.
    * @param count - How many, 1 by default.
    *
    * @example
    * ```ts
-   * await game.player.addItem("Items.slim_fit_pants");
+   * await game.player.addItem("Items.Pants_01_basic_01");
    * await game.player.addItem("Items.money", 5000); // eddies
    * ```
    */
@@ -135,7 +135,7 @@ export interface Player {
    * Takes items out of V's inventory by their TweakDB id. Resolves with whether the
    * game took any. Built on the transaction system's `RemoveItemByTDBID`.
    *
-   * @param id - The item's record, such as `"Items.slim_fit_pants"`.
+   * @param id - The item's record, such as `"Items.Pants_01_basic_01"`.
    * @param count - How many, 1 by default.
    *
    * @example

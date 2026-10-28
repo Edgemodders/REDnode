@@ -301,7 +301,7 @@ Import the `rednode` package, the same one Node mods use. An import map lets the
 | Call | What it does |
 |---|---|
 | `game.player.position()` | V's world position. Rejects at the main menu, where there is no player |
-| `game.player.addItem(id, count?)`, `game.player.removeItem(id, count?)` | Puts items in V's inventory, or takes them out, by TweakDB id: `addItem("Items.slim_fit_pants")`. `addItem` rejects an id with no record (REDnode 0.42.0) |
+| `game.player.addItem(id, count?)`, `game.player.removeItem(id, count?)` | Puts items in V's inventory, or takes them out, by TweakDB id: `addItem("Items.Pants_01_basic_01")`. `addItem` rejects an id with no record (REDnode 0.42.0) |
 | `game.audio.play(name)` | Plays a game sound event |
 | `game.on(name, handler)` | A game event: `"PlayerPuppet.OnGameAttached"` (at the main menu and on every save load), `"language"` (the player changed the game's language), and the `quests.fact:<name>` events that [`quests.watch`](quests.md) uses |
 | `game.state()`, `game.onState(handler)` | Whether a menu, photo mode, a scene or the main menu is showing, the overlay mode, and whether the game is linked |
@@ -841,7 +841,7 @@ The [World test](https://github.com/Edgemodders/REDnode/tree/main/packages/overl
 REDnode's **Console** (built in, switched on from the launcher) is a command line for the game, like a browser's developer console: type JavaScript at the bottom, press Enter, and the answer shows above. The whole `rednode` package is ready without imports, so it is the quickest way to try a call before putting it in an app:
 
 ```js
-addItem("Items.slim_fit_pants")              // a shortcut for game.player.addItem
+addItem("Items.Pants_01_basic_01")              // a shortcut for game.player.addItem
 const stats = await api.GameInstance.GetStatsSystem(game.instance)
 await tweakdb.get("Items.money.price")
 await api.GetPlayer(game.instance)           // PlayerPuppet #12, kept as $3 and $_
