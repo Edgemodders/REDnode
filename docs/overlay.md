@@ -1,6 +1,6 @@
 # HTML overlay
 
-Status: **in use.** Phases O1 to O6 and O8 to O11 passed in game (2026-10-11 to 2026-10-14), then a polish phase (REDnode 0.24.2 to 0.24.7, 2026-10-17). Open: the O4 scene threshold (see the O4 result). Not done yet: O7 Display. O12 Console is built (REDnode 0.42.0) and awaits its in-game test. To build an app, read the [Overlay apps](overlay-apps.md) guide; this page is the design and its test record. The proof of concept passed in game, alone and side by side with CET and 10 other RED4ext plugins (2026-10-11). See [Test results](#test-results) and [the plan](#plan-for-the-real-version).
+Status: **in use.** Phases O1 to O6 and O8 to O11 passed in game (2026-10-11 to 2026-10-14), then a polish phase (REDnode 0.24.2 to 0.24.7, 2026-10-17). Open: the O4 scene threshold (see the O4 result). Not done yet: O7 Display. O12 Console passed in game (REDnode 0.42.1, 2026-10-27). To build an app, read the [Overlay apps](overlay-apps.md) guide; this page is the design and its test record. The proof of concept passed in game, alone and side by side with CET and 10 other RED4ext plugins (2026-10-11). See [Test results](#test-results) and [the plan](#plan-for-the-real-version).
 
 REDnode overlay apps are small web apps (HTML, CSS and JavaScript) drawn on top of the game, like CET's ImGui windows. They talk to the game through the same `rednode` API as Node mods.
 
@@ -190,7 +190,7 @@ Rules that make borderless windows behave:
 | **O9 Debugger** | Chromium DevTools for any overlay app, from an **Inspect** button: first in a desktop window, then, if a prototype works, inside the overlay as a built-in Debugger app. Node mods debugged through Node's inspector, attachable from VS Code and REDcode. See [O9 Debugger: plan](#o9-debugger-plan) | An app's page is inspected and a breakpoint hit while the game runs; a Node mod stops at a breakpoint set in VS Code |
 | **O10 Layers** | A tool layer above packages' windows for REDnode's own windows and packages the player lets stay on top; solo mode, in which one package hides every other package's windows. Asked for by EDGEbuilder ([#10](https://github.com/Edgemodders/REDnode/issues/10), [#7](https://github.com/Edgemodders/REDnode/issues/7)). See [O10 Layers](#o10-layers-built) | A full-screen package cannot cover the launcher or the Test timer, and its solo mode hides everything else until it ends |
 | **O11 Spaces** | Named sets of windows, like virtual desktops: the player switches the space and only its windows show; tool windows and windows set to "all spaces" show in every space. Title-bar actions with overflow. See [O11 Spaces: plan](#o11-spaces-plan) | A player with many HUD widgets keeps them in two or three spaces and switches between them without switching packages on and off |
-| **O12 Console** | A built-in console, like Cyber Engine Tweaks' Lua console, for free-form JavaScript with the whole `rednode` package ready. Built in REDnode 0.42.0: see [O12 Console: built](#o12-console-built) | A player types `await tweakdb.get("Items.money.price")` and gets the answer, then calls a method on a game object from the line before |
+| **O12 Console** | A built-in console, like Cyber Engine Tweaks' Lua console, for free-form JavaScript with the whole `rednode` package ready. Passed in game in REDnode 0.42.1: see [O12 Console: built](#o12-console-built) | A player types `await tweakdb.get("Items.money.price")` and gets the answer, then calls a method on a game object from the line before |
 
 ### O1 Windows: test
 
@@ -698,7 +698,9 @@ REDnode 0.42.0, on game 2.5.
 8. Close the Console with its ✕, then switch it on again: the history (Up) is still there. Mark.
 9. Quit the game.
 
-**First run, 2026-10-27, in progress** (dev PC, game 2.5, REDnode 0.42.0). Step 8 **failed**: after reopening, Up brought back only `1 + 1`. The history file held only that entry. The Console wrote its history asynchronously; the write for `while (true) {}` had truncated the file when the loop blocked the thread, and **Stop** ended it there, so the file was empty when the Console started again. REDnode 0.42.1 writes the history synchronously, before the entry runs, through a temporary file and a rename. A mock check covers it (history survives Stop). The run used `Items.slim_fit_pants` from the first build's examples, which is no TweakDB record; 0.42.0's later commit uses `Items.Pants_01_basic_01`.
+**First run, 2026-10-27** (dev PC, game 2.5, REDnode 0.42.0). Step 8 **failed**: after reopening, Up brought back only `1 + 1`. The history file held only that entry. The Console wrote its history asynchronously; the write for `while (true) {}` had truncated the file when the loop blocked the thread, and **Stop** ended it there, so the file was empty when the Console started again. REDnode 0.42.1 writes the history synchronously, before the entry runs, through a temporary file and a rename. A mock check covers it (history survives Stop). The run used `Items.slim_fit_pants` from the first build's examples, which is no TweakDB record; 0.42.0's later commit uses `Items.Pants_01_basic_01`.
+
+**Retest, 2026-10-27: passed** (dev PC, game 2.5, REDnode 0.42.1). The retest's steps (the welcome line's item id, three entries, `addItem("Items.Pants_01_basic_01")` with the trousers in the inventory, `while (true) {}` and **Stop**, Up through the four entries, then close and reopen with the history kept) all passed. With the first run's steps 1 to 7, the O12 test has passed.
 
 ### Pointer lock: built
 

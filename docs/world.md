@@ -1311,6 +1311,18 @@ Before the game starts: no `zzz_rednode_box.archive` in `archive\pc\mod`, and no
 9. Tell Claude you are at step 9. Claude checks #18 through the MCP tools: a `null` for an object parameter is refused without touching the game, a full overload name works with `class` and with `api_read`, and V's health is set to what it is with no instigator (`{"$null": true}`). Approve the one `api_call` it asks for. **Mark**.
 10. Switch **World objects test** off (its spawns go), then quit the game. Remove `zzz_rednode_box.archive` and the sound override from `archive\pc\mod`.
 
+**First run, 2026-10-27: steps 1 to 6 done, 7 to 10 waiting** (dev PC, game 2.5, REDnode 0.42.1, REDswap 1.0.0, no RED Hot Tools). Step 7 waits for a new EDGEwave katana override made from 2.5 (the old one could not be found).
+
+| Step | Result |
+|---|---|
+| 1, 2 | The World objects test started and spawned the cardboard box (182 ms) |
+| 3. Swap v2 | REDswap: 1 swapped in 69 ms; the box respawned (1 world entity refreshed, 691 ms in all with 5 worn items and the inventory preview). The player reported no problem |
+| 4. Swap v1 | 1 swapped in 73 ms, the box respawned again (555 ms) |
+| 5. Near V | 5 entities within 15 m, none naming the box mesh (an item drop, a bottle, a loot query, an `entEntity`, an access point); with files 17 ms |
+| 6. Game boxes | The boxes the player found near V are other meshes, not `cardboard_box_a_closed.mesh`, and did not change, as expected: a swap refreshes only entities whose components name a file in the archive. v2 swapped in 77 ms; v1 was not swapped back, so v2 is what stays installed |
+
+The fault watch recorded the three swaps with no faults. Still unverified on 2.5: a game-placed entity that uses the swapped mesh, refreshed by appearance (verified on 2.31 in H2c-a).
+
 ## H2c World objects: plan
 
 Proposed and **agreed with the owner on 2026-10-23**, with the three recommendations below. H2c finishes H2 for things in the world. The owner's aim (2026-10-22): scenes built and stored in EDGEbuilder, with NPCs, props and the rest, load into the game from EDGEbuilder, and a swapped archive shows on them as it does on what V wears. EDGEquest needs the same pieces for quest NPCs and places (EDGEbuilder's [#3](https://github.com/Edgemodders/EDGEbuilder/issues/3)).
