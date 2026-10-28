@@ -14,6 +14,7 @@
 import { api } from "./api.js";
 import { currentLanguage, startText, type Language } from "./i18n.js";
 import { cleanError, transport, type HostMessage } from "./transport.js";
+import { tweakdb } from "./tweakdb.js";
 
 /** Stops a subscription made with {@link Game.on} or {@link Game.onState}. */
 export type Unsubscribe = () => void;
@@ -113,6 +114,36 @@ export interface Player {
    * ```
    */
   teleport(to: { x: number; y: number; z: number; yaw?: number } | { nodeRef: string }): Promise<void>;
+
+  /**
+   * Puts items in V's inventory by their TweakDB id, as Cyber Engine Tweaks'
+   * `Game.AddToInventory` does. Built on the transaction system's `GiveItemByTDBID`.
+   * Rejects when there is no such record, so a typo is not given as an empty item.
+   *
+   * @param id - The item's record, such as `"Items.slim_fit_pants"`.
+   * @param count - How many, 1 by default.
+   *
+   * @example
+   * ```ts
+   * await game.player.addItem("Items.slim_fit_pants");
+   * await game.player.addItem("Items.money", 5000); // eddies
+   * ```
+   */
+  addItem(id: string, count?: number): Promise<void>;
+
+  /**
+   * Takes items out of V's inventory by their TweakDB id. Resolves with whether the
+   * game took any. Built on the transaction system's `RemoveItemByTDBID`.
+   *
+   * @param id - The item's record, such as `"Items.slim_fit_pants"`.
+   * @param count - How many, 1 by default.
+   *
+   * @example
+   * ```ts
+   * await game.player.removeItem("Items.money", 100);
+   * ```
+   */
+  removeItem(id: string, count?: number): Promise<boolean>;
 }
 
 /** The game's audio. */
@@ -338,6 +369,16 @@ export const game: Game = {
       const p = await player();
       if ("nodeRef" in to) await facility.TeleportToNode(p, to.nodeRef);
       else await facility.Teleport(p, { X: to.x, Y: to.y, Z: to.z, W: 1 }, { Roll: 0, Pitch: 0, Yaw: to.yaw ?? 0 });
+    },
+    async addItem(id, count = 1) {
+      if (!(await tweakdb.record(id))) throw new Error(`addItem: no record "${id}" in TweakDB`);
+      const shop = await api.GameInstance.GetTransactionSystem(instance);
+      const ok = await shop!.GiveItemByTDBID(await player(), id, count);
+      if (!ok) throw new Error(`addItem: the game did not give "${id}"`);
+    },
+    async removeItem(id, count = 1) {
+      const shop = await api.GameInstance.GetTransactionSystem(instance);
+      return shop!.RemoveItemByTDBID(await player(), id, count);
     },
   },
   audio: {
