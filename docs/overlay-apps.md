@@ -543,6 +543,42 @@ await ui.solo(false);
 
 Solo ends when the package turns it off, stops or crashes, another package takes it, or the player presses **End** beside the launcher tab, which shows "SOLO" and the package's name. `ui.onSolo` hears every end, so a package can keep its own button in step. The [Layers test](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/layers-test) sample shows both.
 
+## Editor tools: the editor channel
+
+A tool on the player's PC, such as a VS Code extension, can ask the running game to play a sound event, so a modder picking a music cue or a sound hears it with the game's own mix. No MCP server and no token to copy: while REDnode runs, it writes `%LOCALAPPDATA%\REDnode\editor.json` with its port and a token made new each run, and only the player's own programs can read it. REDnode 0.43.0 ([#17](https://github.com/Edgemodders/REDnode/issues/17)).
+
+```js
+// In a VS Code extension (Node): play a game sound event in the running game.
+const fs = require('node:fs');
+const path = require('node:path');
+
+async function rednode(call, body) {
+  const file = path.join(process.env.LOCALAPPDATA, 'REDnode', 'editor.json');
+  try {
+    const { port, token } = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const res = await fetch(`http://127.0.0.1:${port}/editor/${call}`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return await res.json();
+  } catch {
+    return { ok: false, reason: 'Start the game with REDnode to hear this' };
+  }
+}
+
+const played = await rednode('sound.play', { name: 'ui_menu_onpress' }); // { ok, playingId, on }
+await rednode('sound.stop', { playingId: played.playingId });             // { ok, stopped }
+```
+
+| Call | Body | Answer |
+|---|---|---|
+| `GET /editor/info` | | `{ ok, version, connected }` |
+| `POST /editor/sound.play` | `{ name, on? }`: `on` is `"player"` (the default: on V, so positional sounds are heard; no entity at the main menu) or `"none"` | `{ ok, playingId, on }`. The game plays nothing for a name it does not know, and does not say so |
+| `POST /editor/sound.stop` | `{ playingId }`, or `{}` for every sound the channel started | `{ ok, stopped }` |
+
+An error answers `{ ok: false, reason }`: 401 without the right token, 409 while the game is not linked, 400 for a bad body. The channel listens on 127.0.0.1 only and refuses requests from web pages (any `Origin` header) and under another host name, so call it from the extension's Node side, not from a webview. When the game ends, Windows ends REDnode at once and `editor.json` stays behind: a refused connection, or a `pid` that no longer runs, means no game. Players can turn the channel off with `"editorChannel": "off"` in `%APPDATA%\@rednode\overlay\settings.json`. More calls, such as hot-loading an archive after an in-game Allow, come later.
+
 ## Calling other packages
 
 A package can offer functions to every other package, and call theirs: a quest mod asks a world builder for a scene's places, a HUD widget asks a stats mod for its numbers. REDnode 0.34.0 and later; descriptions from JSDoc come with 0.35.0 and AI assistants calling them as tools with 0.36.0. The design and its tests are on the [Mod services](services.md) page.

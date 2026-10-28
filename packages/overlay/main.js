@@ -26,6 +26,7 @@ const net = require('node:net');
 const path = require('node:path');
 const { createMods } = require('./mods');
 const { createMcp } = require('./mcp');
+const { createEditor } = require('./editor');
 const { createOAuth } = require('./oauth');
 const { createServices } = require('./services');
 const { scanGame, checkRequires, validRange, key: gamefilesKey } = require('./gamefiles');
@@ -254,6 +255,7 @@ let mods = null;
 let services = null; // the service router (SV1), services.js
 /** The kernel MCP server (mcp.js), created when the app is ready. */
 let mcp = null;
+let editor = null; // the editor channel (#17), editor.js
 /** The plugin's newest perf report, for the MCP perf tool. */
 let lastGamePerf = null;
 /** Windows built by Node mods, by key '<mod id>~<window id>': { modId, win, spec } */
@@ -4400,6 +4402,12 @@ app.whenReady().then(() => {
   }
   mcp = createMcp(mcpHost());
   mcp.configure(mcpConfig());
+  // The editor channel (#17): tools on this PC, such as EDGEwave, play game sounds through
+  // it. "editorChannel": "off" in settings.json turns it off.
+  if (settings.editorChannel !== 'off') {
+    editor = createEditor({ log, version: VERSION, connected: () => connected, bridgeCall });
+    editor.start();
+  } else log('Editor channel: off in settings');
   // Mods start below; one may ask for the kernel's tools at once (mcpFor).
   services = createServices({
     entry: (id) => apps.get(id),
@@ -4504,5 +4512,6 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   mods?.stopAll();
   mcp?.stop();
+  editor?.stop();
   redbridge.stop();
 });

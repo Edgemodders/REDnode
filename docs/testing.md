@@ -74,6 +74,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H3a REDswap](world.md#h3a-test) | In the game | H3 | 2026-10-27 | 0.41.0 + REDswap, Refresh test 0.3.1, game 2.5, no RED Hot Tools | **Pass** (dev PC): four swaps through REDswap (three replaces of `EDGEmatA.archive`, one new archive added), 52 to 59 ms each, 0 faults; V and the inventory preview refreshed with no button, inventory open or closed, which also verifies PV-b (0.40.2) on 2.5 ([results](world.md#h3a-test-results-2026-10-27-passed)) |
 | [H3b World refresh and sound on 2.5](world.md#h3b-test) | In the game | H3 | 2026-10-27 | 0.42.1 + REDswap 1.0.0, World objects test 0.2.2, game 2.5 | **Steps 1 to 6 passed** (dev PC): the spawned box respawned after each of three REDswap swaps (69 to 77 ms), no game entity near V used its mesh, 0 faults. Steps 7 to 10 wait for a new EDGEwave katana override; step 9 checks #18 ([results](world.md#h3b-test)) |
 | [O12 Console](#o12-console) | In the game | O12 | 2026-10-27 | 0.42.1, game 2.5 | **Pass** (dev PC): every step. The first run (0.42.0) lost the history at Stop (an unfinished asynchronous write), fixed in 0.42.1 and passed on retest ([results](overlay.md#o12-console-test)). Mock game: 21 checks |
+| [Editor channel (#17)](#editor-channel-17) | In the game, with Claude | Sound API | Not run | 0.43.0, game 2.5 | Awaits its run. Mock game: 15 checks |
 | [H2b preview spike](world.md#h2b-preview-test) | In the game | H2 | 2026-10-27 | 0.37.0 + Refresh test 0.3.0, RED Hot Tools 1.3.0+edgemodders.1, game 2.31 | **Pass** (laptop): the preview reached through Codeware's menu layer, alive after the menu closes; Reset preview showed the swapped version, menu open or closed; Game event not run (`DelayEventNextFrame` overload); step 2 unanswered (Scan still running) ([results](world.md#h2b-preview-test-results-2026-10-27-passed)) |
 | [H2b refresh after a swap](world.md#h2b-test) | In the game | H2 | 2026-10-22 | 0.26.20 | **Pass** (laptop): four swaps both ways shown on V with no button; nothing else changed; base items Equipment-EX hides were reset from the second swap on, with nothing showing |
 | [UI builder list](#ui-builder-list) | In the game | `ui.list` | 2026-10-20 | 0.26.13 | **Pass** (laptop): the list scrolls, the window does not, follow and Clear work |
@@ -750,6 +751,17 @@ Showed: pan did nothing on the 8-channel HDMI device (miniaudio pans only a ster
 3. Hold the scanner: note "V's dilation".
 
 Showed: the volume reads follow each slider. Step 3: the scanner did not slow time in that run.
+
+### Editor channel (#17)
+
+Built 2026-10-27 in REDnode 0.43.0 (`packages/overlay/editor.js`; docs: overlay-apps.md, "Editor tools"). Checked in the mock game (scratchpad `editor/check.mjs`, 15 checks: editor.json written, token, Origin and Host refused, info, play, play with no entity, stop one and all, errors). Can run in the same session as H3b.
+
+0. Test timer: Start, Mark after each step.
+1. Load a save and stand still. Tell Claude. Claude reads `%LOCALAPPDATA%\REDnode\editor.json` and calls `GET /editor/info`: `connected: true`. Mark.
+2. Claude plays `ui_menu_onpress`: the menu click sound is heard once. Mark.
+3. Claude plays `amb_bl_g_adverts_music` on V: an advert's music is heard (if it is a one-shot it simply ends). Claude stops it with `sound.stop`: it stops, if it was still playing. Mark.
+4. Press Esc (pause menu) and back; Claude plays `ui_menu_onpress` again: heard. Mark.
+5. Quit the game. `editor.json` stays (the game ends the host at once); a call to its port is refused.
 
 ## Game 2.5
 
