@@ -1321,6 +1321,8 @@ Before the game starts: no `zzz_rednode_box.archive` in `archive\pc\mod`, and no
 | 5. Near V | 5 entities within 15 m, none naming the box mesh (an item drop, a bottle, a loot query, an `entEntity`, an access point); with files 17 ms |
 | 6. Game boxes | The boxes the player found near V are other meshes, not `cardboard_box_a_closed.mesh`, and did not change, as expected: a swap refreshes only entities whose components name a file in the archive. v2 swapped in 77 ms; v1 was not swapped back, so v2 is what stays installed |
 
+The player saw the spawned box float a little above the ground, near other objects. Expected from how the test places it: at the height of V's feet, 2 m ahead, level, with no ground check and no physics, so it floats wherever the ground ahead is lower. Accepted as a pass; the player will spawn one on flat open ground in a later session to tell terrain from the mesh's own origin (unverified). A ground-snapping option for `world.spawn` (a raycast down) is a possible addition, not agreed.
+
 The fault watch recorded the three swaps with no faults. Still unverified on 2.5: a game-placed entity that uses the swapped mesh, refreshed by appearance (verified on 2.31 in H2c-a).
 
 ## H2c World objects: plan
