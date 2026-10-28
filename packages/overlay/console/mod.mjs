@@ -231,7 +231,15 @@ for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
 function remember(code) {
   if (history[history.length - 1] !== code) history.push(code);
   if (history.length > HISTORY) history = history.slice(-HISTORY);
-  fs.promises.writeFile(historyFile, JSON.stringify(history)).catch(() => {});
+  // Written at once, before the entry runs, and through a temporary file: an entry that
+  // never returns blocks this thread, and Stop ends it, so a write left for later would
+  // never finish and could leave the file empty.
+  try {
+    fs.writeFileSync(`${historyFile}.tmp`, JSON.stringify(history));
+    fs.renameSync(`${historyFile}.tmp`, historyFile);
+  } catch {
+    // history is a convenience
+  }
 }
 
 let busy = false;

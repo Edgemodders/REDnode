@@ -698,6 +698,8 @@ REDnode 0.42.0, on game 2.5.
 8. Close the Console with its ✕, then switch it on again: the history (Up) is still there. Mark.
 9. Quit the game.
 
+**First run, 2026-10-27, in progress** (dev PC, game 2.5, REDnode 0.42.0). Step 8 **failed**: after reopening, Up brought back only `1 + 1`. The history file held only that entry. The Console wrote its history asynchronously; the write for `while (true) {}` had truncated the file when the loop blocked the thread, and **Stop** ended it there, so the file was empty when the Console started again. REDnode 0.42.1 writes the history synchronously, before the entry runs, through a temporary file and a rename. A mock check covers it (history survives Stop). The run used `Items.slim_fit_pants` from the first build's examples, which is no TweakDB record; 0.42.0's later commit uses `Items.Pants_01_basic_01`.
+
 ### Pointer lock: built
 
 Asked for by EDGEbuilder ([#11](https://github.com/Edgemodders/REDnode/issues/11)) for its editor camera, which turns while the right mouse button is held: the cursor must stay put and the mouse keep turning the view. REDnode 0.22.0.
