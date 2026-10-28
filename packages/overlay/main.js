@@ -173,8 +173,10 @@ const PERMISSIONS = {
   // host's tasks and tools calls (fromAdmin). The Mod Manager and launcher show a warning under it.
   admin: "managing REDnode: what every package costs, ending or restarting any package, and switching AI assistants' tools on and off",
 };
-// What a package may offer other packages in its manifest's "provides".
-const PROVIDES = ['agent'];
+// What a package may offer other packages in its manifest's "provides": "agent" (the host's
+// own broker, REDagent), or any other role name (#20), answered by the package's service
+// file and reached with use("voice") in the rednode package.
+const ROLE_NAME = /^[a-z][a-z0-9-]{0,31}$/;
 // The UI kit, served to every app as rednode://ui/rednode-ui.js.
 const UI_DIR = app.isPackaged ? path.join(__dirname, 'ui') : path.join(__dirname, '..', 'ui', 'src');
 // The rednode package (built from packages/rednode), served to apps as rednode://sdk/index.js
@@ -352,8 +354,12 @@ function readManifest(dir) {
   if (m.permissions !== undefined && (!Array.isArray(m.permissions) || m.permissions.some((p) => !(p in PERMISSIONS)))) {
     problems.push(`permissions must be a list of ${Object.keys(PERMISSIONS).join(', ')}`);
   }
-  if (m.provides !== undefined && (!Array.isArray(m.provides) || m.provides.some((p) => !PROVIDES.includes(p)))) {
-    problems.push(`provides must be a list of ${PROVIDES.join(', ')}`);
+  if (m.provides !== undefined) {
+    if (!Array.isArray(m.provides) || m.provides.some((p) => typeof p !== 'string' || !ROLE_NAME.test(p))) {
+      problems.push('provides must be a list of role names, such as ["voice"]: lowercase letters, digits and -');
+    } else if (m.provides.some((p) => p !== 'agent') && m.service === undefined) {
+      problems.push('a package that provides a role answers it with its service file: add "service"');
+    }
   }
   if (m.anchor !== undefined && !ANCHORS.includes(m.anchor)) problems.push(`anchor must be one of ${ANCHORS.join(', ')}`);
   if (m.kind !== undefined && !['window', 'hud'].includes(m.kind)) problems.push('kind must be window or hud');
@@ -2412,12 +2418,18 @@ const SOUND_CATEGORIES = ['sfx', 'dialogue', 'music'];
 const PLAY_KEYS = ['category', 'volume', 'loop', 'delay', 'start', 'end', 'rate', 'semitones', 'pan', 'fadeIn', 'stream', 'pauseInMenu'];
 const soundOwners = new Map(); // sound id -> package id, until the plugin says it ended
 
+// A file in the package's folder, or (#20) a full path in its data folder (pkg.dataDir),
+// for sounds a package makes while it runs. The engine reads the file at each play.
 function soundFile(entry, name) {
+  const inside = (dir, file) => {
+    const rel = path.relative(dir, file);
+    return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+  };
   const file = path.resolve(entry.dir, name);
-  const rel = path.relative(entry.dir, file);
-  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) throw new Error(`${name} is outside the package's folder`);
+  const where = inside(entry.dir, file) ? "the package's folder" : path.isAbsolute(name) && inside(dataDirOf(entry.manifest.id), file) ? "the package's data folder" : null;
+  if (!where) throw new Error(`${name} is outside the package's folder and its data folder (pkg.dataDir)`);
   if (!SOUND_TYPES.has(path.extname(file).toLowerCase())) throw new Error(`${name}: REDnode plays .wav, .ogg, .mp3 and .flac files`);
-  if (!fs.existsSync(file)) throw new Error(`${name} was not found in the package's folder`);
+  if (!fs.existsSync(file)) throw new Error(`${name} was not found in ${where}`);
   return file;
 }
 
@@ -2885,6 +2897,8 @@ function appList() {
         mod: isMod(m) ? mods.info(m.id, metrics) : null,
         // Its service (SV1): the functions it offers other packages, once its service file has loaded.
         service: m.service ? serviceSummary(m.id, m.service) : null,
+        // Its roles (#20): "provides" other than agent, and who else provides each.
+        roles: rolesOf(m),
         closedWindows: [...playerClosed.values()].filter((c) => c.modId === m.id).map((c) => c.win),
         hasWindow: windowsOfPackage(m.id).length > 0,
         // Its space: set for the package, else the one its open windows share, else null.
@@ -3507,6 +3521,59 @@ function describeService(id, functions) {
   return describer.describeSource(fs.readFileSync(path.join(entry.dir, entry.manifest.service), 'utf8'), functions);
 }
 
+// ---------- roles (#20): a service found by what it does, not by its id ----------
+//
+// A package that says "provides": ["voice"] answers use("voice") with its service file.
+// When more than one installed package provides a role, the one the player chose in the
+// Mod Manager answers (settings.roles); with no choice, the only one switched on. Else
+// use() is refused with their names: a provider may spend the player's money (an AI
+// voice service), so the host does not guess.
+
+function providersOf(role) {
+  return [...apps.values()].filter((e) => !e.pinned && e.manifest.provides.includes(role));
+}
+
+// The package that answers a role now, or throws why none does.
+function providerOf(role, callerId) {
+  if (role === 'agent') throw new Error('The agent role is reached with agent.ask');
+  if (!ROLE_NAME.test(role)) throw new Error('use needs a role name, such as "voice"');
+  const all = providersOf(role).filter((e) => e.manifest.id !== callerId);
+  if (!all.length) throw new Error(`No installed package provides "${role}"`);
+  const chosen = settings.roles?.[role];
+  if (chosen && all.some((e) => e.manifest.id === chosen)) return chosen;
+  if (all.length === 1) return all[0].manifest.id;
+  const on = all.filter((e) => isEnabled(e));
+  if (on.length === 1) return on[0].manifest.id;
+  const names = all.map((e) => e.manifest.name).sort();
+  throw new Error(`${names.slice(0, -1).join(', ')} and ${names.at(-1)} all provide "${role}": choose one in the Mod Manager`);
+}
+
+// What the Mod Manager shows of a package's roles: who else provides each, and whether
+// this package is the one that answers.
+function rolesOf(m) {
+  return m.provides
+    .filter((role) => role !== 'agent')
+    .map((role) => {
+      let answers = null;
+      try {
+        answers = providerOf(role);
+      } catch {
+        // several and no choice, or none
+      }
+      const others = providersOf(role).filter((e) => e.manifest.id !== m.id).map((e) => e.manifest.name);
+      return { role, others, answers: answers === m.id, chosen: settings.roles?.[role] === m.id };
+    });
+}
+
+ipcMain.handle('rednode:apps:role', (event, role, id) => {
+  fromLauncher(event);
+  if (!providersOf(role).some((e) => e.manifest.id === id)) throw new Error(`${id} does not provide "${role}"`);
+  settings.roles = { ...settings.roles, [role]: id };
+  writeJson('settings.json', settings);
+  log(`Roles: ${id} answers "${role}" from now on (packages that called use("${role}") before keep theirs until they restart)`);
+  return appList();
+});
+
 function onService(id, msg) {
   const entry = apps.get(id);
   if (!entry) throw new Error('Unknown package');
@@ -3514,6 +3581,10 @@ function onService(id, msg) {
   switch (msg?.op) {
     case 'connect':
       return services.connect(id, String(msg.provider ?? ''));
+    case 'use': {
+      const role = String(msg.role ?? '');
+      return services.connect(id, providerOf(role, id)).then((info) => ({ ...info, role }));
+    }
     case 'call': {
       const key = `${id}:${msg.cid}`;
       return services

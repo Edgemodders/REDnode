@@ -80,6 +80,8 @@ export interface InputProps {
   label?: string;
   placeholder?: string;
   value?: string;
+  /** Hide what is typed, for a key or a password (REDnode 0.44.0 or later). Keep the value with `secrets`, not in a file. */
+  password?: boolean;
 }
 /** Properties of {@link ui.progress}. */
 export interface ProgressProps {

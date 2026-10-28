@@ -105,6 +105,7 @@ contextBridge.exposeInMainWorld('rednode', {
     theme: (name) => ipcRenderer.invoke('rednode:host:theme', name),
     /** Grants or withdraws a permission a package asks for, such as 'mcp'. */
     grant: (id, permission, granted) => ipcRenderer.invoke('rednode:apps:grant', id, permission, granted),
+    role: (role, id) => ipcRenderer.invoke('rednode:apps:role', role, id),
     /** Gets the kernel MCP server's switch, or turns it on or off. */
     mcp: (on) => ipcRenderer.invoke('rednode:host:mcp', on),
     /** Copies the command that adds the MCP server to Claude Code. */

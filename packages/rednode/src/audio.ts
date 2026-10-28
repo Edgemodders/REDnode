@@ -155,9 +155,23 @@ function handle(id: number): Sound {
  */
 export const audio = {
   /**
-   * Plays a sound: an id from the manifest's `"sounds"`, or a file's path in your
-   * package's folder. Resolves once the engine has it, with a {@link Sound}; the file
-   * loads in the background and starts as soon as it is ready.
+   * Plays a sound: an id from the manifest's `"sounds"`, a file's path in your
+   * package's folder, or (REDnode 0.44.0 or later) a full path in your package's data
+   * folder, `pkg.dataDir`, for sounds made while the package runs, such as spoken lines.
+   * Resolves once the engine has it, with a {@link Sound}; the file loads in the
+   * background and starts as soon as it is ready. The file is read at each play, so a
+   * file written again plays its new sound.
+   *
+   * @example
+   * ```js
+   * import { audio, pkg } from "rednode";
+   * import fs from "node:fs";
+   * import path from "node:path";
+   *
+   * const file = path.join(pkg.dataDir, "line-1.wav");
+   * fs.writeFileSync(file, wavBytes); // made by the package
+   * await audio.play(file, { category: "dialogue" });
+   * ```
    */
   async play(sound: string, options?: PlayOptions): Promise<Sound> {
     listen();

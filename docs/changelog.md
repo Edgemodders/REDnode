@@ -17,9 +17,14 @@ How to keep it:
 - The editor channel (https://github.com/Edgemodders/REDnode/issues/17): tools on the player's PC, such as EDGEwave in VS Code, can play a game sound event in the running game, and stop it, with the game's own mix. While REDnode runs it writes `%LOCALAPPDATA%\REDnode\editor.json` with a local port and a token made new each run; the calls are `POST /editor/sound.play`, `/editor/sound.stop` and `GET /editor/info`. Local only, refused to web pages; `"editorChannel": "off"` in REDnode's settings turns it off. See the Overlay apps guide, "Editor tools".
 - `game.player.addItem(id, count?)` and `game.player.removeItem(id, count?)` put items in V's inventory, or take them out, by their TweakDB id, as Cyber Engine Tweaks' `Game.AddToInventory` does. `addItem` refuses an id with no record, so a typo is not given as an empty item.
 - `api.$null` passes no object on purpose, for an object parameter the game does not mark optional (MCP: `{"$null": true}`).
+- Roles (https://github.com/Edgemodders/REDnode/issues/20): a package can provide a role, such as `"provides": ["voice"]`, answered by its service file, and any mod reaches it with `use("voice")` without knowing which package that is. When two installed packages provide a role, the player picks the one that answers in the Mod Manager's new **Provides** section.
+- `audio.play` plays a file from the package's data folder (`pkg.dataDir`) by its full path, for sounds a package makes while it runs, such as spoken lines.
+- `ui.input({ password: true })`: a text field that shows dots, for a key or a password.
+- The **Roles test** sample checks all three.
 
 **Changed**
 
+- Counter service 0.3.0 provides the `counter` role.
 - A plain `null` for an object parameter the game does not mark optional is refused with an error naming the parameter, instead of being passed as an empty object: many game functions use such a parameter without checking it, and `GetItemName` with a null item data crashed the game (https://github.com/Edgemodders/REDnode/issues/18). The game API's types no longer allow `null` there.
 
 **Fixed**

@@ -340,6 +340,10 @@ for (const app of apps) {
   copyForPreview(app);
   writeFileSync(join(out, `${app.id}.html`), appPage(app, apps));
 }
+// Who provides each role (#20), for the sim's use(): role -> package ids.
+const roles = {};
+for (const app of apps) for (const role of app.manifest.provides ?? []) (roles[role] ??= []).push(app.id);
+writeFileSync(join(out, 'run', 'roles.json'), JSON.stringify(roles));
 writeFileSync(join(out, 'index.html'), indexPage(apps));
 const missing = apps.filter((a) => !NOTES[a.id]).map((a) => a.id);
 console.log(`Example apps: ${apps.length} pages in docs/examples${missing.length ? `; no notes yet for ${missing.join(', ')}` : ''}`);

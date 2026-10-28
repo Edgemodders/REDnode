@@ -42,6 +42,7 @@ function apply(type, el, props) {
       break;
     case 'input':
       for (const k of ['label', 'placeholder']) if (k in props) attr(el, k, props[k]);
+      if ('password' in props) attr(el, 'type', props.password ? 'password' : 'text');
       if ('value' in props) attr(el, 'value', props.value ?? '');
       break;
     case 'progress':

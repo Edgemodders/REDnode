@@ -322,6 +322,7 @@ export const NOTES = {
       'Its rednode-app.json names a service file, `"service": "service.mjs"`, and no `main`: the service is the whole package. Every function `service.mjs` exports can be called by other packages, by this package\'s id, through the REDnode host.',
       '`service.emit("changed", ...)` tells every package that connected. `service.caller()` says who is calling, and `service.signal()` aborts when the caller gives up, which `wait` uses.',
       'The JSDoc on each function is its description: from SV2 the host reads it, and functions marked `@tool` become tools an AI assistant can call.',
+      'Its rednode-app.json also says `"provides": ["counter"]`: a package that does not know its id can find it with `use("counter")` (REDnode 0.44.0 or later), as Roles test does.',
     ],
     tryThis: ['Open Counter panel\'s page: it runs this service beside it.'],
     preview: 'In the game this package has no window. Here the preview lists the functions it offers.',
@@ -337,6 +338,18 @@ export const NOTES = {
     ],
     tryThis: ['Press +1 and +10: the count and the log follow the service\'s events.', 'Press Wait, then Stop, then Stop.', 'Press Fail and Unknown function.', 'In the game, Describe lists the service\'s JSDoc, and Bad call is refused by REDnode before the service sees it.'],
     preview: 'Here the service runs in the same preview; in the game it is a package of its own, and the host carries each call.',
+  },
+  'roles-test': {
+    group: 'tests',
+    summary: 'Finds a service by its role with `use("counter")`, plays a sound it writes into its data folder, and hides a key typed into a password field.',
+    teaches: ['use', 'provides', 'audio.play from pkg.dataDir', 'ui.input password'],
+    how: [
+      '`use("counter")` asks the host for the package that provides the `counter` role (Counter service says `"provides": ["counter"]`) and answers the same handle as `service.connect`. With two providers, the player picks one in the Mod Manager\'s Provides section.',
+      'The tone buttons write a WAV file into `pkg.dataDir` and play it with its full path. The second writes the same file again at another pitch: the engine reads the file at each play.',
+      '`ui.input({ password: true })` shows dots as the player types; keep such a value with `secrets`.',
+    ],
+    tryThis: ['Press use("counter"), then add(1).', 'Press use("nobody"): no package provides it.', 'Type into the password field.'],
+    preview: 'Here Counter service runs in the same preview. The tone buttons fail: a preview cannot write files.',
   },
   'world-objects-test': {
     group: 'tests',

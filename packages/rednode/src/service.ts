@@ -48,10 +48,12 @@ export interface ServiceDescription {
   events: Record<string, EventDescriptor>;
 }
 
-/** What a provider offers, as {@link service.connect} found it. */
+/** What a provider offers, as {@link service.connect} or {@link use} found it. */
 export interface ServiceInfo {
   /** The package's id. */
   id: string;
+  /** The role it was found by, with {@link use}; absent for {@link service.connect}. */
+  role?: string;
   /** The package's name, for people. */
   name: string;
   /** The package's version, from its rednode-app.json. */
@@ -178,6 +180,36 @@ function handle<T>(info: ServiceInfo, options: ServiceCallOptions): ServiceHandl
       return (...args: unknown[]) => call(k, args);
     },
   }) as ServiceHandle<T>;
+}
+
+/**
+ * Connects to the package that provides a **role**, such as `"voice"`, rather than to a
+ * package by its id (REDnode 0.44.0 or later). A provider says so in its rednode-app.json
+ * with `"provides": ["voice"]` and answers with its service file, as for
+ * {@link service.connect}; the handle is the same.
+ *
+ * Which package answers: the only one installed; or, with several, the one the player
+ * chose in the Mod Manager (its Provides section), else the only one switched on. With
+ * several and no choice, `use` rejects with their names, so the player decides which
+ * service (and whose bill) a mod uses. A handle keeps its provider: after the player
+ * chooses another, call `use` again to reach it.
+ *
+ * Rejects when no installed package provides the role, or as {@link service.connect} does.
+ * Pass the interface you expect for typed calls; the provider's docs say what it offers.
+ *
+ * @example
+ * ```js
+ * import { use } from "rednode";
+ *
+ * const voice = await use("voice"); // EDGEwave's edgewave-voice, or another provider
+ * const line = await voice.speak("Choom, you look like hell.", "judy");
+ * voice.$on("ended", (e) => { if (e.id === line.id) console.log("done"); });
+ * console.log(`${voice.$info.name} speaks`);
+ * ```
+ */
+export async function use<T = Record<string, (...args: any[]) => any>>(role: string): Promise<ServiceHandle<T>> {
+  const info = (await send({ op: "use", role })) as ServiceInfo;
+  return handle<T>(info, {});
 }
 
 /**

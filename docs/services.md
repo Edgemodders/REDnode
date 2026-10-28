@@ -308,4 +308,36 @@ Before: REDnode 0.36.0 deployed, with REDagent 0.3.1. In the launcher's settings
 ### SV3 test: second run (steps 3 and 5)
 
 2026-10-24, the same build: **pass**, so SV3 passed. Claude Code asked before `add` and the call went through ("claude-code called add as a tool"). REDagent 0.3.1 fetched its Agent SDK in 2.8 s, read the count with `get` without asking, asked before `reset` (the call came 7 s into the turn, after the player allowed it), and read 0 after it. Each call is in Counter service's log by the assistant's name.
+
+## Roles (#20): built
+
+Asked for by EDGEwave in [#20](https://github.com/Edgemodders/REDnode/issues/20): a mod that writes dialogue at runtime wants each line spoken, by whatever voice package the player has, without knowing that package's id. Agreed with the owner on 2026-10-27: roles with `use("voice")`, a choice in the Mod Manager when two packages provide one, `audio.play` from the data folder, and a password field. Sound handles across packages and spending limits come later. Built in REDnode 0.44.0.
+
+| Part | How |
+|---|---|
+| A role | `"provides": ["voice"]` in a provider's rednode-app.json: any name of lowercase letters, digits and `-`. The provider answers with its service file, so a role other than `agent` needs `"service"` (the manifest is refused without it). `agent` keeps its own broker, `agent.ask` |
+| Using one | `use("voice")` in the `rednode` package, from a Node mod or a page. It answers the same handle as `service.connect`, with `$info.role` set. Typed calls: `use<VoiceApi>("voice")` |
+| Which package answers | The only one installed. With several: the one the player chose in the Mod Manager (`settings.roles`), else the only one switched on. With several and no choice, `use` is refused with their names: a provider may spend the player's money, so the host does not guess. A package never answers its own `use` |
+| The choice | The Mod Manager's **Provides** section on each provider: the role, who else provides it, and **Use this one**; the one that answers shows IN USE. A handle keeps its provider until the caller calls `use` again |
+| Sounds a package makes | `audio.play` takes a full path in `pkg.dataDir` as well as a file in the package's folder. The engine reads the file at each play, so a file written again plays its new sound. No more `.cache/` in the package folder |
+| Password field | `ui.input({ password: true })` shows dots; the UI kit's `rn-input` takes `type="password"` |
+| Docs previews | The examples build lists who provides each role (`run/roles.json`); the simulation's `use` connects to the first |
+
+Not built, from #20's list: streaming audio or bytes to `audio.play` (a file in `pkg.dataDir` is the supported way), sound handles a caller can stop across packages, spending limits per caller, and types a provider ships for its role. Reopening a Node mod's closed window from the Mod Manager already works (**Show**, since 0.12.1).
+
+Checked in the mock game (scratchpad `roles/check.mjs`, 15 checks): two providers with no choice refused with both names, the choice stored and used, a call and an event through the role, a chosen provider switched off named as off, the choice changed, no provider, a provider with no service file refused at load, two tones written into the data folder and played by full path, and the password field.
+
+## Roles test
+
+REDnode 0.44.0, game 2.5. With Counter service 0.3.0 (`"provides": ["counter"]`), the Roles test sample, and a second provider for the choice, **Counter copy** (a test package with `"provides": ["counter"]` whose count starts at 1000, put in the apps folder for this test only).
+
+0. Switch on the **Test timer** in the launcher and press **Start**. Press **Mark** after each step.
+1. Load a save. In the Mod Manager switch on **Counter service**, **Counter copy** and **Roles test**. None asks for a permission.
+2. In Roles test press **use("counter")**. Expected: refused, "Counter copy and Counter service all provide "counter": choose one in the Mod Manager".
+3. In the Mod Manager open Counter copy: its **Provides** section lists `counter`, "Also provided by Counter service". Press **Use this one**: it shows IN USE.
+4. In Roles test press **use("counter")**, then **add(1)**. Expected: "Counter copy (counter-copy 0.1.0) answers "counter"", then "add(1): 1001" and the changed event.
+5. In the Mod Manager open Counter service and press **Use this one**. In Roles test press **use("counter")** and **add(1)**. Expected: Counter service answers; its count goes up by one.
+6. Press **use("nobody")**. Expected: "No installed package provides "nobody"".
+7. Press **Write and play 440 Hz**, then **Write again, 880 Hz**. Expected: a one-second tone, then a higher one, each line naming `tone.wav` in the package's data folder.
+8. Type into the password field and press Enter. Expected: dots in the field, and "Got N characters; the field showed dots".
 {% endraw %}

@@ -1,9 +1,10 @@
 {
   "id": "counter-service",
   "name": "Counter service",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": "Edgemodders",
-  "description": "A service with no window: a count other packages read and change through REDnode's mod services. Its functions are in service.mjs. Counter panel uses it.",
+  "description": "A service with no window: a count other packages read and change through REDnode's mod services. Its functions are in service.mjs. Counter panel uses it by its id; Roles test finds it by its role, \"counter\".",
   "service": "service.mjs",
+  "provides": ["counter"],
   "open": false
 }

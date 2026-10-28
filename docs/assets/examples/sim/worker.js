@@ -450,6 +450,21 @@ export const service = {
   },
 };
 
+// Roles (#20): in a preview, the first example app that provides the role answers
+// (the docs build lists them in run/roles.json); in the game the player chooses.
+export async function use(role) {
+  let ids = [];
+  try {
+    ids = (await (await fetch(new URL('../roles.json', self.name))).json())[role] ?? [];
+  } catch {
+    // no list: none provides it
+  }
+  if (!ids.length) throw new Error(`No package provides "${role}" in this preview: in the game one must be installed`);
+  const h = await service.connect(ids[0]);
+  h.$info.role = role;
+  return h;
+}
+
 export const agent = {
   ask(question, options = {}) {
     const id = nextCall++;

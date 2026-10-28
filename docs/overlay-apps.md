@@ -276,6 +276,8 @@ Settings, in the manifest or in the call (the call's win):
 | `stream` | Read the file as it plays instead of loading it first; on by default for music |
 | `pauseInMenu` | Pause while a game menu is open; on by default |
 
+A sound your package makes while it runs, such as a spoken line from a speech service, goes in your data folder: write the file into `pkg.dataDir` and play it by its full path (REDnode 0.44.0 and later), `audio.play(path.join(pkg.dataDir, 'line-1.wav'), { category: 'dialogue' })`. Not into your package's folder: hot reload watches it. The engine reads the file at each play, so a file written again plays its new sound.
+
 `audio.playing()` lists your sounds with their position, and `audio.stopAll()` stops them. The file loads in the background, so `audio.play` returns at once and the sound starts when it is ready. The same works from an overlay app's page. The [Sound API page](sound.md) has the plan: sound on entities and positions comes next.
 
 ## Talking to the game
@@ -373,7 +375,7 @@ game.on('PlayerPuppet.OnGameAttached', () => console.log('A save was loaded'));
 | `ui.button(label, onClick, { variant, sound })` | A button. `variant` is `ghost` or `danger` |
 | `ui.toggle(label, onChange, { checked })` | An on and off switch |
 | `ui.slider(label, onChange, { min, max, step, value, unit })` | A slider |
-| `ui.input({ label, placeholder, value, onChange, onSubmit })` | A text field |
+| `ui.input({ label, placeholder, value, password, onChange, onSubmit })` | A text field; `password: true` shows dots (0.44.0), for a key you keep with `secrets` |
 | `ui.progress(value, { label, max })` | A progress bar |
 | `ui.list({ lines, keep, height, follow })` | A list of lines that scrolls on its own, for a log or a live feed. `push(...lines)` adds at the bottom (only the new lines travel to the window) and `clear()` empties it. It keeps the newest `keep` lines (500 by default, up to 5,000) and follows the newest one unless the player has scrolled up. Without `height` it fills the space the other nodes leave, at least 160 px; when they leave less, the window scrolls |
 | `ui.row(...nodes)`, `ui.column(...nodes)` | Layout |
@@ -633,6 +635,32 @@ await counter.$with({ timeoutMs: 60000 }).add(1);            // a longer timeout
 | Cost | The Task Manager shows each package's service calls a second, in and out |
 
 The [Counter service](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/counter-service) and [Counter panel](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/counter-panel) samples show both sides, with a timeout, Stop and errors.
+
+### Roles: a service found by what it does
+
+Sometimes a mod wants a kind of service, not one package: a voice that speaks its lines, whichever voice package the player has. The provider names a **role** in its manifest, and callers ask for the role with `use` (REDnode 0.44.0 and later):
+
+```json
+{ "id": "edgewave-voice", "name": "EDGEwave voice", "version": "0.1.0", "service": "service.mjs", "provides": ["voice"] }
+```
+
+```js
+import { use } from 'rednode';
+
+const voice = await use('voice');           // the same handle as service.connect
+await voice.speak('Choom, you look like hell.', 'judy');
+console.log(`${voice.$info.name} answers "${voice.$info.role}"`);
+```
+
+| Rule | Detail |
+|---|---|
+| Role names | Lowercase letters, digits and `-`, such as `voice` or `quest-log`. A package may provide several. The provider answers with its service file, so `"provides"` needs `"service"`. `agent` is REDagent's and is reached with `agent.ask` |
+| Which package answers | The only one installed. When more than one provides a role, the one the player chose in the Mod Manager's **Provides** section, else the only one switched on. With several and no choice, `use` fails with their names, so the player decides which service, and whose bill, a mod uses |
+| Changing it | A handle keeps the provider it found. After the player chooses another, call `use` again to reach it |
+| What it offers | Whatever the provider's service exports; agree the functions in the provider's docs. `use<Voice>('voice')` types the handle in TypeScript |
+| Errors | "No installed package provides ..." when none does; otherwise as `service.connect` (switched off, crashed, not answering) |
+
+The [Roles test](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/roles-test) sample finds Counter service by its role, `counter`.
 
 ### Describing a service
 

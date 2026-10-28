@@ -469,6 +469,23 @@ function renderDetails() {
     }
     if (i.service.events?.length) parts.push(el('div', 'dim', `Events: ${i.service.events.join(', ')}`));
   }
+  if (i.roles?.length) {
+    // Its roles (#20): other packages reach it with use("<role>"). With more than one
+    // provider of a role, the player picks the one that answers.
+    parts.push(el('div', 'section', 'Provides'));
+    for (const r of i.roles) {
+      const row = el('div', 'row');
+      row.append(el('span', 'mono', r.role));
+      if (!r.others.length) row.append(el('span', 'dim', 'answers use() calls for it'));
+      else if (r.answers) row.append(el('span', 'badge', 'IN USE'));
+      else row.append(button('Use this one', () => act(i.name, () => window.rednode.apps.role(r.role, i.id))));
+      parts.push(row);
+      if (r.others.length) {
+        const note = r.answers ? `Answers it; also provided by ${r.others.join(', ')}` : `Also provided by ${r.others.join(', ')}`;
+        parts.push(el('div', 'dim', r.answers || r.chosen ? note : `${note}. Choose which one answers.`));
+      }
+    }
+  }
   const bridgeInRequires = (i.requires ?? []).some((r) => isBridgeName(r.name));
   if (i.permissions?.length) {
     parts.push(el('div', 'section', 'Permissions'));

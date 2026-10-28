@@ -1075,6 +1075,9 @@ export const service = {
   signal: () => null,
   emit() {},
 };
+export async function use(role) {
+  throw new Error(`No package provides "${role}" in this preview: in the game one must be installed`);
+}
 
 const ANSWER =
   'This is the docs page, so REDagent is not here to answer. In the game, your question goes to REDagent (powered by Claude) with the context this mod sends, and the answer streams into this window the way this text does.';

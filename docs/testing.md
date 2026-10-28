@@ -75,6 +75,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H3b World refresh and sound on 2.5](world.md#h3b-test) | In the game | H3 | 2026-10-27 | 0.42.1 + REDswap 1.0.0, World objects test 0.2.2, game 2.5 | **Steps 1 to 6 passed** (dev PC): the spawned box respawned after each of three REDswap swaps (69 to 77 ms), no game entity near V used its mesh, 0 faults. Steps 7 to 10 wait for a new EDGEwave katana override; step 9 checks #18 ([results](world.md#h3b-test)) |
 | [O12 Console](#o12-console) | In the game | O12 | 2026-10-27 | 0.42.1, game 2.5 | **Pass** (dev PC): every step. The first run (0.42.0) lost the history at Stop (an unfinished asynchronous write), fixed in 0.42.1 and passed on retest ([results](overlay.md#o12-console-test)). Mock game: 21 checks |
 | [Editor channel (#17)](#editor-channel-17) | In the game, with Claude | Sound API | Not run | 0.43.0, game 2.5 | Awaits its run. Mock game: 15 checks |
+| [Roles (#20)](services.md#roles-test) | In the game | Services | Not run | 0.44.0 + Roles test 0.1.0, Counter service 0.3.0, game 2.5 | Awaits its run: `use("counter")` with two providers and the player's choice, a tone from the data folder, the password field. Mock game: 15 checks |
 | [H2b preview spike](world.md#h2b-preview-test) | In the game | H2 | 2026-10-27 | 0.37.0 + Refresh test 0.3.0, RED Hot Tools 1.3.0+edgemodders.1, game 2.31 | **Pass** (laptop): the preview reached through Codeware's menu layer, alive after the menu closes; Reset preview showed the swapped version, menu open or closed; Game event not run (`DelayEventNextFrame` overload); step 2 unanswered (Scan still running) ([results](world.md#h2b-preview-test-results-2026-10-27-passed)) |
 | [H2b refresh after a swap](world.md#h2b-test) | In the game | H2 | 2026-10-22 | 0.26.20 | **Pass** (laptop): four swaps both ways shown on V with no button; nothing else changed; base items Equipment-EX hides were reset from the second swap on, with nothing showing |
 | [UI builder list](#ui-builder-list) | In the game | `ui.list` | 2026-10-20 | 0.26.13 | **Pass** (laptop): the list scrolls, the window does not, follow and Clear work |
@@ -762,6 +763,10 @@ Built 2026-10-27 in REDnode 0.43.0 (`packages/overlay/editor.js`; docs: overlay-
 3. Claude plays `amb_bl_g_adverts_music` on V: an advert's music is heard (if it is a one-shot it simply ends). Claude stops it with `sound.stop`: it stops, if it was still playing. Mark.
 4. Press Esc (pause menu) and back; Claude plays `ui_menu_onpress` again: heard. Mark.
 5. Quit the game. `editor.json` stays (the game ends the host at once); a call to its port is refused.
+
+### Roles (#20)
+
+Built 2026-10-28 in REDnode 0.44.0. Its steps are on the Mod services page: [Roles test](services.md#roles-test). Can run in the same session as the editor channel and H3b.
 
 ## Game 2.5
 

@@ -1,0 +1,10 @@
+{
+  "id": "roles-test",
+  "name": "Roles test",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "Checks REDnode 0.44.0's parts for EDGEwave's voice (#20): use(\"counter\") reaches whichever package provides the counter role, a sound written into the package's data folder plays, and a password field hides what is typed.",
+  "main": "mod.mjs",
+  "requires": { "rednode": ">=0.44.0" },
+  "open": false
+}
