@@ -1287,7 +1287,7 @@ The loader answered 0 in every swap, as the game's own callers expect when nothi
 
 ### H3b test
 
-Game 2.5 on the dev PC with REDnode 0.41.1 and REDswap 1.0.0 (deployed by `deploy-native.ps1`), Codeware, World objects test 0.2.2 and Sound Tools' Hot swap. No RED Hot Tools. The same run checks 0.41.1's fix for [#18](https://github.com/Edgemodders/REDnode/issues/18) (step 9).
+Game 2.5 on the dev PC with REDnode 0.42.0 (0.41.1's changes and the Console) and REDswap 1.0.0 (deployed by `deploy-native.ps1`), Codeware, World objects test 0.2.2 and Sound Tools' Hot swap. No RED Hot Tools. The same run checks 0.41.1's fix for [#18](https://github.com/Edgemodders/REDnode/issues/18) (step 9).
 
 Files:
 

@@ -69,6 +69,9 @@ const BUILTIN_ROOTS = [
   { dir: path.join(__dirname, 'welcome'), single: true, builtin: true },
   // The Connect window (#19): open only while an MCP client waits for the player's answer.
   { dir: path.join(__dirname, 'connect'), single: true, builtin: true, prompt: true },
+  // The Console (O12): a page and a Node mod. Packaged, it sits outside app.asar, in
+  // resources/, so its mod's worker thread loads it as plain files.
+  { dir: app.isPackaged ? path.join(process.resourcesPath, 'console') : path.join(__dirname, 'console'), single: true, builtin: true },
 ];
 // --apps-dir may list several folders, separated by ";", for example REDnode's
 // examples and another repo's packages during development.
@@ -4117,6 +4120,15 @@ ipcMain.handle('rednode:logs:recent', (event) => {
 ipcMain.handle('rednode:logs:copy', (event, text) => {
   fromBuiltin(event);
   clipboard.writeText(String(text));
+  return true;
+});
+
+// The Console's Stop (O12): what runs there may never end, so its mod starts again.
+ipcMain.handle('rednode:console:stop', (event) => {
+  const w = windowFor(event.sender);
+  if (!w?.app.builtin || w.app.manifest.id !== 'console') throw new Error("Only REDnode's Console can stop the Console");
+  if (!mods.isEnabled('console')) throw new Error('The Console is switched off');
+  mods.restart('console', 'Stopped from its window');
   return true;
 });
 

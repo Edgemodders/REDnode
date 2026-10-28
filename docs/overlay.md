@@ -1,6 +1,6 @@
 # HTML overlay
 
-Status: **in use.** Phases O1 to O6 and O8 to O11 passed in game (2026-10-11 to 2026-10-14), then a polish phase (REDnode 0.24.2 to 0.24.7, 2026-10-17). Open: the O4 scene threshold (see the O4 result). Not done yet: O7 Display, and O12 Console (proposed). To build an app, read the [Overlay apps](overlay-apps.md) guide; this page is the design and its test record. The proof of concept passed in game, alone and side by side with CET and 10 other RED4ext plugins (2026-10-11). See [Test results](#test-results) and [the plan](#plan-for-the-real-version).
+Status: **in use.** Phases O1 to O6 and O8 to O11 passed in game (2026-10-11 to 2026-10-14), then a polish phase (REDnode 0.24.2 to 0.24.7, 2026-10-17). Open: the O4 scene threshold (see the O4 result). Not done yet: O7 Display. O12 Console is built (REDnode 0.42.0) and awaits its in-game test. To build an app, read the [Overlay apps](overlay-apps.md) guide; this page is the design and its test record. The proof of concept passed in game, alone and side by side with CET and 10 other RED4ext plugins (2026-10-11). See [Test results](#test-results) and [the plan](#plan-for-the-real-version).
 
 REDnode overlay apps are small web apps (HTML, CSS and JavaScript) drawn on top of the game, like CET's ImGui windows. They talk to the game through the same `rednode` API as Node mods.
 
@@ -190,7 +190,7 @@ Rules that make borderless windows behave:
 | **O9 Debugger** | Chromium DevTools for any overlay app, from an **Inspect** button: first in a desktop window, then, if a prototype works, inside the overlay as a built-in Debugger app. Node mods debugged through Node's inspector, attachable from VS Code and REDcode. See [O9 Debugger: plan](#o9-debugger-plan) | An app's page is inspected and a breakpoint hit while the game runs; a Node mod stops at a breakpoint set in VS Code |
 | **O10 Layers** | A tool layer above packages' windows for REDnode's own windows and packages the player lets stay on top; solo mode, in which one package hides every other package's windows. Asked for by EDGEbuilder ([#10](https://github.com/Edgemodders/REDnode/issues/10), [#7](https://github.com/Edgemodders/REDnode/issues/7)). See [O10 Layers](#o10-layers-built) | A full-screen package cannot cover the launcher or the Test timer, and its solo mode hides everything else until it ends |
 | **O11 Spaces** | Named sets of windows, like virtual desktops: the player switches the space and only its windows show; tool windows and windows set to "all spaces" show in every space. Title-bar actions with overflow. See [O11 Spaces: plan](#o11-spaces-plan) | A player with many HUD widgets keeps them in two or three spaces and switches between them without switching packages on and off |
-| **O12 Console** | A built-in console, like Cyber Engine Tweaks' Lua console, for free-form JavaScript with the whole `rednode` package ready. See [O12 Console: plan](#o12-console-plan) | A player types `await tweakdb.get("Items.money.price")` and gets the answer, then calls a method on a game object from the line before |
+| **O12 Console** | A built-in console, like Cyber Engine Tweaks' Lua console, for free-form JavaScript with the whole `rednode` package ready. Built in REDnode 0.42.0: see [O12 Console: built](#o12-console-built) | A player types `await tweakdb.get("Items.money.price")` and gets the answer, then calls a method on a game object from the line before |
 
 ### O1 Windows: test
 
@@ -665,6 +665,38 @@ Proposed by the user on 2026-10-15: Cyber Engine Tweaks has a console where play
 | For agents | The kernel MCP server could offer the same evaluation (an `eval` tool), behind the player's OK, since it can change the game. To decide |
 
 Questions to settle first: the key that opens it, whether players who never turned on Developer mode get it (CET gives its console to everyone), and whether scripts can be saved and run again (a "snippets" list) in the first version.
+
+### O12 Console: built
+
+Asked for by the user on 2026-10-27, for routine jobs they did with Cyber Engine Tweaks' console, so CET can leave their loadout; the first job is giving items by TweakDB id. Built in REDnode 0.42.0. The plan's questions, as decided for this first version: no key yet (the launcher opens it, like the other built-ins), every player gets it (no Developer mode needed, as CET does), no snippets list.
+
+| Piece | Where |
+|---|---|
+| The package | `packages/overlay/console`: a built-in package with a page (`index.html`, `app.js`) and a Node mod (`mod.mjs`). Packaged, it sits in the host's `resources/console`, outside app.asar, so the mod's worker thread loads it as plain files (`tools/overlay/package-host.mjs`) |
+| Where code runs | The Console's own Node mod, in its own process. Each entry goes over the channel to the mod, which runs it with Node's REPL evaluator (`repl.start` on dummy streams, `useGlobal`): top-level `await`, variables kept, unfinished entries recognized. Its errors come out on its output stream, which the mod reads, so errors thrown later by a timer or promise the entry started show too and the Console keeps running. Top-level `let` and `const` become `var`, so an entry can run again without "already declared" |
+| Scope | Everything the `rednode` package exports, plus Node's built-in modules by name (`fs`, `path` ...), plus the shortcuts `addItem`, `removeItem`, `pos`, `tp`, `clear`, `help` |
+| Results | Each result is `$<n>`, the last also `$_` (the last 50 kept, so old game objects are let go). A promise is waited for. Values show as a tree that folds open; game objects as their type and reference (`PlayerPuppet #1`); `console.log` lines in the output and in the Mod log |
+| The window | 760 by 460, at the top of the screen, a tool window. Enter runs, Shift+Enter adds a line, Up and Down go through history (200 entries, kept in the Console's data folder across starts), Tab completes with Node's completer (globals and properties; not yet the game's types), Ctrl+L clears. **Stop** starts the mod again (host call `rednode:console:stop`, the Console's page only), which ends an endless loop; variables are cleared, the output stays. **Copy** copies the output as text |
+| Items | `game.player.addItem(id, count?)` and `removeItem` in the `rednode` package, on the transaction system's `GiveItemByTDBID` and `RemoveItemByTDBID`; `addItem` checks the record exists first |
+
+Closing the Console's window stops its mod, as with any package. TweakDB changes made from the Console go through the undo journal like a package's, so they should be undone when the Console closes or stops (unverified). Not in this version: a key to open it, completion from the game's types, snippets, an MCP `eval` tool.
+
+Checked in the mock game, in development and with the packaged host (scratchpad `console/check.mjs`, 20 checks): `addItem` gives through `GiveItemByTDBID` and refuses an unknown id; `let` runs again; top-level await; a returned promise is waited for; a game object's method called through `$_`; errors; `console.log`; an unfinished entry; a late error from a timer; `fs`; arrays; `help()`; Tab; history; folding; `while (true) {}` shows RUNNING and **Stop** brings the Console back with its variables cleared. **Unverified** in the game.
+
+### O12 Console: test
+
+REDnode 0.42.0, on game 2.5.
+
+0. Switch on the **Test timer** in the launcher, press **Start**, and press **Mark** after each step.
+1. Load a save. Press F10, and in the launcher switch on **Console**. Its window opens at the top with a welcome line. Mark.
+2. Type `addItem("Items.slim_fit_pants")` and press Enter: the answer says it was added. Open the inventory: the trousers are there. Close it. Mark.
+3. Type `addItem("Items.slim_fit_pantz")` (a typo): a red error says there is no such record. Mark.
+4. Type `addItem("Items.money", 1000)`: V's eddies go up by 1,000. Mark.
+5. Type `pos()`: V's position shows. Click it to fold it open. Then `await api.GetPlayer(game.instance)` shows `PlayerPuppet #...`, and `await $_.GetDisplayName()` answers (any text). Mark.
+6. Press Up twice: the entries come back. Type `help()`: the shortcuts are listed. Type `game.pl` and press Tab: it becomes `game.player`. Clear the line. Mark.
+7. Type `while (true) {}`: the status says RUNNING. Press **Stop**: the Console says it started again. Type `1 + 1`: it answers 2. Mark.
+8. Close the Console with its ✕, then switch it on again: the history (Up) is still there. Mark.
+9. Quit the game.
 
 ### Pointer lock: built
 

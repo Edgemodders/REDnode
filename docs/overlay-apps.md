@@ -301,6 +301,7 @@ Import the `rednode` package, the same one Node mods use. An import map lets the
 | Call | What it does |
 |---|---|
 | `game.player.position()` | V's world position. Rejects at the main menu, where there is no player |
+| `game.player.addItem(id, count?)`, `game.player.removeItem(id, count?)` | Puts items in V's inventory, or takes them out, by TweakDB id: `addItem("Items.slim_fit_pants")`. `addItem` rejects an id with no record (REDnode 0.42.0) |
 | `game.audio.play(name)` | Plays a game sound event |
 | `game.on(name, handler)` | A game event: `"PlayerPuppet.OnGameAttached"` (at the main menu and on every save load), `"language"` (the player changed the game's language), and the `quests.fact:<name>` events that [`quests.watch`](quests.md) uses |
 | `game.state()`, `game.onState(handler)` | Whether a menu, photo mode, a scene or the main menu is showing, the overlay mode, and whether the game is linked |
@@ -834,6 +835,20 @@ await world.unload(scene.name);
 What a package spawns is removed when it stops (switched off, restarted, hot reloaded or crashed). After an archive swap (`archives.reload`), your spawns that use a swapped file are spawned again with a new ID, and the game's own entities within 30 m of V that use one switch appearance and back, so they show the new version.
 
 The [World test](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/world-test) sample spawns a box in front of V, spins it and removes it. The [World objects test](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/world-objects-test) tries every other call.
+
+## The Console
+
+REDnode's **Console** (built in, switched on from the launcher) is a command line for the game, like a browser's developer console: type JavaScript at the bottom, press Enter, and the answer shows above. The whole `rednode` package is ready without imports, so it is the quickest way to try a call before putting it in an app:
+
+```js
+addItem("Items.slim_fit_pants")              // a shortcut for game.player.addItem
+const stats = await api.GameInstance.GetStatsSystem(game.instance)
+await tweakdb.get("Items.money.price")
+await api.GetPlayer(game.instance)           // PlayerPuppet #12, kept as $3 and $_
+await $_.GetDisplayName()                    // call it from the next entry
+```
+
+Top-level `await` works, a returned promise is waited for, and variables stay between entries. Shift+Enter adds a line, Up and Down go through history, Tab completes, `help()` lists the shortcuts (`addItem`, `removeItem`, `pos`, `tp`, `clear`). The code runs in the Console's own Node mod, so Node's modules (`fs`, `path`) work too, and **Stop** ends a loop that never returns by starting the Console again. REDnode 0.42.0.
 
 ## Debugging
 

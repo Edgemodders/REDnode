@@ -48,6 +48,8 @@ const dist = join(repo, 'packages', 'rednode', 'dist');
 for (const f of readdirSync(dist)) if (f.endsWith('.js')) cpSync(join(dist, f), join(sdk, f));
 writeFileSync(join(sdk, 'package.json'), JSON.stringify({ type: 'module' }, null, 2));
 cpSync(join(overlay, 'runtime'), join(resources, 'runtime'), { recursive: true });
+// The Console (O12) is a built-in package with a Node mod, so it goes there too.
+cpSync(join(overlay, 'console'), join(resources, 'console'), { recursive: true });
 // Game API types and REDnode's notes, for the MCP server's gameapi_lookup.
 const gameapi = join(resources, 'gameapi');
 mkdirSync(gameapi, { recursive: true });
@@ -85,7 +87,7 @@ const [out] = await packager({
   electronVersion,
   appVersion: pkg.version,
   asar: true,
-  extraResource: [sdk, join(resources, 'runtime'), gameapi],
+  extraResource: [sdk, join(resources, 'runtime'), join(resources, 'console'), gameapi],
   overwrite: true,
   quiet: true,
   win32metadata: {

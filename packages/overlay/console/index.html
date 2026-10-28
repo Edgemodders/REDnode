@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Console</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<style>
+  html, body { margin: 0; width: 760px; height: 460px; overflow: hidden; background: transparent; }
+  rn-window { position: absolute; inset: 0; }
+  #out { flex: 1; min-height: 120px; overflow-y: auto; padding: 6px 8px; background: var(--rn-panel);
+    border: 1px solid var(--rn-line); font: 12px/1.45 var(--rn-mono); color: var(--rn-fg);
+    white-space: pre-wrap; word-break: break-word; user-select: text; }
+  .e { padding: 2px 0; border-bottom: 1px solid color-mix(in srgb, var(--rn-line) 40%, transparent); }
+  .e.input { color: var(--rn-dim); }
+  .e.input .code { color: var(--rn-fg); }
+  .e.input .n, .e.result .n { color: var(--rn-accent-2); }
+  .e.error { color: var(--rn-danger); }
+  .e.info { color: var(--rn-dim); }
+  .e.log.warn { color: var(--rn-accent); }
+  .e.log.error { color: var(--rn-danger); }
+  .ms { float: right; color: var(--rn-dim); font-size: 10px; }
+  .str { color: var(--rn-ok); }
+  .num { color: var(--rn-accent-2); }
+  .null, .fn, .sym { color: var(--rn-dim); }
+  .ref { color: var(--rn-accent); }
+  .err { color: var(--rn-danger); }
+  .fold { cursor: pointer; }
+  .fold::before { content: '▸ '; color: var(--rn-dim); }
+  .fold.open::before { content: '▾ '; }
+  .kids { padding-left: 16px; }
+  .k { color: var(--rn-dim); }
+  #hints { display: none; max-height: 64px; overflow-y: auto; padding: 4px 8px; font: 11px/1.5 var(--rn-mono);
+    color: var(--rn-dim); border: 1px solid var(--rn-line); border-bottom: 0; background: var(--rn-panel-2); }
+  #hints.on { display: block; }
+  #hints span { margin-right: 12px; }
+  .entry { display: flex; align-items: flex-start; gap: 6px; padding: 6px 8px; background: var(--rn-panel);
+    border: 1px solid var(--rn-line); }
+  .entry:focus-within { border-color: var(--rn-accent); }
+  .prompt { font: 600 13px/18px var(--rn-mono); color: var(--rn-accent); }
+  #code { flex: 1; resize: none; border: 0; outline: 0; padding: 0; margin: 0; background: transparent;
+    color: var(--rn-fg); font: 12px/18px var(--rn-mono); height: 18px; max-height: 108px; overflow-y: auto; }
+  .tools { display: flex; align-items: center; gap: 8px; }
+  .keys { flex: 1; font: 10px var(--rn-mono); color: var(--rn-dim); letter-spacing: .04em; }
+  .status { font: 11px var(--rn-mono); letter-spacing: .08em; color: var(--rn-dim); }
+  .status.busy { color: var(--rn-accent); }
+</style>
+</head>
+<body>
+  <rn-window title="Console" draggable closable>
+    <span class="status" slot="status" id="status">STARTING</span>
+    <div id="out"></div>
+    <div>
+      <div id="hints"></div>
+      <div class="entry">
+        <span class="prompt">›</span>
+        <textarea id="code" rows="1" spellcheck="false" autocomplete="off" placeholder="addItem(&quot;Items.slim_fit_pants&quot;)"></textarea>
+      </div>
+    </div>
+    <div class="tools">
+      <span class="keys">ENTER RUNS · SHIFT+ENTER NEW LINE · ↑↓ HISTORY · TAB COMPLETES · help()</span>
+      <rn-button id="stop" variant="ghost" title="Ends what is running by restarting the Console: its variables are cleared">Stop</rn-button>
+      <rn-button id="clear" variant="ghost" title="Empties the output (Ctrl+L)">Clear</rn-button>
+      <rn-button id="copy" title="Copies the output as text">Copy</rn-button>
+    </div>
+  </rn-window>
+<script src="app.js"></script>
+</body>
+</html>

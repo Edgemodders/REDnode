@@ -124,6 +124,10 @@ contextBridge.exposeInMainWorld('rednode', {
     recent: () => ipcRenderer.invoke('rednode:logs:recent'),
     copy: (text) => ipcRenderer.invoke('rednode:logs:copy', text),
   },
+  /** The Console's window (O12): Stop starts its mod again. Built-in only. */
+  console: {
+    stop: () => ipcRenderer.invoke('rednode:console:stop'),
+  },
   /** This app's own secrets and the kernel's tools; used by `secrets` and `kernel` in the rednode package. */
   pkg: {
     secret: (op, name, value) => ipcRenderer.invoke('rednode:pkg:secret', op, name, value),

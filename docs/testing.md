@@ -72,6 +72,8 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H2b refinement: Equipment-EX's hidden items](world.md#h2b-refinement-test) | In the game | H2 | 2026-10-22 | 0.26.21 | **Pass** (laptop): three swaps both ways shown on V; only `OutfitSlots.*` refreshed; shorts in the base Legs slot never showed through |
 | [Sound Tools 0.1.1 and REDswap 1.0.0](sound-tools.md) | In the game | Sound Tools, H3 | 2026-10-27 | 0.41.0 + REDswap 1.0.0, Sound Tools 0.1.1, game 2.5 | **Pass** (dev PC): REDswap 1.0.0 ready at the first frame; Hot swap said ready with no RED Hot Tools and made seven swaps of `EDGEmatA.archive` (the save already wore V2, so several in step 2; ↻ in step 3), 49 to 61 ms each, 0 faults, V and the inventory preview refreshed each time; Sound Search searched and played; Sound Tracer traced (477 lines in `rednode-sound-trace.log`). The first run of Sound Search and Sound Tracer on game 2.5 |
 | [H3a REDswap](world.md#h3a-test) | In the game | H3 | 2026-10-27 | 0.41.0 + REDswap, Refresh test 0.3.1, game 2.5, no RED Hot Tools | **Pass** (dev PC): four swaps through REDswap (three replaces of `EDGEmatA.archive`, one new archive added), 52 to 59 ms each, 0 faults; V and the inventory preview refreshed with no button, inventory open or closed, which also verifies PV-b (0.40.2) on 2.5 ([results](world.md#h3a-test-results-2026-10-27-passed)) |
+| [H3b World refresh and sound on 2.5](world.md#h3b-test) | In the game | H3 | Not run | 0.42.0 + REDswap, World objects test 0.2.2, Sound Tools, game 2.5 | Awaits its run; step 9 checks #18 (`null` for required object parameters, `api.$null`) |
+| [O12 Console](#o12-console) | In the game | O12 | Not run | 0.42.0, game 2.5 | Awaits its run. Checked in the mock game (20 checks, development and packaged host) |
 | [H2b preview spike](world.md#h2b-preview-test) | In the game | H2 | 2026-10-27 | 0.37.0 + Refresh test 0.3.0, RED Hot Tools 1.3.0+edgemodders.1, game 2.31 | **Pass** (laptop): the preview reached through Codeware's menu layer, alive after the menu closes; Reset preview showed the swapped version, menu open or closed; Game event not run (`DelayEventNextFrame` overload); step 2 unanswered (Scan still running) ([results](world.md#h2b-preview-test-results-2026-10-27-passed)) |
 | [H2b refresh after a swap](world.md#h2b-test) | In the game | H2 | 2026-10-22 | 0.26.20 | **Pass** (laptop): four swaps both ways shown on V with no button; nothing else changed; base items Equipment-EX hides were reset from the second swap on, with nothing showing |
 | [UI builder list](#ui-builder-list) | In the game | `ui.list` | 2026-10-20 | 0.26.13 | **Pass** (laptop): the list scrolls, the window does not, follow and Clear work |
@@ -516,6 +518,21 @@ Built 2026-10-20 in REDnode 0.26.13: `ui.list` in the UI builder, sample **Live 
 3. Pause menu open, F10; still and moving 10 s.
 4. Pause menu closed, F10; fast circles 10 s.
 5. Quit. Plugin log: `Overlay: cursor` lines for each step.
+
+### O12 Console
+
+[Source](overlay.md#o12-console-test). Built 2026-10-27 in REDnode 0.42.0: the built-in **Console** (`packages/overlay/console`) and `game.player.addItem`/`removeItem`. Checked in the mock game, in development and with the packaged host (scratchpad `console/check.mjs`, 20 checks). Not yet run in the game.
+
+0. Test timer: Start, Mark after each step.
+1. Load a save, F10, switch on **Console** in the launcher: it opens at the top with a welcome line.
+2. `addItem("Items.slim_fit_pants")`: added; the trousers are in the inventory.
+3. `addItem("Items.slim_fit_pantz")`: a red error, no such record.
+4. `addItem("Items.money", 1000)`: eddies up by 1,000.
+5. `pos()`, fold it open; `await api.GetPlayer(game.instance)` shows `PlayerPuppet #...`; `await $_.GetDisplayName()` answers.
+6. Up twice brings entries back; `help()` lists the shortcuts; `game.pl` + Tab gives `game.player`.
+7. `while (true) {}` shows RUNNING; **Stop** brings the Console back; `1 + 1` answers 2.
+8. Close with ✕, switch on again: history is still there.
+9. Quit.
 
 ## MCP server
 
