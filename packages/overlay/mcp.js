@@ -10,8 +10,9 @@
 // Tools: logs, apps, game_state, perf, gameapi_lookup, window_text, window_image,
 // window_console, game_image, api_read, api_call, api_get, tweakdb, archives_reload,
 // the quest tools, and (SV3, docs/services.md) every package's @tool functions as
-// <package>__<function>, with mod_services, mod_read and mod_call. The player switches any
-// of them off in the Tools Manager. See docs/mcp.md.
+// <package>__<function>, with mod_services, mod_read and mod_call, and (E1) the tools of the
+// MCP servers REDnode runs, such as EDGEmat's (attached.js). The player switches any of them
+// off in the Tools Manager. See docs/mcp.md.
 
 'use strict';
 
@@ -35,6 +36,7 @@ REDnode runs overlay apps (web pages drawn on top of the game) and Node mods (No
 For a quest: game_facts and game_journal read facts and journal entries; game_facts_set, game_journal_set and game_teleport change the player's save or move V, and ask first.
 Use api_read for reads: it runs functions named like reads (Get, Is, Has, Can, Find) and a TweakDB record's methods, and refuses the rest. api_call runs any function and can change the player's game, such as their money or health; archives_reload replaces files in the game's mod folder. Both ask the player before every call.
 Installed mods offer tools of their own, named <package>__<function>, described by the mod's author: those marked read-only run without asking, the rest ask the player first. mod_services lists every mod's tools, including ones started after this list was read; mod_read and mod_call call them by package and function.
+For in-game assistants, REDnode also runs EDGEmat's tools, named edgemat__mat_*: find a garment's materials by its in-game name, describe and recolor its layers, and make new materials, saving into the player's WolvenKit project. Its searches and descriptions run without asking; edits, new materials and library builds ask the player first.
 Guide: https://edgemodders.github.io/REDnode/overlay-apps.html`;
 
 const text = (t) => ({ content: [{ type: 'text', text: typeof t === 'string' ? t : JSON.stringify(t, null, 2) }] });
@@ -42,6 +44,8 @@ const fail = (t) => ({ content: [{ type: 'text', text: t }], isError: true });
 const READ = { readOnlyHint: true, openWorldHint: false };
 // Claude Code asks the player before every call of a tool with this, in every permission mode.
 const ASK_FIRST = { 'anthropic/requiresUserInteraction': true };
+// The key of an attached server's own answer in what host.callModTool returns (E1).
+const MCP_RESULT = Symbol.for('rednode.mcpResult');
 
 // api_read's rule. The game's own const flag cannot tell reads from changes (in 2.31, 1,865
 // const functions are not getters, such as SetAIRole, and two thirds of the getters are not
@@ -816,22 +820,26 @@ function createMcp(host) {
 
     // ---------- packages' tools (SV3) ----------
 
-    // Calls a package function for this assistant, logs it, and answers as a tool.
+    // Calls a package function for this assistant, logs it, and answers as a tool. An attached
+    // server's tool (E1) answers as MCP already, and its answer is passed on as it is.
     const runModTool = async (pkg, fn, input) => {
       try {
-        return text(await host.callModTool(who, pkg, fn, input ?? {}));
+        const r = await host.callModTool(who, pkg, fn, input ?? {});
+        return r?.[MCP_RESULT] ?? text(r);
       } catch (err) {
         return fail(err.message);
       }
     };
+    const from = (t) =>
+      t.attached ? `From ${t.pkgName}, run by REDnode.` : `From the ${t.pkgName} mod, described by its author.`;
 
     if (host.modTools) {
-      for (const t of host.modTools()) {
+      for (const t of host.modTools(who)) {
         registerTool(
           modToolName(t.pkg, t.fn.name),
           {
             title: `${t.pkgName}: ${t.fn.name}`,
-            description: `${t.fn.description || `${t.fn.name}, from ${t.pkgName}.`} (From the ${t.pkgName} mod, described by its author.${t.fn.readonly ? ' It only reads.' : ' The player is asked before every call.'})`,
+            description: `${t.fn.description || `${t.fn.name}, from ${t.pkgName}.`} (${from(t)}${t.fn.readonly ? ' It only reads.' : ' The player is asked before every call.'})`,
             inputSchema: toolInput(t.fn),
             annotations: t.fn.readonly ? READ : { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
             ...(t.fn.readonly ? {} : { _meta: ASK_FIRST }),
@@ -851,7 +859,7 @@ function createMcp(host) {
         },
         async () =>
           text(
-            host.modTools().map((t) => ({
+            host.modTools(who).map((t) => ({
               tool: modToolName(t.pkg, t.fn.name),
               package: t.pkg,
               function: t.fn.name,
@@ -868,7 +876,7 @@ function createMcp(host) {
         function: z.string().describe('The function name'),
         args: z.record(z.string(), z.unknown()).optional().describe('The arguments by parameter name'),
       };
-      const findTool = (pkg, fn) => host.modTools().find((t) => t.pkg === pkg && t.fn.name === fn);
+      const findTool = (pkg, fn) => host.modTools(who).find((t) => t.pkg === pkg && t.fn.name === fn);
 
       mcp.registerTool(
         'mod_read',
@@ -982,6 +990,7 @@ function createMcp(host) {
       if (m?.method === 'initialize' && !signedIn) host.seen?.(token, m.params?.clientInfo?.name ?? null);
     }
     const who = host.seen?.(token) ?? { name: 'An assistant', kind: 'unknown' };
+    await host.prepare?.(who);
     const mcp = build(who);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,

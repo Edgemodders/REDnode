@@ -32,6 +32,7 @@ const { createServices } = require('./services');
 const { scanGame, checkRequires, validRange, key: gamefilesKey } = require('./gamefiles');
 const { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED } = require('./redbridge');
 const bridgeInstall = require('./bridge-install');
+const { createAttached } = require('./attached');
 const { createLookup } = require('./gameapi-lookup');
 const { soundPaksIn, hotToolsLookupMisses, archiveHashes } = require('./archive-index');
 const { gameSoundWav, eventSounds, soundIndex: gameSoundIndex } = require('./game-sounds');
@@ -464,6 +465,40 @@ const redbridge = createRedbridge({
   configured: () => settings.redbridge,
   clean: () => settings.bridgeTest === 'clean',
 });
+
+// EDGEmat's MCP server (E1, attached.js), shipped in resources/edgemat: its tools for
+// in-game assistants, such as REDagent, as edgemat__<tool>. "edgematTools": "all" in
+// settings.json lists them to desktop assistants too (Claude Code gets EDGEmat from EDGEchat).
+const EDGEMAT_DIR = (() => {
+  if (app.isPackaged) return path.join(process.resourcesPath, 'edgemat');
+  try {
+    return path.dirname(require.resolve('@edgemodders/edgemat-mcp/package.json'));
+  } catch {
+    return null;
+  }
+})();
+const edgemat = createAttached({
+  id: 'edgemat',
+  name: 'EDGEmat',
+  script: () => EDGEMAT_DIR && path.join(EDGEMAT_DIR, app.isPackaged ? 'server.cjs' : path.join('dist', 'server.cjs')),
+  env: () => {
+    const env = {};
+    if (GAME_DIR) env.EDGEMAT_GAME_PATH = GAME_DIR;
+    const b = redbridge.status();
+    if (b.exe) env.REDBRIDGE_EXE = b.exe;
+    // A per-user .NET 10 goes to EDGEmat's server and its REDbridge only, as to REDnode's own.
+    const runtime = bridgeInstall.dotnet10(settings.bridgeTest === 'clean');
+    if (runtime && !runtime.machine) env.DOTNET_ROOT = runtime.root;
+    return env;
+  },
+  // Every other tool (mat_edit, mat_apply, mat_generate, mat_from_image, mat_library, mat_desk) asks first.
+  reads: new Set(['mat_templates', 'mat_microblends', 'mat_colors', 'mat_describe', 'mat_find']),
+  version: VERSION,
+  log,
+});
+const ATTACHED = [edgemat];
+// Whether an assistant sees the attached servers' tools: in-game ones always, desktop ones by setting.
+const seesAttached = (who) => who?.kind === 'package' || settings.edgematTools === 'all';
 
 // ---------- getting REDbridge from the Mod Manager (W3) ----------
 
@@ -3853,6 +3888,18 @@ function allModTools() {
     }
     for (const fn of fns) out.push({ pkg: id, pkgName: entry.manifest.name, fn, key: `${id}:${fn.name}`, off: toolKeyOff(`${id}:${fn.name}`, t) });
   }
+  // The MCP servers REDnode runs (E1), once started: switched like a package, by their id.
+  for (const a of ATTACHED) {
+    if (apps.has(a.id)) continue; // a package with the same id wins
+    const fns = a.functions();
+    if (!fns.length) continue;
+    if (!t.known.has(a.id)) {
+      t.known.add(a.id);
+      if (t.newOff) t.offPackages.add(a.id);
+      learned = true;
+    }
+    for (const fn of fns) out.push({ pkg: a.id, pkgName: a.name, fn, key: `${a.id}:${fn.name}`, off: toolKeyOff(`${a.id}:${fn.name}`, t), attached: a });
+  }
   if (learned) saveToolSettings(t);
   return out;
 }
@@ -3877,13 +3924,29 @@ async function callModTool(who, pkg, fn, input) {
   const t = allModTools().find((x) => x.pkg === pkg && x.fn.name === fn);
   if (!t) throw new Error(`${pkg} offers no tool "${fn}" now`);
   if (t.off) throw new Error(`The player switched ${t.pkgName}'s ${fn} off for assistants (Tools Manager)`);
-  // MCP passes arguments by name; the function takes them in order.
-  const args = t.fn.params.map((p) => input?.[p.name]);
-  while (args.length && args[args.length - 1] === undefined) args.pop();
+  if (t.attached && !seesAttached(who)) throw new Error(`${t.pkgName}'s tools are for in-game assistants`);
   const started = Date.now();
   const record = { at: started, assistant: who.name, tool: `${pkg}__${fn}`, pkg, fn, ok: false, ms: 0, detail: '' };
   toolCalls.push(record);
   if (toolCalls.length > 200) toolCalls.shift();
+  // An attached server's tool takes its arguments by name and answers as MCP: passed on as it is.
+  if (t.attached) {
+    log(`${who.name} called ${t.pkgName}'s ${fn}`);
+    try {
+      const result = await t.attached.call(fn, input ?? {});
+      record.ok = !result.isError;
+      record.detail = (result.content ?? []).map((c) => (c.type === 'text' ? c.text : `[${c.type}]`)).join(' ').slice(0, 200);
+      return { [Symbol.for('rednode.mcpResult')]: result }; // a mod's answer, cloned from its worker, cannot carry a symbol
+    } catch (err) {
+      record.detail = err.message;
+      throw err;
+    } finally {
+      record.ms = Date.now() - started;
+    }
+  }
+  // MCP passes arguments by name; the function takes them in order.
+  const args = t.fn.params.map((p) => input?.[p.name]);
+  while (args.length && args[args.length - 1] === undefined) args.pop();
   mods.log(pkg, 'info', `${who.name} called ${fn} as a tool`);
   try {
     const result = await services.call({ assistant: who.name }, pkg, fn, args);
@@ -3966,8 +4029,13 @@ function mcpHost() {
     log,
     version: VERSION,
     // SV3: packages' tools that are switched on, their calls, REDnode's own switches, the assistants.
-    modTools: () => allModTools().filter((x) => !x.off),
+    modTools: (who) => allModTools().filter((x) => !x.off && (!x.attached || seesAttached(who))),
     callModTool,
+    // Before a request is answered: an assistant that sees the attached servers' tools waits
+    // for them to start, the first time, so its tool list has them (E1).
+    prepare: async (who) => {
+      if (seesAttached(who)) await Promise.all(ATTACHED.map((a) => a.ready()));
+    },
     toolOff: (key) => toolKeyOff(key),
     seen: seenToken,
     logs: () => mods.recentLog(),
@@ -4585,4 +4653,5 @@ app.on('will-quit', () => {
   mcp?.stop();
   editor?.stop();
   redbridge.stop();
+  for (const a of ATTACHED) a.stop();
 });

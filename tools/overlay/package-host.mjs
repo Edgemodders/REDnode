@@ -7,6 +7,7 @@
 //   native/build/dist/red4ext/plugins/REDnode/host/REDnode-overlay.exe  the host, with its own Electron
 //   native/build/dist/red4ext/plugins/REDnode/host/resources/sdk/        the rednode package, for apps and mods
 //   native/build/dist/red4ext/plugins/REDnode/host/resources/runtime/    the Node mod runtime
+//   native/build/dist/red4ext/plugins/REDnode/host/resources/edgemat/    EDGEmat's MCP server, for in-game assistants
 //   native/build/dist/red4ext/plugins/REDnode/apps/<id>/                 the example apps and mods
 //
 // The REDnode plugin starts host/REDnode-overlay.exe when the game loads.
@@ -35,7 +36,7 @@ if (build.status !== 0) throw new Error('Building the rednode package failed');
 // Apps and mods go to the game separately.
 rmSync(work, { recursive: true, force: true });
 mkdirSync(stage, { recursive: true });
-for (const f of ['main.js', 'preload.js', 'mods.js', 'mcp.js', 'gameapi-lookup.js', 'gamefiles.js', 'redbridge.js', 'bridge-install.js', 'archive-index.js', 'game-sounds.js', 'services.js', 'oauth.js', 'editor.js']) cpSync(join(overlay, f), join(stage, f));
+for (const f of ['main.js', 'preload.js', 'mods.js', 'mcp.js', 'gameapi-lookup.js', 'gamefiles.js', 'redbridge.js', 'bridge-install.js', 'archive-index.js', 'game-sounds.js', 'services.js', 'oauth.js', 'editor.js', 'attached.js']) cpSync(join(overlay, f), join(stage, f));
 for (const d of ['launcher', 'modlog', 'manager', 'welcome', 'connect', 'builder']) cpSync(join(overlay, d), join(stage, d), { recursive: true });
 cpSync(join(repo, 'packages', 'ui', 'src'), join(stage, 'ui'), { recursive: true });
 
@@ -50,6 +51,11 @@ writeFileSync(join(sdk, 'package.json'), JSON.stringify({ type: 'module' }, null
 cpSync(join(overlay, 'runtime'), join(resources, 'runtime'), { recursive: true });
 // The Console (O12) is a built-in package with a Node mod, so it goes there too.
 cpSync(join(overlay, 'console'), join(resources, 'console'), { recursive: true });
+// EDGEmat's MCP server (E1, attached.js): one bundled file, run by the host's own Node.
+const edgematFrom = join(repo, 'node_modules', '@edgemodders', 'edgemat-mcp');
+const edgemat = join(resources, 'edgemat');
+mkdirSync(edgemat, { recursive: true });
+for (const f of ['dist/server.cjs', 'package.json', 'LICENSE', 'THIRD-PARTY-NOTICES.txt']) cpSync(join(edgematFrom, f), join(edgemat, f.replace('dist/', '')));
 // Game API types and REDnode's notes, for the MCP server's gameapi_lookup.
 const gameapi = join(resources, 'gameapi');
 mkdirSync(gameapi, { recursive: true });
@@ -87,7 +93,7 @@ const [out] = await packager({
   electronVersion,
   appVersion: pkg.version,
   asar: true,
-  extraResource: [sdk, join(resources, 'runtime'), join(resources, 'console'), gameapi],
+  extraResource: [sdk, join(resources, 'runtime'), join(resources, 'console'), edgemat, gameapi],
   overwrite: true,
   quiet: true,
   win32metadata: {

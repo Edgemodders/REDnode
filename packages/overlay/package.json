@@ -1,6 +1,6 @@
 {
   "name": "@rednode/overlay",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "private": true,
   "description": "REDnode overlay host and Tier 2 runtime: overlay apps and Node mods. See docs/overlay.md.",
   "license": "MIT",
@@ -10,6 +10,7 @@
     "window": "node start.js --window"
   },
   "devDependencies": {
+    "@edgemodders/edgemat-mcp": "0.3.1",
     "@electron/packager": "20.3.0",
     "electron": "44.7.0"
   },
