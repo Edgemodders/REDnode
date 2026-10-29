@@ -21,6 +21,7 @@ How to keep it:
 - `audio.play` plays a file from the package's data folder (`pkg.dataDir`) by its full path, for sounds a package makes while it runs, such as spoken lines.
 - `ui.input({ password: true })`: a text field that shows dots, for a key or a password.
 - The **Roles test** sample checks all three.
+- EDGEmat's material tools for in-game assistants: REDnode now ships EDGEmat's MCP server (`@edgemodders/edgemat-mcp` 0.3.1) and runs it when an in-game assistant such as REDagent first needs it, with REDnode's own Node, the game folder and REDbridge. Its tools are listed as `edgemat__mat_*`: searches and descriptions run without asking, edits and new materials ask the player first, and the Tools Manager switches them. Desktop assistants such as Claude Code get EDGEmat through EDGEchat instead (`"edgematTools": "all"` in REDnode's settings lists them there too). See https://edgemodders.github.io/REDnode/mcp.html#edgemats-tools-e1
 
 **Changed**
 

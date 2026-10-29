@@ -51,6 +51,7 @@ How the sign-in works, for other MCP clients: standard OAuth 2.1 with dynamic cl
 | `mod_services` | Every running mod's tools: package, function, description, parameters and whether it only reads, including mods started after the client read its tool list. REDnode 0.36.0 or later | No |
 | `mod_read` | Calls a mod's read-only tool by `package` and `function`, with `args` by name, without asking; refuses the rest. REDnode 0.36.0 or later | No |
 | `mod_call` | Calls any mod's tool by `package` and `function`, with `args` by name. REDnode 0.36.0 or later | **Yes**: whatever the mod does; it asks the player first |
+| `edgemat__mat_*` | EDGEmat's material tools, for in-game assistants such as REDagent: see [EDGEmat's tools](#edgemats-tools-e1). REDnode 0.45.0 or later | Only `mat_edit`, `mat_apply`, `mat_generate`, `mat_from_image` and `mat_library`, which ask the player first |
 
 ### Mods' tools and the Tools Manager
 
@@ -61,6 +62,38 @@ The **Tools Manager**, in the optional [Admin Tools](admin-tools.md) pack (built
 A REDnode package can use the same tools: it lists `"permissions": ["mcp"]` in its `rednode-app.json`, the player allows it in the Mod Manager, and `kernel.mcp()` in the `rednode` package gives it the address and its own token. The server then runs for it even with the **MCP server** switch off; that switch only controls access from outside, such as Claude Code. REDagent uses the tools this way.
 
 Claude Code asks before it uses a tool, unless you allow it. Allow the read-only tools freely. From REDnode 0.26.16, `api_call` and `archives_reload` (and from 0.32.0 `game_facts_set`, `game_journal_set` and `game_teleport`, from 0.36.0 `mod_call` and every mod tool not marked `@readonly`) carry `_meta: { "anthropic/requiresUserInteraction": true }`, as EDGEdeck's deploy, undo and remove do: Claude Code asks you before every call of them, in every permission mode, auto mode included, with no "don't ask again". Reads go through `api_read`, which never asks.
+
+### EDGEmat's tools (E1)
+
+REDnode 0.45.0 runs [EDGEmat](https://edgemodders.github.io/EDGEmat/)'s MCP server for in-game assistants, so REDagent can find a garment's materials, explain them and recolor them while the player plays. Asked for by the owner on 2026-10-29.
+
+| | |
+|---|---|
+| What ships | `@edgemodders/edgemat-mcp` 0.3.1 (MIT), one bundled file, in the host's `resources/edgemat` with its licence and notices. Pinned in `packages/overlay/package.json` |
+| How it runs | The host starts it at the first request from an assistant that sees its tools, with Electron's own Node (`ELECTRON_RUN_AS_NODE`), so players need no Node.js; about 120 ms. It stays up until the host ends. A server that ends is started again at the next request, at most 3 times a session (`packages/overlay/attached.js`) |
+| What it gets | The game folder (`EDGEMAT_GAME_PATH`), the REDbridge REDnode found (`REDBRIDGE_EXE`) and a per-user .NET 10 (`DOTNET_ROOT`), beside the MCP SDK's short list of safe variables. None of the player's keys: from [#23](https://github.com/Edgemodders/REDnode/issues/23) on, EDGEmat reads them from the shared key store itself |
+| Names | `edgemat__<tool>`, listed beside the packages' tools and in `mod_services`; `mod_read` and `mod_call` reach them by package `edgemat` |
+| Reads, without asking | `mat_templates`, `mat_microblends`, `mat_colors`, `mat_describe`, `mat_find` |
+| Ask first | `mat_edit`, `mat_apply`, `mat_generate` (spends the player's image service credits), `mat_from_image`, `mat_library` (a build, a minute or two). Any tool a later EDGEmat adds asks too |
+| Who sees them | In-game assistants (packages with the `mcp` permission, such as REDagent). Not desktop ones: Claude Code gets EDGEmat directly through EDGEchat, and would see every tool twice. `"edgematTools": "all"` in the host's `settings.json` lists them to every assistant |
+| Switches | The Tools Manager lists them as the group EDGEmat, switched like a package's (`edgemat:<tool>`) |
+
+`mat_generate` needs a Gemini or OpenAI key, which EDGEmat's server does not get yet: until it reads the shared store (#23), it answers that it has no key, and the other tools work. EDGEmat's server starts its own REDbridge when a tool needs one (its library is built already for most), beside REDnode's shared one: more memory while the player plays (not measured, unverified).
+
+Checked outside the game on 2026-10-29 (scratchpad `e1/check.cjs`, 21 checks: the real `attached.js` and `mcp.js` with EDGEmat 0.3.1: 10 tools listed to an in-game assistant and none to a desktop one, the read and ask flags, every input schema converted, `mat_library` and `mat_templates` answering through, `mod_services`, `mod_read` refusing `mat_edit` and running `mat_microblends`). The packaged host runs as Node (`ELECTRON_RUN_AS_NODE=1 REDnode-overlay.exe -e ...`: Node 24.21.0).
+
+### EDGEmat's tools: test
+
+REDnode 0.45.0, REDagent 0.3.3 (its briefing knows the tools). REDagent needs its Anthropic key and the Claude Agent SDK, as before.
+
+0. Test timer: **Start**, and **Mark** after each step.
+1. Load a save. In the launcher, switch on **REDagent** and its **Allowed** switch for REDnode's tools (`mcp`). Mark.
+2. Ask REDagent: "Which EDGEmat tools do you have?" It lists the `edgemat__mat_*` tools. Mark.
+3. Ask: "Find the materials of Items.Pants_01_basic_01." It runs `mat_find` without asking you and names the trousers' meshes and materials. The first call may take a while (EDGEmat's REDbridge starts). Mark.
+4. Ask: "Describe the layers of its first material setup." It runs `mat_describe` without asking: each layer's surface and color in plain words. Mark.
+5. Ask: "Recolor its first layer dark red, in a new project." REDagent asks you before `mat_edit`: press **Deny**. It says you declined, and nothing is written. Mark.
+6. If the Admin Tools pack is installed: in the **Tools Manager**, find the **EDGEmat** group with its 10 tools, the reads marked as reads. Switch `mat_find` off, ask step 3 again: REDagent says the tool is not there. Switch it back on. Mark.
+7. Quit the game. Claude reads the host log: `EDGEmat tools: edgemat 0.3.1 started in N ms, 10 tools`, each call, and no `EDGEmat tools: the server ended` before the quit.
 
 ### How `api_read` tells a read
 

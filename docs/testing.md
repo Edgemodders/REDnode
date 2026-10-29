@@ -768,6 +768,10 @@ Built 2026-10-27 in REDnode 0.43.0 (`packages/overlay/editor.js`; docs: overlay-
 
 Built 2026-10-28 in REDnode 0.44.0. Its steps are on the Mod services page: [Roles test](services.md#roles-test). Can run in the same session as the editor channel and H3b.
 
+### EDGEmat's tools (E1)
+
+Built 2026-10-29 in REDnode 0.45.0, with REDagent 0.3.3. Checked outside the game (scratchpad `e1/check.cjs`, 21 checks). Its steps are on the MCP page: [EDGEmat's tools: test](mcp.md#edgemats-tools-test).
+
 ## Game 2.5
 
 ### G1 REDnode on game 2.5
