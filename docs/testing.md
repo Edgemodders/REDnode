@@ -772,6 +772,12 @@ Built 2026-10-28 in REDnode 0.44.0. Its steps are on the Mod services page: [Rol
 
 Built 2026-10-29 in REDnode 0.45.0, with REDagent 0.3.3. Checked outside the game (scratchpad `e1/check.cjs`, 21 checks). Its steps are on the MCP page: [EDGEmat's tools: test](mcp.md#edgemats-tools-test).
 
+### Shared keys: the store (K1)
+
+Built 2026-10-29 (`tools/keys/keys.mjs`, [Shared keys](keys.md)). No in-game test: no REDnode part uses it until K2. `node tools/keys/check.mjs` runs 30 checks against a scratch folder with made-up keys: a key written and read back, files made by PowerShell's own `ConvertFrom-SecureString` read and ours decrypted by PowerShell, the cache and a replaced key, the environment variable winning, an undecryptable file counting as unset, the "used by" record holding names only, bad ids and keys refused, and the non-blocking forms.
+
+**First run, 2026-10-29: all 30 passed** on the dev PC (a PowerShell start about 1 s; cached reads under 1 ms). The real store in `%APPDATA%\Edgemodders\keys` was not touched.
+
 ## Game 2.5
 
 ### G1 REDnode on game 2.5

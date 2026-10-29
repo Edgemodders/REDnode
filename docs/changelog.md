@@ -33,6 +33,10 @@ How to keep it:
 - A static function's full name now works with `class` (`api.$static("UIItemsHelper", "GetItemName;TweakDBIDgameItemData", ...)`, or the MCP tools' `class` and `fn`), with or without the class in front.
 - The MCP tool `api_read` accepts a full name that starts with its class, such as `gameUIItemsHelper::GetItemName;TweakDBIDgameItemData`.
 
+**Other**
+
+- Shared keys, first part (https://github.com/Edgemodders/REDnode/issues/23): one store for the player's AI service keys that every EDGE tool on the PC can read, `%APPDATA%\Edgemodders\keys\<service>.txt` encrypted for the Windows user, and a small MIT library for tools to copy, `tools/keys/keys.mjs`. REDnode's Keys window and package access come next. See https://edgemodders.github.io/REDnode/keys.html
+
 ## 0.41.0 (2026-10-27)
 
 **New**
