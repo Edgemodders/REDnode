@@ -563,3 +563,103 @@ The bindings cost 0.10 to 0.19 ms a frame in this run (5 bindings, 4 sources).
 
 **Phase I2 is done:** the driver (I2a), layout and the game look (I2b), bound values and lists from data (I2c), and the language (I2d). Next in the design's order: I3 Input (buttons, sliders, lists and text input in menus, with the game's cursor), I4 the game look's ready pieces, I5 Screens, I6 frame drawing. The order with the other work (H2c with EDGEbuilder, the Sound API's S2, a release) is to agree with the owner.
 
+## UI Tools: plan
+
+Asked for by the owner on 2026-10-29: carry native UI on to where modders build ink widgets and screens from REDnode's own HTML-style tags, plus a **UI Workbench** app to inspect the game's UI, write ink, run it live and save it. Everything below is *proposed*, to agree with the owner.
+
+**UI Tools** is an optional app pack, like Sound Tools and Admin Tools. Its source lives in this repo in `packs/ui-tools/`, outside the REDnode build, with its own zip, version, changelog and Nexus page, and it installs into `red4ext/plugins/REDnode/apps/`. The **UI Workbench** is its first app, and more can join it. What the apps need from the game (reading trees, picking, the markup) goes into REDnode itself, so any mod can use it.
+
+### What the owner asked for
+
+| # | Ask | Proposal |
+|---|---|---|
+| 1 | Click on the game's UI elements, visible or not, and get their information and their tree, like RED Hot Tools' Ink Inspector | An **Inspect** tab: a tree of every ink layer, and a **Pick** mode that selects the widget under the cursor. Invisible widgets are picked from the tree, since they cannot be clicked |
+| 2 | Maybe edit what is picked | A few properties of a game widget, tried live and not kept: visible, opacity, color, text, size, margin. That is enough to find what controls a look; anything more belongs in the modder's own copy |
+| 3 | Turn what was clicked into REDnode source, in the editor | **To source** on any picked widget or subtree: the [Dump source](#dump-source-idea-2026-10-22) generator writes it as REDnode tags into the editor |
+| 4 | Write tags or code directly, and **Run** them live on screen | An **Edit** tab: a markup pane and a script pane, with Run, Stop, and run again on save |
+| 5 | Write the callbacks in REDnode JavaScript | The script pane is a module. The markup names its functions: `<button label="Track" onclick="track" />` calls `export function track()` |
+| 6 | Save as a project, and export the source for a mod | Each project is a REDnode package in a folder of its own (below). **Export** writes its files, or a zip, ready to drop into a mod |
+| 7 | Screens too | Once I5 builds screens, a project can be a screen, and Run opens it |
+
+### The markup: REDnode's tags as HTML
+
+The design already gives one tree format, written three ways: JSX in `.tsx`, a tagged template, or the functions. The workbench needs a fourth that is a plain file: **ink markup**, an `.ink.html` file with the same tags, and their properties as attributes.
+
+```html
+<!-- bounty.ink.html -->
+<mount layer="hud" anchor="top-right" x="-40" y="120">
+  <column gap="6">
+    <text style="title">Bounty board</text>
+    <text bind="player.health" style="value" />
+    <list items="contracts" key="id">
+      <text style="body">{name}</text>
+    </list>
+  </column>
+</mount>
+```
+
+```js
+// mod.mjs
+import { ink } from 'rednode';
+import * as handlers from './bounty.mjs';
+
+const board = await ink.load('bounty.ink.html', handlers, { contracts: [] });
+board.set({ contracts: await fetchContracts() });
+```
+
+| Piece | Proposal |
+|---|---|
+| `ink.parse(source, handlers?, data?)` and `ink.load(file, …)` | In the `rednode` package. They give the same nodes as the functions, so `set`, `update` and lists work the same. No new driver in the plugin |
+| Tags and attributes | I2's tag table and props, by the same names. A number, color or style word is written as text. Unknown tags and attributes are refused with their line and column |
+| Events | `on<event>="name"` names an export of the handlers module. No code goes inside the markup, so the markup stays data that a tool can read and write |
+| Data | `{name}` inside a list item, and named data the mod passes in. Nothing more: no expressions |
+| Where it is used | Mods, the workbench, To source's output, and the docs simulation's previews |
+
+### UI Workbench
+
+A tool window with three tabs. It has the `admin` permission, like the Admin Tools, and the root flag that keeps tool windows above other packages.
+
+| Tab | What |
+|---|---|
+| **Inspect** | Layers and their trees, live. In Pick mode the overlay lets the mouse through, and the widget under the cursor is outlined and selected. For the selected widget: class, name, path, size and place on screen, visibility, every property, its controllers, the library item it was spawned from, and its bindings. Buttons for **To source** and **Try** (the few live edits) |
+| **Edit** | Markup and script panes in a code editor (CodeMirror 6, MIT, with completion from the tag table and the generated types), with errors shown in place. Also a plain preview drawn in the window, like the docs simulation's, for work with no game running. **Run** mounts the tree in the game; **Stop** removes it |
+| **Projects** | New, open, rename, duplicate, delete. **Export** to a folder or a zip |
+
+**A project is a package.** Each project is a folder with a `rednode-app.json`, its `.ink.html` and its script, kept in a development folder (from Developer mode) or the apps folder. Run starts that package, and saving restarts it through REDnode's own hot reload. So the modder's code runs as it will in their mod: in its own Node mod, with its own permissions and its own cleanup, and a crash in it does not touch the workbench. Export is then nothing more than copying its files.
+
+### What REDnode gains for it
+
+| Part | Where |
+|---|---|
+| `ink.parse` and `ink.load` | `packages/rednode/src/ink.ts` |
+| **Reading a tree in one call**: a layer's or a widget's tree with its geometry, properties, controllers and spawn info. I1 read 4138 widgets in 2 s through `api`, one call at a time | The plugin's ink driver, `ink.read` |
+| **Layers**: every ink layer and its windows | The plugin, `ink.layers` |
+| **Pick**: the widgets under a point on screen, each with its drawn box | The plugin, `ink.at(x, y)`. The overlay lets the mouse through while the workbench picks |
+| **Spawn info**: the library and item a widget came from | The plugin. To source then writes a `library` tag instead of spelling out the widgets |
+| **Outline**: a box drawn around a widget, over the game | The overlay, from the drawn box |
+| **Try**: setting a property on a widget REDnode did not make | The plugin, only for packages with the `admin` permission, never kept |
+
+**How RED Hot Tools does it.** RED Hot Tools is MIT-licensed: we read it for REDswap, and may port from it with its licence kept, as REDswap does. Its native code collects the layers, the widgets under the pointer and a widget's spawn info. It gets a widget's drawn box from its draw context (`inkDrawArea::GetBoundingRect`, a raw game address), and draws its window with CET. REDnode would port the collection and draw the window in the overlay. The raw addresses are game-version specific, so each needs a hash or a byte pattern for 2.5, as REDswap's archive loader did (*unverified*).
+
+### Phases
+
+| Phase | What | Needs | Test |
+|---|---|---|---|
+| **UT1 Ink markup** | `ink.parse`, `ink.load`, events by export name, list data, errors with line and column. The I2 samples rewritten in markup; the docs simulation previews markup | I2 (done) | A HUD panel and a list from markup, in game |
+| **UT2 Read and pick** | `ink.layers`, `ink.read` in one call, `ink.at`, spawn info, the outline. The Inspect tab with the tree and Pick | UT1, for To source | Pick widgets on the HUD and in menus, open invisible ones from the tree, time a read of the perks screen |
+| **UT3 Workbench** | The Edit and Projects tabs, Run and Stop, To source into the editor, Try, Export. The pack's zip and docs page. The first release of UI Tools comes after this | UT1, UT2 | Pick a game panel, To source, change it, Run it, save it, export it, and run the export from a mod of its own |
+| **I3 Input** (the design's phase) | Buttons, sliders, lists, toggles and text input on the `menu` layer, with the game's cursor. Clicks reach the markup's handlers | | |
+| **UT4 Interactive** | Projects on the `menu` layer with working callbacks. The workbench's Run opens the menu they mount on | I3 | |
+| **I4 Game look**, **I5 Screens** (the design's phases) | The game's library items and composites; new screens | | |
+| **UT5 Screens** | A project can be a screen: Run opens it, Back closes it. To source on a whole game screen gives the modder a screen to start from | I4, I5 | |
+
+### Open questions
+
+| Question | Recommendation |
+|---|---|
+| Where UI Tools goes in the order, after the in-game tests now waiting (#17, #20, H3b) | UT1 right after those tests, then UT2 and UT3, then I3 and UT4. S2 Space, and H2c's refresh after a swap, stay where they are |
+| The file extension | `.ink.html`, so editors colour it as HTML |
+| `column` and `row`, or the design's `vbox` and `hbox`, in the docs | `column` and `row`, which the samples already use. `vbox` and `hbox` work too |
+| Is Try on game widgets worth having? | Yes, but only the few properties above, and only for `admin` packages |
+| The code editor: CodeMirror 6 or Monaco | CodeMirror 6: it is smaller, and it should work in an offscreen window. Monaco's workers there are unverified |
+
