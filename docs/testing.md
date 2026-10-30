@@ -764,6 +764,8 @@ Built 2026-10-27 in REDnode 0.43.0 (`packages/overlay/editor.js`; docs: overlay-
 4. Press Esc (pause menu) and Esc again, back into the game; Claude plays `ui_jingle_quest_new` again: heard. Mark.
 
 Claude sends each sound about 15 s after the player's message, so the player can switch back into the game first: the game mutes when it is not in front, unless its background mute is off. The menu click (`ui_menu_onpress`) and the advert music (`amb_bl_g_adverts_music`) of the first steps were too quiet to tell from the game's own ambient sound.
+
+**First run, 2026-10-29: passed** (dev PC, game 2.5, REDnode 0.45.0). Step 1: `connected: true`. Step 2: the menu click was sent twice (once with the game in the background, which mutes it) and not told apart from the ambient sound; the new-quest jingle was heard. Step 3: the advert music was not clearly heard and was stopped by `sound.stop`; the laptop alarm loop was heard and stopped. Step 4: the jingle heard after the pause menu. Step 5: after the quit, `editor.json` stayed and a call to its port was refused. The host log has one `Editor: played the sound event ...` line per call. #17 closed.
 5. Quit the game. `editor.json` stays (the game ends the host at once); a call to its port is refused.
 
 ### Roles (#20)
@@ -776,7 +778,7 @@ Built 2026-10-28 in REDnode 0.44.0. Its steps are on the Mod services page: [Rol
 
 Built 2026-10-29 in REDnode 0.45.0, with REDagent 0.3.3. Checked outside the game (scratchpad `e1/check.cjs`, 21 checks). Its steps are on the MCP page: [EDGEmat's tools: test](mcp.md#edgemats-tools-test).
 
-**First run, 2026-10-29: steps 1 to 6 passed** (step 6 after asking REDagent first: the Tools Manager showed EDGEmat only once its server had started; 0.45.1 starts it from the Tools Manager).
+**First run, 2026-10-29: passed** (step 6 after asking REDagent first: the Tools Manager showed EDGEmat only once its server had started; 0.45.1 starts it from the Tools Manager). Host log: `EDGEmat tools: edgemat 0.3.1 started in 133 ms, 10 tools`, the Tools Manager's off and on switches, no `server ended` before the quit.
 
 ### Shared keys: the store (K1)
 
