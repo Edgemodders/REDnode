@@ -51,11 +51,14 @@ bool g_preGameWarned = false;
 int g_lastMainMenu = -1; // 0 or 1 once logged
 int g_lastWorld = -1;    // 0 or 1 once logged
 
-// The player's attach and detach, from REDnode.reds through NotePlayerEvent. Game thread.
-bool g_attached = false;              // an OnGameAttached since the start or the last detach
-void* g_detachedPlayer = nullptr;     // the player whose OnDetach turned world off
+// The player's attach and detach, from REDnode.reds through NotePlayerEvent. OnDetach runs on
+// one of the game's worker threads (seen on the laptop, 2026-10-30), so the event side only
+// touches atomics; the poll, on the game thread, does the rest.
+std::atomic_bool g_attached{false}; // an OnGameAttached since the start or the last detach
+enum : int { NoEvent, Attached, Left };
+std::atomic_int g_lastEvent{NoEvent}; // the last attach or leave since the poll, for the poll
+void* g_detachedPlayer = nullptr;     // game thread: the player there when world went off
 uint64_t g_detachedFrame = 0;
-uint64_t g_frame = 0;
 constexpr uint64_t DetachHoldFrames = 600; // about 10 s at 60 fps
 bool g_scriptsChecked = false;
 bool g_scripts = false; // REDnode's scripts are loaded, so attach events come
@@ -201,7 +204,18 @@ void PollGameState(uint64_t aFrame)
         }
     }
 
-    g_frame = aFrame;
+    switch (g_lastEvent.exchange(NoEvent))
+    {
+    case Left:
+        g_detachedPlayer = player.GetPtr(); // null once the game has let go of it
+        g_detachedFrame = aFrame;
+        break;
+    case Attached:
+        g_detachedPlayer = nullptr;
+        break;
+    default:
+        break;
+    }
     if (!g_scriptsChecked)
     {
         // Without REDnode's scripts (a script error stops them all) no attach event comes:
@@ -219,7 +233,7 @@ void PollGameState(uint64_t aFrame)
         g_detachedPlayer = nullptr;
         g_attached = true;
     }
-    if (!(state & StateMainMenu) && (g_scripts ? g_attached : true) && !g_detachedPlayer)
+    if (!(state & StateMainMenu) && (g_scripts ? g_attached.load() : true) && !g_detachedPlayer)
         state |= StateWorld;
 
     const int mainMenu = (state & StateMainMenu) ? 1 : 0;
@@ -234,7 +248,7 @@ void PollGameState(uint64_t aFrame)
     {
         g_lastWorld = world;
         Log("Overlay: world %s (player %s, IsPreGame %s, attached %s)", world ? "on" : "off", player ? "yes" : "no",
-            preGame < 0 ? "unread" : (preGame ? "true" : "false"), g_attached ? "yes" : "no");
+            preGame < 0 ? "unread" : (preGame ? "true" : "false"), g_attached.load() ? "yes" : "no");
     }
 
     const uint32_t old = g_state.exchange(state);
@@ -270,13 +284,14 @@ void LeaveWorld()
 
 namespace rednode::overlay
 {
+// Any thread: OnDetach comes on a worker thread. Only atomics and the log here.
 void NotePlayerEvent(std::string_view aName, int32_t aValue)
 {
     using namespace detail;
     if (aName == "PlayerPuppet.OnGameAttached")
     {
         g_attached = true;
-        g_detachedPlayer = nullptr;
+        g_lastEvent = Attached;
         return;
     }
     // REDnode.reds sends OnDetach for the main player (1) or once the game has let go of it
@@ -288,8 +303,7 @@ void NotePlayerEvent(std::string_view aName, int32_t aValue)
         return;
     const bool wasOn = InWorld();
     g_attached = false;
-    g_detachedPlayer = rtti::Player().GetPtr();
-    g_detachedFrame = g_frame;
+    g_lastEvent = Left;
     LeaveWorld();
     Log("Overlay: V left the world (%s)%s", why, wasOn ? "" : "; world was already off");
 }

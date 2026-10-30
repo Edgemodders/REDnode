@@ -75,8 +75,8 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H3b World refresh and sound on 2.5](world.md#h3b-test) | In the game | H3 | 2026-10-27 | 0.42.1 + REDswap 1.0.0, World objects test 0.2.2, game 2.5 | **Steps 1 to 6 passed** (dev PC): the spawned box respawned after each of three REDswap swaps (69 to 77 ms), no game entity near V used its mesh, 0 faults. Steps 7 to 10 wait for a new EDGEwave katana override; step 9 checks #18 ([results](world.md#h3b-test)) |
 | [O12 Console](#o12-console) | In the game | O12 | 2026-10-27 | 0.42.1, game 2.5 | **Pass** (dev PC): every step. The first run (0.42.0) lost the history at Stop (an unfinished asynchronous write), fixed in 0.42.1 and passed on retest ([results](overlay.md#o12-console-test)). Mock game: 21 checks |
 | [Editor channel (#17)](#editor-channel-17) | In the game, with Claude | Sound API | 2026-10-29 | 0.45.0, game 2.5 | **Pass** (dev PC): info, play, play and stop a loop, play after the pause menu, the port closed after the quit. Mock game: 15 checks |
-| [Shared keys: the Keys view (K2)](#shared-keys-the-keys-view-k2) | In the game | #23 | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop): every step. Found: no sign of the save while a key is encrypted (about 1 s, the box still editable), and an id typed under Other service is saved and logged whatever it is; both changed in 0.47.1 ([retest](#keys-retest-on-0471)). Mock game: 23 checks |
-| [The world flag and game text (#25, #26)](#the-world-flag-and-game-text-25-26) | In the game, with Claude | EDGEmobile's requests | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop), with one finding: `world` was right at every step, but went off at a load only when the player went, since the `OnDetach` wrap never sent its event; the Console showed the long refusal as `Uncaught:` only. Both fixed in 0.47.1, which awaits a [retest](#world-flag-retest-on-0471) |
+| [Shared keys: the Keys view (K2)](#shared-keys-the-keys-view-k2) | In the game | #23 | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop): every step. Found: no sign of the save while a key is encrypted (about 1 s, the box still editable), and an id typed under Other service is saved and logged whatever it is; both changed in 0.47.1; its [retest](#keys-retest-on-0471) **passed** on 2026-10-30 (laptop). Mock game: 23 checks, 30 on 0.47.1 |
+| [The world flag and game text (#25, #26)](#the-world-flag-and-game-text-25-26) | In the game, with Claude | EDGEmobile's requests | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop), with one finding: `world` was right at every step, but went off at a load only when the player went, since the `OnDetach` wrap never sent its event; the Console showed the long refusal as `Uncaught:` only. Both fixed in 0.47.1: its [retest](#world-flag-retest-on-0471) **passed** on 2026-10-30 (laptop): `world` went off at the start of each load and at the main menu, 0.3 s before the player went. 0.47.2 moves the event's work off the worker thread it arrives on; a short check rides with the next test |
 | [Tools Manager starts EDGEmat's server (0.45.1)](mcp.md#edgemats-tools-test) | In the game | E1 | 2026-10-30 | 0.47.0 + Admin Tools 0.1.0, game 2.5 | **Pass** (laptop): the EDGEmat group showed its 10 tools in a fresh session, no assistant asked first |
 | [Roles (#20)](services.md#roles-test) | In the game | Services | 2026-10-29 | 0.45.0 + Roles test 0.1.0, Counter service 0.3.0, game 2.5 | **Pass** (dev PC): all eight steps. Mock game: 15 checks |
 | [H2b preview spike](world.md#h2b-preview-test) | In the game | H2 | 2026-10-27 | 0.37.0 + Refresh test 0.3.0, RED Hot Tools 1.3.0+edgemodders.1, game 2.31 | **Pass** (laptop): the preview reached through Codeware's menu layer, alive after the menu closes; Reset preview showed the swapped version, menu open or closed; Game event not run (`DelayEventNextFrame` overload); step 2 unanswered (Scan still running) ([results](world.md#h2b-preview-test-results-2026-10-27-passed)) |
@@ -818,6 +818,8 @@ Every step passed, with the ElevenLabs key in step 2, in one session with the wo
 2. In **Other service id**, type `sk-test-1234567890` and press Enter: refused with "That looks like a key, not a service id", and the box is empty. Then `my-tool`: a `my-tool` line, Not set. Mark.
 3. **Remove** the key from step 1 (twice): "Removing the key…", then Not set. If it was a real key you want to keep, Set it again. Mark.
 
+Result, 2026-10-30 (laptop, 0.47.1): **passed**, every step.
+
 ### The world flag and game text (#25, #26)
 
 Built 2026-10-30 in REDnode 0.47.0 for EDGEmobile's requests. **#25:** `game.state().world`, true only while V is in the world. The plugin turns it on with a player past the main menu after `PlayerPuppet.OnGameAttached`, and off at the main player's `OnDetach` (a new wrap in `REDnode.reds`), so a load from the pause menu turns it off at its start. While it is off, `rtti.call` refuses global and static functions that take a `GameInstance`, except `GetPlayer` and `GetSettingsSystem`. **#26:** `script_ref` arguments in `api`, and `loc.text` (the bridge's `loc.text`, through the game's `GetLocalizedText`). The scripts compiled with redscript-cli against 2.5's `final.redscripts`, with and without Codeware 1.21.0 (0 errors in REDnode's files). Checked in the mock game (scratchpad `w25`): before the plugin's first `ui-state` a mod sees `mainMenu: true, world: false`, `onState` gets each change of `world`, and `loc.text` answers one key and an array. The guard and `script_ref` are in the plugin, so only this test checks them. Everything is typed in the **Console** (launcher, **Console**), which has the whole `rednode` package; no permission switch is involved: the Console is REDnode's own.
@@ -858,6 +860,17 @@ Findings:
 2. Load a save. Open the pause menu and load a save again. Mark.
 3. Exit to the main menu. Mark.
 4. Tell Claude. Claude reads the plugin log: `V left the world (...)` at the start of step 2's load and at step 3, each before `world off` or with "world was already off", then `world on` after the load. Mark.
+
+Result, 2026-10-30 (laptop, 0.47.1, run with the Keys retest): **passed.** The Console showed the whole message. In the plugin log:
+
+| Moment | What came |
+|---|---|
+| Load from the main menu (11:02:59) | `OnDetach` (value 2, no player left) and `the session ended`, world already off; `world on` 0.6 s after `OnGameAttached` |
+| Load from the pause menu (11:04:04.880) | `V left the world (OnDetach, no player left)` turned world off; `main menu on (player no)` came 0.3 s later (11:04:05.180), when the game thread ran again; `the session ended` 29 ms after OnDetach; `world on` with the next `OnGameAttached` |
+| Exit to the main menu (11:05:06.008) | The same: OnDetach first, the poll 0.28 s later |
+| Quit (11:05:27) | Both, world already off |
+
+So the game lets go of its player before `PlayerPuppet.OnDetach` runs (value 2 every time, never 1), and it runs on one of the game's worker threads, not the game thread. While the load holds the game thread, no call runs; but a call queued then would have run in the first frame after it, before the poll saw no player: 0.47.0 would have let it reach the game, 0.47.1 refused it. 0.47.2 keeps the event's side to atomics (the plugin read the player on that worker thread in 0.47.1) and lets the poll, on the game thread, do the rest; a short check of it (a load from the pause menu, the same log lines) rides with the next in-game test.
 
 ## Game 2.5
 
