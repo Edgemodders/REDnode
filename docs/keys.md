@@ -9,8 +9,8 @@ The player's AI service keys (Anthropic, Google Gemini, OpenAI, ElevenLabs and o
 | Phase | What | State |
 |---|---|---|
 | K1 | The store and its library, `tools/keys/keys.mjs` | Built |
-| K2 | A **Keys** view in the launcher's Settings drawer, in the game | Built in REDnode 0.46.0, awaiting its in-game test |
-| K3 | The `keys:<service>` permission, `secrets.shared` and `secrets.askShared` for packages; REDagent and `edgewave-voice` move to the store | Planned |
+| K2 | A **Keys** view in the launcher's Settings drawer, in the game | Passed in game on 2026-10-30 (REDnode 0.47.0, 0.47.1's changes too) |
+| K3 | The `keys:<service>` permission, `secrets.shared` and `secrets.askShared` for packages, REDnode's **Key request** window; REDagent 0.4.0 moves to the store | Built in REDnode 0.48.0, awaiting its in-game test. `edgewave-voice` moves in EDGEwave's own repo (see below) |
 
 The files are the shared contract. REDnode's Keys view (K2) is the in-game way to set them; outside the game, each tool reads and writes the same files itself, with REDnode closed.
 
@@ -19,7 +19,7 @@ The files are the shared contract. REDnode's Keys view (K2) is the in-game way t
 | | |
 |---|---|
 | Where | `%APPDATA%\Edgemodders\keys\<service>.txt`, one file per service |
-| Service ids | Lowercase letters, digits and dashes, up to 40: `anthropic`, `gemini`, `openai`, `elevenlabs`, or any other a tool needs |
+| Service ids | Lowercase letters, digits and dashes, up to 40 (the Keys view takes up to 24 and refuses what looks like a key): `anthropic`, `gemini`, `openai`, `elevenlabs`, or any other a tool needs |
 | Format | Windows DPAPI for the current user, written as PowerShell's `ConvertFrom-SecureString` writes it: one line of hex |
 | Who can read it | Only the same Windows user on the same PC. Any program that user runs can read it, as with VS Code's secret storage or an environment variable |
 | Environment | A variable wins when set: `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ELEVENLABS_API_KEY`; for another id, its name in capitals with `_API_KEY` (`my-tool` is `MY_TOOL_API_KEY`). For CI, and for clients that pass keys |
@@ -49,6 +49,34 @@ In the game: F10, the gear (Settings), then **Open** on the **Keys** line. The v
 **Set** and **Replace** open a box that shows dots: paste the key and press Enter. A key that does not look right for its service is refused (an Anthropic key starts with `sk-ant-`, an OpenAI one with `sk-`). **Remove** asks once more, since it removes the key for every tool. **Other service id** adds a line for any service by its id.
 
 The page never holds a key after Enter: it goes to the host, which saves it with the library's non-blocking functions and answers only what `keyInfo` gives. Only the launcher and the Mod Manager may make the call (`rednode:host:keys`). The host logs `Keys: <service> set` or `removed`, never a key.
+
+## Keys for packages
+
+A REDnode package reads a shared key only when its manifest lists it and the player allows it, as `mcp`, `bridge` and `archives` work:
+
+```json
+"permissions": ["keys:anthropic"]
+```
+
+| Call | Gives |
+|---|---|
+| `secrets.shared(service)` | The key, or `null` until the player allows the package, or while none is set. Never asks |
+| `secrets.askShared(service, { reason, offer })` | The key at once when the package is allowed and the key is set. Otherwise REDnode's own **Key request** window asks the player, and the call waits for the answer: the key, or `null` when the player denies, does not answer within 10 minutes, or the package stops |
+
+The Key request window names the package and the service, shows `reason`, and:
+
+| When | The window |
+|---|---|
+| No key is saved | A box that shows dots: the player pastes the key and presses **Allow** (the same prefix check as the Keys view). Saving says "Encrypting the key…" |
+| A key is saved | Its last 4 characters, and **Allow** |
+| No key is saved, and the package offers its own (`offer`) | The offered key's last 4 characters and **Move and allow**, which saves it to the store; or the player pastes another |
+
+**Allow** grants the package its `keys:<service>` permission, which the Mod Manager shows and can withdraw. The page never holds a key after Allow, and the host logs only which package asked for which service and the answer. A package never writes the store: only the player does, in the Keys view or the Key request window. Only REDnode's own window can answer a request (`rednode:keyask:answer`).
+
+| Package | Moves |
+|---|---|
+| REDagent 0.4.0 | Reads `anthropic`. **Set up the key** opens the Key request window. Its own old key (`anthropic-api-key` in its secrets) is offered at the first question and deleted once moved; if the player declines, REDagent keeps using its own copy for the session |
+| `edgewave-voice` | In EDGEwave's repo, by EDGEwave's session: list `"keys:elevenlabs"`, read with `secrets.shared('elevenlabs')`, ask with `secrets.askShared('elevenlabs', { offer: <its own key> })`, then delete its own copy. Its window's key field becomes a button that asks |
 
 ## The library
 
@@ -93,8 +121,8 @@ On other systems than Windows the library reads environment variables only; `set
 | Tool | Reads | Writes | When |
 |---|---|---|---|
 | REDnode's Keys view | All | All (Set, Replace, Remove) | K2, REDnode 0.46.0 |
-| REDnode packages (`secrets.shared`, `secrets.askShared`) | The keys their manifest lists and the player allowed | Never directly: `askShared` opens REDnode's own prompt | K3 |
-| REDagent | `anthropic` | Through `secrets.askShared` | K3 |
-| `edgewave-voice` | `elevenlabs` | Through `secrets.askShared` | K3 |
+| REDnode packages (`secrets.shared`, `secrets.askShared`) | The keys their manifest lists and the player allowed | Never directly: `askShared` opens REDnode's own Key request window | K3, REDnode 0.48.0 |
+| REDagent | `anthropic` | Through `secrets.askShared` | K3, REDagent 0.4.0 |
+| `edgewave-voice` | `elevenlabs` | Through `secrets.askShared` | EDGEwave's session, after K3 |
 | EDGEmat's MCP server and extension | `gemini`, `openai` | **Set Image Service Key...** | EDGEmat's own issue, after K1 |
 | EDGEwave (VS Code) | `elevenlabs` | Its key prompt | Later |

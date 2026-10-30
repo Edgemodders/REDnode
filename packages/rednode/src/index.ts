@@ -33,7 +33,7 @@ export { world } from "./world.js";
 export type { EntityId, WorldPoint, WorldRotation, SpawnOptions, Spawned, EntityEventName, NearEntity, NearOptions, EntityFiles, SpawnedEntry, LoadResult } from "./world.js";
 export type { Scene, SceneObject } from "./scene.js";
 export type { AgentAnswer, AskOptions, AgentRequest, AgentResult } from "./agent.js";
-export type { PackageInfo, KernelMcp, KernelBridge, Requirement } from "./pkg.js";
+export type { PackageInfo, KernelMcp, KernelBridge, Requirement, AskSharedOptions } from "./pkg.js";
 export { tweakdb } from "./tweakdb.js";
 export type { TweakId, Flat, RecordTypeName } from "./tweakdb.js";
 export { audio } from "./audio.js";

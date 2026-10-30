@@ -1,0 +1,11 @@
+{
+  "id": "keys-test",
+  "name": "Keys test",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "Checks REDnode 0.48.0's shared keys for packages (#23): secrets.shared, secrets.askShared with REDnode's Key request window, a package's own key moved to the shared store, and a key it does not list refused. Uses a made-up service, rednode-test.",
+  "main": "mod.mjs",
+  "permissions": ["keys:rednode-test"],
+  "requires": { "rednode": ">=0.48.0" },
+  "open": false
+}

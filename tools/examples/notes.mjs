@@ -352,6 +352,19 @@ export const NOTES = {
     tryThis: ['Press use("counter"), then add(1).', 'Press use("nobody"): no package provides it.', 'Type into the password field.'],
     preview: 'Here Counter service runs in the same preview. The tone buttons fail: a preview cannot write files.',
   },
+  'keys-test': {
+    group: 'tests',
+    summary: 'Reads one of the player\'s shared keys with `secrets.shared`, asks for it with `secrets.askShared`, and moves a key the package kept itself into the shared store.',
+    teaches: ['secrets.shared', 'secrets.askShared', 'keys:<service> permission'],
+    how: [
+      'The manifest lists `"keys:rednode-test"`, a made-up service, so the test never touches a real key. `secrets.shared` answers null until the player allows the package or while no key is set.',
+      '`secrets.askShared` opens REDnode\'s own Key request window: the player allows the package and, when no key is saved, pastes one. The package gets the key, or null when the player denies.',
+      'With `offer`, a key the package kept in its own `secrets` moves to the shared store; the window shows only its last 4 characters. Then the package deletes its own copy, as REDagent does.',
+      'A key the manifest does not list is refused with an error.',
+    ],
+    tryThis: ['Press secrets.shared, then secrets.askShared.', 'Press Keep an own key, then Ask, offering it.', 'Press secrets.shared("openai").'],
+    preview: 'A preview has no keys: every read gives null, and the ask only logs what the game would show.',
+  },
   'world-objects-test': {
     group: 'tests',
     summary: 'Spawn a person and a prop, list what is near V with the files each uses, load an EDGEbuilder scene around V, and swap an archive to see what its refresh does to the world.',

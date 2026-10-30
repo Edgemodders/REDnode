@@ -438,6 +438,7 @@ A package can live in your own project, for example `E:\Modding\MyMod\`, and sti
 |---|---|---|
 | `pkg.id`, `pkg.dir`, `pkg.dataDir` | This package's id, its folder in the apps folder, and a data folder of its own outside it, which survives updates. Write files to `dataDir`, never to `dir`: hot reload watches `dir` | Node mods |
 | `secrets.get(name)`, `secrets.set(name, value)`, `secrets.delete(name)` | Secrets such as an API key, encrypted with the player's Windows account and kept by the host. A package reads only its own. A secret that cannot be decrypted, for example one saved under another Windows account, reads as `null` | Node mods and apps |
+| `secrets.shared(service)`, `secrets.askShared(service, { reason, offer })` | One of the player's [shared keys](keys.md) (Anthropic, Google Gemini, OpenAI, ElevenLabs or any other), typed once and read by every EDGE tool on the PC. List `"keys:<service>"` in the manifest's `permissions`, such as `"keys:gemini"`. `shared` gives the key, or `null` until the player allows it or while none is set; `askShared` opens REDnode's own **Key request** window when needed, where the player allows the package and pastes a missing key, and gives the key or `null`. The package never writes the store. REDnode 0.48.0 | Node mods and apps |
 | `kernel.mcp()` | The address and a token for the [kernel MCP server](mcp.md), for an AI agent in the package. The package must list `"permissions": ["mcp"]` in its manifest, and the player must allow it in the Mod Manager | Node mods and apps |
 | `channel.post(data)`, `channel.on(handler)` | Messages between a package's pages and its own Node mod: a web UI with a Node backend | Node mods and apps |
 | `kernel.requirements()` | The package's `requires`, checked against the game folder (see [Requirements](#requirements)) | Node mods and apps |
@@ -450,6 +451,17 @@ import { pkg, secrets, kernel } from 'rednode';
 
 await secrets.set('api-key', key);
 const { url, headers } = await kernel.mcp(); // rejects until the player allows it
+
+// rednode-app.json: "permissions": ["keys:gemini"]
+const gemini = (await secrets.shared('gemini')) ?? (await secrets.askShared('gemini', { reason: 'To make your textures' }));
+```
+
+A package that kept a key in its own `secrets` before can offer it to the shared keys: `askShared` with `offer` shows the player only its last 4 characters, and moves it when the player allows. Then delete the package's own copy:
+
+```js
+const mine = await secrets.get('api-key');
+const key = (await secrets.shared('anthropic')) ?? (await secrets.askShared('anthropic', { offer: mine ?? undefined }));
+if (key && mine) await secrets.delete('api-key');
 ```
 
 ## Requirements

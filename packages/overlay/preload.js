@@ -125,6 +125,11 @@ contextBridge.exposeInMainWorld('rednode', {
     pending: () => ipcRenderer.invoke('rednode:connect:pending'),
     answer: (allow) => ipcRenderer.invoke('rednode:connect:answer', allow),
   },
+  /** The Key request window (#23, K3): a package's ask for a shared key, and the player's answer. Built-in only. */
+  keyask: {
+    pending: () => ipcRenderer.invoke('rednode:keyask:pending'),
+    answer: (aid, allow, how, key) => ipcRenderer.invoke('rednode:keyask:answer', aid, allow, how, key),
+  },
   /** The mod log, for apps built into REDnode. Other apps get an error. New lines arrive as {event: 'mod-log', entries}. */
   logs: {
     recent: () => ipcRenderer.invoke('rednode:logs:recent'),

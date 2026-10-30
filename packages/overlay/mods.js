@@ -291,12 +291,13 @@ function createMods(host) {
         return;
       case 'secret':
       case 'mcp':
-        try {
-          const result = msg.t === 'secret' ? host.secret(id, msg.op, msg.name, msg.value) : host.mcpFor(id);
-          reply(p, id, msg.rid, result);
-        } catch (err) {
-          reply(p, id, msg.rid, undefined, err.message);
-        }
+        // A shared key's ask waits for the player, so the answer may come later.
+        Promise.resolve()
+          .then(() => (msg.t === 'secret' ? host.secret(id, msg.op, msg.name, msg.value) : host.mcpFor(id)))
+          .then(
+            (result) => reply(p, id, msg.rid, result),
+            (err) => reply(p, id, msg.rid, undefined, err.message),
+          );
         return;
       case 'ui':
         if (msg.op === 'open') host.ui.open(id, String(msg.window), msg.spec);

@@ -76,6 +76,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [O12 Console](#o12-console) | In the game | O12 | 2026-10-27 | 0.42.1, game 2.5 | **Pass** (dev PC): every step. The first run (0.42.0) lost the history at Stop (an unfinished asynchronous write), fixed in 0.42.1 and passed on retest ([results](overlay.md#o12-console-test)). Mock game: 21 checks |
 | [Editor channel (#17)](#editor-channel-17) | In the game, with Claude | Sound API | 2026-10-29 | 0.45.0, game 2.5 | **Pass** (dev PC): info, play, play and stop a loop, play after the pause menu, the port closed after the quit. Mock game: 15 checks |
 | [Shared keys: the Keys view (K2)](#shared-keys-the-keys-view-k2) | In the game | #23 | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop): every step. Found: no sign of the save while a key is encrypted (about 1 s, the box still editable), and an id typed under Other service is saved and logged whatever it is; both changed in 0.47.1; its [retest](#keys-retest-on-0471) **passed** on 2026-10-30 (laptop). Mock game: 23 checks, 30 on 0.47.1 |
+| [Shared keys for packages (K3)](#shared-keys-for-packages-k3) | In the game, with Claude | #23 | Not run | 0.48.0 + Keys test 0.1.0, REDagent 0.4.0, game 2.5 | Awaits its run. Mock game: 20 checks (Keys test), 8 (REDagent) |
 | [The world flag and game text (#25, #26)](#the-world-flag-and-game-text-25-26) | In the game, with Claude | EDGEmobile's requests | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop), with one finding: `world` was right at every step, but went off at a load only when the player went, since the `OnDetach` wrap never sent its event; the Console showed the long refusal as `Uncaught:` only. Both fixed in 0.47.1: its [retest](#world-flag-retest-on-0471) **passed** on 2026-10-30 (laptop): `world` went off at the start of each load and at the main menu, 0.3 s before the player went. 0.47.2 moves the event's work off the worker thread it arrives on; a short check rides with the next test |
 | [Tools Manager starts EDGEmat's server (0.45.1)](mcp.md#edgemats-tools-test) | In the game | E1 | 2026-10-30 | 0.47.0 + Admin Tools 0.1.0, game 2.5 | **Pass** (laptop): the EDGEmat group showed its 10 tools in a fresh session, no assistant asked first |
 | [Roles (#20)](services.md#roles-test) | In the game | Services | 2026-10-29 | 0.45.0 + Roles test 0.1.0, Counter service 0.3.0, game 2.5 | **Pass** (dev PC): all eight steps. Mock game: 15 checks |
@@ -819,6 +820,21 @@ Every step passed, with the ElevenLabs key in step 2, in one session with the wo
 3. **Remove** the key from step 1 (twice): "Removing the key…", then Not set. If it was a real key you want to keep, Set it again. Mark.
 
 Result, 2026-10-30 (laptop, 0.47.1): **passed**, every step.
+
+### Shared keys for packages (K3)
+
+Built 2026-10-30 in REDnode 0.48.0, with REDagent 0.4.0. A package lists `"keys:<service>"` in its `permissions`; `secrets.shared` reads the key once the player allowed it, and `secrets.askShared` opens REDnode's own **Key request** window (`packages/overlay/keyask`), where the player allows the package and pastes a missing key or moves the key the package offers. Checked in the mock game against a scratch key folder with made-up keys (scratchpad `k3/check.mjs`, 20 checks: null before allowed, the window's text, an empty Allow refused, Encrypting, the key to the mod and the store, the window closed, no window once allowed, the offer moved and the own copy deleted, Deny, an unlisted key refused, another page refused, no key in the host log; `k3/redagent-check.mjs`, 8 checks of REDagent's **Set up the key**). The **Keys test** sample uses a made-up service, `rednode-test`, so your real keys are not touched until step 8.
+
+0. Test timer: Start, Mark after each step.
+1. Load a save. In the Mod Manager, switch on **Keys test**. Leave its permission (**your rednode-test key**) off: the Key request window grants it. In its window press **secrets.shared**: the log says `shared: null`. Mark.
+2. Press **secrets.askShared**. REDnode's **Key request** window opens over the game: "Keys test asks to use your rednode-test key", "For the Keys test", and a box. Press F10, then **Allow** with the box empty: "Paste your rednode-test key first". Type `rnt-typed-key-ab12` and press **Allow**: "Encrypting the key…", then the window closes and the Keys test logs `askShared: a key ending in ab12`. Mark.
+3. Press **secrets.shared**: `a key ending in ab12`. In the Mod Manager, the Keys test's permission is now on. Mark.
+4. In Settings, **Keys**: a `rednode-test` line shows `•••• ab12` and "Used by Keys test". **Remove** it (press twice). Mark.
+5. In the Keys test, press **Keep an own key**, then **Ask, offering it**: the window says "Keys test kept its own rednode-test key (•••• 7k3q)" with **Move and allow**. Press it: the log says `a key ending in 7k3q; own copy deleted`, and Keys shows `rednode-test` with `•••• 7k3q`. Mark.
+6. In Keys, remove `rednode-test` again. Press **secrets.askShared**, then **Deny**: `askShared: null`, and nothing is saved. Mark.
+7. Press **secrets.shared("openai")**: refused with `does not ask for "keys:openai"`. Mark.
+8. REDagent 0.4.0 (its permission **REDnode's tools** already on). If REDagent kept a key from 0.3, ask it a question: the Key request window offers to move it (its last 4) with **Move and allow**; press it, and REDagent answers. If it had none: press **Set up the key**, paste your Anthropic key, **Allow**. Keys then shows Anthropic set, "Used by REDagent". Mark.
+9. Tell Claude. Claude reads the host log: one `asks for` and one answer line per ask, `Granted keys:...` lines, and no key in it. Mark.
 
 ### The world flag and game text (#25, #26)
 

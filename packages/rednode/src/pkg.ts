@@ -48,7 +48,7 @@ export const pkg: PackageInfo = new Proxy({} as PackageInfo, {
 });
 
 interface SecretTransport {
-  secret?(op: string, name: string, value?: string): Promise<unknown>;
+  secret?(op: string, name: string, value?: unknown): Promise<unknown>;
   mcp?(): Promise<unknown>;
   bridge?(op: string, method?: string, params?: unknown): Promise<unknown>;
   requires?(): Promise<unknown>;
@@ -60,7 +60,7 @@ function pageBridge(): SecretTransport | undefined {
   return r?.pkg;
 }
 
-async function secretCall(op: string, name: string, value?: string): Promise<unknown> {
+async function secretCall(op: string, name: string, value?: unknown): Promise<unknown> {
   const t = (transport() as SecretTransport).secret ? (transport() as SecretTransport) : pageBridge();
   if (!t?.secret) throw new Error("rednode: secrets need the REDnode host");
   try {
@@ -70,10 +70,27 @@ async function secretCall(op: string, name: string, value?: string): Promise<unk
   }
 }
 
+/** What {@link secrets.askShared} may tell the player and give the store. */
+export interface AskSharedOptions {
+  /** One line on why the package needs the key, shown in REDnode's Key request window. */
+  reason?: string;
+  /**
+   * A key the package already kept itself (in its own {@link secrets}), offered to move into
+   * the shared store when none is saved there. The window shows only its last 4 characters.
+   * Once the player allows, delete the package's own copy.
+   */
+  offer?: string;
+}
+
 /**
  * Secrets of this package, such as an API key. They are encrypted with the
  * player's Windows account and kept by the REDnode host; a package can read
  * only its own. They never go into the package's folder.
+ *
+ * The player's AI service keys (Anthropic, Google Gemini, OpenAI, ElevenLabs and any other),
+ * typed once and shared by every EDGE tool on the PC, are read with {@link secrets.shared}
+ * and asked for with {@link secrets.askShared}: list `"keys:<service>"` in the manifest's
+ * `permissions` (from REDnode 0.48.0).
  *
  * @example
  * ```ts
@@ -95,6 +112,45 @@ export const secrets = {
   /** Deletes the secret. */
   async delete(name: string): Promise<void> {
     await secretCall("delete", name);
+  },
+  /**
+   * One of the player's shared keys, such as `"anthropic"`: the key, or null until the player
+   * allows this package to use it, or while none is set. Never asks: use
+   * {@link secrets.askShared} for that. The manifest must list `"keys:<service>"`.
+   *
+   * @example
+   * ```ts
+   * // rednode-app.json: "permissions": ["keys:gemini"]
+   * const key = await secrets.shared("gemini");
+   * if (!key) console.log("No Gemini key yet");
+   * ```
+   */
+  async shared(service: string): Promise<string | null> {
+    return (await secretCall("shared", service)) as string | null;
+  },
+  /**
+   * One of the player's shared keys, asked for when needed. When the package is allowed and
+   * the key is set, it answers at once. Otherwise REDnode's own Key request window asks the
+   * player to allow the package and, when no key is saved, to paste one; the package never
+   * sees that box. Resolves with the key, or null when the player denies, does not answer
+   * within 10 minutes, or the package stops. One window per package and service at a time.
+   *
+   * @example
+   * ```ts
+   * // rednode-app.json: "permissions": ["keys:anthropic"]
+   * import { secrets } from "rednode";
+   *
+   * let key = await secrets.shared("anthropic");
+   * if (!key) {
+   *   // A key this package kept itself before is offered to the shared store.
+   *   const mine = await secrets.get("anthropic-api-key");
+   *   key = await secrets.askShared("anthropic", { reason: "To answer your questions", offer: mine ?? undefined });
+   *   if (key && mine) await secrets.delete("anthropic-api-key");
+   * }
+   * ```
+   */
+  async askShared(service: string, options?: AskSharedOptions): Promise<string | null> {
+    return (await secretCall("askShared", service, options ?? {})) as string | null;
   },
 };
 

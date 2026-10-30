@@ -71,6 +71,7 @@ const BUILTIN_ROOTS = [
   { dir: path.join(__dirname, 'welcome'), single: true, builtin: true },
   // The Connect window (#19): open only while an MCP client waits for the player's answer.
   { dir: path.join(__dirname, 'connect'), single: true, builtin: true, prompt: true },
+  { dir: path.join(__dirname, 'keyask'), single: true, builtin: true, prompt: true },
   // The Console (O12): a page and a Node mod. Packaged, it sits outside app.asar, in
   // resources/, so its mod's worker thread loads it as plain files.
   { dir: app.isPackaged ? path.join(process.resourcesPath, 'console') : path.join(__dirname, 'console'), single: true, builtin: true },
@@ -174,6 +175,16 @@ const PERMISSIONS = {
   // host's tasks and tools calls (fromAdmin). The Mod Manager and launcher show a warning under it.
   admin: "managing REDnode: what every package costs, ending or restarting any package, and switching AI assistants' tools on and off",
 };
+// "keys:<service>" (#23, K3): one of the player's shared keys, such as "keys:anthropic", read
+// with secrets.shared and asked for with secrets.askShared.
+const KEYS_PERMISSION = /^keys:([a-z0-9][a-z0-9-]{0,39})$/;
+const KEY_NAMES = { anthropic: 'Anthropic', gemini: 'Google Gemini', openai: 'OpenAI', elevenlabs: 'ElevenLabs' };
+const serviceName = (service) => KEY_NAMES[service] ?? service;
+function permissionWhat(name) {
+  const k = KEYS_PERMISSION.exec(name);
+  return k ? `your ${serviceName(k[1])} key, shared with every EDGE tool (calls with it may cost you)` : PERMISSIONS[name];
+}
+const isPermission = (name) => typeof name === 'string' && (name in PERMISSIONS || KEYS_PERMISSION.test(name));
 // What a package may offer other packages in its manifest's "provides": "agent" (the host's
 // own broker, REDagent), or any other role name (#20), answered by the package's service
 // file and reached with use("voice") in the rednode package.
@@ -354,8 +365,8 @@ function readManifest(dir) {
     }
   }
   if (m.isolation !== undefined && !['process', 'any'].includes(m.isolation)) problems.push('isolation must be process or any');
-  if (m.permissions !== undefined && (!Array.isArray(m.permissions) || m.permissions.some((p) => !(p in PERMISSIONS)))) {
-    problems.push(`permissions must be a list of ${Object.keys(PERMISSIONS).join(', ')}`);
+  if (m.permissions !== undefined && (!Array.isArray(m.permissions) || m.permissions.some((p) => !isPermission(p)))) {
+    problems.push(`permissions must be a list of ${Object.keys(PERMISSIONS).join(', ')}, or keys:<service> such as keys:anthropic`);
   }
   if (m.provides !== undefined) {
     if (!Array.isArray(m.provides) || m.provides.some((p) => typeof p !== 'string' || !ROLE_NAME.test(p))) {
@@ -1063,7 +1074,7 @@ function rewatchAppRoots() {
 
 function shouldOpen(entry) {
   if (entry.pinned) return true;
-  if (entry.prompt) return !!oauth?.pending();
+  if (entry.prompt) return entry.manifest.id === 'keyask' ? keyAsks.length > 0 : !!oauth?.pending();
   if (entry.builtin && entry.manifest.id === 'welcome' && !settings.welcomed) return true; // the first start
   if (chosenApps) return chosenApps.includes(entry.manifest.id);
   return settings.apps[entry.manifest.id]?.open ?? entry.manifest.open;
@@ -2947,7 +2958,7 @@ function appList() {
         })(),
         requires: requirementsOf(m.id),
         bridge: m.permissions.includes('bridge') || needsBridge(m) ? bridgeInfo() : null,
-        permissions: m.permissions.map((name) => ({ name, what: PERMISSIONS[name], granted: isGranted(m.id, name) })),
+        permissions: m.permissions.map((name) => ({ name, what: permissionWhat(name), granted: isGranted(m.id, name) })),
       };
     });
 }
@@ -3346,6 +3357,7 @@ function readSecrets() {
   return readJson('secrets.json', {});
 }
 function secret(id, op, name, value) {
+  if (op === 'shared' || op === 'askShared') return sharedKey(id, op, name, value);
   if (typeof name !== 'string' || !/^[\w.-]{1,64}$/.test(name)) throw new Error('A secret name is 1 to 64 letters, digits, _ . or -');
   if (!safeStorage.isEncryptionAvailable()) throw new Error('Encryption is not available on this PC');
   const all = readSecrets();
@@ -3373,6 +3385,125 @@ function secret(id, op, name, value) {
   fs.mkdirSync(app.getPath('userData'), { recursive: true });
   fs.writeFileSync(dataFile('secrets.json'), JSON.stringify(all, null, 2));
   return null;
+}
+
+// ---------- shared keys for packages (#23, K3) ----------
+//
+// secrets.shared(service) reads one of the player's shared keys (K1's store) once the manifest
+// lists "keys:<service>" and the player allowed it: null until then, or while it is not set.
+// secrets.askShared(service, { reason, offer }) answers at once when it can; otherwise REDnode's
+// own Key request window (packages/overlay/keyask) asks the player: allow the package, paste a
+// missing key, or move the key the package offers (one it kept in its own secrets) into the
+// store. The package never sees the window's box; it gets the key only once allowed.
+
+const ASK_MS = 10 * 60 * 1000;
+const keyAsks = []; // waiting requests, the first one shown
+let nextAid = 1;
+
+function keysPermissionOf(id, service) {
+  const entry = apps.get(id);
+  if (typeof service !== 'string' || !KEYS_PERMISSION.test(`keys:${service}`)) {
+    throw new Error('A key\'s service id is lowercase letters, digits and dashes, such as "anthropic"');
+  }
+  const permission = `keys:${service}`;
+  if (!entry?.manifest.permissions.includes(permission)) {
+    throw new Error(`This package does not ask for "${permission}" in its rednode-app.json`);
+  }
+  return { entry, permission };
+}
+
+async function sharedKey(id, op, service, options) {
+  const { entry, permission } = keysPermissionOf(id, service);
+  const k = await sharedKeys();
+  const read = () => k.promises.getKey(service, { tool: entry.manifest.name }).then((v) => v ?? null);
+  if (op === 'shared') return isGranted(id, permission) ? read() : null;
+
+  const o = options && typeof options === 'object' ? options : {};
+  const offer = typeof o.offer === 'string' && o.offer.trim() ? o.offer.trim() : null;
+  if (offer && k.checkKey(service, offer)) throw new Error(`The offered key does not look right: ${k.checkKey(service, offer)}`);
+  const has = await k.promises.hasKey(service);
+  if (isGranted(id, permission) && has) return read();
+  const saved = has ? (await k.promises.keyInfo(service)).last4 ?? null : null;
+  // One request per package and service: a second ask waits for the same answer.
+  const same = keyAsks.find((a) => a.id === id && a.service === service);
+  if (same) return new Promise((resolve) => same.also.push(resolve));
+  return new Promise((resolve) => {
+    const a = {
+      aid: nextAid++, id, name: entry.manifest.name, service, serviceName: serviceName(service),
+      reason: typeof o.reason === 'string' ? o.reason.slice(0, 300) : '',
+      offer, needsKey: !has, saved, granted: isGranted(id, permission), resolve, also: [],
+    };
+    a.timer = setTimeout(() => finishAsk(a, null, 'no answer in 10 minutes'), ASK_MS);
+    keyAsks.push(a);
+    log(`Keys: ${a.name} asks for the ${service} key${a.needsKey ? ' (not set)' : ''}${offer ? ', offering its own' : ''}`);
+    showKeyAsk();
+  });
+}
+
+// What the Key request window shows: never a key, only the last 4 characters of an offer.
+function keyAskView(a) {
+  if (!a) return null;
+  return {
+    aid: a.aid, package: a.name, service: a.service, serviceName: a.serviceName, reason: a.reason,
+    needsKey: a.needsKey, saved: a.saved, granted: a.granted, offer: a.offer ? { last4: a.offer.slice(-4) } : null,
+    prefix: { anthropic: 'sk-ant-', openai: 'sk-' }[a.service] ?? null, waiting: keyAsks.length - 1,
+  };
+}
+
+function showKeyAsk() {
+  const entry = apps.get('keyask');
+  if (!entry) return;
+  if (keyAsks.length) {
+    openApp(entry);
+    const w = windowOfApp('keyask');
+    if (w) toPage(w, { event: 'keyask', request: keyAskView(keyAsks[0]) });
+  } else {
+    closeApp('keyask');
+  }
+}
+
+function finishAsk(a, key, why) {
+  const i = keyAsks.indexOf(a);
+  if (i < 0) return;
+  keyAsks.splice(i, 1);
+  clearTimeout(a.timer);
+  log(`Keys: ${a.name}'s ask for the ${a.service} key: ${why}`);
+  for (const r of [a.resolve, ...a.also]) r(key);
+  showKeyAsk();
+}
+
+// A package that stops takes its waiting asks with it.
+function dropKeyAsks(id) {
+  for (const a of keyAsks.filter((x) => x.id === id)) finishAsk(a, null, 'the package stopped');
+}
+
+// The player's answer: allow (with a typed key, or "offer" to move the package's own), or deny.
+async function answerKeyAsk(aid, allow, how, typed) {
+  const a = keyAsks.find((x) => x.aid === aid);
+  if (!a) throw new Error('That request is no longer waiting');
+  if (!allow) {
+    finishAsk(a, null, 'denied');
+    return true;
+  }
+  const k = await sharedKeys();
+  const key = how === 'offer' ? a.offer : typeof typed === 'string' ? typed.trim() : '';
+  if (a.needsKey || how === 'offer' || key) {
+    if (!key) throw new Error(`Paste your ${a.serviceName} key first`);
+    const wrong = k.checkKey(a.service, key);
+    if (wrong) throw new Error(wrong);
+    await k.promises.setKey(a.service, key);
+    log(`Keys: ${a.service} set${how === 'offer' ? ` (moved from ${a.name})` : ''}`);
+  }
+  const permission = `keys:${a.service}`;
+  const list = new Set(settings.apps[a.id]?.granted ?? []);
+  list.add(permission);
+  settings.apps[a.id] = { ...settings.apps[a.id], granted: [...list] };
+  writeJson('settings.json', settings);
+  log(`Granted ${permission} for ${a.id}`);
+  notifyLauncher();
+  const value = await k.promises.getKey(a.service, { tool: a.name });
+  finishAsk(a, value ?? null, how === 'offer' ? 'allowed, its key moved' : 'allowed');
+  return true;
 }
 
 /** The kernel MCP server's address and a token for one package, if the player granted it. */
@@ -4144,6 +4275,20 @@ ipcMain.handle('rednode:connect:answer', (event, allow) => {
   return oauthFor().answer(allow === true);
 });
 
+// The Key request window (#23, K3): REDnode's own, never a package's.
+function fromKeyAsk(event) {
+  const w = windowFor(event.sender);
+  if (w?.app.manifest.id !== 'keyask' || !w.app.builtin) throw new Error("Only REDnode's Key request window answers key requests");
+}
+ipcMain.handle('rednode:keyask:pending', (event) => {
+  fromKeyAsk(event);
+  return keyAskView(keyAsks[0]);
+});
+ipcMain.handle('rednode:keyask:answer', (event, aid, allow, how, typed) => {
+  fromKeyAsk(event);
+  return answerKeyAsk(Number(aid), allow === true, how, typed);
+});
+
 ipcMain.handle('rednode:connect:clients', (event) => {
   fromLauncher(event);
   return oauthFor().clients();
@@ -4640,6 +4785,7 @@ app.whenReady().then(() => {
     stopped: (id) => {
       services.gone(id);
       undoTweaks(id, 'the mod stopped');
+      dropKeyAsks(id);
       removeSpawns(id, 'the mod stopped');
       stopSounds(id);
       clearInk(id);

@@ -1062,6 +1062,14 @@ export const secrets = {
   async delete(n) {
     secretStore.delete(n);
   },
+  // The player's shared keys stay on their PC: a preview has none.
+  async shared() {
+    return null;
+  },
+  async askShared(service) {
+    log('info', `secrets.askShared("${service}"): in the game, REDnode's Key request window asks the player; this page has no keys`, 'sim');
+    return null;
+  },
 };
 export const channel = { post() {}, on: () => () => {} };
 

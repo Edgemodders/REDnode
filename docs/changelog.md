@@ -25,6 +25,8 @@ How to keep it:
 - EDGEmat's material tools for in-game assistants: REDnode now ships EDGEmat's MCP server (`@edgemodders/edgemat-mcp` 0.3.1) and runs it when an in-game assistant such as REDagent first needs it, with REDnode's own Node, the game folder and REDbridge. Its tools are listed as `edgemat__mat_*`: searches and descriptions run without asking, edits and new materials ask the player first, and the Tools Manager switches them. Desktop assistants such as Claude Code get EDGEmat through EDGEchat instead (`"edgematTools": "all"` in REDnode's settings lists them there too). See https://edgemodders.github.io/REDnode/mcp.html#edgemats-tools-e1
 - `game.state().world` (https://github.com/Edgemodders/REDnode/issues/25): true only while V is in the world, false while the game starts, at the main menu and from the start of every load, the pause menu's too, sent through `game.onState` as it changes. Mods read the world's systems (time, weather, districts) only while it is true.
 - `loc.text(key)` (https://github.com/Edgemodders/REDnode/issues/26): the game's own text for a LocKey, such as a district's or an item's name, in the player's language: `await loc.text("LocKey#10963")` gives "Little China" in English. An array of keys is read in one round trip, and an unknown key gives `null`. `loc.language()` gives the language.
+- Packages can use the player's shared keys (https://github.com/Edgemodders/REDnode/issues/23): list `"keys:anthropic"` (or any other service) in `permissions`, read it with `secrets.shared("anthropic")`, and ask for it with `secrets.askShared("anthropic", { reason, offer })`, which opens REDnode's own **Key request** window: the player allows the package and, when no key is saved, pastes one, or moves the key the package kept itself. The package never sees the window's box, and never writes the store. The Mod Manager shows and withdraws the permission. See https://edgemodders.github.io/REDnode/keys.html
+- The **Keys test** sample checks shared keys with a made-up service.
 - `api` calls take `script_ref` parameters: pass the value itself, as in `api.GetLocalizedText("LocKey#10947")`.
 
 **Changed**
@@ -44,7 +46,7 @@ How to keep it:
 
 **Other**
 
-- Shared keys, first part (https://github.com/Edgemodders/REDnode/issues/23): one store for the player's AI service keys that every EDGE tool on the PC can read, `%APPDATA%\Edgemodders\keys\<service>.txt` encrypted for the Windows user, and a small MIT library for tools to copy, `tools/keys/keys.mjs`. Package access comes next. See https://edgemodders.github.io/REDnode/keys.html
+- Shared keys, first part (https://github.com/Edgemodders/REDnode/issues/23): one store for the player's AI service keys that every EDGE tool on the PC can read, `%APPDATA%\Edgemodders\keys\<service>.txt` encrypted for the Windows user, and a small MIT library for tools to copy, `tools/keys/keys.mjs`. Packages reach it with `secrets.shared` and `secrets.askShared` (above). See https://edgemodders.github.io/REDnode/keys.html
 
 ## 0.41.0 (2026-10-27)
 
