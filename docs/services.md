@@ -340,4 +340,6 @@ REDnode 0.44.0, game 2.5. With Counter service 0.3.0 (`"provides": ["counter"]`)
 6. Press **use("nobody")**. Expected: "No installed package provides "nobody"".
 7. Press **Write and play 440 Hz**, then **Write again, 880 Hz**. Expected: a one-second tone, then a higher one, each line naming `tone.wav` in the package's data folder.
 8. Type into the password field and press Enter. Expected: dots in the field, and "Got N characters; the field showed dots".
+
+**First run, 2026-10-29: passed** (dev PC, game 2.5, REDnode 0.45.0, which holds 0.44.0's roles). Every step as written, reported by the player. #20 closed.
 {% endraw %}

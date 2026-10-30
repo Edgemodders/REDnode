@@ -95,6 +95,8 @@ REDnode 0.45.0, REDagent 0.3.3 (its briefing knows the tools). REDagent needs it
 6. If the Admin Tools pack is installed: in the **Tools Manager**, find the **EDGEmat** group with its 10 tools, the reads marked as reads. Switch `mat_find` off, ask step 3 again: REDagent says the tool is not there. Switch it back on. Mark.
 7. Quit the game. Claude reads the host log: `EDGEmat tools: edgemat 0.3.1 started in N ms, 10 tools`, each call, and no `EDGEmat tools: the server ended` before the quit.
 
+**First run, 2026-10-29: steps 1 to 5 passed** (dev PC, game 2.5, REDnode 0.45.0, REDagent 0.3.3), reported by the player: REDagent listed the tools, `mat_find` and `mat_describe` ran without asking, and the recolor asked first and wrote nothing on Deny. Step 6 waits for the Admin Tools pack, which was not installed; step 7's log reading comes after the session.
+
 ### How `api_read` tells a read
 
 The game's own `const` flag cannot: in 2.31, 1,865 `const` functions are not getters (such as `SetAIRole` and `SendMinigameFailedToAllNPCs`), and two thirds of the functions named like getters are not `const`. So the name decides:
