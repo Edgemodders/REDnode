@@ -90,7 +90,7 @@ void REDnode_Emit(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, 
     aFrame->code++; // skip ParamEnd
 
     // The player's attach and detach decide game.state().world at once, not a frame later (#25).
-    rednode::overlay::NotePlayerEvent(name.c_str());
+    rednode::overlay::NotePlayerEvent(name.c_str(), value);
     std::scoped_lock lock(g_eventsMutex);
     g_events.emplace_back(name.c_str(), value);
 }

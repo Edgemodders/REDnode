@@ -56,7 +56,7 @@ let pending = null; // the entry running now: { resolve }
 
 // Errors from the evaluator's domain: the running entry's, or one thrown later.
 out.on('data', (chunk) => {
-  for (const block of String(chunk).split(/^(?=Uncaught )/m)) {
+  for (const block of String(chunk).split(/^(?=Uncaught[ :])/m)) {
     const text = cleanError(block);
     if (!text) continue;
     if (pending) {
@@ -69,7 +69,9 @@ out.on('data', (chunk) => {
 
 // The first line and the frames in the player's code; the evaluator's own frames go.
 function cleanError(block) {
-  const lines = block.replace(/^Uncaught /, '').trimEnd().split('\n');
+  // "Uncaught Error: ...", or, when that line is longer than 80 characters, "Uncaught:" with
+  // the error on the next line (lost before REDnode 0.47.1).
+  const lines = block.replace(/^Uncaught:?[ \t]*\n?/, '').trimEnd().split('\n');
   if (!lines[0]) return '';
   return [lines[0], ...lines.slice(1).filter((l) => /\bat .*console:\d/.test(l))].join('\n');
 }

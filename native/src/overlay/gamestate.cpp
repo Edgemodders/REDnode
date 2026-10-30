@@ -15,8 +15,10 @@
 // |            | and from the start of a load, so mods know when the game's     |
 // |            | world systems exist. rtti.call refuses world calls without it. |
 //
-// A load from the pause menu does not pass the main menu: the main player's OnDetach
-// (REDnode.reds) turns world off at its start, before the player is gone. Should the
+// A load from the pause menu does not pass the main menu: the main player's OnDetach and
+// REDnode's session system (REDnode.reds) turn world off at its start, before the player
+// is gone. 0.47.0's OnDetach alone never came (laptop, 2026-10-30): world went off only
+// when the player did. Should the
 // game keep the same player for 10 s after it (unverified), world comes back on.
 //
 // The SceneTier threshold is unverified. Tiers run from 1 (free gameplay) to
@@ -268,22 +270,27 @@ void LeaveWorld()
 
 namespace rednode::overlay
 {
-void NotePlayerEvent(std::string_view aName)
+void NotePlayerEvent(std::string_view aName, int32_t aValue)
 {
     using namespace detail;
     if (aName == "PlayerPuppet.OnGameAttached")
     {
         g_attached = true;
         g_detachedPlayer = nullptr;
+        return;
     }
-    else if (aName == "PlayerPuppet.OnDetach")
-    {
-        // REDnode.reds sends it only for the main player, while the game still has it.
-        g_attached = false;
-        g_detachedPlayer = rtti::Player().GetPtr();
-        g_detachedFrame = g_frame;
-        LeaveWorld();
-        Log("Overlay: V left the world (OnDetach)");
-    }
+    // REDnode.reds sends OnDetach for the main player (1) or once the game has let go of it
+    // (2), and SessionEnd from its scriptable system when the game session ends.
+    const char* why = aName == "PlayerPuppet.OnDetach" ? (aValue == 2 ? "OnDetach, no player left" : "OnDetach")
+                      : aName == "REDnode.SessionEnd"  ? "the session ended"
+                                                       : nullptr;
+    if (!why)
+        return;
+    const bool wasOn = InWorld();
+    g_attached = false;
+    g_detachedPlayer = rtti::Player().GetPtr();
+    g_detachedFrame = g_frame;
+    LeaveWorld();
+    Log("Overlay: V left the world (%s)%s", why, wasOn ? "" : "; world was already off");
 }
 } // namespace rednode::overlay

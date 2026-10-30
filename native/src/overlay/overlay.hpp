@@ -33,8 +33,8 @@ void Update(uint64_t aFrame);
 // session attach, when the objects of the last session are gone.
 void ClearGameRefs();
 // A script event from REDnode_Emit, on the game thread as the script runs: the player's
-// attach and detach set whether V is in the world (#25).
-void NotePlayerEvent(std::string_view aName);
+// attach and detach, and the session's end, set whether V is in the world (#25).
+void NotePlayerEvent(std::string_view aName, int32_t aValue);
 
 // Plugin unload: remove hooks and stop threads.
 void Stop();

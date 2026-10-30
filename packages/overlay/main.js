@@ -4230,9 +4230,17 @@ async function keysList() {
 }
 
 // op 'list', 'set' (with the key) or 'remove'. Answers the list as it is now.
+// A key typed where a service id goes: it would become a file name and a log line.
+function keyLikeId(id) {
+  return id.length > 24 || /^(sk-|sk_|aiza)/i.test(id) || /\d{6}/.test(id) || (/[a-z]/.test(id) && /[A-Z]/.test(id) && /\d/.test(id));
+}
+
 ipcMain.handle('rednode:host:keys', async (event, op, service, key) => {
   fromLauncher(event);
   const k = await sharedKeys();
+  if (op === 'set' && !k.SERVICES[service] && keyLikeId(String(service ?? ''))) {
+    throw new Error('That looks like a key, not a service id');
+  }
   if (op === 'set') {
     const wrong = k.checkKey(service, key);
     if (wrong) throw new Error(wrong);

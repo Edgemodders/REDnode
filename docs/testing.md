@@ -75,8 +75,9 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H3b World refresh and sound on 2.5](world.md#h3b-test) | In the game | H3 | 2026-10-27 | 0.42.1 + REDswap 1.0.0, World objects test 0.2.2, game 2.5 | **Steps 1 to 6 passed** (dev PC): the spawned box respawned after each of three REDswap swaps (69 to 77 ms), no game entity near V used its mesh, 0 faults. Steps 7 to 10 wait for a new EDGEwave katana override; step 9 checks #18 ([results](world.md#h3b-test)) |
 | [O12 Console](#o12-console) | In the game | O12 | 2026-10-27 | 0.42.1, game 2.5 | **Pass** (dev PC): every step. The first run (0.42.0) lost the history at Stop (an unfinished asynchronous write), fixed in 0.42.1 and passed on retest ([results](overlay.md#o12-console-test)). Mock game: 21 checks |
 | [Editor channel (#17)](#editor-channel-17) | In the game, with Claude | Sound API | 2026-10-29 | 0.45.0, game 2.5 | **Pass** (dev PC): info, play, play and stop a loop, play after the pause menu, the port closed after the quit. Mock game: 15 checks |
-| [Shared keys: the Keys view (K2)](#shared-keys-the-keys-view-k2) | In the game | #23 | Not run | 0.46.0, game 2.5 | Awaits its run. Mock game: 23 checks |
-| [The world flag and game text (#25, #26)](#the-world-flag-and-game-text-25-26) | In the game, with Claude | EDGEmobile's requests | Not run | 0.47.0, game 2.5 | Awaits its run. Mock game: the flag's default, its changes and `loc.text` |
+| [Shared keys: the Keys view (K2)](#shared-keys-the-keys-view-k2) | In the game | #23 | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop): every step. Found: no sign of the save while a key is encrypted (about 1 s, the box still editable), and an id typed under Other service is saved and logged whatever it is; both changed in 0.47.1 ([retest](#keys-retest-on-0471)). Mock game: 23 checks |
+| [The world flag and game text (#25, #26)](#the-world-flag-and-game-text-25-26) | In the game, with Claude | EDGEmobile's requests | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop), with one finding: `world` was right at every step, but went off at a load only when the player went, since the `OnDetach` wrap never sent its event; the Console showed the long refusal as `Uncaught:` only. Both fixed in 0.47.1, which awaits a [retest](#world-flag-retest-on-0471) |
+| [Tools Manager starts EDGEmat's server (0.45.1)](mcp.md#edgemats-tools-test) | In the game | E1 | 2026-10-30 | 0.47.0 + Admin Tools 0.1.0, game 2.5 | **Pass** (laptop): the EDGEmat group showed its 10 tools in a fresh session, no assistant asked first |
 | [Roles (#20)](services.md#roles-test) | In the game | Services | 2026-10-29 | 0.45.0 + Roles test 0.1.0, Counter service 0.3.0, game 2.5 | **Pass** (dev PC): all eight steps. Mock game: 15 checks |
 | [H2b preview spike](world.md#h2b-preview-test) | In the game | H2 | 2026-10-27 | 0.37.0 + Refresh test 0.3.0, RED Hot Tools 1.3.0+edgemodders.1, game 2.31 | **Pass** (laptop): the preview reached through Codeware's menu layer, alive after the menu closes; Reset preview showed the swapped version, menu open or closed; Game event not run (`DelayEventNextFrame` overload); step 2 unanswered (Scan still running) ([results](world.md#h2b-preview-test-results-2026-10-27-passed)) |
 | [H2b refresh after a swap](world.md#h2b-test) | In the game | H2 | 2026-10-22 | 0.26.20 | **Pass** (laptop): four swaps both ways shown on V with no button; nothing else changed; base items Equipment-EX hides were reset from the second swap on, with nothing showing |
@@ -801,6 +802,22 @@ Built 2026-10-29 in REDnode 0.46.0: a **Keys** line in the launcher's Settings d
 6. Press **‹ Settings**: the settings are back. Open **Keys** again, then close the drawer with ✕ and open the gear: it opens on Settings. Mark.
 7. Tell Claude. Claude reads the store outside the game with a plain Node process (`keyInfo`: the last 4 characters only, never the key) and checks it matches step 2, that `test-key` is gone, and that the host log has `Keys: ... set` lines with no key in them. Mark.
 
+#### Results, 2026-10-30 (laptop, 0.47.0): passed
+
+Every step passed, with the ElevenLabs key in step 2, in one session with the world flag test. The host log has `Keys: elevenlabs set`, `test-key set`, `test-key removed`, and no key. Run on the laptop, so step 7's reading of the store was done by the player.
+
+| Finding | Changed in 0.47.1 |
+|---|---|
+| After Enter, about a second passes (the encryption through PowerShell) with the box still there and editable, before the line shows the key (the player's note) | The box goes and the line says "Encrypting the key…" until it is saved; "Removing the key…" for Remove |
+| The host log also has `Keys: abc123456789 set` and `removed`: the test key's value typed under **Other service id** became a service, so its file name and the log line carried it. A real key pasted there would be saved under its own text | Other service id refuses what looks like a key (over 24 characters, `sk-`, `sk_` or `AIza` in front, six digits in a row, or mixed case with digits) and clears the box; the host refuses saving under one too |
+
+#### Keys retest on 0.47.1
+
+0. Test timer: Start, Mark after each step.
+1. Keys: **Set** a key on any line, paste it, press Enter. The box goes at once and the line says "Encrypting the key…", then shows the dots. Mark.
+2. In **Other service id**, type `sk-test-1234567890` and press Enter: refused with "That looks like a key, not a service id", and the box is empty. Then `my-tool`: a `my-tool` line, Not set. Mark.
+3. **Remove** the key from step 1 (twice): "Removing the key…", then Not set. If it was a real key you want to keep, Set it again. Mark.
+
 ### The world flag and game text (#25, #26)
 
 Built 2026-10-30 in REDnode 0.47.0 for EDGEmobile's requests. **#25:** `game.state().world`, true only while V is in the world. The plugin turns it on with a player past the main menu after `PlayerPuppet.OnGameAttached`, and off at the main player's `OnDetach` (a new wrap in `REDnode.reds`), so a load from the pause menu turns it off at its start. While it is off, `rtti.call` refuses global and static functions that take a `GameInstance`, except `GetPlayer` and `GetSettingsSystem`. **#26:** `script_ref` arguments in `api`, and `loc.text` (the bridge's `loc.text`, through the game's `GetLocalizedText`). The scripts compiled with redscript-cli against 2.5's `final.redscripts`, with and without Codeware 1.21.0 (0 errors in REDnode's files). Checked in the mock game (scratchpad `w25`): before the plugin's first `ui-state` a mod sees `mainMenu: true, world: false`, `onState` gets each change of `world`, and `loc.text` answers one key and an array. The guard and `script_ref` are in the plugin, so only this test checks them. Everything is typed in the **Console** (launcher, **Console**), which has the whole `rednode` package; no permission switch is involved: the Console is REDnode's own.
@@ -815,6 +832,32 @@ Built 2026-10-30 in REDnode 0.47.0 for EDGEmobile's requests. **#25:** `game.sta
 7. Open the pause menu and load another save (or the same one). After it loads, `(await game.state()).world` is `true` again. Mark.
 8. Exit to the main menu. `(await game.state()).world` is `false`. Mark.
 9. Tell Claude. Claude reads the plugin log: in order, `world off` while the game started, `world on` after the first load, `V left the world (OnDetach)` at the start of step 7's load, `world on` after it, `V left the world` or `world off` at step 8, no "stayed in the world for 10 s" line, and no `crashed inside the game`. Mark.
+
+#### Results, 2026-10-30 (laptop, 0.47.0): passed, with findings
+
+Run on the laptop's game 2.5 (2560 x 1440, about 37 fps), REDnode 0.41.0 with the 0.47.0 update zip over it, Admin Tools 0.1.0, in one session with the K2 test and the 0.45.1 check; the Test timer's 15 marks match the session's steps.
+
+| Step | Result |
+|---|---|
+| 1 to 3 | **Pass.** `world` false at the main menu; GetWeatherSystem refused and the game went on; `loc.text` and `api.GetLocalizedText` gave the district names. The Console showed the refusal as `Uncaught:` with no message (the player's note: "truncated") |
+| 4 to 7 | **Pass.** `world` true in the save; the rain read; Watson from its record; still true after the inventory |
+| 14, 15 | **Pass.** True after a load from the pause menu, false at the main menu |
+| Log | `world off` from the first poll (09:55:53, no player, IsPreGame true) until the first load; `world on` within 0.2 s of each `OnGameAttached`; no "stayed 10 s" line; no `crashed inside the game` |
+
+Findings:
+
+| Finding | Cause | Fixed in |
+|---|---|---|
+| No `V left the world (OnDetach)` line at any load or at the main menu: at the pause menu's load `world` went off only with the player (`main menu on (player no, IsPreGame false)`, 10:06:40). So between the start of a load and the player going, `world` was still true | The wrap sent its event only when `GetPlayer` still gave the puppet; the likeliest reading is that the game lets go of its player first (unverified) | 0.47.1: it also sends it when the game has no player (value 2), and REDnode's own scriptable system sends `REDnode.SessionEnd` from its `OnDetach`; either turns `world` off and is logged with its reason |
+| The Console showed `Uncaught:` for the refusal | Node's evaluator writes `Uncaught:` on a line of its own when the error's line is longer than 80 characters; the Console kept only that line | 0.47.1 (the Console's `cleanError`); reproduced and checked in the mock game |
+
+#### World flag retest on 0.47.1
+
+0. Test timer: Start, Mark after each step.
+1. At the main menu, in the Console: `await api.GameInstance.GetWeatherSystem(game.instance)`. The whole message shows in red: "Error: V is not in the world yet: GetWeatherSystem reaches the game's world, ...". Mark.
+2. Load a save. Open the pause menu and load a save again. Mark.
+3. Exit to the main menu. Mark.
+4. Tell Claude. Claude reads the plugin log: `V left the world (...)` at the start of step 2's load and at step 3, each before `world off` or with "world was already off", then `world on` after the load. Mark.
 
 ## Game 2.5
 

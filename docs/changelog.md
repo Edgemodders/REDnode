@@ -31,11 +31,14 @@ How to keep it:
 
 - While V is not in the world, `api` refuses the game's global and static functions that take a `GameInstance` (the gates to the world's systems, such as `GameInstance.GetWeatherSystem`) with "V is not in the world yet", where some crashed the game (https://github.com/Edgemodders/REDnode/issues/25). `GetPlayer` and `GetSettingsSystem` stay allowed: they answer safely without a world.
 - Until the game first says what it shows, `game.state()` reports the main menu, so a mod linked while the game starts never takes it for a loaded save.
+- Keys: while a key is encrypted and saved (about a second), its line says "Encrypting the key…" in place of the box, and "Removing the key…" while one is removed.
+- Keys: **Other service id** refuses what looks like a key (long, a key's prefix such as `sk-` or `AIza`, a long run of digits) and clears the box, so a key pasted there by mistake never becomes a file name or a log line. Service ids are now 1 to 24 characters.
 - Counter service 0.3.0 provides the `counter` role.
 - A plain `null` for an object parameter the game does not mark optional is refused with an error naming the parameter, instead of being passed as an empty object: many game functions use such a parameter without checking it, and `GetItemName` with a null item data crashed the game (https://github.com/Edgemodders/REDnode/issues/18). The game API's types no longer allow `null` there.
 
 **Fixed**
 
+- The Console showed only `Uncaught:` for an error whose first line is longer than 80 characters, such as "V is not in the world yet: ...": the whole message shows now.
 - A static function's full name now works with `class` (`api.$static("UIItemsHelper", "GetItemName;TweakDBIDgameItemData", ...)`, or the MCP tools' `class` and `fn`), with or without the class in front.
 - The MCP tool `api_read` accepts a full name that starts with its class, such as `gameUIItemsHelper::GetItemName;TweakDBIDgameItemData`.
 

@@ -526,13 +526,22 @@ function keyLine(k) {
     acts.hidden = false;
   };
   cancel.addEventListener('click', close);
+  // Saving encrypts through Windows (DPAPI), about a second: the box goes while it runs.
+  const busy = el('div', 'busy', 'Encrypting the key…');
+  busy.hidden = true;
   input.addEventListener('submit', async (e) => {
     const key = String(e.detail?.value ?? '').trim();
     input.value = '';
     if (!key) return;
+    edit.hidden = true;
+    busy.hidden = false;
     if (await keysOp('set', k.service, key)) {
       keysExtra = keysExtra.filter((id) => id !== k.service);
       RednodeUI.notify(`Every EDGE tool now uses this ${k.name} key`, { title: 'Keys' });
+    } else {
+      busy.hidden = true;
+      edit.hidden = false;
+      input.focus();
     }
   });
   acts.append(setBtn);
@@ -551,20 +560,40 @@ function keyLine(k) {
         return;
       }
       clearTimeout(armed);
+      acts.hidden = true;
+      busy.textContent = 'Removing the key…';
+      busy.hidden = false;
       if (await keysOp('remove', k.service)) RednodeUI.notify(`${k.name} key removed`, { title: 'Keys' });
+      else {
+        busy.hidden = true;
+        acts.hidden = false;
+        remove.textContent = 'Remove';
+        armed = null;
+      }
     });
     acts.append(remove);
   }
-  line.append(acts, edit);
+  line.append(acts, edit, busy);
   return line;
+}
+
+// A key, not a name: long, a key's own prefix, or a long run of digits or mixed case.
+function keyLikeId(id) {
+  return id.length > 24 || /^(sk-|sk_|aiza)/i.test(id) || /\d{6}/.test(id) || (/[a-z]/.test(id) && /[A-Z]/.test(id) && /\d/.test(id));
 }
 
 $('keys-open').addEventListener('click', () => showKeysView(true));
 $('keys-back').addEventListener('click', () => showKeysView(false));
 $('key-other').addEventListener('submit', (e) => {
-  const id = String(e.detail?.value ?? '').trim().toLowerCase();
+  const id = String(e.detail?.value ?? '').trim();
   if (!id) return;
-  if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(id)) return keyError('A service id is 1 to 40 lowercase letters, digits or dashes');
+  // A key pasted here by mistake would become a file name and a log line: refuse it and clear
+  // the box, which shows its text. The host refuses it too (keyLikeId in main.js).
+  if (keyLikeId(id)) {
+    $('key-other').value = '';
+    return keyError("That looks like a key, not a service id. Type the service's name here (like my-tool), then paste the key on its line");
+  }
+  if (!/^[a-z0-9][a-z0-9-]{0,23}$/.test(id)) return keyError('A service id is 1 to 24 lowercase letters, digits or dashes, like my-tool');
   $('key-other').value = '';
   if (!keysExtra.includes(id)) keysExtra.push(id);
   keyError(null);

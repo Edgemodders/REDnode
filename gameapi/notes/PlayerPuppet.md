@@ -17,4 +17,6 @@ Tested on 2.31 with a `@wrapMethod` probe. See [P1 results](https://edgemodders.
 
 ## OnDetach
 
-Runs when the puppet leaves the world: a load starts, from the pause menu too, or the game goes back to the main menu. REDnode wraps it (`REDnode.reds`, REDnode 0.47.0) to turn `game.state().world` off before the world goes, and sends the `PlayerPuppet.OnDetach` game event. It sends it only when `GetPlayer` still gives this puppet, so other puppets do not count. Whether it runs for every way of leaving the world is **unverified**.
+Runs when the puppet leaves the world: a load starts, from the pause menu too, or the game goes back to the main menu (**unverified**). REDnode wraps it (`REDnode.reds`) to turn `game.state().world` off before the world goes, and sends the `PlayerPuppet.OnDetach` game event: value 1 when `GetPlayer` still gives this puppet, 2 when the game has no player any more. Not for another puppet while V is still there.
+
+In REDnode 0.47.0's test (laptop, game 2.5, 2026-10-30) the wrap sent nothing at three loads and two returns to the main menu, when it sent only for value 1: either `GetPlayer` no longer gives the puppet when it runs, or it does not run then. 0.47.1 sends value 2 as well, and REDnode's scriptable system sends `REDnode.SessionEnd` from its own `OnDetach`; the retest says which comes.
