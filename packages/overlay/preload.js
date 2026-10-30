@@ -97,6 +97,11 @@ contextBridge.exposeInMainWorld('rednode', {
     devFolders: (op, dir) => ipcRenderer.invoke('rednode:host:dev-folders', op ?? 'list', dir),
     /** Gets Open at start, or turns it on or off. Off: the game starts with only HUD widgets showing, until F10. */
     openAtStart: (on) => ipcRenderer.invoke('rednode:host:open-at-start', on),
+    /**
+     * Shared keys (#23): op 'list', 'set' (service, key) or 'remove' (service). Answers each
+     * service's keyInfo (last 4 characters, never the key), with `known` and `prefix`.
+     */
+    keys: (op, service, key) => ipcRenderer.invoke('rednode:host:keys', op ?? 'list', service, key),
     /** Gets the Tooltips switch, or turns it on or off for every window. */
     tooltips: (on) => ipcRenderer.invoke('rednode:host:tooltips', on),
     /** Gets REDbridge, and .NET 10 for this Windows user if missing (W3). Progress arrives with the apps list. */

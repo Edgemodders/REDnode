@@ -8,11 +8,11 @@ The player's AI service keys (Anthropic, Google Gemini, OpenAI, ElevenLabs and o
 
 | Phase | What | State |
 |---|---|---|
-| K1 | The store and its library, `tools/keys/keys.mjs` | Built (REDnode 0.45.0's tree, no REDnode part uses it yet) |
-| K2 | A **Keys** section in the launcher's Settings drawer, in the game | Planned |
+| K1 | The store and its library, `tools/keys/keys.mjs` | Built |
+| K2 | A **Keys** view in the launcher's Settings drawer, in the game | Built in REDnode 0.46.0, awaiting its in-game test |
 | K3 | The `keys:<service>` permission, `secrets.shared` and `secrets.askShared` for packages; REDagent and `edgewave-voice` move to the store | Planned |
 
-The files are the shared contract. REDnode's Keys window (K2) is the in-game way to set them; outside the game, each tool reads and writes the same files itself, with REDnode closed.
+The files are the shared contract. REDnode's Keys view (K2) is the in-game way to set them; outside the game, each tool reads and writes the same files itself, with REDnode closed.
 
 ## The store
 
@@ -33,6 +33,22 @@ Read-Host 'Gemini key' -AsSecureString | ConvertFrom-SecureString | Set-Content 
 ```
 
 A file that cannot be decrypted (made by another Windows user, or copied from another PC) counts as unset, so the tool asks for the key again.
+
+## The Keys view
+
+In the game: F10, the gear (Settings), then **Open** on the **Keys** line. The view takes the drawer's place, with **‹ Settings** to go back.
+
+| Shows | Means |
+|---|---|
+| `•••• abcd` | Set; the key's last 4 characters. Hover for when it was saved |
+| From `GEMINI_API_KEY` | An environment variable is set and wins over the saved key |
+| Unreadable here | A file made by another Windows user or PC: set it again |
+| Not set | No key |
+| Used by EDGEmat, REDagent | Tools that have read it; hover for when |
+
+**Set** and **Replace** open a box that shows dots: paste the key and press Enter. A key that does not look right for its service is refused (an Anthropic key starts with `sk-ant-`, an OpenAI one with `sk-`). **Remove** asks once more, since it removes the key for every tool. **Other service id** adds a line for any service by its id.
+
+The page never holds a key after Enter: it goes to the host, which saves it with the library's non-blocking functions and answers only what `keyInfo` gives. Only the launcher and the Mod Manager may make the call (`rednode:host:keys`). The host logs `Keys: <service> set` or `removed`, never a key.
 
 ## The library
 
@@ -76,7 +92,7 @@ On other systems than Windows the library reads environment variables only; `set
 
 | Tool | Reads | Writes | When |
 |---|---|---|---|
-| REDnode's Keys window | All | All (Set, Replace, Remove) | K2 |
+| REDnode's Keys view | All | All (Set, Replace, Remove) | K2, REDnode 0.46.0 |
 | REDnode packages (`secrets.shared`, `secrets.askShared`) | The keys their manifest lists and the player allowed | Never directly: `askShared` opens REDnode's own prompt | K3 |
 | REDagent | `anthropic` | Through `secrets.askShared` | K3 |
 | `edgewave-voice` | `elevenlabs` | Through `secrets.askShared` | K3 |

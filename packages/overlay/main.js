@@ -4211,6 +4211,39 @@ ipcMain.handle('rednode:host:tooltips', (event, on) => {
   return settings.tooltips !== false;
 });
 
+// Shared keys (#23, K2): the player's AI service keys in %APPDATA%\Edgemodders\keys, read by
+// every EDGE tool through tools/keys/keys.mjs. The launcher's Keys view sets them; a key goes in
+// and only keyInfo comes out (the last 4 characters, never the key). docs/keys.md.
+const KEYS_LIB = app.isPackaged ? path.join(process.resourcesPath, 'keys', 'keys.mjs') : path.join(__dirname, '..', '..', 'tools', 'keys', 'keys.mjs');
+let keysLib = null;
+function sharedKeys() {
+  keysLib ??= import(require('node:url').pathToFileURL(KEYS_LIB).href);
+  return keysLib;
+}
+async function keysList() {
+  const k = await sharedKeys();
+  return Promise.all(
+    k.listServices().map(async (id) => ({ ...(await k.promises.keyInfo(id)), known: !!k.SERVICES[id], prefix: k.SERVICES[id]?.prefix ?? null })),
+  );
+}
+
+// op 'list', 'set' (with the key) or 'remove'. Answers the list as it is now.
+ipcMain.handle('rednode:host:keys', async (event, op, service, key) => {
+  fromLauncher(event);
+  const k = await sharedKeys();
+  if (op === 'set') {
+    const wrong = k.checkKey(service, key);
+    if (wrong) throw new Error(wrong);
+    await k.promises.setKey(service, key);
+    log(`Keys: ${service} set`);
+  } else if (op === 'remove') {
+    if (await k.promises.removeKey(service)) log(`Keys: ${service} removed`);
+  } else if (op !== 'list') {
+    throw new Error(`Unknown keys operation ${op}`);
+  }
+  return keysList();
+});
+
 ipcMain.handle('rednode:host:open-at-start', (event, on) => {
   fromLauncher(event);
   if (typeof on === 'boolean' && on !== (settings.openAtStart !== false)) {

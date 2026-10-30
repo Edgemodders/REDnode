@@ -21,6 +21,7 @@ How to keep it:
 - `audio.play` plays a file from the package's data folder (`pkg.dataDir`) by its full path, for sounds a package makes while it runs, such as spoken lines.
 - `ui.input({ password: true })`: a text field that shows dots, for a key or a password.
 - The **Roles test** sample checks all three.
+- **Keys** in the launcher's Settings (https://github.com/Edgemodders/REDnode/issues/23): the player's AI service keys (Anthropic, Google Gemini, OpenAI, ElevenLabs, or any other by its id), set once in the game and read by every EDGE tool on the PC. Each line shows only the key's last 4 characters and which tools have used it, with **Set**, **Replace** and **Remove**; an Anthropic or OpenAI key that does not start the right way is refused. Keys are kept encrypted for the Windows user in `%APPDATA%\Edgemodders\keys`. See https://edgemodders.github.io/REDnode/keys.html
 - EDGEmat's material tools for in-game assistants: REDnode now ships EDGEmat's MCP server (`@edgemodders/edgemat-mcp` 0.3.1) and runs it when an in-game assistant such as REDagent first needs it, with REDnode's own Node, the game folder and REDbridge. Its tools are listed as `edgemat__mat_*`: searches and descriptions run without asking, edits and new materials ask the player first, and the Tools Manager switches them. Desktop assistants such as Claude Code get EDGEmat through EDGEchat instead (`"edgematTools": "all"` in REDnode's settings lists them there too). See https://edgemodders.github.io/REDnode/mcp.html#edgemats-tools-e1
 
 **Changed**
@@ -35,7 +36,7 @@ How to keep it:
 
 **Other**
 
-- Shared keys, first part (https://github.com/Edgemodders/REDnode/issues/23): one store for the player's AI service keys that every EDGE tool on the PC can read, `%APPDATA%\Edgemodders\keys\<service>.txt` encrypted for the Windows user, and a small MIT library for tools to copy, `tools/keys/keys.mjs`. REDnode's Keys window and package access come next. See https://edgemodders.github.io/REDnode/keys.html
+- Shared keys, first part (https://github.com/Edgemodders/REDnode/issues/23): one store for the player's AI service keys that every EDGE tool on the PC can read, `%APPDATA%\Edgemodders\keys\<service>.txt` encrypted for the Windows user, and a small MIT library for tools to copy, `tools/keys/keys.mjs`. Package access comes next. See https://edgemodders.github.io/REDnode/keys.html
 
 ## 0.41.0 (2026-10-27)
 

@@ -423,10 +423,159 @@ $('solo-end').addEventListener('click', () => act('Solo mode', () => window.redn
 
 $('more-open').addEventListener('click', () => act('Mod Manager', () => window.rednode.apps.setOpen('modmanager', true)));
 
+// ---------- Keys (#23, K2) ----------
+// The player's AI service keys in the shared store, swapped into the drawer with a back row.
+// A typed key goes to the host and is cleared from the page; only its last 4 characters come back.
+let keysShown = [];
+let keysExtra = []; // ids typed under "Other service" that have no file yet
+
+function showKeysView(on) {
+  $('keys-view').hidden = !on;
+  $('settings-view').hidden = on;
+  drawer.setAttribute('title', on ? 'Keys' : 'Settings');
+  keyError(null);
+  if (on) keysOp('list');
+  else $('key-list').querySelectorAll('rn-input').forEach((i) => (i.value = ''));
+}
+
+function keyError(text) {
+  $('key-error').textContent = text ?? '';
+  $('key-error').hidden = !text;
+}
+
+async function keysOp(op, service, key) {
+  try {
+    keysShown = await window.rednode.apps.keys(op, service, key);
+    keyError(null);
+    showKeys();
+    return true;
+  } catch (err) {
+    keyError(cleanError(err));
+    return false;
+  }
+}
+
+const ago = (iso) => {
+  const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+  if (s < 90) return 'just now';
+  if (s < 5400) return `${Math.round(s / 60)} min ago`;
+  if (s < 129600) return `${Math.round(s / 3600)} h ago`;
+  return `${Math.round(s / 86400)} days ago`;
+};
+
+function showKeys() {
+  const ids = new Set(keysShown.map((k) => k.service));
+  const extra = keysExtra.filter((id) => !ids.has(id)).map((service) => ({ service, name: service, set: false, usedBy: [], known: false }));
+  $('key-list').replaceChildren(...[...keysShown, ...extra].map(keyLine));
+}
+
+function button(text) {
+  const b = document.createElement('rn-button');
+  b.setAttribute('variant', 'ghost');
+  b.textContent = text;
+  return b;
+}
+
+function keyLine(k) {
+  const line = el('div', 'svc');
+  const top = el('div', 'top');
+  const state = el('span', 'state');
+  if (k.source === 'env') {
+    state.textContent = `From ${k.env}`;
+    state.classList.add('set');
+    state.title = `The variable ${k.env} wins over the saved key while it is set`;
+  } else if (k.unreadable) {
+    state.textContent = 'Unreadable here';
+    state.classList.add('bad');
+    state.title = 'Saved by another Windows user or PC: set it again';
+  } else if (k.set) {
+    state.textContent = k.last4 ? `•••• ${k.last4}` : 'Set';
+    state.classList.add('set');
+    if (k.updated) state.title = `Saved ${new Date(k.updated).toLocaleString()}`;
+  } else {
+    state.textContent = 'Not set';
+  }
+  top.append(el('span', 'name', k.name), state);
+  line.append(top);
+
+  if (k.usedBy?.length) {
+    const used = el('div', 'used', `Used by ${k.usedBy.map((u) => u.tool).join(', ')}`);
+    used.title = k.usedBy.map((u) => `${u.tool}: ${ago(u.at)}`).join('\n');
+    line.append(used);
+  }
+
+  const acts = el('div', 'acts');
+  const edit = el('div', 'edit');
+  edit.hidden = true;
+  const input = document.createElement('rn-input');
+  input.setAttribute('type', 'password');
+  input.setAttribute('placeholder', 'Paste the key, then Enter');
+  if (k.prefix) input.title = `${k.name} keys start with ${k.prefix}`;
+  const cancel = button('Cancel');
+  edit.append(input, cancel);
+
+  const setBtn = button(k.set || k.unreadable ? 'Replace' : 'Set');
+  setBtn.addEventListener('click', () => {
+    acts.hidden = true;
+    edit.hidden = false;
+    input.focus();
+  });
+  const close = () => {
+    input.value = '';
+    edit.hidden = true;
+    acts.hidden = false;
+  };
+  cancel.addEventListener('click', close);
+  input.addEventListener('submit', async (e) => {
+    const key = String(e.detail?.value ?? '').trim();
+    input.value = '';
+    if (!key) return;
+    if (await keysOp('set', k.service, key)) {
+      keysExtra = keysExtra.filter((id) => id !== k.service);
+      RednodeUI.notify(`Every EDGE tool now uses this ${k.name} key`, { title: 'Keys' });
+    }
+  });
+  acts.append(setBtn);
+
+  // Remove asks once more, since it removes the key for every tool.
+  if (k.updated) {
+    const remove = button('Remove');
+    let armed = null;
+    remove.addEventListener('click', async () => {
+      if (!armed) {
+        remove.textContent = 'Remove for all tools?';
+        armed = setTimeout(() => {
+          armed = null;
+          remove.textContent = 'Remove';
+        }, 4000);
+        return;
+      }
+      clearTimeout(armed);
+      if (await keysOp('remove', k.service)) RednodeUI.notify(`${k.name} key removed`, { title: 'Keys' });
+    });
+    acts.append(remove);
+  }
+  line.append(acts, edit);
+  return line;
+}
+
+$('keys-open').addEventListener('click', () => showKeysView(true));
+$('keys-back').addEventListener('click', () => showKeysView(false));
+$('key-other').addEventListener('submit', (e) => {
+  const id = String(e.detail?.value ?? '').trim().toLowerCase();
+  if (!id) return;
+  if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(id)) return keyError('A service id is 1 to 40 lowercase letters, digits or dashes');
+  $('key-other').value = '';
+  if (!keysExtra.includes(id)) keysExtra.push(id);
+  keyError(null);
+  showKeys();
+});
+
 // The settings drawer, on the right of the panel: the gear opens and closes it, and so do
 // its own close button and the panel closing.
 const drawer = $('drawer');
 function showDrawer(on) {
+  if (!on && !$('keys-view').hidden) showKeysView(false);
   drawer.hidden = !on;
   if (on && $('dev').checked) window.rednode.apps.devFolders().then(showDevFolders, () => {});
   $('gear').setAttribute('aria-expanded', String(on));

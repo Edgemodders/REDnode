@@ -56,7 +56,7 @@
     font: 11px var(--rn-mono); color: var(--rn-fg); }
   .devdir .path.gone { color: var(--rn-danger); }
   .devdir rn-button::part(button) { min-height: 22px; padding: 2px 8px; font-size: 11px; }
-  /* Tighter than a window's usual spacing, so all six fit beside the panel. */
+  /* Tighter than a window's usual spacing, so the settings fit beside the panel. */
   #drawer::part(body) { gap: 8px; padding: 12px 14px; }
   /* Spaces: the one shown now, and making, renaming and deleting them. */
   .spaces, .space-edit { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -67,6 +67,21 @@
   #space-switch::part(button) { min-height: 26px; color: var(--rn-accent-2); }
   #space-tab { display: inline-block; max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
   .space-error { font: 12px var(--rn-mono); color: var(--rn-danger); }
+  /* The drawer's two views: the settings, and Keys (#23) swapped in with a back row. */
+  #settings-view, #keys-view { display: flex; flex-direction: column; gap: 8px; }
+  .setting .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; color: var(--rn-fg); }
+  .back::part(button) { min-height: 24px; padding: 2px 8px; font-size: 11px; }
+  .back { align-self: flex-start; }
+  .svc { display: flex; flex-direction: column; gap: 4px; padding: 0 0 8px; border-bottom: 1px solid var(--rn-line); }
+  .svc .top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .svc .name { font: 700 13px var(--rn-display); letter-spacing: .06em; text-transform: uppercase; }
+  .svc .state { font: 11px var(--rn-mono); color: var(--rn-dim); white-space: nowrap; }
+  .svc .state.set { color: var(--rn-ok); }
+  .svc .state.bad { color: var(--rn-danger); }
+  .svc .used { font: 11px var(--rn-mono); color: var(--rn-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .svc .acts, .svc .edit { display: flex; align-items: center; gap: 6px; }
+  .svc .edit rn-input { flex: 1; min-width: 0; }
+  .svc rn-button::part(button) { min-height: 22px; padding: 2px 8px; font-size: 11px; }
   .rn-window-menu .key { margin-left: auto; font: 11px var(--rn-mono); color: var(--rn-dim); }
   .version { text-align: right; font: 10px var(--rn-mono); letter-spacing: .12em; color: var(--rn-dim); opacity: .8; }
   .themes .label { font: 600 11px var(--rn-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--rn-dim); margin-right: 4px; }
@@ -124,6 +139,18 @@
       </div>
     </rn-window>
     <rn-window id="drawer" title="Settings" drawer closable hidden>
+      <div id="keys-view" hidden>
+        <rn-button class="back" id="keys-back" variant="ghost">&#x2039; Settings</rn-button>
+        <div class="what">Shared with every EDGE tool on this PC, encrypted for your Windows user. Only the last 4 characters show.</div>
+        <div id="key-list"><p class="what">Reading keys...</p></div>
+        <rn-input id="key-other" placeholder="Other service id, then Enter"></rn-input>
+        <div class="space-error" id="key-error" hidden></div>
+      </div>
+      <div id="settings-view">
+      <div class="setting">
+        <div class="head">Keys <rn-button id="keys-open" variant="ghost">Open</rn-button></div>
+        <div class="what">Your AI service keys, shared with every EDGE tool.</div>
+      </div>
       <div class="setting">
         <rn-toggle id="gpu" label="GPU sharing"></rn-toggle>
         <div class="what">Off: the slower CPU path. Reopens every window.</div>
@@ -159,6 +186,7 @@
       <div class="setting">
         <rn-toggle id="tips" label="Tooltips"></rn-toggle>
         <div class="what">Hints when you hover a control.</div>
+      </div>
       </div>
     </rn-window>
     </div>

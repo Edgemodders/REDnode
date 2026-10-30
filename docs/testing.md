@@ -74,8 +74,9 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H3a REDswap](world.md#h3a-test) | In the game | H3 | 2026-10-27 | 0.41.0 + REDswap, Refresh test 0.3.1, game 2.5, no RED Hot Tools | **Pass** (dev PC): four swaps through REDswap (three replaces of `EDGEmatA.archive`, one new archive added), 52 to 59 ms each, 0 faults; V and the inventory preview refreshed with no button, inventory open or closed, which also verifies PV-b (0.40.2) on 2.5 ([results](world.md#h3a-test-results-2026-10-27-passed)) |
 | [H3b World refresh and sound on 2.5](world.md#h3b-test) | In the game | H3 | 2026-10-27 | 0.42.1 + REDswap 1.0.0, World objects test 0.2.2, game 2.5 | **Steps 1 to 6 passed** (dev PC): the spawned box respawned after each of three REDswap swaps (69 to 77 ms), no game entity near V used its mesh, 0 faults. Steps 7 to 10 wait for a new EDGEwave katana override; step 9 checks #18 ([results](world.md#h3b-test)) |
 | [O12 Console](#o12-console) | In the game | O12 | 2026-10-27 | 0.42.1, game 2.5 | **Pass** (dev PC): every step. The first run (0.42.0) lost the history at Stop (an unfinished asynchronous write), fixed in 0.42.1 and passed on retest ([results](overlay.md#o12-console-test)). Mock game: 21 checks |
-| [Editor channel (#17)](#editor-channel-17) | In the game, with Claude | Sound API | Not run | 0.43.0, game 2.5 | Awaits its run. Mock game: 15 checks |
-| [Roles (#20)](services.md#roles-test) | In the game | Services | Not run | 0.44.0 + Roles test 0.1.0, Counter service 0.3.0, game 2.5 | Awaits its run: `use("counter")` with two providers and the player's choice, a tone from the data folder, the password field. Mock game: 15 checks |
+| [Editor channel (#17)](#editor-channel-17) | In the game, with Claude | Sound API | 2026-10-29 | 0.45.0, game 2.5 | **Pass** (dev PC): info, play, play and stop a loop, play after the pause menu, the port closed after the quit. Mock game: 15 checks |
+| [Shared keys: the Keys view (K2)](#shared-keys-the-keys-view-k2) | In the game | #23 | Not run | 0.46.0, game 2.5 | Awaits its run. Mock game: 23 checks |
+| [Roles (#20)](services.md#roles-test) | In the game | Services | 2026-10-29 | 0.45.0 + Roles test 0.1.0, Counter service 0.3.0, game 2.5 | **Pass** (dev PC): all eight steps. Mock game: 15 checks |
 | [H2b preview spike](world.md#h2b-preview-test) | In the game | H2 | 2026-10-27 | 0.37.0 + Refresh test 0.3.0, RED Hot Tools 1.3.0+edgemodders.1, game 2.31 | **Pass** (laptop): the preview reached through Codeware's menu layer, alive after the menu closes; Reset preview showed the swapped version, menu open or closed; Game event not run (`DelayEventNextFrame` overload); step 2 unanswered (Scan still running) ([results](world.md#h2b-preview-test-results-2026-10-27-passed)) |
 | [H2b refresh after a swap](world.md#h2b-test) | In the game | H2 | 2026-10-22 | 0.26.20 | **Pass** (laptop): four swaps both ways shown on V with no button; nothing else changed; base items Equipment-EX hides were reset from the second swap on, with nothing showing |
 | [UI builder list](#ui-builder-list) | In the game | `ui.list` | 2026-10-20 | 0.26.13 | **Pass** (laptop): the list scrolls, the window does not, follow and Clear work |
@@ -762,11 +763,11 @@ Built 2026-10-27 in REDnode 0.43.0 (`packages/overlay/editor.js`; docs: overlay-
 2. Claude plays `ui_jingle_quest_new` (the new-quest jingle): heard once. Mark.
 3. Claude plays `q114_sc_03c_laptop_alarm_loop` on V: a laptop alarm beeps over and over. About 10 s later Claude stops it with `sound.stop`: it stops. Mark.
 4. Press Esc (pause menu) and Esc again, back into the game; Claude plays `ui_jingle_quest_new` again: heard. Mark.
+5. Quit the game. `editor.json` stays (the game ends the host at once); a call to its port is refused.
 
 Claude sends each sound about 15 s after the player's message, so the player can switch back into the game first: the game mutes when it is not in front, unless its background mute is off. The menu click (`ui_menu_onpress`) and the advert music (`amb_bl_g_adverts_music`) of the first steps were too quiet to tell from the game's own ambient sound.
 
 **First run, 2026-10-29: passed** (dev PC, game 2.5, REDnode 0.45.0). Step 1: `connected: true`. Step 2: the menu click was sent twice (once with the game in the background, which mutes it) and not told apart from the ambient sound; the new-quest jingle was heard. Step 3: the advert music was not clearly heard and was stopped by `sound.stop`; the laptop alarm loop was heard and stopped. Step 4: the jingle heard after the pause menu. Step 5: after the quit, `editor.json` stayed and a call to its port was refused. The host log has one `Editor: played the sound event ...` line per call. #17 closed.
-5. Quit the game. `editor.json` stays (the game ends the host at once); a call to its port is refused.
 
 ### Roles (#20)
 
@@ -785,6 +786,19 @@ Built 2026-10-29 in REDnode 0.45.0, with REDagent 0.3.3. Checked outside the gam
 Built 2026-10-29 (`tools/keys/keys.mjs`, [Shared keys](keys.md)). No in-game test: no REDnode part uses it until K2. `node tools/keys/check.mjs` runs 30 checks against a scratch folder with made-up keys: a key written and read back, files made by PowerShell's own `ConvertFrom-SecureString` read and ours decrypted by PowerShell, the cache and a replaced key, the environment variable winning, an undecryptable file counting as unset, the "used by" record holding names only, bad ids and keys refused, and the non-blocking forms.
 
 **First run, 2026-10-29: all 30 passed** on the dev PC (a PowerShell start about 1 s; cached reads under 1 ms). The real store in `%APPDATA%\Edgemodders\keys` was not touched.
+
+### Shared keys: the Keys view (K2)
+
+Built 2026-10-29 in REDnode 0.46.0: a **Keys** line in the launcher's Settings drawer opens the Keys view in its place (`rednode:host:keys` in main.js, launcher and Mod Manager only; the library in the host's `resources/keys`). Checked in the mock game (scratchpad `k2/check.mjs`, 23 checks against a scratch key folder with made-up keys: Set, the prefix refusal, an other service by id, Unreadable here, Used by, Remove pressed twice, the key never in the page, the list answer or the host log, other pages refused). Your keys go into the real store, `%APPDATA%\Edgemodders\keys`. No permission switch is involved: the launcher is REDnode's own.
+
+0. Test timer: Start, Mark after each step.
+1. Load a save. Press F10, open the gear (Settings), and press **Open** on the **Keys** line. The drawer's title is **Keys**, with four lines: Anthropic, Google Gemini, OpenAI, ElevenLabs. Note what each shows (Not set, or dots and 4 characters for a key already saved). Mark.
+2. On a service you have a key for (Google Gemini if you have one): **Set**, paste the key with Ctrl+V, press Enter. The box closes, the line shows dots and the key's last 4 characters, and a note says every EDGE tool now uses it. Mark.
+3. On Anthropic: **Set** (or **Replace**), type `hello`, press Enter: refused with "Anthropic keys start with sk-ant-", and nothing is saved. Press **Cancel**. Mark.
+4. In **Other service id**, type `test-key` and press Enter: a `test-key` line, Not set. **Set** it to `abc123456789`: it shows `•••• 6789`. Mark.
+5. On `test-key`, press **Remove**: it asks "Remove for all tools?". Press it again: Not set. Mark.
+6. Press **‹ Settings**: the settings are back. Open **Keys** again, then close the drawer with ✕ and open the gear: it opens on Settings. Mark.
+7. Tell Claude. Claude reads the store outside the game with a plain Node process (`keyInfo`: the last 4 characters only, never the key) and checks it matches step 2, that `test-key` is gone, and that the host log has `Keys: ... set` lines with no key in them. Mark.
 
 ## Game 2.5
 

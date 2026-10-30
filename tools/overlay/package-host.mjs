@@ -8,6 +8,7 @@
 //   native/build/dist/red4ext/plugins/REDnode/host/resources/sdk/        the rednode package, for apps and mods
 //   native/build/dist/red4ext/plugins/REDnode/host/resources/runtime/    the Node mod runtime
 //   native/build/dist/red4ext/plugins/REDnode/host/resources/edgemat/    EDGEmat's MCP server, for in-game assistants
+//   native/build/dist/red4ext/plugins/REDnode/host/resources/keys/       the shared keys library, for the Keys view
 //   native/build/dist/red4ext/plugins/REDnode/apps/<id>/                 the example apps and mods
 //
 // The REDnode plugin starts host/REDnode-overlay.exe when the game loads.
@@ -56,6 +57,9 @@ const edgematFrom = join(repo, 'node_modules', '@edgemodders', 'edgemat-mcp');
 const edgemat = join(resources, 'edgemat');
 mkdirSync(edgemat, { recursive: true });
 for (const f of ['dist/server.cjs', 'package.json', 'LICENSE', 'THIRD-PARTY-NOTICES.txt']) cpSync(join(edgematFrom, f), join(edgemat, f.replace('dist/', '')));
+// The shared keys library (#23), for the launcher's Keys view: an ES module, loaded as a plain file.
+mkdirSync(join(resources, 'keys'), { recursive: true });
+cpSync(join(repo, 'tools', 'keys', 'keys.mjs'), join(resources, 'keys', 'keys.mjs'));
 // Game API types and REDnode's notes, for the MCP server's gameapi_lookup.
 const gameapi = join(resources, 'gameapi');
 mkdirSync(gameapi, { recursive: true });
@@ -93,7 +97,7 @@ const [out] = await packager({
   electronVersion,
   appVersion: pkg.version,
   asar: true,
-  extraResource: [sdk, join(resources, 'runtime'), join(resources, 'console'), edgemat, gameapi],
+  extraResource: [sdk, join(resources, 'runtime'), join(resources, 'console'), edgemat, join(resources, 'keys'), gameapi],
   overwrite: true,
   quiet: true,
   win32metadata: {
