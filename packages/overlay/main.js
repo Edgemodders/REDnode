@@ -249,8 +249,10 @@ const pending = new Map(); // request id -> { resolve, reject, timer }
 let nextRequestId = 1;
 
 // What the game shows, from the plugin's ui-state events. Sent to apps and mods as
-// {event: 'state'} whenever it, the link or the overlay mode changes.
-let uiState = { menu: false, photoMode: false, scene: false, mainMenu: false };
+// {event: 'state'} whenever it, the link or the overlay mode changes. Until the plugin's
+// first one, the main menu with no world: a mod linked while the game starts must not
+// take it for a loaded save (#25).
+let uiState = { menu: false, photoMode: false, scene: false, mainMenu: true, world: false };
 let lastStateJson = '';
 
 /** Node mods (mods.js), created when the app is ready. */
@@ -1070,7 +1072,7 @@ function shouldOpen(entry) {
 // ---------- game state for apps and mods ----------
 
 function gameState() {
-  return { connected, overlay: mode, ...(connected ? uiState : { menu: false, photoMode: false, scene: false, mainMenu: false }) };
+  return { connected, overlay: mode, ...(connected ? uiState : { menu: false, photoMode: false, scene: false, mainMenu: false, world: false }) };
 }
 
 // Tells apps and mods when the state changed.
@@ -1402,7 +1404,7 @@ function onGameMessage(m) {
       stateChanged();
       return;
     case 'ui-state': {
-      const next = { menu: !!m.menu, photoMode: !!m.photoMode, scene: !!m.scene, mainMenu: !!m.mainMenu };
+      const next = { menu: !!m.menu, photoMode: !!m.photoMode, scene: !!m.scene, mainMenu: !!m.mainMenu, world: !!m.world };
       const changed = JSON.stringify(next) !== JSON.stringify(uiState);
       onUiStateForSound(uiState, next);
       uiState = next;

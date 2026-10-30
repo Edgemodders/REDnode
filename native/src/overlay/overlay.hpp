@@ -32,6 +32,9 @@ void Update(uint64_t aFrame);
 // Forgets every game object reference handed to apps and mods. Called on each
 // session attach, when the objects of the last session are gone.
 void ClearGameRefs();
+// A script event from REDnode_Emit, on the game thread as the script runs: the player's
+// attach and detach set whether V is in the world (#25).
+void NotePlayerEvent(std::string_view aName);
 
 // Plugin unload: remove hooks and stop threads.
 void Stop();
@@ -156,9 +159,11 @@ enum : uint32_t
     StatePhotoMode = 2, // photo mode
     StateScene = 4,     // a cinematic scene
     StateMainMenu = 8,  // no player: main menu or loading screen
+    StateWorld = 16,    // V is in the world: attached, past the main menu, no load under way (#25)
 };
 void PollGameState(uint64_t aFrame); // game thread
 bool InMainMenu();                     // the last poll's main-menu state (no player, or IsPreGame)
+bool InWorld();                        // V is in the world, as of the last poll and the last script event
 uint32_t GetUiState();               // any thread
 void ResendGameState();              // send the state again, e.g. to a new host
 

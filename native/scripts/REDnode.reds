@@ -18,3 +18,14 @@ protected cb func OnGameAttached() -> Bool {
 
   return result;
 }
+
+// V leaves the world: a load starts (from the pause menu too) or the game goes back to the
+// main menu. Only for the main player, while the game still has it: the inventory's preview
+// character is a puppet too. Turns game.state().world off before the world goes (#25).
+@wrapMethod(PlayerPuppet)
+protected cb func OnDetach() -> Bool {
+  if GetPlayer(this.GetGame()) == this {
+    REDnode_Emit("PlayerPuppet.OnDetach", 0);
+  }
+  return wrappedMethod();
+}

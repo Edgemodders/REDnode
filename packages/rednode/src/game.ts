@@ -61,6 +61,14 @@ export interface GameState {
   scene: boolean;
   /** The main menu, before a save is loaded. */
   mainMenu: boolean;
+  /**
+   * V is in the world: a save has loaded and no other load has started. False while the
+   * game starts, at the main menu and from the moment a load starts, from the pause menu
+   * too. Call the game's world systems (time, weather, districts, quests) only while it
+   * is true: {@link api} refuses them while it is false, since some crash the game before
+   * the world exists. {@link Game.onState} tells when it changes. From REDnode 0.47.0.
+   */
+  world: boolean;
   /** The overlay's input mode, switched with F10. */
   overlay: "passive" | "interactive" | "hidden";
 }
@@ -206,7 +214,7 @@ export interface Game {
    * @example
    * ```ts
    * const s = await game.state();
-   * if (s.connected && !s.mainMenu) console.log("In a loaded save");
+   * if (s.world) console.log("V is in the world");
    * ```
    */
   state(): Promise<GameState>;
@@ -218,6 +226,16 @@ export interface Game {
    * @example
    * ```ts
    * game.onState((s) => console.log(s.menu ? "menu open" : "menu closed"));
+   *
+   * // Read the world only while V is in it.
+   * let reading: ReturnType<typeof setInterval> | undefined;
+   * game.onState((s) => {
+   *   if (s.world && !reading) reading = setInterval(readWeather, 1000);
+   *   if (!s.world && reading) {
+   *     clearInterval(reading);
+   *     reading = undefined;
+   *   }
+   * });
    * ```
    */
   onState(handler: EventHandler<GameState>): Unsubscribe;
@@ -286,6 +304,7 @@ function toState(raw: Record<string, unknown> | undefined): GameState {
     photoMode: connected && !!s.photoMode,
     scene: connected && !!s.scene,
     mainMenu: connected && !!s.mainMenu,
+    world: connected && !!s.world,
     overlay: s.overlay ?? "passive",
   };
 }

@@ -87,12 +87,13 @@ export function gameState() {
     photoMode: sim.photoMode,
     scene: sim.scene,
     mainMenu: sim.mainMenu,
+    world: sim.connected && !sim.mainMenu,
     overlay: sim.overlay,
   };
 }
 function stateChanged() {
   emit({ event: 'game-state', ...gameState() });
-  emit({ event: 'ui-state', menu: sim.menu, photoMode: sim.photoMode, scene: sim.scene, sceneTier: sim.sceneTier, mainMenu: sim.mainMenu });
+  emit({ event: 'ui-state', menu: sim.menu, photoMode: sim.photoMode, scene: sim.scene, sceneTier: sim.sceneTier, mainMenu: sim.mainMenu, world: !sim.mainMenu });
   post({ t: 'sim', state: { ...gameState(), solo: sim.solo } });
   audioPause();
 }

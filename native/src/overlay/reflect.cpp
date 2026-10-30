@@ -41,12 +41,22 @@
 //   handles and weak handles                              {"$ref": n, "$type": "PlayerPuppet"}, or null
 //   Variant                                               {"$type": "Float", "value": 1.5}: a value with its
 //                                                         type, by the type's name (Int32, CName, array:CName)
+//   script_ref<T> parameters                              a T: the plugin keeps it beside the call and points
+//                                                         the game at it; {"$out":true} reads it back after
 //   resource references (rRef, raRef, ResRef)             a depot path such as "base\...\crate_a.mesh",
 //                                                         or its hash as a decimal or "0x..." string;
 //                                                         read back as the hash string (a path needs an
 //                                                         asset index, such as REDbridge's)
 // Object references point at the object weakly: a call on an object the game
 // has deleted fails cleanly. They are all forgotten on every session attach.
+//
+// World calls (#25): while V is not in the world (the game starting, the main menu, a load),
+// rtti.call refuses global and static functions that take a GameInstance, the gates to the
+// world's systems, except the few that work without a world (WorksWithoutWorld). GetWeatherSystem
+// called while the game started crashed it (EDGEmobile, 2026-10-29).
+//
+//   loc.text      {"keys":["LocKey#10963", ...]}  -> ["Watson", null, ...]: the game's own text in its
+//                 current language (GetLocalizedText), null for a key it does not know (#26)
 
 #include "jvalue.hpp"
 #include "overlay.hpp"
@@ -406,6 +416,13 @@ void ToJson(const rtti::IType* aType, const void* aMem, std::string& aOut, int a
         // Both start with the path's hash.
         Quoted64(aOut, false, static_cast<const ResourcePath*>(aMem)->hash);
         return;
+    case Kind::ScriptReference:
+    {
+        // The value it points at, as the game left it.
+        const auto* ref = static_cast<const ScriptRef<void>*>(aMem);
+        ToJson(ref->innerType, ref->ref, aOut, aDepth + 1);
+        return;
+    }
     default:
     {
         CString s;
@@ -706,7 +723,7 @@ bool FromJson(const rtti::IType* aType, void* aMem, const Value& aValue, std::st
         return true;
     }
     case Kind::ScriptReference:
-        aError = TypeName(aType) + ": script_ref parameters are not supported yet";
+        aError = TypeName(aType) + ": a script_ref works only as a function's parameter";
         return false;
     default:
         aError = TypeName(aType) + " is not supported yet";
@@ -732,6 +749,7 @@ struct Slot
     const rtti::IType* type = nullptr;
     void* mem = nullptr;
     size_t align = 8;
+    std::unique_ptr<Slot> inner; // what a script_ref points at; outlives the call with it
 
     explicit Slot(const rtti::IType* aType)
         : type(aType)
@@ -928,6 +946,24 @@ bool SafeExecute(void* aInstance, CBaseFunction* aFn, void* aOut, StackArgs_t* a
 
 std::string Invoke(CBaseFunction* fn, Handle<IScriptable>& self, const Value& aArgs, std::string& aError);
 
+// Functions given a GameInstance that answer safely with no world: GetPlayer answers null, and
+// the settings live outside the world (the host reads the volumes at the main menu).
+bool WorksWithoutWorld(const std::string& aName)
+{
+    return aName == "GetPlayer" || aName == "GetSettingsSystem";
+}
+
+// A global or static function that takes a GameInstance: a gate to the world's systems.
+bool NeedsWorld(CBaseFunction* aFn)
+{
+    if (!aFn->flags.isStatic || WorksWithoutWorld(Str(aFn->shortName)))
+        return false;
+    for (uint32_t k = 0; k < aFn->params.Size(); ++k)
+        if (aFn->params[k]->type->GetName() == "ScriptGameInstance")
+            return true;
+    return false;
+}
+
 std::string Call(const Value& aParams, std::string& aError)
 {
     static const Value noArgs{Value::Kind::Array};
@@ -944,6 +980,13 @@ std::string Call(const Value& aParams, std::string& aError)
     CBaseFunction* fn = Resolve(aParams, self, args->items.size(), aError);
     if (!fn)
         return {};
+    if (!InWorld() && NeedsWorld(fn))
+    {
+        aError = "V is not in the world yet: " + Str(fn->shortName) +
+                 " reaches the game's world, which does not exist while the game starts, at the main menu or "
+                 "during a load. Wait for game.state().world (game.onState tells when it turns true)";
+        return {};
+    }
     return Invoke(fn, self, *args, aError);
 }
 
@@ -970,7 +1013,27 @@ bool Run(CBaseFunction* fn, Handle<IScriptable>& self, const Value& aArgs, std::
         const Value* outFlag = arg ? arg->Get("$out") : nullptr;
         const Value* nullFlag = arg ? arg->Get("$null") : nullptr;
         const Kind kind = p->type->GetType();
-        if (outFlag && outFlag->kind == Value::Kind::Bool && outFlag->boolean)
+        const bool asOut = outFlag && outFlag->kind == Value::Kind::Bool && outFlag->boolean;
+        if (kind == Kind::ScriptReference)
+        {
+            // script_ref<T>: the game reads, and may change, a T it is pointed at. The T lives in
+            // the slot beside the reference, filled from the argument, as the game's scripts do.
+            const auto* refType = static_cast<const CRTTIScriptReferenceType*>(p->type);
+            slot->inner = std::make_unique<Slot>(refType->innerType);
+            const bool none = asOut || (nullFlag && nullFlag->kind == Value::Kind::Bool && nullFlag->boolean);
+            if (arg && !arg->IsNull() && !none && !FromJson(refType->innerType, slot->inner->mem, *arg, aError, 0))
+            {
+                aError = "argument " + std::to_string(k + 1) + " (" + Str(p->name) + ", " + TypeName(p->type) +
+                         "): " + aError;
+                return false;
+            }
+            auto* ref = static_cast<ScriptRef<void>*>(slot->mem);
+            ref->innerType = refType->innerType;
+            ref->ref = slot->inner->mem;
+            ref->hash = refType->innerType->GetName();
+            wanted[k] = asOut;
+        }
+        else if (asOut)
         {
             wanted[k] = true;
         }
@@ -995,11 +1058,6 @@ bool Run(CBaseFunction* fn, Handle<IScriptable>& self, const Value& aArgs, std::
                          "): " + aError;
                 return false;
             }
-        }
-        else if (p->type->GetType() == Kind::ScriptReference)
-        {
-            aError = "argument " + std::to_string(k + 1) + " (" + Str(p->name) + ") is a script_ref, not supported yet";
-            return false;
         }
         stack.emplace_back(p->type, slot->mem);
         slots.push_back(std::move(slot));
@@ -1862,6 +1920,53 @@ std::string WorldNear(const Value& aParams, std::string& aError)
     std::snprintf(tail, sizeof(tail), "],\"ms\":%.1f}", ms);
     return out + tail;
 }
+
+// loc.text (#26): the game's own text for each key, in its current language, through the
+// game's GetLocalizedText (a script_ref<String>). A number n means "LocKey#n". The game gives
+// back the key, or nothing, for a key it does not know: that is null here (unverified for
+// every kind of key).
+std::string LocText(const Value& aParams, std::string& aError)
+{
+    const Value* keys = aParams.Get("keys");
+    if (!keys || keys->kind != Value::Kind::Array)
+    {
+        aError = "keys must be an array of strings";
+        return {};
+    }
+    auto* fn = CRTTISystem::Get()->GetFunction("GetLocalizedText");
+    if (!fn || fn->params.Size() != 1)
+    {
+        aError = "the game has no GetLocalizedText(script_ref<String>)";
+        return {};
+    }
+    std::string out = "[";
+    for (size_t k = 0; k < keys->items.size(); ++k)
+    {
+        const Value& item = keys->items[k];
+        out += k ? "," : "";
+        std::string key = item.kind == Value::Kind::String ? item.text
+                          : item.kind == Value::Kind::Number ? "LocKey#" + item.text
+                                                              : std::string();
+        if (key.empty())
+        {
+            out += "null";
+            continue;
+        }
+        Value args{Value::Kind::Array};
+        Value v{Value::Kind::String};
+        v.text = key;
+        args.items.push_back(std::move(v));
+        Handle<IScriptable> none;
+        std::vector<std::unique_ptr<Slot>> slots;
+        std::vector<bool> wanted;
+        std::unique_ptr<Slot> ret;
+        if (!Run(fn, none, args, slots, wanted, ret, aError))
+            return {};
+        const char* text = ret ? static_cast<CString*>(ret->mem)->c_str() : nullptr;
+        out += (!text || !*text || key == text) ? "null" : JsonString(text);
+    }
+    return out + "]";
+}
 } // namespace
 
 bool IsReflectMethod(const std::string& aMethod)
@@ -1870,7 +1975,7 @@ bool IsReflectMethod(const std::string& aMethod)
            aMethod == "rtti.set" || aMethod == "tweakdb.get" || aMethod == "tweakdb.record" ||
            aMethod == "tweakdb.records" || aMethod == "tweakdb.set" || aMethod == "tweakdb.clone" ||
            aMethod == "tweakdb.create" || aMethod == "tweakdb.update" || aMethod == "world.near" ||
-           aMethod == "world.files";
+           aMethod == "world.files" || aMethod == "loc.text";
 }
 
 std::string Reflect(const std::string& aMethod, const json::Value& aParams, std::string& aError)
@@ -1901,6 +2006,8 @@ std::string Reflect(const std::string& aMethod, const json::Value& aParams, std:
         return WorldNear(aParams, aError);
     if (aMethod == "world.files")
         return WorldFiles(aParams, aError);
+    if (aMethod == "loc.text")
+        return LocText(aParams, aError);
     return Release(aParams);
 }
 

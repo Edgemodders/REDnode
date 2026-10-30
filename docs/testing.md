@@ -76,6 +76,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [O12 Console](#o12-console) | In the game | O12 | 2026-10-27 | 0.42.1, game 2.5 | **Pass** (dev PC): every step. The first run (0.42.0) lost the history at Stop (an unfinished asynchronous write), fixed in 0.42.1 and passed on retest ([results](overlay.md#o12-console-test)). Mock game: 21 checks |
 | [Editor channel (#17)](#editor-channel-17) | In the game, with Claude | Sound API | 2026-10-29 | 0.45.0, game 2.5 | **Pass** (dev PC): info, play, play and stop a loop, play after the pause menu, the port closed after the quit. Mock game: 15 checks |
 | [Shared keys: the Keys view (K2)](#shared-keys-the-keys-view-k2) | In the game | #23 | Not run | 0.46.0, game 2.5 | Awaits its run. Mock game: 23 checks |
+| [The world flag and game text (#25, #26)](#the-world-flag-and-game-text-25-26) | In the game, with Claude | EDGEmobile's requests | Not run | 0.47.0, game 2.5 | Awaits its run. Mock game: the flag's default, its changes and `loc.text` |
 | [Roles (#20)](services.md#roles-test) | In the game | Services | 2026-10-29 | 0.45.0 + Roles test 0.1.0, Counter service 0.3.0, game 2.5 | **Pass** (dev PC): all eight steps. Mock game: 15 checks |
 | [H2b preview spike](world.md#h2b-preview-test) | In the game | H2 | 2026-10-27 | 0.37.0 + Refresh test 0.3.0, RED Hot Tools 1.3.0+edgemodders.1, game 2.31 | **Pass** (laptop): the preview reached through Codeware's menu layer, alive after the menu closes; Reset preview showed the swapped version, menu open or closed; Game event not run (`DelayEventNextFrame` overload); step 2 unanswered (Scan still running) ([results](world.md#h2b-preview-test-results-2026-10-27-passed)) |
 | [H2b refresh after a swap](world.md#h2b-test) | In the game | H2 | 2026-10-22 | 0.26.20 | **Pass** (laptop): four swaps both ways shown on V with no button; nothing else changed; base items Equipment-EX hides were reset from the second swap on, with nothing showing |
@@ -799,6 +800,21 @@ Built 2026-10-29 in REDnode 0.46.0: a **Keys** line in the launcher's Settings d
 5. On `test-key`, press **Remove**: it asks "Remove for all tools?". Press it again: Not set. Mark.
 6. Press **‹ Settings**: the settings are back. Open **Keys** again, then close the drawer with ✕ and open the gear: it opens on Settings. Mark.
 7. Tell Claude. Claude reads the store outside the game with a plain Node process (`keyInfo`: the last 4 characters only, never the key) and checks it matches step 2, that `test-key` is gone, and that the host log has `Keys: ... set` lines with no key in them. Mark.
+
+### The world flag and game text (#25, #26)
+
+Built 2026-10-30 in REDnode 0.47.0 for EDGEmobile's requests. **#25:** `game.state().world`, true only while V is in the world. The plugin turns it on with a player past the main menu after `PlayerPuppet.OnGameAttached`, and off at the main player's `OnDetach` (a new wrap in `REDnode.reds`), so a load from the pause menu turns it off at its start. While it is off, `rtti.call` refuses global and static functions that take a `GameInstance`, except `GetPlayer` and `GetSettingsSystem`. **#26:** `script_ref` arguments in `api`, and `loc.text` (the bridge's `loc.text`, through the game's `GetLocalizedText`). The scripts compiled with redscript-cli against 2.5's `final.redscripts`, with and without Codeware 1.21.0 (0 errors in REDnode's files). Checked in the mock game (scratchpad `w25`): before the plugin's first `ui-state` a mod sees `mainMenu: true, world: false`, `onState` gets each change of `world`, and `loc.text` answers one key and an array. The guard and `script_ref` are in the plugin, so only this test checks them. Everything is typed in the **Console** (launcher, **Console**), which has the whole `rednode` package; no permission switch is involved: the Console is REDnode's own.
+
+0. Test timer: Start, Mark after each step.
+1. Start the game and wait for the main menu. F10, open the **Console**, type `(await game.state()).world` and press Enter: `false`. Mark.
+2. Type `await api.GameInstance.GetWeatherSystem(game.instance)`: refused with "V is not in the world yet: GetWeatherSystem reaches the game's world, ...", and the game goes on. Mark.
+3. Type `await loc.text(["LocKey#10947", 10963, "LocKey#1"])`: `["Watson", "Little China", null]` (the last could be another text if the game knows key 1). Then `await api.GetLocalizedText("LocKey#10963")`: `"Little China"`. Mark.
+4. Load a save. Type `(await game.state()).world`: `true`. Then `await (await api.GameInstance.GetWeatherSystem(game.instance)).GetRainIntensityType()`: a name such as `"NoRain"`. Mark.
+5. Type `await loc.text(await (await tweakdb.record("Districts.Watson", "District")).LocalizedName())`: `"Watson"`. Mark.
+6. Open the inventory, look at V's preview, close it. Type `(await game.state()).world`: still `true`. Mark.
+7. Open the pause menu and load another save (or the same one). After it loads, `(await game.state()).world` is `true` again. Mark.
+8. Exit to the main menu. `(await game.state()).world` is `false`. Mark.
+9. Tell Claude. Claude reads the plugin log: in order, `world off` while the game started, `world on` after the first load, `V left the world (OnDetach)` at the start of step 7's load, `world on` after it, `V left the world` or `world off` at step 8, no "stayed in the world for 10 s" line, and no `crashed inside the game`. Mark.
 
 ## Game 2.5
 

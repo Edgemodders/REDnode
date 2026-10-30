@@ -105,7 +105,8 @@ function signature(f) {
   let optional = false;
   const params = f.params.map((p, i) => {
     optional ||= p.flags.includes('optional') || p.flags.includes('out');
-    let t = p.type.startsWith('script_ref:') ? 'unknown' : tsType(p.type, true);
+    // A script_ref<T> takes a T: the plugin keeps it beside the call (REDnode 0.47.0).
+    let t = tsType(p.type.startsWith('script_ref:') ? p.type.slice('script_ref:'.length) : p.type, true);
     // The plugin refuses null for an object parameter the game does not mark optional (#18).
     if (/^w?handle:/.test(p.type) && !p.flags.includes('optional')) t = t.replace(/ \| null$/, '');
     return `${paramName(p.name, i)}${optional ? '?' : ''}: ${t}`;

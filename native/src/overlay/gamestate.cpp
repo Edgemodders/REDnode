@@ -9,6 +9,15 @@
 // | main-menu  | no player, or the system requests handler's IsPreGame(): the   |
 // |            | main menu and loading screens, also the boot loading screen,   |
 // |            | where the game already has a player                            |
+// | world      | V is in the world (#25): a player, not IsPreGame, and attached |
+// |            | (PlayerPuppet.OnGameAttached seen, and no OnDetach of the main |
+// |            | player since). False while the game starts, at the main menu   |
+// |            | and from the start of a load, so mods know when the game's     |
+// |            | world systems exist. rtti.call refuses world calls without it. |
+//
+// A load from the pause menu does not pass the main menu: the main player's OnDetach
+// (REDnode.reds) turns world off at its start, before the player is gone. Should the
+// game keep the same player for 10 s after it (unverified), world comes back on.
 //
 // The SceneTier threshold is unverified. Tiers run from 1 (free gameplay) to
 // 5 (full cinematic); the in-game test calibrates it.
@@ -38,6 +47,16 @@ int g_lastTier = -1;
 bool g_warned = false;
 bool g_preGameWarned = false;
 int g_lastMainMenu = -1; // 0 or 1 once logged
+int g_lastWorld = -1;    // 0 or 1 once logged
+
+// The player's attach and detach, from REDnode.reds through NotePlayerEvent. Game thread.
+bool g_attached = false;              // an OnGameAttached since the start or the last detach
+void* g_detachedPlayer = nullptr;     // the player whose OnDetach turned world off
+uint64_t g_detachedFrame = 0;
+uint64_t g_frame = 0;
+constexpr uint64_t DetachHoldFrames = 600; // about 10 s at 60 fps
+bool g_scriptsChecked = false;
+bool g_scripts = false; // REDnode's scripts are loaded, so attach events come
 
 rtti::Handle g_scenario; // an inkMenuScenario, only to reach the system requests handler
 
@@ -141,6 +160,11 @@ bool InMainMenu()
     return (g_state.load() & StateMainMenu) != 0;
 }
 
+bool InWorld()
+{
+    return (g_state.load() & StateWorld) != 0;
+}
+
 void PollGameState(uint64_t aFrame)
 {
     if (aFrame % PollEveryFrames != 0 && !g_resend)
@@ -175,12 +199,40 @@ void PollGameState(uint64_t aFrame)
         }
     }
 
+    g_frame = aFrame;
+    if (!g_scriptsChecked)
+    {
+        // Without REDnode's scripts (a script error stops them all) no attach event comes:
+        // world then needs only a player past the main menu.
+        g_scriptsChecked = true;
+        g_scripts = RED4ext::CRTTISystem::Get()->GetClass("REDnodeFactListener") != nullptr;
+        if (!g_scripts)
+            Log("Overlay: REDnode's scripts are not loaded; \"world\" is only a player past the main menu");
+    }
+    if (g_detachedPlayer && player.GetPtr() != g_detachedPlayer)
+        g_detachedPlayer = nullptr; // that player is gone: the next attach decides
+    if (g_detachedPlayer && !(state & StateMainMenu) && aFrame - g_detachedFrame > DetachHoldFrames)
+    {
+        Log("Overlay: V detached but stayed in the world for 10 s; world on again");
+        g_detachedPlayer = nullptr;
+        g_attached = true;
+    }
+    if (!(state & StateMainMenu) && (g_scripts ? g_attached : true) && !g_detachedPlayer)
+        state |= StateWorld;
+
     const int mainMenu = (state & StateMainMenu) ? 1 : 0;
     if (mainMenu != g_lastMainMenu)
     {
         g_lastMainMenu = mainMenu;
         Log("Overlay: main menu %s (player %s, IsPreGame %s)", mainMenu ? "on" : "off", player ? "yes" : "no",
             preGame < 0 ? "unread" : (preGame ? "true" : "false"));
+    }
+    const int world = (state & StateWorld) ? 1 : 0;
+    if (world != g_lastWorld)
+    {
+        g_lastWorld = world;
+        Log("Overlay: world %s (player %s, IsPreGame %s, attached %s)", world ? "on" : "off", player ? "yes" : "no",
+            preGame < 0 ? "unread" : (preGame ? "true" : "false"), g_attached ? "yes" : "no");
     }
 
     const uint32_t old = g_state.exchange(state);
@@ -191,6 +243,7 @@ void PollGameState(uint64_t aFrame)
                  ",\"photoMode\":" + (state & StatePhotoMode ? "true" : "false") +
                  ",\"scene\":" + (state & StateScene ? "true" : "false") +
                  ",\"mainMenu\":" + (state & StateMainMenu ? "true" : "false") +
+                 ",\"world\":" + (state & StateWorld ? "true" : "false") +
                  ",\"sceneTier\":" + std::to_string(tier) + "}");
     }
 }
@@ -204,4 +257,33 @@ void ResendGameState()
 {
     g_resend = true;
 }
+
+// Turns world off at once, before the next poll, so a call queued in the same frame is refused.
+void LeaveWorld()
+{
+    g_state.fetch_and(~uint32_t(StateWorld));
+    g_resend = true;
+}
 } // namespace rednode::overlay::detail
+
+namespace rednode::overlay
+{
+void NotePlayerEvent(std::string_view aName)
+{
+    using namespace detail;
+    if (aName == "PlayerPuppet.OnGameAttached")
+    {
+        g_attached = true;
+        g_detachedPlayer = nullptr;
+    }
+    else if (aName == "PlayerPuppet.OnDetach")
+    {
+        // REDnode.reds sends it only for the main player, while the game still has it.
+        g_attached = false;
+        g_detachedPlayer = rtti::Player().GetPtr();
+        g_detachedFrame = g_frame;
+        LeaveWorld();
+        Log("Overlay: V left the world (OnDetach)");
+    }
+}
+} // namespace rednode::overlay

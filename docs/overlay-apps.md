@@ -306,8 +306,32 @@ Import the `rednode` package, the same one Node mods use. An import map lets the
 | `game.player.addItem(id, count?)`, `game.player.removeItem(id, count?)` | Puts items in V's inventory, or takes them out, by TweakDB id: `addItem("Items.Pants_01_basic_01")`. `addItem` rejects an id with no record (REDnode 0.42.0) |
 | `game.audio.play(name)` | Plays a game sound event |
 | `game.on(name, handler)` | A game event: `"PlayerPuppet.OnGameAttached"` (at the main menu and on every save load), `"language"` (the player changed the game's language), and the `quests.fact:<name>` events that [`quests.watch`](quests.md) uses |
-| `game.state()`, `game.onState(handler)` | Whether a menu, photo mode, a scene or the main menu is showing, the overlay mode, and whether the game is linked |
+| `game.state()`, `game.onState(handler)` | Whether a menu, photo mode, a scene or the main menu is showing, whether V is in the world (`world`), the overlay mode, and whether the game is linked |
+| `loc.text(key)` | The game's own text for a LocKey, in the player's language: `loc.text("LocKey#10963")` gives "Little China" in English. An array of keys reads them all in one round trip; `null` for a key the game does not know (REDnode 0.47.0) |
 | `game.call(method, params)` | Any bridge method by name, for example `"game.info"` |
+
+### When the world exists
+
+The game's world systems (time, weather, districts, quests, the journal) exist only while V is in the world. A mod linked while the game starts, at the main menu or during a load must not call them: some crash the game. `game.state().world` says when they exist (REDnode 0.47.0):
+
+| The game | `mainMenu` | `world` |
+|---|---|---|
+| Starting, before the main menu | true | false |
+| Main menu | true | false |
+| Loading a save, from the main menu or the pause menu | true once the old world is gone (unverified) | false from the start of the load |
+| V in the world | false | true |
+
+```js
+import { api, game } from 'rednode';
+
+let timer;
+game.onState((s) => {
+  if (s.world && !timer) timer = setInterval(readWeather, 1000); // V arrived
+  if (!s.world && timer) { clearInterval(timer); timer = undefined; } // a load started, or the main menu
+});
+```
+
+While `world` is false, `api` refuses the game's global and static functions that take a `GameInstance`, such as `api.GameInstance.GetWeatherSystem`, with "V is not in the world yet". Two answer safely without a world and stay allowed: `GetPlayer` (it gives `null`) and `GetSettingsSystem`. Methods of game objects you already hold are not checked: get fresh ones after each load.
 
 The full list, with examples, is in the [API reference](api/). For anything else in the game, use the [game API](#the-game-api).
 
@@ -796,7 +820,8 @@ await shop.GiveItem(player, await api.MarketSystem.Money(), 100);   // a change:
 | References | A game object comes back as a reference that points at it weakly. When the game deletes the object, or a save loads, calls on it fail with "that game object no longer exists". Get a fresh one after each `PlayerPuppet.OnGameAttached` |
 | Wrong arguments | The arguments are checked against the function's types before the call. A wrong one fails with the argument's name and type, and the game is not touched |
 | Out parameters | A function with out parameters returns `{ result, out }` |
-| Not supported yet | `script_ref` parameters. Such calls fail with a clear message |
+| `script_ref` parameters | Pass the value itself: `api.GetLocalizedText("LocKey#10963")`. The plugin keeps it beside the call and points the game at it; `api.$out` in its place reads back what the game left there (REDnode 0.47.0) |
+| Before V is in the world | Global and static functions that take a `GameInstance` are refused while `game.state().world` is false (see [When the world exists](#when-the-world-exists)) |
 | Risk | The checks catch wrong types, not wrong values. Calling a function the game does not expect to be called at that moment can still crash it, as with any script mod |
 
 ## TweakDB

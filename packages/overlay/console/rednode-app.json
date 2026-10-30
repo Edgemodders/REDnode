@@ -1,7 +1,7 @@
 {
   "id": "console",
   "name": "Console",
-  "version": "0.46.0",
+  "version": "0.47.0",
   "author": "Edgemodders",
   "description": "A command line for the game, like a browser's developer console: type JavaScript with the whole rednode package ready, such as addItem(\"Items.Pants_01_basic_01\"). help() lists the shortcuts.",
   "entry": "index.html",

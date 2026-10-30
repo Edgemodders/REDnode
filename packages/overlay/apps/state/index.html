@@ -24,6 +24,7 @@
     <tr><td>Scene (tier 4+)</td><td id="scene" class="off">no</td></tr>
     <tr><td>Scene tier</td><td id="tier" class="off">-</td></tr>
     <tr><td>Main menu / loading</td><td id="mainMenu" class="off">no</td></tr>
+    <tr><td>V in the world</td><td id="world" class="off">no</td></tr>
   </table>
   <ol id="log"></ol>
 </rn-window>
@@ -33,7 +34,7 @@
   let last = null;
   window.rednode.on((m) => {
     if (m.event !== 'ui-state') return;
-    for (const k of ['menu', 'photoMode', 'scene', 'mainMenu']) {
+    for (const k of ['menu', 'photoMode', 'scene', 'mainMenu', 'world']) {
       $(k).textContent = m[k] ? 'yes' : 'no';
       $(k).className = m[k] ? 'on' : 'off';
     }
@@ -41,7 +42,7 @@
     $('tier').className = m.sceneTier >= 2 ? 'on' : 'off';
     // A short log of changes, to match scene tiers to what is on screen.
     const now = new Date().toTimeString().slice(0, 8);
-    const what = ['menu', 'photoMode', 'scene', 'mainMenu'].filter((k) => m[k]).join(', ') || 'gameplay';
+    const what = [...['menu', 'photoMode', 'scene', 'mainMenu'].filter((k) => m[k]), ...(m.world ? [] : ['no world'])].join(', ') || 'gameplay';
     const line = `${what}, tier ${m.sceneTier}`;
     if (line !== last) {
       last = line;

@@ -21,7 +21,7 @@
  * @module
  */
 
-import { transport } from "./transport.js";
+import { cleanError, transport } from "./transport.js";
 
 /** The language the player chose in the game: its own name (`fr-fr`) and the standard tag (`fr-FR`), for `Intl`. */
 export interface Language {
@@ -253,3 +253,57 @@ export const t = Object.defineProperty(
   "ready",
   { get: () => startText(), enumerable: true },
 ) as ((key: string, params?: TextParams) => LocalText) & { readonly ready: Promise<void> };
+
+/** The game's own text, read from the running game in its current language (#26). */
+export interface Loc {
+  /**
+   * The game's text for a LocKey, such as a record's `LocalizedName()`, in the language the
+   * player chose for on-screen text. A number `n` means `"LocKey#n"`; a secondary key such as
+   * `"UI-Menus-WorldMap-Title"` works too (unverified for every key). `null` for a key the game does not know.
+   * An array of keys is read in one round trip.
+   *
+   * Works at the main menu and in a save; while the game is still starting the texts may not
+   * be loaded yet (unverified).
+   *
+   * @example
+   * ```ts
+   * import { loc, tweakdb } from "rednode";
+   *
+   * const district = await tweakdb.record("Districts.Watson", "District");
+   * const name = await loc.text(await district!.LocalizedName()); // "Watson", in the player's language
+   * const [a, b] = await loc.text(["LocKey#10947", 10963]);       // "Watson", "Little China"
+   * ```
+   */
+  text(key: string | number): Promise<string | null>;
+  text(keys: readonly (string | number)[]): Promise<(string | null)[]>;
+  /** The language the game shows its text in, as {@link Game.language} gives it. */
+  language(): Promise<Language>;
+}
+
+async function locText(keys: readonly (string | number)[]): Promise<(string | null)[]> {
+  try {
+    const r = await transport().call("loc.text", { keys: [...keys] });
+    return Array.isArray(r) ? (r as (string | null)[]) : keys.map(() => null);
+  } catch (err) {
+    throw cleanError(err);
+  }
+}
+
+/**
+ * The game's own text. For a package's own words, see {@link t}.
+ *
+ * @example
+ * ```ts
+ * import { loc } from "rednode";
+ *
+ * console.log(await loc.text("LocKey#10963")); // "Little China" in English
+ * ```
+ */
+export const loc: Loc = {
+  text: (async (key: string | number | readonly (string | number)[]) =>
+    Array.isArray(key) ? locText(key) : (await locText([key as string | number]))[0]) as Loc["text"],
+  async language() {
+    await startText();
+    return currentLanguage();
+  },
+};

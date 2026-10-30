@@ -154,10 +154,11 @@ export const NOTES = {
   },
   state: {
     group: 'overlay',
-    summary: 'A table of what the game is doing: menu, photo mode, scene and its tier, main menu, with a short log of changes.',
+    summary: 'A table of what the game is doing: menu, photo mode, scene and its tier, main menu, whether V is in the world, with a short log of changes.',
     teaches: ['ui-state event', 'window.rednode.on'],
     how: [
       'The plugin sends a `ui-state` event whenever the game\'s UI state changes. HUD widgets are hidden from the same data.',
+      '`world` is true only while V is in the world: false while the game starts, at the main menu and from the start of a load. Call the game\'s world systems only while it is true.',
     ],
     tryThis: ['Press Menu, Photo mode and Scene below and watch the log.'],
   },
