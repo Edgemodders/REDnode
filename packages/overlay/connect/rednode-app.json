@@ -1,7 +1,7 @@
 {
   "id": "connect",
   "name": "Connect",
-  "version": "0.45.0",
+  "version": "0.45.1",
   "author": "Edgemodders",
   "description": "Shown while an AI assistant, such as Claude Code, asks to use REDnode's tools: its name and a code to compare with the browser, with Allow and Deny.",
   "entry": "index.html",

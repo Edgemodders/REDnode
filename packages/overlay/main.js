@@ -3990,8 +3990,11 @@ function toolsList() {
   };
 }
 
-ipcMain.handle('rednode:tools:list', (event) => {
+ipcMain.handle('rednode:tools:list', async (event) => {
   fromAdmin(event);
+  // The servers REDnode runs list their tools only once started: the Tools Manager starts them,
+  // so their groups show before any assistant has asked (E1's test found them missing).
+  await Promise.all(ATTACHED.filter((a) => !apps.has(a.id)).map((a) => a.ready()));
   return toolsList();
 });
 

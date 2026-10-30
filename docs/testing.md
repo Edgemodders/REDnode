@@ -759,9 +759,11 @@ Built 2026-10-27 in REDnode 0.43.0 (`packages/overlay/editor.js`; docs: overlay-
 
 0. Test timer: Start, Mark after each step.
 1. Load a save and stand still. Tell Claude. Claude reads `%LOCALAPPDATA%\REDnode\editor.json` and calls `GET /editor/info`: `connected: true`. Mark.
-2. Claude plays `ui_menu_onpress`: the menu click sound is heard once. Mark.
-3. Claude plays `amb_bl_g_adverts_music` on V: an advert's music is heard (if it is a one-shot it simply ends). Claude stops it with `sound.stop`: it stops, if it was still playing. Mark.
-4. Press Esc (pause menu) and back; Claude plays `ui_menu_onpress` again: heard. Mark.
+2. Claude plays `ui_jingle_quest_new` (the new-quest jingle): heard once. Mark.
+3. Claude plays `q114_sc_03c_laptop_alarm_loop` on V: a laptop alarm beeps over and over. About 10 s later Claude stops it with `sound.stop`: it stops. Mark.
+4. Press Esc (pause menu) and Esc again, back into the game; Claude plays `ui_jingle_quest_new` again: heard. Mark.
+
+Claude sends each sound about 15 s after the player's message, so the player can switch back into the game first: the game mutes when it is not in front, unless its background mute is off. The menu click (`ui_menu_onpress`) and the advert music (`amb_bl_g_adverts_music`) of the first steps were too quiet to tell from the game's own ambient sound.
 5. Quit the game. `editor.json` stays (the game ends the host at once); a call to its port is refused.
 
 ### Roles (#20)
@@ -774,7 +776,7 @@ Built 2026-10-28 in REDnode 0.44.0. Its steps are on the Mod services page: [Rol
 
 Built 2026-10-29 in REDnode 0.45.0, with REDagent 0.3.3. Checked outside the game (scratchpad `e1/check.cjs`, 21 checks). Its steps are on the MCP page: [EDGEmat's tools: test](mcp.md#edgemats-tools-test).
 
-**First run, 2026-10-29: steps 1 to 5 passed**; step 6 (Tools Manager) waits for the Admin Tools pack.
+**First run, 2026-10-29: steps 1 to 6 passed** (step 6 after asking REDagent first: the Tools Manager showed EDGEmat only once its server had started; 0.45.1 starts it from the Tools Manager).
 
 ### Shared keys: the store (K1)
 
