@@ -424,15 +424,16 @@ $('solo-end').addEventListener('click', () => act('Solo mode', () => window.redn
 $('more-open').addEventListener('click', () => act('Mod Manager', () => window.rednode.apps.setOpen('modmanager', true)));
 
 // ---------- Keys (#23, K2) ----------
-// The player's AI service keys in the shared store, swapped into the drawer with a back row.
+// The player's AI service keys in the shared store, in a drawer that slides out beside Settings.
 // A typed key goes to the host and is cleared from the page; only its last 4 characters come back.
 let keysShown = [];
 let keysExtra = []; // ids typed under "Other service" that have no file yet
 
 function showKeysView(on) {
-  $('keys-view').hidden = !on;
-  $('settings-view').hidden = on;
-  drawer.setAttribute('title', on ? 'Keys' : 'Settings');
+  $('keys-drawer').hidden = !on;
+  $('keys-open').setAttribute('aria-expanded', String(on));
+  if (on) $('keys-open').removeAttribute('variant');
+  else $('keys-open').setAttribute('variant', 'ghost');
   keyError(null);
   if (on) keysOp('list');
   else $('key-list').querySelectorAll('rn-input').forEach((i) => (i.value = ''));
@@ -582,8 +583,8 @@ function keyLikeId(id) {
   return id.length > 24 || /^(sk-|sk_|aiza)/i.test(id) || /\d{6}/.test(id) || (/[a-z]/.test(id) && /[A-Z]/.test(id) && /\d/.test(id));
 }
 
-$('keys-open').addEventListener('click', () => showKeysView(true));
-$('keys-back').addEventListener('click', () => showKeysView(false));
+$('keys-open').addEventListener('click', () => showKeysView($('keys-drawer').hidden));
+$('keys-drawer').addEventListener('close', () => showKeysView(false)); // a drawer's close hides only it
 $('key-other').addEventListener('submit', (e) => {
   const id = String(e.detail?.value ?? '').trim();
   if (!id) return;
@@ -604,7 +605,7 @@ $('key-other').addEventListener('submit', (e) => {
 // its own close button and the panel closing.
 const drawer = $('drawer');
 function showDrawer(on) {
-  if (!on && !$('keys-view').hidden) showKeysView(false);
+  if (!on && !$('keys-drawer').hidden) showKeysView(false);
   drawer.hidden = !on;
   if (on && $('dev').checked) window.rednode.apps.devFolders().then(showDevFolders, () => {});
   $('gear').setAttribute('aria-expanded', String(on));

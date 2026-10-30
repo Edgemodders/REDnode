@@ -7,12 +7,19 @@
 <style>
   /* Collapsed, only the tab at the bottom is drawn; the rest is transparent
      and clicks through to the game. Expanded, the app list opens above it. */
-  html, body { margin: 0; width: 690px; height: 560px; overflow: hidden; background: transparent; }
+  html, body { margin: 0; width: 1040px; height: 560px; overflow: hidden; background: transparent; }
   .dock { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
   /* The panel, and the settings drawer beside it on the right, their bottoms in line. */
   .row { display: flex; align-items: flex-end; gap: 8px; }
   #panel { width: 380px; max-height: 500px; }
   #drawer { width: 300px; max-height: 500px; }
+  /* Keys (#23) slides out on the right of the settings drawer, as tall as it: the wrapper takes
+     the settings drawer's size, and the Keys drawer is placed against it, scrolling inside. */
+  .drawers { position: relative; display: flex; }
+  #keys-drawer { position: absolute; top: 0; bottom: 0; left: calc(100% + 8px); width: 340px; }
+  #keys-drawer:not([hidden]) { animation: slide-out .16s ease-out; }
+  @keyframes slide-out { from { opacity: 0; transform: translateX(-24px); } }
+  @media (prefers-reduced-motion: reduce) { #keys-drawer:not([hidden]) { animation: none; } }
   rn-window[hidden] { display: none; }
   .dock { padding-bottom: 2px; }
   /* The tab stays visible over the game, so it gets a dark backing. */
@@ -57,7 +64,7 @@
   .devdir .path.gone { color: var(--rn-danger); }
   .devdir rn-button::part(button) { min-height: 22px; padding: 2px 8px; font-size: 11px; }
   /* Tighter than a window's usual spacing, so the settings fit beside the panel. */
-  #drawer::part(body) { gap: 8px; padding: 12px 14px; }
+  #drawer::part(body), #keys-drawer::part(body) { gap: 8px; padding: 12px 14px; }
   /* Spaces: the one shown now, and making, renaming and deleting them. */
   .spaces, .space-edit { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .spaces .label { font: 600 11px var(--rn-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--rn-dim); margin-right: 4px; }
@@ -67,11 +74,8 @@
   #space-switch::part(button) { min-height: 26px; color: var(--rn-accent-2); }
   #space-tab { display: inline-block; max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
   .space-error { font: 12px var(--rn-mono); color: var(--rn-danger); }
-  /* The drawer's two views: the settings, and Keys (#23) swapped in with a back row. */
   #settings-view, #keys-view { display: flex; flex-direction: column; gap: 8px; }
   .setting .head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; color: var(--rn-fg); }
-  .back::part(button) { min-height: 24px; padding: 2px 8px; font-size: 11px; }
-  .back { align-self: flex-start; }
   .svc { display: flex; flex-direction: column; gap: 4px; padding: 0 0 8px; border-bottom: 1px solid var(--rn-line); }
   .svc .top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
   .svc .name { font: 700 13px var(--rn-display); letter-spacing: .06em; text-transform: uppercase; }
@@ -139,14 +143,8 @@
         <div class="version" id="version"></div>
       </div>
     </rn-window>
+    <div class="drawers">
     <rn-window id="drawer" title="Settings" drawer closable hidden>
-      <div id="keys-view" hidden>
-        <rn-button class="back" id="keys-back" variant="ghost">&#x2039; Settings</rn-button>
-        <div class="what">Shared with every EDGE tool on this PC, encrypted for your Windows user. Only the last 4 characters show.</div>
-        <div id="key-list"><p class="what">Reading keys...</p></div>
-        <rn-input id="key-other" placeholder="Other service id, then Enter"></rn-input>
-        <div class="space-error" id="key-error" hidden></div>
-      </div>
       <div id="settings-view">
       <div class="setting">
         <div class="head">Keys <rn-button id="keys-open" variant="ghost">Open</rn-button></div>
@@ -190,6 +188,15 @@
       </div>
       </div>
     </rn-window>
+    <rn-window id="keys-drawer" title="Keys" drawer closable hidden>
+      <div id="keys-view">
+        <div class="what">Shared with every EDGE tool on this PC, encrypted for your Windows user. Only the last 4 characters show.</div>
+        <div id="key-list"><p class="what">Reading keys...</p></div>
+        <rn-input id="key-other" placeholder="Other service id, then Enter"></rn-input>
+        <div class="space-error" id="key-error" hidden></div>
+      </div>
+    </rn-window>
+    </div>
     </div>
     <div class="tab">
       <div class="grip" data-rednode-drag title="Drag to move"></div>

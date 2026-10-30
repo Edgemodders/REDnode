@@ -36,7 +36,7 @@ A file that cannot be decrypted (made by another Windows user, or copied from an
 
 ## The Keys view
 
-In the game: F10, the gear (Settings), then **Open** on the **Keys** line. The view takes the drawer's place, with **‹ Settings** to go back.
+In the game: F10, the gear (Settings), then **Open** on the **Keys** line. Keys slides out beside Settings, as tall as it; **Open** again or its ✕ closes it, and closing Settings closes both.
 
 | Shows | Means |
 |---|---|
