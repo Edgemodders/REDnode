@@ -8,7 +8,7 @@ const $ = (id) => document.getElementById(id);
 // Under the admin permission (the Admin Tools pack and other admin packages).
 const ADMIN_WARNING =
   'Allow this only for a package you trust: it can end or restart any of your mods, and switch on AI tools you switched off.';
-const PAGE = 14; // rows a page: as many as the window shows without scrolling
+let PAGE = 14; // rows a page: as many as the table shows without scrolling, measured as the window's size changes
 
 const STATUS = {
   starting: 'STARTING',
@@ -192,24 +192,109 @@ function matches(i) {
 // ---------- the table ----------
 
 // Column widths; the name takes the rest. The Space column shows only with a second space.
+// The player's own widths, set by dragging a column's edge, are kept in this page's storage.
 const WIDTHS = { select: 28, launcher: 30, hud: 30, kind: 88, status: 96, space: 72, memory: 58, version: 60, author: 96 };
 const columns = () => COLUMNS.filter((c) => !c.spaces || manySpaces());
+const STORE = 'rn-modmanager:';
+function load(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(STORE + key)) ?? fallback;
+  } catch {
+    return fallback; // storage is a convenience
+  }
+}
+function save(key, value) {
+  try {
+    localStorage.setItem(STORE + key, JSON.stringify(value));
+  } catch {
+    // storage is a convenience
+  }
+}
+const userWidths = load('widths', {});
+let colDrag = null; // a column edge being dragged: the head is not rebuilt meanwhile
+let colDragEnded = 0; // the release after a drag must not sort the column
+const MIN_COL = 28;
+const MIN_NAME = 120;
+
+function widthOf(key) {
+  if (key === 'name') return null;
+  const narrow = manySpaces() ? { kind: 78, author: 70 } : {};
+  return userWidths[key] ?? narrow[key] ?? WIDTHS[key];
+}
+
+// Dragging the edge between two columns moves it: the column on the right gives or takes
+// the room, or Name, which takes whatever the others leave.
+function startColDrag(e, index) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const cols = columns();
+  const ths = [...$('head').children];
+  const widths = ths.map((th) => th.getBoundingClientRect().width);
+  const nameAt = cols.findIndex((c) => c.key === 'name');
+  colDrag = { x: e.clientX, left: cols[index].key, right: cols[index + 1].key, widths, nameW: widths[nameAt], index, handle: e.currentTarget };
+  colDrag.handle.classList.add('on');
+  document.querySelector('table').classList.add('resizing');
+}
+function moveColDrag(e) {
+  const d = colDrag;
+  if (!d) return;
+  const wl = d.widths[d.index];
+  const wr = d.widths[d.index + 1];
+  let dx = e.clientX - d.x;
+  if (d.left === 'name') dx = Math.max(MIN_NAME - d.nameW, Math.min(wr - MIN_COL, dx));
+  else if (d.right === 'name') dx = Math.max(MIN_COL - wl, Math.min(d.nameW - MIN_NAME, dx));
+  else dx = Math.max(MIN_COL - wl, Math.min(wr - MIN_COL, dx));
+  if (d.left !== 'name') userWidths[d.left] = Math.round(wl + dx);
+  if (d.right !== 'name') userWidths[d.right] = Math.round(wr - dx);
+  const cols = $('cols').children;
+  columns().forEach((c, i) => {
+    const w = widthOf(c.key);
+    if (w) cols[i].style.width = `${w}px`;
+  });
+  fitTable();
+}
+// Name keeps its smallest width: a narrow window scrolls the table sideways instead.
+function fitTable() {
+  const fixed = columns().reduce((sum, c) => sum + (widthOf(c.key) ?? 0), 0);
+  document.querySelector('table').style.minWidth = `${fixed + MIN_NAME}px`;
+}
+function endColDrag() {
+  if (!colDrag) return;
+  colDrag.handle.classList.remove('on');
+  document.querySelector('table').classList.remove('resizing');
+  colDrag = null;
+  colDragEnded = Date.now();
+  save('widths', userWidths);
+  render();
+}
+window.addEventListener('pointermove', moveColDrag);
+window.addEventListener('pointerup', endColDrag);
 
 function renderHead() {
-  const narrow = manySpaces() ? { kind: 78, author: 70 } : {};
   $('cols').replaceChildren(
     ...columns().map((c) => {
       const col = document.createElement('col');
-      const w = narrow[c.key] ?? WIDTHS[c.key];
+      const w = widthOf(c.key);
       if (w) col.style.width = `${w}px`;
       return col;
     }),
   );
+  fitTable();
+  const list = columns();
+  const nameAt = list.findIndex((c) => c.key === 'name');
   $('head').replaceChildren(
-    ...columns().map((c) => {
+    ...list.map((c, index) => {
       const th = el('th', c.nosort ? 'nosort' : view.sort === c.key ? 'sorted' : '', c.label);
       if (c.title) th.title = c.title;
       if (c.key === view.sort) th.textContent += view.desc ? ' ▼' : ' ▲';
+      if (index >= nameAt && index < list.length - 1) {
+        const grip = el('span', 'col-resize');
+        grip.title = 'Drag to resize';
+        grip.addEventListener('pointerdown', (e) => startColDrag(e, index));
+        grip.addEventListener('click', (e) => e.stopPropagation());
+        th.append(grip);
+      }
       if (c.key === 'select') {
         const all = document.createElement('input');
         all.type = 'checkbox';
@@ -222,6 +307,7 @@ function renderHead() {
         th.append(all);
       } else if (!c.nosort) {
         th.addEventListener('click', () => {
+          if (Date.now() - colDragEnded < 300) return;
           view.desc = view.sort === c.key ? !view.desc : false;
           view.sort = c.key;
           render();
@@ -513,7 +599,7 @@ function renderDetails() {
 function render() {
   chips($('kinds'), KINDS, 'kind');
   chips($('states'), STATES, 'state');
-  renderHead();
+  if (!colDrag) renderHead();
   renderRows();
   renderBulk();
   renderDetails();
@@ -534,6 +620,7 @@ async function refresh() {
     if (fresh.length) await window.rednode.apps.seen(fresh); // listed here: no longer "new" in the launcher
     if (current && !items.some((i) => i.id === current)) current = null;
     render();
+    measurePage(); // the rows' real height is known now
   } catch (err) {
     RednodeUI.notify(cleanError(err), { type: 'error', title: 'Mod Manager' });
   } finally {
@@ -555,6 +642,34 @@ $('next').addEventListener('click', () => {
   view.page += 1;
   render();
 });
+
+// Rows a page follow the table's height, which follows the window's.
+function measurePage() {
+  const wrap = document.querySelector('.table-wrap');
+  const head = $('head').getBoundingClientRect().height || 26;
+  const row = $('rows').firstElementChild?.getBoundingClientRect().height || 31;
+  const rows = Math.max(3, Math.floor((wrap.clientHeight - head) / row));
+  if (rows !== PAGE) {
+    // Keep the first row shown on the new page.
+    const first = view.page * PAGE;
+    PAGE = rows;
+    view.page = Math.floor(first / PAGE);
+    if (items.length) render();
+  }
+}
+new ResizeObserver(measurePage).observe(document.querySelector('.table-wrap'));
+
+// The details drawer: shut to the right or open, kept for the next visit.
+function showDetails(open) {
+  $('details-tab').closest('.main').classList.toggle('shut', !open);
+  $('details-tab').textContent = open ? '›' : '‹';
+  $('details-tab').title = open ? 'Hide the details' : 'Show the details';
+  $('details-tab').setAttribute('aria-expanded', String(open));
+  $('details-tab').setAttribute('aria-label', open ? 'Hide the details' : 'Show the details');
+  save('details', open);
+}
+$('details-tab').addEventListener('click', () => showDetails($('details-tab').getAttribute('aria-expanded') !== 'true'));
+showDetails(load('details', true) !== false);
 
 window.rednode.on((m) => {
   if (m.event === 'apps') refresh();

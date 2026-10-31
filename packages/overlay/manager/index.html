@@ -5,7 +5,8 @@
 <title>Mod Manager</title>
 <script src="rednode://ui/rednode-ui.js"></script>
 <style>
-  html, body { margin: 0; width: 980px; height: 600px; overflow: hidden; background: transparent; }
+  /* The window is resizable: the page follows its size. */
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: transparent; }
   rn-window { position: absolute; inset: 0; }
   [hidden] { display: none !important; }
   .status { font: 11px var(--rn-mono); letter-spacing: .08em; color: var(--rn-dim); }
@@ -23,13 +24,18 @@
   rn-button::part(button) { min-height: 24px; padding: 2px 9px; font-size: 11px; }
 
   /* The table and the details beside it */
-  .main { flex: 1; min-height: 0; display: flex; gap: 12px; }
-  .table-wrap { flex: 1; min-width: 0; overflow-x: hidden; overflow-y: auto; border: 1px solid var(--rn-line); background: var(--rn-panel); }
+  .main { flex: 1; min-height: 0; display: flex; }
+  .table-wrap { flex: 1; min-width: 0; overflow-x: auto; overflow-y: auto; border: 1px solid var(--rn-line); background: var(--rn-panel); }
   table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
   th { position: sticky; top: 0; z-index: 1; background: var(--rn-panel-2); text-align: left; padding: 6px 8px;
     font: 600 10px var(--rn-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--rn-dim);
     border-bottom: 1px solid var(--rn-line); white-space: nowrap; cursor: pointer; user-select: none; }
   th.sorted { color: var(--rn-accent); }
+  /* Drag a column's right edge to resize it; the column beside it, or Name, gives the room. */
+  th .col-resize { position: absolute; top: 0; bottom: 0; right: 0; width: 8px; z-index: 2; cursor: col-resize; }
+  th .col-resize::after { content: ''; position: absolute; top: 5px; bottom: 5px; right: 0; width: 1px; background: var(--rn-line); }
+  th .col-resize:hover::after, th .col-resize.on::after { width: 3px; background: var(--rn-accent); }
+  table.resizing, table.resizing th { cursor: col-resize; user-select: none; }
   th.nosort { cursor: default; }
   td { padding: 5px 8px; border-bottom: 1px solid color-mix(in srgb, var(--rn-line) 60%, transparent);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -54,7 +60,15 @@
   .bulk { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 8px; border: 1px dashed var(--rn-line);
     font: 11px var(--rn-mono); color: var(--rn-dim); }
 
-  .details { width: 260px; flex: none; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+  /* The details slide shut to the right, and open again, with the tab beside them. */
+  .drawer-tab { flex: none; width: 16px; margin: 0 6px; padding: 0; border: 1px solid var(--rn-line); background: var(--rn-panel-2);
+    color: var(--rn-dim); font: 700 13px var(--rn-mono); cursor: pointer; }
+  .drawer-tab:hover { color: var(--rn-accent); border-color: var(--rn-accent); }
+  .drawer { flex: none; width: 262px; display: flex; overflow: hidden; transition: width .18s ease-out; }
+  .main.shut .drawer { width: 0; }
+  .main.shut .drawer-tab { margin-right: 0; }
+  @media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
+  .details { width: 262px; flex: none; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
     padding: 10px 12px; border: 1px solid var(--rn-line); background: var(--rn-panel); }
   .details h2 { margin: 0; font: 700 16px var(--rn-display); letter-spacing: .06em; text-transform: uppercase; color: var(--rn-accent); overflow-wrap: anywhere; }
   .details .meta { font: 11px var(--rn-mono); color: var(--rn-dim); overflow-wrap: anywhere; }
@@ -111,7 +125,10 @@
         </table>
         <div class="empty" id="empty" hidden>No package matches.</div>
       </div>
-      <div class="details" id="details"><div class="dim">Select a package to see its details.</div></div>
+      <button class="drawer-tab" id="details-tab" type="button" aria-controls="drawer" aria-expanded="true">›</button>
+      <div class="drawer" id="drawer">
+        <div class="details" id="details"><div class="dim">Select a package to see its details.</div></div>
+      </div>
     </div>
   </rn-window>
 <script src="app.js"></script>
