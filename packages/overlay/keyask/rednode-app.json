@@ -1,7 +1,7 @@
 {
   "id": "keyask",
   "name": "Key request",
-  "version": "0.48.1",
+  "version": "0.49.0",
   "author": "Edgemodders",
   "description": "Shown while a mod asks for one of your shared AI service keys: which mod and which key, with a box for a key that is not set yet, and Allow and Deny.",
   "entry": "index.html",

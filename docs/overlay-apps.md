@@ -541,10 +541,26 @@ AI agents have the same as the [MCP tool](mcp.md) `archives_reload`.
 
 Players can sort windows into **spaces**, like virtual desktops: the launcher's **Space** row makes them, the tab switches them, and so does Ctrl+1 to 9 while the overlay is open. Only the current space's windows show; REDnode's own tools show in all. A package needs nothing to take part: its windows join the space the player is in, and the player moves them from the title bar or the Mod Manager.
 
-An `rn-window` title bar shows close and up to three action icons, right to left: move to space (once there is a second space), roll up, pin to HUD, reset position (after the window was moved), and debug in Developer mode. More than three: ⋯ on the far left holds the rest. The overlay-window actions (space, pin, reset) show only on a page's only `rn-window`, since they act on the whole page. To leave one out for a window, add `no-space`, `no-rollup` or `no-debug`. A panel that belongs to the main window, such as a settings drawer beside it, takes `drawer`: it does not count as a second window, has no actions but close, and closing it only hides it.
+An `rn-window` title bar shows close and up to three action icons, right to left: move to space (once there is a second space), roll up, pin to HUD, reset position (after the window was moved or resized), and debug in Developer mode. More than three: ⋯ on the far left holds the rest. The overlay-window actions (space, pin, reset) show only on a page's only `rn-window`, since they act on the whole page. To leave one out for a window, add `no-space`, `no-rollup` or `no-debug`. A panel that belongs to the main window, such as a settings drawer beside it, takes `drawer`: it does not count as a second window, has no actions but close, and closing it only hides it.
 
 ```html
 <rn-window title="Speedometer" draggable no-rollup>...</rn-window>
+```
+
+### Resizable windows
+
+With `"resizable": true` in the manifest, the player can resize the window by the grip in its bottom-right corner, as the Mod Manager does. `minWidth` and `minHeight` set the smallest size (default: the manifest's size, at most 320 by 200); the largest is 4096 by 4096. REDnode keeps the size with the window's position, and **Reset position and size** in the title bar goes back to the manifest's. The page must follow its viewport: size it with `100vw` and `100vh` (or stretch the `rn-window` with `inset: 0`) instead of fixed pixels. The `rn-window` emits `resize-end` with the new `{ width, height }` when the player lets go.
+
+```json
+{
+  "id": "big-table",
+  "entry": "index.html",
+  "width": 900,
+  "height": 560,
+  "resizable": true,
+  "minWidth": 600,
+  "minHeight": 360
+}
 ```
 
 ## Pointer lock
@@ -926,14 +942,14 @@ await world.unload(scene.name);
 | `world.files(entity)` | The files an entity uses: its template and every resource its components name, as path hashes |
 | `world.spawned()` | This package's spawns, with what each was spawned with |
 | `world.onRespawn(handler)` | Called with the old and new ID when REDnode spawned one of yours again after an archive swap, so it shows the new version |
-| `world.move(id, position, orientation?, yaw?)` | Places it |
+| `world.move(id, position, orientation?, yaw?)` | Places it. For your own spawns it also keeps the new place, so a respawn after a swap puts it there |
 | `world.remove(id)` | Removes it |
 | `world.watch(id)` | Lifecycle events for an entity spawned some other way |
 | `world.on(name, handler)` | `Entity/Initialize`, `Entity/AfterAttach` (or Codeware's old name `Entity/Attached`) and `Entity/Detach`, with the entity's `entityId` and `entityType` |
 | `world.entity(id)` | The entity, or `null` once it is gone |
 | `world.available()` | True when Codeware is installed and a game is loaded |
 
-What a package spawns is removed when it stops (switched off, restarted, hot reloaded or crashed). After an archive swap (`archives.reload`), your spawns that use a swapped file are spawned again with a new ID, and the game's own entities within 30 m of V that use one switch appearance and back, so they show the new version.
+What a package spawns is removed when it stops (switched off, restarted, hot reloaded or crashed). After an archive swap (`archives.reload`), your spawns that use a swapped file are spawned again with a new ID, where they are now (moved with `world.move`, by physics or by a script), and the game's own entities within 30 m of V that use one switch appearance and back, so they show the new version.
 
 The [World test](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/world-test) sample spawns a box in front of V, spins it and removes it. The [World objects test](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/world-objects-test) tries every other call.
 

@@ -77,6 +77,8 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [Editor channel (#17)](#editor-channel-17) | In the game, with Claude | Sound API | 2026-10-29 | 0.45.0, game 2.5 | **Pass** (dev PC): info, play, play and stop a loop, play after the pause menu, the port closed after the quit. Mock game: 15 checks |
 | [Shared keys: the Keys view (K2)](#shared-keys-the-keys-view-k2) | In the game | #23 | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop): every step. Found: no sign of the save while a key is encrypted (about 1 s, the box still editable), and an id typed under Other service is saved and logged whatever it is; both changed in 0.47.1; its [retest](#keys-retest-on-0471) **passed** on 2026-10-30 (laptop). Mock game: 23 checks, 30 on 0.47.1 |
 | [Shared keys for packages (K3)](#shared-keys-for-packages-k3) | In the game, with Claude | #23 | Not run | 0.48.1 + Keys test 0.1.0, REDagent 0.4.0, game 2.5 | Awaits its run (0.48.1: Keys slides out beside Settings, step 4). Mock game: 20 checks (Keys test), 8 (REDagent) |
+| [Resizable windows and the Mod Manager (0.49.0)](#resizable-windows-and-the-mod-manager-0490) | In the game | Overlay | Not run | 0.49.0, game 2.5 | Awaits its run. Mock game: 21 checks (scratchpad `mm/check.mjs`); unit test: `window.size` |
+| [A respawn keeps the moved place (#27)](#a-respawn-keeps-the-moved-place-27) | In the game | World | Not run | 0.49.0 + REDswap 1.0.0, World objects test 0.2.3, game 2.5 | Awaits its run. Stand-in host: 7 checks (scratchpad `w27/check.mjs`) |
 | [The world flag and game text (#25, #26)](#the-world-flag-and-game-text-25-26) | In the game, with Claude | EDGEmobile's requests | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop), with one finding: `world` was right at every step, but went off at a load only when the player went, since the `OnDetach` wrap never sent its event; the Console showed the long refusal as `Uncaught:` only. Both fixed in 0.47.1: its [retest](#world-flag-retest-on-0471) **passed** on 2026-10-30 (laptop): `world` went off at the start of each load and at the main menu, 0.3 s before the player went. 0.47.2 moves the event's work off the worker thread it arrives on; a short check rides with the next test |
 | [Tools Manager starts EDGEmat's server (0.45.1)](mcp.md#edgemats-tools-test) | In the game | E1 | 2026-10-30 | 0.47.0 + Admin Tools 0.1.0, game 2.5 | **Pass** (laptop): the EDGEmat group showed its 10 tools in a fresh session, no assistant asked first |
 | [Roles (#20)](services.md#roles-test) | In the game | Services | 2026-10-29 | 0.45.0 + Roles test 0.1.0, Counter service 0.3.0, game 2.5 | **Pass** (dev PC): all eight steps. Mock game: 15 checks |
@@ -835,6 +837,32 @@ Built 2026-10-30 in REDnode 0.48.0, with REDagent 0.4.0. REDnode 0.48.1 (asked f
 7. Press **secrets.shared("openai")**: refused with `does not ask for "keys:openai"`. Mark.
 8. REDagent 0.4.0 (its permission **REDnode's tools** already on). If REDagent kept a key from 0.3, ask it a question: the Key request window offers to move it (its last 4) with **Move and allow**; press it, and REDagent answers. If it had none: press **Set up the key**, paste your Anthropic key, **Allow**. Keys then shows Anthropic set, "Used by REDagent". Mark.
 9. Tell Claude. Claude reads the host log: one `asks for` and one answer line per ask, `Granted keys:...` lines, and no key in it. Mark.
+
+### Resizable windows and the Mod Manager (0.49.0)
+
+Asked for by the user on 2026-10-30. A package's manifest can say `"resizable": true` (with `minWidth` and `minHeight`): the UI kit's `rn-window` then shows a grip in its bottom-right corner, the host resizes the page (`windowAction('size')`), and the plugin's new `window.size` command resizes the window in the game, keeping its top-left corner and answering `moved`, so the size is saved with the position. The Mod Manager is the first: resizable down to 720 by 400, rows a page follow its height, columns resize by their header edges (the column on the right, or Name, gives the room; Name keeps 120 px and the table scrolls sideways), and the details slide shut to the right with the tab beside them. Widths and the shut details are kept in the page's storage. The Mod log gets a close button. Checked in the mock game (scratchpad `mm/check.mjs`, 21 checks, driving the grip and the column edges with DevTools mouse events) and in `windows_test.cpp`. Unverified: how the grip feels in the game, where the plugin sends moves to the page a button was pressed in, also outside its edges.
+
+0. Test timer: Start, Mark after each step.
+1. In the launcher, open the **Mod Manager**. Its bottom-right corner shows a grip of three short lines. Drag it right and down: the window grows with the cursor, and the table shows more rows a page. Drag it as small as it goes: it stops at 720 by 400, Name stays readable and the table scrolls sideways. Mark.
+2. Drag the window by its title to another spot, then resize it again: its top-left corner stays put. Close it (✕) and open it again from the launcher: the same place and size. Mark.
+3. In the table's header, drag the line at the right edge of **Kind** to the right: Kind widens and Status narrows by the same, and the sort does not change. Drag the right edge of **Name** to the left: Name narrows and Kind widens. Mark.
+4. Press the **›** tab between the table and the details: the details slide shut to the right and the table takes the room; the tab shows **‹**. Close and open the Mod Manager: the details are still shut and the columns as you left them. Press **‹**: the details slide back. Mark.
+5. In the title bar, **Reset position and size** (an icon, or under ⋯): the window goes back to the middle of the screen at its first size. Mark.
+6. In the launcher, open the **Mod log**: its title bar has ✕. Press it: the Mod log closes and its switch in the launcher goes off. Mark.
+
+### A respawn keeps the moved place (#27)
+
+Built 2026-10-30 in REDnode 0.49.0 for EDGEbuilder's [#27](https://github.com/Edgemodders/REDnode/issues/27). After an archive swap, a package's spawns that use a swapped file are spawned again; until 0.49.0 they came back where they were first spawned. Now `world.move` keeps the new place in the spawn's options, and the respawn reads the entity's place in the game first (`GetWorldPosition`, `GetWorldOrientation`), so an entity moved by physics or a script comes back where it is too; the kept options are the fallback. The host's respawn of assistants' (MCP) spawns does the same. Checked with a stand-in host (scratchpad `w27/check.mjs`, 7 checks). The World objects test 0.2.3 adds **Move** (the newest spawn, 2 m east, turned a quarter).
+
+Files: `E:\Modding\Cyberpunk 2077\Projects\H2c_swap\v1\zzz_rednode_box.archive` (the box) and `...\v2\zzz_rednode_box.archive` (the box's mesh holding a barrel). H3b's run left v2 in `archive\pc\mod`, so the prop may start as a barrel.
+
+0. Test timer: Start, Mark after each step.
+1. Load a save in a quiet open spot outdoors. In the launcher, switch on **World objects test** and its **Allowed** switch for swapping archives, and open the **Mod log**. Mark.
+2. Press **Spawn a prop**: a cardboard box (or a barrel) appears 2 m ahead, to V's right. Mark.
+3. Press **Move**: it jumps 2 m east and turns a quarter. Mark.
+4. In **4. Swap**, paste v1's full path and press **Swap**. Expected: the Mod log says one world entity refreshed (spawned again), and the box stands **where Move put it, turned the same way**, not at its first spot. Mark.
+5. Press **Move** again, then swap v2's full path: a barrel, at the new place and heading. Mark.
+6. Switch **World objects test** off (its spawns go), then quit the game. Remove `zzz_rednode_box.archive` from `archive\pc\mod`.
 
 ### The world flag and game text (#25, #26)
 

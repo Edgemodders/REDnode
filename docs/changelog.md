@@ -28,8 +28,13 @@ How to keep it:
 - Packages can use the player's shared keys (https://github.com/Edgemodders/REDnode/issues/23): list `"keys:anthropic"` (or any other service) in `permissions`, read it with `secrets.shared("anthropic")`, and ask for it with `secrets.askShared("anthropic", { reason, offer })`, which opens REDnode's own **Key request** window: the player allows the package and, when no key is saved, pastes one, or moves the key the package kept itself. The package never sees the window's box, and never writes the store. The Mod Manager shows and withdraws the permission. See https://edgemodders.github.io/REDnode/keys.html
 - The **Keys test** sample checks shared keys with a made-up service.
 - `api` calls take `script_ref` parameters: pass the value itself, as in `api.GetLocalizedText("LocKey#10947")`.
+- Resizable windows: `"resizable": true` in a package's `rednode-app.json` (with `minWidth` and `minHeight`) gives its `rn-window` a grip in the bottom-right corner. REDnode keeps the size with the window's position, and **Reset position and size** in the title bar goes back to the manifest's. See https://edgemodders.github.io/REDnode/overlay-apps.html#resizable-windows
+- The Mod Manager is resizable, its table shows as many rows a page as fit, and its columns are resized by dragging the edges in the header. The details beside the table slide shut to the right, and open again, with the tab between them. Column widths and the shut details are kept for the next visit.
+- The Mod log has a close button.
 
 **Changed**
+
+- `world.move` keeps the new place of the package's own spawns, and a respawn after an archive swap reads where the entity is now, so an entity moved since its spawn (by `world.move`, physics or a script) comes back there, not where it was first spawned (https://github.com/Edgemodders/REDnode/issues/27). Assistants' spawns through MCP do the same.
 
 - The launcher's window is wider (1040 pixels, was 690) to make room for Keys beside Settings; its empty parts stay see-through and click through to the game. A launcher you moved goes back to its corner once.
 - While V is not in the world, `api` refuses the game's global and static functions that take a `GameInstance` (the gates to the world's systems, such as `GameInstance.GetWeatherSystem`) with "V is not in the world yet", where some crashed the game (https://github.com/Edgemodders/REDnode/issues/25). `GetPlayer` and `GetSettingsSystem` stay allowed: they answer safely without a world.
