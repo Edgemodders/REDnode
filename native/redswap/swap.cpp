@@ -34,7 +34,10 @@
 #include <chrono>
 #include <cstring>
 #include <mutex>
+#include <shared_mutex>
 #include <system_error>
+#include <thread>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace redswap
@@ -207,6 +210,12 @@ std::string NameOf(const char* aPath)
     return slash == std::string::npos ? p : p.substr(slash + 1);
 }
 
+std::filesystem::path FromUtf8Path(const char* aText)
+{
+    const std::string text = aText;
+    return std::filesystem::path(std::u8string(text.begin(), text.end()));
+}
+
 std::string Utf8(const std::filesystem::path& aPath)
 {
     const auto u8 = aPath.u8string();
@@ -267,6 +276,71 @@ void SetLogger(RED4ext::v1::PluginHandle aHandle, const RED4ext::v1::Sdk* aSdk)
     g_sdk = aSdk;
 }
 
+// Diagnostics for the paths a replaced archive left (#29; the restore swap crashed in its first
+// test): their tokens before the drop, and the game's next load of them, watched from a thread
+// of REDswap's own for two seconds.
+constexpr uint32_t LoadByPathHash = 1250309504; // RED4ext.SDK's ResourceLoader_IssueLoadingRequestByPath
+using LoadByPath_t = uintptr_t (*)(RED4ext::ResourceLoader*, RED4ext::SharedPtr<RED4ext::ResourceToken<>>&,
+                                   RED4ext::ResourcePath);
+constexpr size_t LeftLogLimit = 64;
+
+std::string TokenState(RED4ext::ResourceToken<>* aToken, const RED4ext::RefCnt* aCount)
+{
+    if (!aToken)
+        return "no token";
+    char text[200];
+    snprintf(text, sizeof(text), "token %s%s, %s, %u holder(s), %u weak", aToken->finished ? "finished" : "loading",
+             aToken->error ? " with an error" : "", aToken->resource.GetPtr() ? "a resource" : "no resource",
+             aCount ? aCount->strongRefs : 0u, aCount ? aCount->weakRefs : 0u);
+    return text;
+}
+
+std::string GameTokenState(RED4ext::ResourceLoader* aLoader, RED4ext::ResourcePath aPath)
+{
+    std::shared_lock lock(aLoader->tokenLock);
+    auto* token = aLoader->tokens.Get(aPath);
+    if (!token || !token->instance)
+        return "no token";
+    return TokenState(token->instance, token->refCount);
+}
+
+void WatchLeft(std::vector<uint64_t> aPaths, std::vector<RED4ext::SharedPtr<RED4ext::ResourceToken<>>> aProbes)
+{
+    std::thread([paths = std::move(aPaths), probes = std::move(aProbes)]() {
+        auto* loader = RED4ext::ResourceLoader::Get();
+        const std::unordered_set<uint64_t> wanted(paths.begin(), paths.end());
+        std::vector<std::string> last(paths.size()), lastProbe(probes.size());
+        std::unordered_set<uint64_t> failedSeen;
+        int slept = 0;
+        for (const int at : {100, 250, 400, 700, 1000, 2000})
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(at - slept));
+            slept = at;
+            for (size_t i = 0; i < paths.size(); ++i)
+            {
+                auto state = GameTokenState(loader, paths[i]);
+                if (state != last[i])
+                    Log("  %d ms: left %llu, the game's: %s", at, paths[i], state.c_str());
+                last[i] = std::move(state);
+            }
+            for (size_t i = 0; i < probes.size(); ++i)
+            {
+                auto state = TokenState(probes[i].instance, probes[i].refCount);
+                if (state != lastProbe[i])
+                    Log("  %d ms: left %llu, REDswap's probe: %s", at, probes[i].instance ? probes[i].instance->path.hash : 0ull, state.c_str());
+                lastProbe[i] = std::move(state);
+            }
+            std::shared_lock lock(loader->tokenLock);
+            for (const auto& failed : loader->failed)
+            {
+                if (failed.instance && wanted.count(failed.instance->path.hash) && failedSeen.insert(failed.instance->path.hash).second)
+                    Log("  %d ms: left %llu is in the loader's failed list", at, failed.instance->path.hash);
+            }
+        }
+        Log("Watch of the left paths done");
+    }).detach();
+}
+
 std::string Check()
 {
     const auto& f = Find();
@@ -279,7 +353,7 @@ std::string Check()
     return {};
 }
 
-SwapResult Swap(const std::vector<std::filesystem::path>& aFiles)
+SwapResult Swap(const std::vector<std::filesystem::path>& aFiles, const SwapOptions& aOptions)
 {
     std::scoped_lock lock(g_swapLock);
     SwapResult result;
@@ -519,9 +593,39 @@ SwapResult Swap(const std::vector<std::filesystem::path>& aFiles)
         }
     }
     result.left = static_cast<uint32_t>(left.size());
+    auto* loader = RED4ext::ResourceLoader::Get();
+
+    // Before anything is dropped: each left path's token, the mod archive that holds it now, and
+    // whether the depot finds it (#29's diagnostics).
+    std::vector<uint64_t> leftDropped;
+    if (!left.empty())
+    {
+        std::unordered_map<uint64_t, std::string> holder;
+        for (auto* group : groups)
+        {
+            for (const auto& archive : group->archives)
+            {
+                if (const auto hashes = ArchiveHashes(FromUtf8Path(archive.path.c_str())))
+                {
+                    for (const auto hash : *hashes)
+                        holder.emplace(hash, NameOf(archive.path.c_str()));
+                }
+            }
+        }
+        Log("%zu left path(s)%s:", left.size(), aOptions.keepLeft ? ", kept (left=keep)" : "");
+        for (size_t i = 0; i < left.size() && i < LeftLogLimit; ++i)
+        {
+            const auto there = holder.find(left[i].hash);
+            Log("  left %llu: %s; a mod archive holds it: %s; the depot finds it: %s", left[i].hash,
+                GameTokenState(loader, left[i]).c_str(), there == holder.end() ? "none" : there->second.c_str(),
+                depot->ResourceExists(left[i]) ? "yes" : "no");
+        }
+    }
+    if (aOptions.keepLeft)
+        left.clear();
+
     if (loaded.size() || left.size())
     {
-        auto* loader = RED4ext::ResourceLoader::Get();
         std::unique_lock tokens(loader->tokenLock);
         const auto drop = [&](RED4ext::ResourcePath aPath) {
             bool dropped = false;
@@ -547,12 +651,39 @@ SwapResult Swap(const std::vector<std::filesystem::path>& aFiles)
         for (const auto& path : left)
         {
             if (drop(path))
+            {
                 ++result.leftInvalidated;
+                leftDropped.push_back(path.hash);
+            }
         }
     }
 
-    if (!result.done.empty())
+    // probe=on: load each dropped left path now, to see whether the load itself ends well.
+    std::vector<RED4ext::SharedPtr<RED4ext::ResourceToken<>>> probes;
+    if (aOptions.probe && !leftDropped.empty())
+    {
+        if (const auto load = reinterpret_cast<LoadByPath_t>(ResolveQuiet(LoadByPathHash)))
+        {
+            for (const auto hash : leftDropped)
+            {
+                RED4ext::SharedPtr<RED4ext::ResourceToken<>> token;
+                load(loader, token, RED4ext::ResourcePath(hash));
+                probes.push_back(token);
+            }
+            Log("Probe: asked the loader for %zu dropped left path(s)", probes.size());
+        }
+        else
+        {
+            LogError("Probe: the loader's request function is not in RED4ext's address list");
+        }
+    }
+    if (!leftDropped.empty())
+        WatchLeft(leftDropped, std::move(probes));
+
+    if (!result.done.empty() && aOptions.archiveXL)
         ReloadArchiveXL(result);
+    else if (!result.done.empty())
+        Log("ArchiveXL.Reload skipped (axl=off)");
 
     return result;
 }

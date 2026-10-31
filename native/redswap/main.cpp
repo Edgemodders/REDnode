@@ -6,8 +6,8 @@
 //   public static native func REDswap_Check() -> String     // empty when it can swap
 //   public static native func REDswap_Swap(files: String) -> String
 //
-// REDswap_Swap takes absolute paths separated by "|" (a character Windows paths never hold)
-// and answers JSON: { "done": [{ file, target, how }], "failed": [{ file, why }],
+// REDswap_Swap takes absolute paths separated by "|" (a character Windows paths never hold),
+// optionally after research switches as a first entry, "?left=keep&probe=on&axl=off", and answers JSON: { "done": [{ file, target, how }], "failed": [{ file, why }],
 // "resources", "invalidated", "left", "leftInvalidated", "extensions", "ms", "error"? }. It runs on the game thread.
 
 #include "swap.hpp"
@@ -93,13 +93,23 @@ void REDswap_Swap(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, 
     aFrame->code++; // skip ParamEnd
 
     std::vector<std::filesystem::path> files;
+    redswap::SwapOptions options;
     const std::string text = list.c_str();
     size_t start = 0;
     while (start <= text.size())
     {
         const auto end = text.find('|', start);
         const auto one = text.substr(start, end == std::string::npos ? std::string::npos : end - start);
-        if (!one.empty())
+        if (!one.empty() && one[0] == '?')
+        {
+            // Research switches, "?left=keep&probe=on&axl=off" (a path never starts with "?").
+            const auto has = [&](const char* aPair) { return ("&" + one.substr(1) + "&").find(std::string("&") + aPair + "&") != std::string::npos; };
+            options.keepLeft = has("left=keep");
+            options.probe = has("probe=on");
+            options.archiveXL = !has("axl=off");
+            g_sdk->logger->InfoF(g_handle, "Options: %s", one.c_str());
+        }
+        else if (!one.empty())
             files.push_back(FromUtf8(one));
         if (end == std::string::npos)
             break;
@@ -108,7 +118,7 @@ void REDswap_Swap(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, 
 
     g_sdk->logger->InfoF(g_handle, "Swap of %zu file(s) asked for", files.size());
     const auto started = std::chrono::steady_clock::now();
-    const auto result = redswap::Swap(files);
+    const auto result = redswap::Swap(files, options);
     const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
 
     std::string json = "{\"done\":[";

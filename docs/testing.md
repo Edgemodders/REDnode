@@ -81,6 +81,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [A respawn keeps the moved place (#27)](#a-respawn-keeps-the-moved-place-27) | In the game | World | 2026-10-31 | 0.49.3 + REDswap 1.0.1, World objects test 0.2.3, game 2.5 | **Pass** (dev PC): both swaps respawned the prop where Move had put it, turned the same way. Stand-in host: 7 checks (scratchpad `w27/check.mjs`) |
 | [The inventory's preview on its own (#28)](#the-inventorys-preview-on-its-own-28) | In the game | H2b | 2026-10-31 | 0.49.3 + REDswap 1.0.1, World objects test 0.2.3, game 2.5, Equipment-EX off | **Pass** (dev PC): with the inventory open the preview showed V2 at once (`AttachmentSlots.Legs` among the slots refreshed); closed, V showed V2 too; V1 both ways. Stand-in bridge: 7 checks (scratchpad `w28/check.mjs`) |
 | [A swap restores the game's own files (#29)](#a-swap-restores-the-games-own-files-29) | In the game | REDswap | 2026-10-31 | 0.49.3 + REDswap 1.0.1, World objects test 0.2.3, game 2.5 | **Fail** (dev PC): the game crashed 0.5 s after the restore swap, when the inventory preview loaded the jeans mesh again and got none (a null mesh in the appearance lookup). Cause open; see the section. Unit tests: the file table reader (8 checks) |
+| [#29 diagnostics: the restore's crash](#29-diagnostics-the-restores-crash) | In the game | REDswap | Not run | 0.49.4 + REDswap 1.0.2, World objects test 0.2.3, game 2.5 | Awaits its run: two sessions, the probe and the keep control |
 | [The world flag and game text (#25, #26)](#the-world-flag-and-game-text-25-26) | In the game, with Claude | EDGEmobile's requests | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop), with one finding: `world` was right at every step, but went off at a load only when the player went, since the `OnDetach` wrap never sent its event; the Console showed the long refusal as `Uncaught:` only. Both fixed in 0.47.1: its [retest](#world-flag-retest-on-0471) **passed** on 2026-10-30 (laptop): `world` went off at the start of each load and at the main menu, 0.3 s before the player went. 0.47.2 moves the event's work off the worker thread it arrives on; a short check rides with the next test |
 | [Tools Manager starts EDGEmat's server (0.45.1)](mcp.md#edgemats-tools-test) | In the game | E1 | 2026-10-30 | 0.47.0 + Admin Tools 0.1.0, game 2.5 | **Pass** (laptop): the EDGEmat group showed its 10 tools in a fresh session, no assistant asked first |
 | [Roles (#20)](services.md#roles-test) | In the game | Services | 2026-10-29 | 0.45.0 + Roles test 0.1.0, Counter service 0.3.0, game 2.5 | **Pass** (dev PC): all eight steps. Mock game: 15 checks |
@@ -904,6 +905,30 @@ Files: V1 is `E:\Gallery\Files\EDGEmat A\EDGEmatA.archive` (it replaces both jea
 
 
 **First run, 0.49.3 + REDswap 1.0.1 (2026-10-31, dev PC): failed, the game crashed.** Steps 1 and 2 ran as the #28 test's last swaps. The restore swap went through (`1 resources (0 dropped), 9 left by the old archive (4 dropped)`, 63 ms), the host refreshed the inventory preview's 5 items, and 0.5 s later the game crashed on a loader thread (`redDispatcher12`): access violation reading `0x1e0` at `Cyberpunk2077.exe+0x4b2267`, under ArchiveXL's hook (`ArchiveXL.dll+0xe303e`). Static reading of the 2.5 exe: `+0x4b2258` looks up an appearance by name in a mesh's appearance list (array at `+0x1e0`, count at `+0x1ec`, the name at entry `+0x30`), and its caller `+0x4b2228` retries with a default name; the mesh it was given was null. So the jeans mesh, dropped from the loader as a path the restore archive no longer held, came back as nothing when the preview asked for it again, instead of the game's own copy. The dump (registers read with a small minidump reader, scratchpad `c49/md.mjs`): the appearance asked for was `default` (the retry), and the path hash beside it on the stack is `344579107807977719`, the game's own `base\characters\garment\player_equipment\legs\l1_012_pants__jeans_tight\l1_012_pwa_pants__jeans_tight.mesh`, which 2.5 holds in `basegame_4_appearance.archive`. A stale depot index is ruled out: the depot keeps none (2.5's depot vtable at `0x1430b7930`; `RequestResource`, slot 2 at `+0x269fbc`, and `ResourceExists`, slot 3 at `+0x9ca000`, both walk the groups at `+0x10` and ask each archive's reader, `+0x26a19c`; the first group with a match wins, so a path the restore archive lacks falls through to the base archives). The depot object is 0xC8 bytes in 2.5, more than the SDK's 0x58. Why the game's own mesh came back null is open; the asymmetry with the passing swaps is that their dropped mesh was in the new archive, while here it had to come from a base archive. Crash report: `%LOCALAPPDATA%\REDEngine\ReportQueue\Cyberpunk2077-20261031-165443-33212-66044`; fault log in `rednode-faults.log`.
+
+### #29 diagnostics: the restore's crash
+
+Built 2026-10-31 in REDswap 1.0.2 (REDnode 0.49.4) after the restore swap crashed in its first run. Each swap that drops paths a replaced archive left now logs, before the drop, each left path's token in the resource loader (finished or loading, a resource or none, its holders), the mod archive that holds it (none for the jeans) and whether the depot finds it; then a thread of REDswap's own watches the game's next load of each dropped path at 0.1, 0.25, 0.4, 0.7, 1 and 2 s, and the loader's failed list. Research switches in the host's settings (`%APPDATA%\@rednode\overlay\settings.json`, read at start), passed to REDswap as a first entry `?left=keep&probe=on&axl=off`: `"swapProbe": "on"` makes REDswap ask the loader for each dropped left path itself, right after the drop, and log how that load ends; `"swapLeftPaths": "keep"` keeps the left paths (1.0.0's way, the control); `"swapArchiveXL": "off"` skips ArchiveXL's reload.
+
+What each outcome means:
+
+| The probe's load of the jeans mesh | The game | Then |
+|---|---|---|
+| Finishes with a resource | Crashes anyway | The base load works: the crash comes from dropping a mesh the puppets still hold, or from loading too late for ArchiveXL's garment code |
+| Finishes with an error, or no resource | Crashes | The game's own file does not load after the swap: look at how it is read |
+| Finishes with a resource | No crash | Loading early hides it: a load of each left path before the refresh may be the fix |
+
+Files: V1 is `E:\Gallery\Files\EDGEmat A\EDGEmatA.archive`, the restore archive `E:\Modding\Cyberpunk 2077\Projects\R29_restore\restore\EDGEmatA.archive`, the trousers `Items.Pants_01_basic_01`. Equipment-EX off, as in the first run.
+
+Session 1, with `"swapProbe": "on"` in the settings:
+
+0. Test timer: Start, Mark after each step.
+1. Load a save. In the Console, `addItem("Items.Pants_01_basic_01")`; equip them. Switch on **World objects test** and its **Allowed** switch for swapping archives, and open the **Mod log**. Mark.
+2. Swap V1's full path: V and the inventory's preview show V1. Close the inventory. Mark.
+3. Swap the restore archive's full path, with the inventory closed. The game may crash about half a second later. If it does not, open the inventory and say what V's trousers look like. Mark.
+4. If it did not crash: wait 5 s, switch **World objects test** off, and quit. Either way, remove `EDGEmatA.archive` from `archive\pc\mod`.
+
+Session 2, with `"swapLeftPaths": "keep"` in place of `"swapProbe"`: the same four steps. Expected: no crash, and V keeps V1's look after the restore (the #29 bug, as in 1.0.0).
 
 ### The world flag and game text (#25, #26)
 

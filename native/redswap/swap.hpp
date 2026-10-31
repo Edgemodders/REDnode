@@ -36,6 +36,14 @@ struct SwapResult
     std::string error;        // set when nothing could be swapped at all
 };
 
+// Research switches for a swap, passed by the caller as a first entry "?left=keep&probe=on&axl=off".
+struct SwapOptions
+{
+    bool keepLeft = false; // keep what a replaced archive held and the new one does not (1.0.0's way)
+    bool probe = false;    // load each dropped left path at once and log how the load ends
+    bool archiveXL = true; // ask ArchiveXL to reload after the swap
+};
+
 // Logs through RED4ext's logger once the plugin has it.
 void SetLogger(RED4ext::v1::PluginHandle aHandle, const RED4ext::v1::Sdk* aSdk);
 
@@ -45,5 +53,5 @@ std::string Check();
 
 // Swaps the files (absolute paths of .archive, .xl, .yaml and .yml files) into the game.
 // Runs on the game thread.
-SwapResult Swap(const std::vector<std::filesystem::path>& aFiles);
+SwapResult Swap(const std::vector<std::filesystem::path>& aFiles, const SwapOptions& aOptions = {});
 } // namespace redswap

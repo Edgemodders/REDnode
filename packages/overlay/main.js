@@ -2297,8 +2297,17 @@ async function swapArchives(caller, params) {
   if (redswap) {
     // REDswap copies each file into the game folder itself and answers what it did.
     let answer = null;
+    // Research switches for REDswap 1.0.2 and later (#29): "swapLeftPaths": "keep",
+    // "swapProbe": "on", "swapArchiveXL": "off" in the settings.
+    const switches = [
+      settings.swapLeftPaths === 'keep' && 'left=keep',
+      settings.swapProbe === 'on' && 'probe=on',
+      settings.swapArchiveXL === 'off' && 'axl=off',
+    ].filter(Boolean);
+    const list = [...(switches.length ? [`?${switches.join('&')}`] : []), ...files.map((f) => f.file)];
+    if (switches.length) log(`Archives: REDswap research switches: ${switches.join(', ')}`);
     try {
-      answer = JSON.parse(String(await bridgeCall('rtti.call', { fn: 'REDswap_Swap', args: [files.map((f) => f.file).join('|')] }, HOT_TIMEOUT)));
+      answer = JSON.parse(String(await bridgeCall('rtti.call', { fn: 'REDswap_Swap', args: [list.join('|')] }, HOT_TIMEOUT)));
     } catch (err) {
       error = err.message;
     }
