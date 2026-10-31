@@ -3,7 +3,8 @@
 // shows on screen is for the player to say. (0.1.x was H2c-a's spike, through `api` only.)
 //
 //   1 Spawn     a person by TweakDB record (stands still, friendly, through world.spawn), a
-//               prop by mesh alone, the package's spawn list
+//               prop by mesh alone, the package's spawn list, a move of the newest spawn (#27:
+//               a swap's respawn must keep the moved place)
 //   2 Near V    world.near: the entities around V with the files they use, read in the game
 //               in one call; only those that use a given file
 //   3 Scene     writes an EDGEbuilder scene around V into this app's folder, loads it with
@@ -86,6 +87,19 @@ const listSpawned = () =>
     const list = world.spawned();
     for (const s of list) say(`  ${s.id.hash}  ${s.options.record ?? s.options.mesh ?? s.options.template}${s.scene ? `  (scene ${s.scene})` : ''}`);
     return `${list.length} listed`;
+  });
+
+// Moves the newest spawn 2 m to its right and turns it a quarter, as an editor's gizmo would.
+const moveNewest = () =>
+  step('Move', async () => {
+    const s = world.spawned().at(-1);
+    if (!s) return 'nothing spawned';
+    const entity = await world.entity(s.id);
+    if (!entity) return `${s.id.hash} is not in the world`;
+    const p = await entity.GetWorldPosition();
+    const yaw = (await entity.GetWorldYaw()) + 90;
+    const moved = await world.move(s.id, { x: p.X + 2, y: p.Y, z: p.Z }, undefined, yaw);
+    return `${s.id.hash} ${moved ? `moved 2 m east and turned to ${yaw.toFixed(0)} degrees; a swap's respawn should keep this place` : 'not moved'}`;
   });
 
 const removeAll = () =>
@@ -210,6 +224,7 @@ ui.window({
     ui.row(
       ui.button('Spawn a person', spawnPerson),
       ui.button('Spawn a prop', spawnProp, { variant: 'ghost' }),
+      ui.button('Move', moveNewest, { variant: 'ghost' }),
       ui.button('Spawned', listSpawned, { variant: 'ghost' }),
       ui.button('Remove spawned', removeAll, { variant: 'ghost' }),
     ),

@@ -368,10 +368,10 @@ export const NOTES = {
   'world-objects-test': {
     group: 'tests',
     summary: 'Spawn a person and a prop, list what is near V with the files each uses, load an EDGEbuilder scene around V, and swap an archive to see what its refresh does to the world.',
-    teaches: ['world.spawn', 'world.near', 'world.files', 'world.load', 'world.unload', 'world.spawned', 'world.onRespawn', 'archives.reload', 'ui.list'],
+    teaches: ['world.spawn', 'world.move', 'world.near', 'world.files', 'world.load', 'world.unload', 'world.spawned', 'world.onRespawn', 'archives.reload', 'ui.list'],
     how: [
       'H2c-b\'s test app: each button calls one part of the world API and logs what came back and how long it took.',
-      '**Spawn a person** uses `world.spawn({ record })`: a `Character.*` record stands where it was placed and stays friendly to V, with no other call. **Spawn a prop** uses `world.spawn({ mesh })`: a mesh on its own. **Keep in saves** passes `keep`.',
+      '**Spawn a person** uses `world.spawn({ record })`: a `Character.*` record stands where it was placed and stays friendly to V, with no other call. **Spawn a prop** uses `world.spawn({ mesh })`: a mesh on its own. **Keep in saves** passes `keep`. **Move** shifts the newest spawn 2 m east and turns it a quarter with `world.move`, which also keeps the new place, so the respawn after a swap brings it back there.',
       '**Near V** is `world.near`: every entity within the radius, nearest first, read in the game in one call; **With files** adds the files each one uses, and **Using this file** keeps only those that use a given depot path.',
       '**Load a scene here** writes an EDGEbuilder scene file around V into the app\'s folder (`node:fs`) and loads it with `world.load`: two props and a person, and a light, which is skipped for now.',
       '**Swap** calls `archives.reload` and lists what its refresh did: this app\'s spawns that use a swapped file are spawned again (`world.onRespawn` says so), and the game\'s entities near V change appearance and back. Switching the app off removes everything it spawned.',

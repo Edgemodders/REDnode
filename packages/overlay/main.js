@@ -1886,13 +1886,31 @@ async function unloadSceneForAgent(name) {
   return { name, removed };
 }
 
-// The MCP spawns that use a swapped file: spawned again by the host, keeping their scene.
+// Where an entity is now, read in the game (#27): it may have been moved since its spawn.
+async function placeForAgent(hash) {
+  const refs = [];
+  try {
+    const entity = await bridgeCall('rtti.call', { class: 'GameInstance', fn: 'FindEntityByID', args: [{}, { hash: String(hash) }] }).catch(() => null);
+    if (!entity?.$ref) return null;
+    refs.push(entity.$ref);
+    const p = await bridgeCall('rtti.call', { self: { $ref: entity.$ref }, fn: 'GetWorldPosition', args: [] }).catch(() => null);
+    const o = await bridgeCall('rtti.call', { self: { $ref: entity.$ref }, fn: 'GetWorldOrientation', args: [] }).catch(() => null);
+    const ok = (v) => typeof v === 'number' && Number.isFinite(v);
+    if (!p || !o || ![p.X, p.Y, p.Z, o.i, o.j, o.k, o.r].every(ok)) return null;
+    return { position: { x: p.X, y: p.Y, z: p.Z }, orientation: { i: o.i, j: o.j, k: o.k, r: o.r } };
+  } finally {
+    if (refs.length) bridgeCall('rtti.release', { refs }).catch(() => {});
+  }
+}
+
+// The MCP spawns that use a swapped file: spawned again by the host where they are now, keeping their scene.
 async function respawnForAgent(hashes) {
   for (const old of hashes) {
     const entry = agentSpawns.get(old);
     if (!entry) continue;
+    const place = await placeForAgent(old);
     await removeForAgent(old).catch(() => false);
-    const r = await spawnForAgent(entry.options).catch(() => null);
+    const r = await spawnForAgent(place ? { ...entry.options, ...place } : entry.options).catch(() => null);
     if (!r) continue;
     if (entry.scene) {
       agentSpawns.get(r.id).scene = entry.scene;

@@ -178,10 +178,24 @@ function listen(): void {
   });
 }
 
-// Removes the entity and spawns it again with the same options: it loads its files anew.
+// Where an entity is now, read in the game: moved by world.move, physics or a script.
+async function placeOf(id: EntityId): Promise<{ position: WorldPoint; orientation: WorldRotation } | null> {
+  const entity = (await world.entity(id).catch(() => null)) as Record<string, () => Promise<unknown>> | null;
+  if (!entity) return null;
+  const p = (await entity.GetWorldPosition().catch(() => null)) as { X?: number; Y?: number; Z?: number } | null;
+  const o = (await entity.GetWorldOrientation().catch(() => null)) as Partial<WorldRotation> | null;
+  const ok = (v: unknown) => typeof v === "number" && Number.isFinite(v);
+  if (!p || !o || ![p.X, p.Y, p.Z, o.i, o.j, o.k, o.r].every(ok)) return null;
+  return { position: { x: p.X!, y: p.Y!, z: p.Z! }, orientation: { i: o.i!, j: o.j!, k: o.k!, r: o.r! } };
+}
+
+// Removes the entity and spawns it again with the same options, where it is now (#27):
+// it loads its files anew.
 async function respawn(entry: SpawnedEntry): Promise<void> {
+  const place = await placeOf(entry.id);
+  const options: SpawnOptions = place ? { ...entry.options, ...place, yaw: undefined } : entry.options;
   await world.remove(entry.id).catch(() => false);
-  const { id } = await world.spawn(entry.options);
+  const { id } = await world.spawn(options);
   const after = mine.get(id.hash);
   if (after && entry.scene) {
     after.scene = entry.scene;
@@ -409,9 +423,17 @@ export const world = {
     return n;
   },
 
-  /** Places an entity. Cheap enough for once a frame, while the player drags it. */
+  /**
+   * Places an entity. Cheap enough for once a frame, while the player drags it. For this
+   * package's own spawns it also keeps the new place, so a respawn after an archive swap
+   * puts the entity where it was moved to.
+   */
   async move(id: EntityId | string, position: WorldPoint, orientation?: WorldRotation, yaw?: number): Promise<boolean> {
-    return (await script("Move", idOf(id), vector(position), rotation(orientation, yaw))) === true;
+    const turn = rotation(orientation, yaw);
+    const moved = (await script("Move", idOf(id), vector(position), turn)) === true;
+    const entry = moved ? mine.get(idOf(id).hash) : undefined;
+    if (entry) entry.options = { ...entry.options, position: { ...position }, orientation: turn, yaw: undefined };
+    return moved;
   },
 
   /** Removes an entity spawned with {@link world.spawn}. */
