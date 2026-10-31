@@ -1311,6 +1311,11 @@ const EDIT_KEYS = {
   Y: (wc) => wc.redo(),
 };
 
+// The held mouse buttons of a window, as sendInputEvent modifiers.
+function heldButtons(w) {
+  return w.held ? [...w.held].map((b) => `${b}ButtonDown`) : [];
+}
+
 function onInput(m) {
   const w = windows.get(m.window);
   if (!w || w.win.isDestroyed()) return;
@@ -1321,12 +1326,20 @@ function onInput(m) {
       // With the pointer locked, the raw movement is in dx, dy. Chromium drops movementX
       // and movementY from injected moves (found in testing), so the page's Pointer Lock
       // code in preload.js makes the pointermove itself.
+      // The plugin sends a leave only with no button held: a safety net for a lost mouseUp.
+      if (m.type === 'mouseLeave') w.held?.clear();
       if (m.dx !== undefined) toPage(w, { event: 'pointer-move', dx: m.dx, dy: m.dy });
-      else wc.sendInputEvent({ type: m.type, x: m.x, y: m.y });
+      else wc.sendInputEvent({ type: m.type, x: m.x, y: m.y, modifiers: heldButtons(w) });
       break;
     case 'mouseDown':
     case 'mouseUp':
-      wc.sendInputEvent({ type: m.type, x: m.x, y: m.y, button: m.button, clickCount: 1 });
+      // A move must say which buttons are held, or Chromium never starts a page's pointer
+      // capture and a drag (a resize grip, a column edge) ends as soon as the cursor leaves
+      // the element (found in testing).
+      w.held ??= new Set();
+      if (m.type === 'mouseDown') w.held.add(m.button);
+      else w.held.delete(m.button);
+      wc.sendInputEvent({ type: m.type, x: m.x, y: m.y, button: m.button, clickCount: 1, modifiers: heldButtons(w) });
       break;
     case 'mouseWheel':
       wc.sendInputEvent({ type: 'mouseWheel', x: m.x, y: m.y, deltaX: 0, deltaY: m.delta });

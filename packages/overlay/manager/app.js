@@ -657,7 +657,9 @@ function measurePage() {
     if (items.length) render();
   }
 }
-new ResizeObserver(measurePage).observe(document.querySelector('.table-wrap'));
+// On the next frame: measuring changes the rows, and a change inside the observer's own
+// callback logs a "ResizeObserver loop" error on every resize.
+new ResizeObserver(() => requestAnimationFrame(measurePage)).observe(document.querySelector('.table-wrap'));
 
 // The details drawer: shut to the right or open, kept for the next visit.
 function showDetails(open) {

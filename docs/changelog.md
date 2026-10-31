@@ -48,6 +48,7 @@ How to keep it:
 **Fixed**
 
 - An archive swap through REDswap that replaces an archive with one holding fewer files now lets the files it left out load from the game, or another mod, again (https://github.com/Edgemodders/REDnode/issues/29). Before, they kept the old archive's version until the game restarted, so a mod could not restore the game's own look by swapping its file out. Comes with REDswap 1.0.1.
+- A drag inside an overlay page now holds on when the cursor leaves the element it started on: mouse moves tell the page which button is held (`buttons` is 1 while the left button is down), so `setPointerCapture` works. Before, a page's own drags, such as a resize grip, stopped after a few pixels.
 - The Console showed only `Uncaught:` for an error whose first line is longer than 80 characters, such as "V is not in the world yet: ...": the whole message shows now.
 - A static function's full name now works with `class` (`api.$static("UIItemsHelper", "GetItemName;TweakDBIDgameItemData", ...)`, or the MCP tools' `class` and `fn`), with or without the class in front.
 - The MCP tool `api_read` accepts a full name that starts with its class, such as `gameUIItemsHelper::GetItemName;TweakDBIDgameItemData`.
