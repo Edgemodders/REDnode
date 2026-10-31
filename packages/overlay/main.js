@@ -2041,6 +2041,17 @@ const CLOTHING_SLOTS = [
   ...EQUIPMENT_EX_SLOTS.map((n) => `OutfitSlots.${n}`),
 ];
 
+// The items a character shows, of those held in CLOTHING_SLOTS. With Equipment-EX in use, its
+// slots carry what is shown and the base slots hold items it hides: those are left out, since
+// applying their appearance again could show them (H2b). So is an empty_appearance_* item.
+function shownItems(held, ids, looks) {
+  const outfit = held.some((w) => w.slot.startsWith('OutfitSlots.'));
+  return held
+    .map((w, i) => ({ slot: w.slot, itemID: ids[i], appearance: String(looks[i] ?? '') }))
+    .filter((w) => !(outfit && w.slot.startsWith('AttachmentSlots.')))
+    .filter((w) => w.itemID && w.appearance && w.appearance !== 'None' && !w.appearance.startsWith('empty_appearance'));
+}
+
 // Applies the appearance of every piece of clothing V wears again. Every game call of a
 // step goes out at once, so the plugin runs them in the same frame: four steps, a few frames.
 async function refreshWorn() {
@@ -2062,16 +2073,12 @@ async function refreshWorn() {
     )).filter(Boolean);
     const ids = await Promise.all(held.map((w) => quiet(call({ self: { $ref: w.item.$ref }, fn: 'GetItemID', args: [] }))));
     const looks = await Promise.all(held.map((w, i) => (ids[i] ? quiet(call({ self, fn: 'GetItemAppearance', args: [v, ids[i]] })) : null)));
-    // With Equipment-EX in use, its slots carry what V shows and the base slots hold items it
-    // hides: those are left out, since applying their appearance again could show them (H2b).
-    const outfit = held.some((w) => w.slot.startsWith('OutfitSlots.'));
-    const shown = held
-      .map((w, i) => ({ slot: w.slot, itemID: ids[i], appearance: String(looks[i] ?? '') }))
-      .filter((w) => !(outfit && w.slot.startsWith('AttachmentSlots.')))
-      .filter((w) => w.itemID && w.appearance && w.appearance !== 'None' && !w.appearance.startsWith('empty_appearance'));
+    const shown = shownItems(held, ids, looks);
     await Promise.all(shown.map((w) => quiet(call({ self, fn: 'ResetItemAppearance', args: [v, w.itemID] }))));
     const items = shown.map((w) => ({ slot: w.slot, appearance: w.appearance }));
-    const preview = shown.length ? await refreshPreview(call, self, shown.map((w) => w.slot)) : { items: [] };
+    // The preview on its own (#28): with the inventory open, V's base-slot items read
+    // empty_appearance_default and are left out above, while the preview shows them.
+    const preview = await refreshPreview(call, self);
     return { items, preview, ms: Date.now() - started };
   } finally {
     if (refs.length) bridgeCall('rtti.release', { refs }).catch(() => {});
@@ -2081,9 +2088,9 @@ async function refreshWorn() {
 // The inventory's preview of V is a second character that wears preview copies of V's
 // items, so it keeps the old look when only V's are reset (docs/world.md, "H2b preview").
 // It belongs to the in-game menu controller, found on Codeware's menu layer, and outlives
-// the closed menu. Its items in the slots refreshed on V are reset the same way. Without
-// Codeware, or before the inventory has made a preview, there is nothing to do.
-async function refreshPreview(call, self, slots) {
+// the closed menu. Its own clothing is read and reset as V's is, whatever V's showed (#28).
+// Without Codeware, or before the inventory has made a preview, there is nothing to do.
+async function refreshPreview(call, self) {
   const quiet = (p) => p.catch(() => null);
   const ink = await quiet(call({ class: 'GameInstance', fn: 'GetInkSystem', args: [] }));
   if (!ink?.$ref) return { items: [], note: 'no ink system (Codeware is not installed)' };
@@ -2093,13 +2100,11 @@ async function refreshPreview(call, self, slots) {
   if (!puppet?.$ref) return { items: [], note: 'no preview yet (the inventory makes one when it opens)' };
   const p = { $ref: puppet.$ref };
   const held = (await Promise.all(
-    slots.map((slot) => quiet(call({ self, fn: 'GetItemInSlot', args: [p, slot] })).then((item) => (item?.$ref ? { slot, item } : null))),
+    CLOTHING_SLOTS.map((slot) => quiet(call({ self, fn: 'GetItemInSlot', args: [p, slot] })).then((item) => (item?.$ref ? { slot, item } : null))),
   )).filter(Boolean);
   const ids = await Promise.all(held.map((w) => quiet(call({ self: { $ref: w.item.$ref }, fn: 'GetItemID', args: [] }))));
   const looks = await Promise.all(held.map((w, i) => (ids[i] ? quiet(call({ self, fn: 'GetItemAppearance', args: [p, ids[i]] })) : null)));
-  const shown = held
-    .map((w, i) => ({ slot: w.slot, itemID: ids[i], appearance: String(looks[i] ?? '') }))
-    .filter((w) => w.itemID && w.appearance && w.appearance !== 'None' && !w.appearance.startsWith('empty_appearance'));
+  const shown = shownItems(held, ids, looks);
   await Promise.all(shown.map((w) => quiet(call({ self, fn: 'ResetItemAppearance', args: [p, w.itemID] }))));
   return { items: shown.map((w) => ({ slot: w.slot, appearance: w.appearance })) };
 }
