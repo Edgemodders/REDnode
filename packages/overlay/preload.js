@@ -55,11 +55,11 @@ contextBridge.exposeInMainWorld('rednode', {
   close: () => ipcRenderer.send('rednode:app:close'),
   /** Opens the debugger for this window. Only in Developer mode; the UI kit's window debug button uses it. */
   debug: () => ipcRenderer.invoke('rednode:app:debug'),
-  /** What this window's title bar may offer: { spaces: {names, current}, space, tool, onHud, canPin, canReset }. Changes arrive as {event: 'window-info', info}. */
+  /** What this window's title bar may offer: { spaces: {names, current}, space, tool, onHud, canPin, canReset, resizable, size, minSize }. Changes arrive as {event: 'window-info', info}. */
   windowInfo: () => ipcRenderer.invoke('rednode:app:info'),
   /** Asks the plugin to hold the cursor for this window (true) or let it go (false); used by the page's Pointer Lock API. */
   pointerLock: (on) => ipcRenderer.invoke('rednode:app:pointer-lock', !!on),
-  /** A title-bar action on this window: 'space' (to a space's name or '*'), 'pin-hud' (true or false), 'reset'. */
+  /** A title-bar action on this window: 'space' (to a space's name or '*'), 'pin-hud' (true or false), 'reset', 'size' ({ width, height }, a resizable window only). Answers the window info. */
   windowAction: (action, arg) => ipcRenderer.invoke('rednode:app:action', action, arg),
   /** Installed apps and mods. Only the built-in launcher and Mod Manager may use these; other apps get an error. */
   apps: {

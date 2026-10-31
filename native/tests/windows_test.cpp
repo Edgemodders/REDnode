@@ -175,6 +175,19 @@ int main()
     OnMouseButton(false, "left");
     Check(View(1).x <= 1920 - 48 && View(1).y <= 1080 - 48, "a dragged window stays partly on screen");
 
+    // A resizable window's new size keeps its top-left corner, also for an anchored window.
+    HandleWindowCommand(R"({"cmd":"window.open","window":5,"anchor":"center","x":0,"y":0,"width":400,"height":200})");
+    g_sent.clear();
+    HandleWindowCommand(R"({"cmd":"window.size","window":5,"width":600,"height":300})");
+    Check(View(5).x == 760 && View(5).y == 440 && View(5).width == 600 && View(5).height == 300,
+          "a new size keeps the top-left corner");
+    Check(SentContains(R"({"event":"moved","window":5,"x":760,"y":440})"), "a new size reports where the window is");
+    SetScreen({1.0f, 1920, 1080, 1920, 1080});
+    Check(View(5).x == 760 && View(5).y == 440, "and the window stays there");
+    HandleWindowCommand(R"({"cmd":"window.size","window":5,"width":5000,"height":300})");
+    Check(View(5).width == 600, "a size over 4096 is refused");
+    HandleWindowCommand(R"({"cmd":"window.close","window":5})");
+
     // B is not draggable from its body: a press there goes to the page.
     g_sent.clear();
     OnMouseMove(305, 205);

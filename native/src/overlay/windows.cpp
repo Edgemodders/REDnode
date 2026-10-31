@@ -28,6 +28,8 @@
 //                                         Pointer Lock does
 //   {"cmd":"pointer.unlock","window":1}
 //   {"cmd":"window.drag","window":1,"regions":[x,y,w,h, ...]}   page pixels
+//   {"cmd":"window.size","window":1,"width":800,"height":500}   a resizable window's new size; its
+//                                         top-left corner stays, and "moved" answers where it is
 //   {"cmd":"window.close","window":1}
 // Plugin -> host events:
 //   {"event":"input","window":1,"type":"mouseMove","x":..,"y":..}   page pixels
@@ -450,6 +452,26 @@ void HandleWindowCommand(const std::string& aJson)
             w->dragRegions.clear();
             for (size_t i = 0; i + 3 < v.size(); i += 4)
                 w->dragRegions.push_back({float(v[i]), float(v[i + 1]), float(v[i + 2]), float(v[i + 3])});
+        }
+        else if (cmd == "window.size" && w)
+        {
+            double width = 0, height = 0;
+            json::Number(aJson, "width", width);
+            json::Number(aJson, "height", height);
+            if (width < 1 || height < 1 || width > 4096 || height > 4096)
+                return;
+            w->width = uint32_t(width);
+            w->height = uint32_t(height);
+            if (w->placed)
+            {
+                // From now on the window is where it is, not where its anchor would put a window of this size.
+                w->anchorX = w->anchorY = 0;
+                w->offsetX = w->x;
+                w->offsetY = w->y;
+                Clamp(*w);
+                Send(actions, "{\"event\":\"moved\",\"window\":" + std::to_string(w->id) + ",\"x\":" +
+                                  std::to_string(int(w->x)) + ",\"y\":" + std::to_string(int(w->y)) + "}");
+            }
         }
         else if (cmd == "window.close" && w)
         {

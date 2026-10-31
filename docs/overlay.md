@@ -164,6 +164,7 @@ The plugin owns window placement, so moving a window never waits on Chromium. Th
 | `frame` | `none` (default) | REDnode draws nothing but the page. A title bar with close and drag comes from the UI kit's `<rn-window>`, not from the plugin |
 | `size` | page pixels | Scaled with the screen height, like the proof of concept. Later also with the game's UI scale |
 | `anchor` | `center`, `top-left` and so on, plus an offset | Lets HUD widgets sit at a screen edge at any resolution and aspect ratio |
+| `resizable` | `true`, with `minWidth` and `minHeight` | The UI kit's `<rn-window>` shows a grip in its bottom-right corner; the host resizes the page and the plugin's `window.size` the window, keeping its top-left corner. The size is kept with the position. Since REDnode 0.49.0 |
 | `draggable` | yes or no | Drag handles are marked in the page's HTML, for example `data-rednode-drag` |
 | `hideWith` | game UI states | For example `menu`, `photo-mode`, `scene`. The plugin hides the window while that state is on |
 

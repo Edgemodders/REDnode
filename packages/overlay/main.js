@@ -364,6 +364,10 @@ function readManifest(dir) {
       if (!Number.isInteger(m[k]) || m[k] < 1 || m[k] > 4096) problems.push(`${k} must be a whole number from 1 to 4096`);
     }
   }
+  if (m.resizable !== undefined && typeof m.resizable !== 'boolean') problems.push('resizable must be true or false');
+  for (const k of ['minWidth', 'minHeight']) {
+    if (m[k] !== undefined && (!Number.isInteger(m[k]) || m[k] < 1 || m[k] > 4096)) problems.push(`${k} must be a whole number from 1 to 4096`);
+  }
   if (m.isolation !== undefined && !['process', 'any'].includes(m.isolation)) problems.push('isolation must be process or any');
   if (m.permissions !== undefined && (!Array.isArray(m.permissions) || m.permissions.some((p) => !isPermission(p)))) {
     problems.push(`permissions must be a list of ${Object.keys(PERMISSIONS).join(', ')}, or keys:<service> such as keys:anthropic`);
@@ -418,6 +422,10 @@ function readManifest(dir) {
     sounds: m.sounds ?? {},
     width: m.width,
     height: m.height,
+    // A resizable window gets a grip in its corner (the UI kit's rn-window); the smallest size defaults to the manifest's, at most 320 x 200.
+    resizable: m.resizable === true && (m.kind ?? 'window') === 'window',
+    minWidth: Math.min(m.minWidth ?? Math.min(m.width ?? 320, 320), m.width ?? 4096),
+    minHeight: Math.min(m.minHeight ?? Math.min(m.height ?? 200, 200), m.height ?? 4096),
     anchor: m.anchor ?? 'top-left',
     x: Number(m.x) || 0,
     y: Number(m.y) || 0,
@@ -880,6 +888,9 @@ function windowInfo(w) {
     onHud: windowOnHud(w),
     canPin: !!owner && !owner.pinned && owner.manifest.kind !== 'hud',
     canReset: !!positions[spaceKey(w)],
+    resizable: !!w.app.manifest.resizable,
+    size: sizeOf(w),
+    minSize: { width: w.app.manifest.minWidth, height: w.app.manifest.minHeight },
   };
 }
 
@@ -1167,21 +1178,43 @@ function sendFrame(windowId, image, dirty) {
   windowStats.get(windowId).frames += 1;
 }
 
-// Tells the plugin about a window. A saved position wins over the manifest's anchor,
-// but only for a window of the size it was saved with: a package whose window changed
+// A saved position, if it was saved for the manifest's size: a package whose window changed
 // size (a small panel that became a full-screen page) starts at its anchor again (#8).
 // Positions saved before sizes were kept have none, and are ignored once.
+function savedPlace(m) {
+  const saved = positions[m.id];
+  return saved && saved.width === m.width && saved.height === m.height ? saved : null;
+}
+
+// A window's size now: the manifest's, or the player's for a resizable window.
+function sizeOf(w) {
+  const m = w.app.manifest;
+  return w.size ?? { width: m.width, height: m.height };
+}
+
+// The size a resizable window was left at, kept with its position.
+function savedSize(m) {
+  const s = m.resizable ? savedPlace(m)?.size : null;
+  return s ? clampSize(m, s.width, s.height) : null;
+}
+
+function clampSize(m, width, height) {
+  return {
+    width: Math.round(Math.min(4096, Math.max(m.minWidth, Number(width) || m.width))),
+    height: Math.round(Math.min(4096, Math.max(m.minHeight, Number(height) || m.height))),
+  };
+}
+
+// Tells the plugin about a window. A saved position wins over the manifest's anchor.
 function openInGame(w) {
   const m = w.app.manifest;
-  const saved = positions[m.id];
-  const fits = saved && saved.width === m.width && saved.height === m.height;
-  const place = fits ? { anchor: 'top-left', x: saved.x, y: saved.y } : { anchor: m.anchor, x: m.x, y: m.y };
+  const saved = savedPlace(m);
+  const place = saved ? { anchor: 'top-left', x: saved.x, y: saved.y } : { anchor: m.anchor, x: m.x, y: m.y };
   sendJson({
     cmd: 'window.open',
     window: w.id,
     ...place,
-    width: m.width,
-    height: m.height,
+    ...sizeOf(w),
     kind: m.kind,
     hideWith: m.hideWith,
     draggable: m.kind !== 'hud',
@@ -1371,7 +1404,7 @@ function onGameMessage(m) {
       if (w) {
         const { width, height } = w.app.manifest;
         const first = !positions[w.app.manifest.id];
-        positions[w.app.manifest.id] = { x: m.x, y: m.y, width, height };
+        positions[w.app.manifest.id] = { x: m.x, y: m.y, width, height, ...(w.size ? { size: w.size } : {}) };
         writeJson('window-positions.json', positions);
         if (first) toPage(w, { event: 'window-info', info: windowInfo(w) }); // Reset position is offered now
       }
@@ -3272,10 +3305,29 @@ ipcMain.handle('rednode:app:action', (event, action, arg) => {
     const owner = ownerOf(w);
     if (!owner || owner.pinned) throw new Error('This window cannot be pinned');
     setPin(owner.manifest.id, 'hud', !!arg);
+  } else if (action === 'size') {
+    const m = w.app.manifest;
+    if (!m.resizable) throw new Error('This window is not resizable');
+    const size = clampSize(m, arg?.width, arg?.height);
+    const now = sizeOf(w);
+    if (size.width === now.width && size.height === now.height) return windowInfo(w);
+    w.size = size.width === m.width && size.height === m.height ? null : size;
+    w.win.setContentSize(size.width, size.height);
+    // The plugin answers "moved", which saves the size with the position.
+    if (connected) sendJson({ cmd: 'window.size', window: w.id, ...size });
+    else if (positions[m.id]) {
+      positions[m.id] = { ...positions[m.id], size: w.size ?? undefined };
+      writeJson('window-positions.json', positions);
+    }
+    return windowInfo(w);
   } else if (action === 'reset') {
     delete positions[key];
     writeJson('window-positions.json', positions);
-    if (connected) openInGame(w); // back to its anchor
+    if (w.size) {
+      w.size = null;
+      w.win.setContentSize(w.app.manifest.width, w.app.manifest.height);
+    }
+    if (connected) openInGame(w); // back to its anchor and size
     log(`Reset the position of ${key}`);
     toPage(w, { event: 'window-info', info: windowInfo(w) });
   } else {
@@ -4621,9 +4673,10 @@ function openApp(entry) {
   if (!entry.manifest.entry || windowOfApp(entry.manifest.id)) return;
   const m = entry.manifest;
   const id = nextWindowId++;
+  const size = savedSize(m);
   const win = new BrowserWindow({
-    width: m.width,
-    height: m.height,
+    width: size?.width ?? m.width,
+    height: size?.height ?? m.height,
     x: windowed ? 60 + windows.size * 80 : undefined,
     y: windowed ? 60 + windows.size * 80 : undefined,
     show: windowed, // never show an off-screen window: that would take OS focus from the game
@@ -4639,7 +4692,7 @@ function openApp(entry) {
       sandbox: true,
     },
   });
-  const w = { id, app: entry, win, dragRegions: [], console: [] };
+  const w = { id, app: entry, win, dragRegions: [], console: [], size };
   windows.set(id, w);
   windowStats.set(id, { frames: 0 });
 

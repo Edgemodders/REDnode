@@ -275,10 +275,16 @@ footer:empty { display: none; }
 /* Pages often stretch a window to the page (inset: 0); rolled up it takes only its title's height. */
 :host([rolled]) { bottom: auto !important; height: auto !important; min-height: 0 !important; }
 :host([rolled]) header { border-bottom: 0; }
-:host([rolled]) .mark { background: transparent; box-shadow: inset 0 0 0 2px var(--rn-title-mark); }`,
+:host([rolled]) .mark { background: transparent; box-shadow: inset 0 0 0 2px var(--rn-title-mark); }
+/* A resizable window's grip, in the corner the frame does not cut. */
+.resize { position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; z-index: 2; cursor: nwse-resize; touch-action: none;
+  background: linear-gradient(135deg, transparent 0 55%, var(--rn-dim) 55% 61%, transparent 61% 72%, var(--rn-dim) 72% 78%, transparent 78% 89%, var(--rn-dim) 89% 95%, transparent 95%); }
+.resize:hover, .resize.on { background: linear-gradient(135deg, transparent 0 55%, var(--rn-accent) 55% 61%, transparent 61% 72%, var(--rn-accent) 72% 78%, transparent 78% 89%, var(--rn-accent) 89% 95%, transparent 95%); }
+.resize[hidden], :host([rolled]) .resize { display: none; }`,
         `<header part="titlebar"><span class="grip"><span class="mark"></span><h1></h1></span><slot name="status"></slot><span class="actions"></span><button class="close" hidden aria-label="Close">✕</button></header>
-<div class="body" part="body"><slot></slot></div><footer><slot name="footer"></slot></footer>`,
+<div class="body" part="body"><slot></slot></div><footer><slot name="footer"></slot></footer><div class="resize" part="resize" hidden title="Drag to resize"></div>`,
       );
+      this.setupResize();
       this.$('.close').addEventListener('click', () => {
         playSound(soundFor(this, 'press'));
         const ev = new CustomEvent('close', { cancelable: true, bubbles: true, composed: true });
@@ -359,16 +365,70 @@ footer:empty { display: none; }
       if (whole && info.canPin) {
         list.push({ id: 'pin', name: info.onHud ? 'Unpin from HUD' : 'Pin to HUD', on: info.onHud, run: run('pin-hud', !info.onHud) });
       }
-      if (whole && info.canReset) list.push({ id: 'reset', name: 'Reset position', run: run('reset') });
+      if (whole && info.canReset) list.push({ id: 'reset', name: info.resizable ? 'Reset position and size' : 'Reset position', run: run('reset') });
       if (document.documentElement.hasAttribute('rn-developer') && window.rednode?.debug && !this.hasAttribute('no-debug')) {
         list.push({ id: 'debug', name: 'Debug', run: () => window.rednode.debug().catch(() => {}) });
       }
       return list;
     }
 
+    // A window whose manifest says "resizable": dragging the grip asks the host for a new
+    // size, one request at a time, with the newest size sent when the last one is done.
+    setupResize() {
+      const grip = this.$('.resize');
+      let drag = null;
+      const send = () => {
+        const d = drag;
+        if (!d || d.busy) return;
+        if (!d.want) {
+          if (d.ending) drag = null;
+          return;
+        }
+        const want = d.want;
+        d.want = null;
+        d.busy = true;
+        window.rednode
+          .windowAction('size', want)
+          .then((info) => (this._info = info), () => {})
+          .finally(() => {
+            d.busy = false;
+            send();
+          });
+      };
+      grip.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || !this._info?.resizable) return;
+        e.preventDefault();
+        grip.setPointerCapture?.(e.pointerId);
+        const size = this._info.size ?? { width: innerWidth, height: innerHeight };
+        drag = { x: e.clientX, y: e.clientY, width: size.width, height: size.height, want: null, busy: false };
+        grip.classList.add('on');
+      });
+      grip.addEventListener('pointermove', (e) => {
+        if (!drag || drag.ending) return;
+        const min = this._info?.minSize ?? {};
+        drag.want = {
+          width: Math.max(min.width ?? 160, Math.round(drag.width + e.clientX - drag.x)),
+          height: Math.max(min.height ?? 100, Math.round(drag.height + e.clientY - drag.y)),
+        };
+        send();
+      });
+      const end = () => {
+        if (!drag || drag.ending) return;
+        drag.ending = true; // the newest size still goes out after the request on its way
+        grip.classList.remove('on');
+        const size = drag.want ?? this._info?.size ?? null;
+        send();
+        this.emit('resize-end', size);
+      };
+      grip.addEventListener('pointerup', end);
+      grip.addEventListener('lostpointercapture', end);
+    }
+
     renderActions() {
       const box = this.$('.actions');
       if (!box) return;
+      const info = this._info;
+      this.$('.resize').hidden = !(info?.resizable && window.rednode?.windowAction && this.isMain());
       const list = this.actions();
       const shown = list.slice(0, 3);
       const overflow = list.slice(3);
