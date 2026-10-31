@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Version | 1.0.0, its own (`native/redswap/redswap.json`), apart from REDnode's |
+| Version | 1.0.1, its own (`native/redswap/redswap.json`), apart from REDnode's |
 | Game | 2.5, with RED4ext 1.31 or later |
 | Installed at | `red4ext/plugins/REDswap/REDswap.dll` |
 | Log | `red4ext/logs/redswap-*.log` |
@@ -20,7 +20,7 @@ Until game 2.5, REDnode swapped archives through RED Hot Tools. RED Hot Tools ha
 1. Each file goes where the game expects it. An `.archive` the game already loaded is **replaced** at its own path; a new one is **added** to `archive/pc/mod`; ArchiveXL's `.xl`, `.yaml` and `.yml` files go beside them. REDswap **copies** each file, so the one you built stays where it is.
 2. The game's open handles on a replaced archive are closed for the moment of the copy, then opened again.
 3. The game's own archive loader loads the new files, and they take the old ones' place in the game's list of mod archives.
-4. The resources those archives hold are dropped from the game's resource loader, so whatever loads them next gets the new version.
+4. The resources those archives hold are dropped from the game's resource loader, so whatever loads them next gets the new version. So are the resources a replaced archive held and its new version does not (read from the old file's table before the copy, since 1.0.1): they load from the base game, or another mod, next time. That is how a mod restores the game's own look: it swaps in its archive without the files it changed.
 5. ArchiveXL, when installed, is asked to reload.
 
 What is already in the world keeps what it loaded. REDswap only swaps; REDnode's `archives.reload` then refreshes what V wears, the inventory's preview of V, REDnode's own spawns and the game's entities near V that use a swapped file ([World API](world.md)).
@@ -121,7 +121,7 @@ std::string SwapThroughREDswap(const std::string& aFiles)
 
 ## The answer
 
-`REDswap_Swap` answers JSON. This one is from REDswap's first in-game test, with the inventory open:
+`REDswap_Swap` answers JSON. This one is from REDswap's first in-game test, with the inventory open (`left` and `leftInvalidated` added as 1.0.1 would answer it):
 
 ```json
 {
@@ -135,6 +135,8 @@ std::string SwapThroughREDswap(const std::string& aFiles)
   "failed": [],
   "resources": 9,
   "invalidated": 4,
+  "left": 7,
+  "leftInvalidated": 0,
   "extensions": true,
   "ms": 52
 }
@@ -146,6 +148,8 @@ std::string SwapThroughREDswap(const std::string& aFiles)
 | `failed` | Each file not swapped, with `why` |
 | `resources` | The resource paths the swapped archives hold |
 | `invalidated` | Of those, the ones the game had loaded, now dropped from its resource loader |
+| `left` | The resource paths a replaced archive held and the new one does not (1.0.1 and later) |
+| `leftInvalidated` | Of those, the ones the game had loaded, now dropped from its resource loader (1.0.1 and later) |
 | `extensions` | Whether ArchiveXL was asked to reload |
 | `ms` | The swap's time on the game thread |
 | `error` | Only when nothing could be swapped at all, such as a failed check |

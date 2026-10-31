@@ -8,7 +8,7 @@
 //
 // REDswap_Swap takes absolute paths separated by "|" (a character Windows paths never hold)
 // and answers JSON: { "done": [{ file, target, how }], "failed": [{ file, why }],
-// "resources", "invalidated", "extensions", "ms", "error"? }. It runs on the game thread.
+// "resources", "invalidated", "left", "leftInvalidated", "extensions", "ms", "error"? }. It runs on the game thread.
 
 #include "swap.hpp"
 
@@ -127,7 +127,8 @@ void REDswap_Swap(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, 
         g_sdk->logger->ErrorF(g_handle, "  failed: %s: %s", f.file.c_str(), f.why.c_str());
     }
     json += "],\"resources\":" + std::to_string(result.resources) + ",\"invalidated\":" +
-            std::to_string(result.invalidated) + ",\"extensions\":" + (result.extensions ? "true" : "false") +
+            std::to_string(result.invalidated) + ",\"left\":" + std::to_string(result.left) +
+            ",\"leftInvalidated\":" + std::to_string(result.leftInvalidated) + ",\"extensions\":" + (result.extensions ? "true" : "false") +
             ",\"ms\":" + std::to_string(ms);
     if (!result.error.empty())
     {
@@ -135,8 +136,11 @@ void REDswap_Swap(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, 
         g_sdk->logger->ErrorF(g_handle, "Swap refused: %s", result.error.c_str());
     }
     json += "}";
-    g_sdk->logger->InfoF(g_handle, "Swap done in %lld ms: %zu swapped, %zu failed, %u resources (%u dropped)", ms,
-                         result.done.size(), result.failed.size(), result.resources, result.invalidated);
+    g_sdk->logger->InfoF(g_handle,
+                         "Swap done in %lld ms: %zu swapped, %zu failed, %u resources (%u dropped), %u left by the old "
+                         "archive (%u dropped)",
+                         ms, result.done.size(), result.failed.size(), result.resources, result.invalidated, result.left,
+                         result.leftInvalidated);
     ReturnString(aOut, json);
 }
 

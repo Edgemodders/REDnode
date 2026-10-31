@@ -30,6 +30,8 @@ struct SwapResult
     std::vector<FileFailure> failed;
     uint32_t resources = 0;   // resource paths the swapped archives hold
     uint32_t invalidated = 0; // of those, loaded ones dropped from the resource loader
+    uint32_t left = 0;            // resource paths a replaced archive held and the new ones do not
+    uint32_t leftInvalidated = 0; // of those, loaded ones dropped from the resource loader
     bool extensions = false;  // ArchiveXL asked to reload
     std::string error;        // set when nothing could be swapped at all
 };

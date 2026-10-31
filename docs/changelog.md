@@ -47,12 +47,14 @@ How to keep it:
 
 **Fixed**
 
+- An archive swap through REDswap that replaces an archive with one holding fewer files now lets the files it left out load from the game, or another mod, again (https://github.com/Edgemodders/REDnode/issues/29). Before, they kept the old archive's version until the game restarted, so a mod could not restore the game's own look by swapping its file out. Comes with REDswap 1.0.1.
 - The Console showed only `Uncaught:` for an error whose first line is longer than 80 characters, such as "V is not in the world yet: ...": the whole message shows now.
 - A static function's full name now works with `class` (`api.$static("UIItemsHelper", "GetItemName;TweakDBIDgameItemData", ...)`, or the MCP tools' `class` and `fn`), with or without the class in front.
 - The MCP tool `api_read` accepts a full name that starts with its class, such as `gameUIItemsHelper::GetItemName;TweakDBIDgameItemData`.
 
 **Other**
 
+- The Nexus release tool (`tools/nexus/nexus.mjs`) takes an optional `"tag"` in `nexus.json`, the prefix of a page's own release tags, such as `"wardrobe-designer-v"`, for a page released apart from its repo's `v<version>` tags (https://github.com/Edgemodders/REDnode/issues/30).
 - Shared keys, first part (https://github.com/Edgemodders/REDnode/issues/23): one store for the player's AI service keys that every EDGE tool on the PC can read, `%APPDATA%\Edgemodders\keys\<service>.txt` encrypted for the Windows user, and a small MIT library for tools to copy, `tools/keys/keys.mjs`. Packages reach it with `secrets.shared` and `secrets.askShared` (above). See https://edgemodders.github.io/REDnode/keys.html
 
 ## 0.41.0 (2026-10-27)

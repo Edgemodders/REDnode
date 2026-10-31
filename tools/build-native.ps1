@@ -45,6 +45,8 @@ if ($LASTEXITCODE) { throw 'Fault watch unit tests failed.' }
 if ($LASTEXITCODE) { throw 'Opus state unit tests failed.' }
 & (Join-Path $build "$Config\REDnode_capture_tests.exe")
 if ($LASTEXITCODE) { throw 'Capture unit tests failed.' }
+& (Join-Path $build "$Config\REDswap_table_tests.exe")
+if ($LASTEXITCODE) { throw 'REDswap file table unit tests failed.' }
 & (Join-Path $build "$Config\REDnode_audio_tests.exe")
 if ($LASTEXITCODE) { throw 'Audio unit tests failed.' }
 

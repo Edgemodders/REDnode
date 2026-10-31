@@ -80,6 +80,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [Resizable windows and the Mod Manager (0.49.0)](#resizable-windows-and-the-mod-manager-0490) | In the game | Overlay | Not run | 0.49.0, game 2.5 | Awaits its run. Mock game: 21 checks (scratchpad `mm/check.mjs`); unit test: `window.size` |
 | [A respawn keeps the moved place (#27)](#a-respawn-keeps-the-moved-place-27) | In the game | World | Not run | 0.49.0 + REDswap 1.0.0, World objects test 0.2.3, game 2.5 | Awaits its run. Stand-in host: 7 checks (scratchpad `w27/check.mjs`) |
 | [The inventory's preview on its own (#28)](#the-inventorys-preview-on-its-own-28) | In the game | H2b | Not run | 0.49.1 + REDswap 1.0.0, World objects test 0.2.3, game 2.5 | Awaits its run. Stand-in bridge: 7 checks (scratchpad `w28/check.mjs`) |
+| [A swap restores the game's own files (#29)](#a-swap-restores-the-games-own-files-29) | In the game | REDswap | Not run | 0.49.2 + REDswap 1.0.1, World objects test 0.2.3, game 2.5 | Awaits its run. Unit tests: the file table reader (8 checks, and both EDGEmat A archives read the same as `archive-index.js`) |
 | [The world flag and game text (#25, #26)](#the-world-flag-and-game-text-25-26) | In the game, with Claude | EDGEmobile's requests | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop), with one finding: `world` was right at every step, but went off at a load only when the player went, since the `OnDetach` wrap never sent its event; the Console showed the long refusal as `Uncaught:` only. Both fixed in 0.47.1: its [retest](#world-flag-retest-on-0471) **passed** on 2026-10-30 (laptop): `world` went off at the start of each load and at the main menu, 0.3 s before the player went. 0.47.2 moves the event's work off the worker thread it arrives on; a short check rides with the next test |
 | [Tools Manager starts EDGEmat's server (0.45.1)](mcp.md#edgemats-tools-test) | In the game | E1 | 2026-10-30 | 0.47.0 + Admin Tools 0.1.0, game 2.5 | **Pass** (laptop): the EDGEmat group showed its 10 tools in a fresh session, no assistant asked first |
 | [Roles (#20)](services.md#roles-test) | In the game | Services | 2026-10-29 | 0.45.0 + Roles test 0.1.0, Counter service 0.3.0, game 2.5 | **Pass** (dev PC): all eight steps. Mock game: 15 checks |
@@ -877,6 +878,19 @@ Files: `E:\Gallery\Files\EDGEmat A\EDGEmatA.archive` (V1) and `E:\Gallery\Files\
 3. Close the inventory. Say whether V shows V2's look, or the old one until the trousers are taken off and put on (open question). Mark.
 4. With the inventory closed, swap V1's full path: V shows V1's look. Open the inventory: the preview shows V1 too. Mark.
 5. Switch **World objects test** off, then quit the game. Remove `EDGEmatA.archive` from `archive\pc\mod` if it was not installed before.
+
+### A swap restores the game's own files (#29)
+
+Built 2026-10-31 in REDswap 1.0.1 (REDnode 0.49.2) for EDGEmat's [#29](https://github.com/Edgemodders/REDnode/issues/29). Replacing an archive with one that holds fewer files left the files it no longer held cached with the old archive's version, so a mod could not bring the game's own look back by swapping its file out. REDswap now reads the old archive's file table (`native/redswap/archive_table.hpp`) after closing the game's handle and before the copy, and drops the paths the new archive does not hold from the resource loader too. Unit tests: `native/tests/redswap_table_test.cpp` (8 checks; with `REDSWAP_TEST_ARCHIVE` set, both EDGEmat A archives read the same 9 hashes as `packages/overlay/archive-index.js`).
+
+Files: V1 is `E:\Gallery\Files\EDGEmat A\EDGEmatA.archive` (it replaces both jeans meshes of `Items.Pants_01_basic_01`, `l1_012_pwa_pants__jeans_tight.mesh` and `l1_012_pma_...`). The restore archive is `E:\Modding\Cyberpunk 2077\Projects\R29_restore\restore\EDGEmatA.archive`: the same name, packed 2026-10-31 with REDbridge, holding one unrelated file (a copy of `main_colors.inkstyle` under `base\edgemodders\rednode\restore_test\`) and neither mesh. V wears the trousers in the base Legs slot (Equipment-EX's outfit slots empty).
+
+0. Test timer: Start, Mark after each step.
+1. Load a save, V wearing `Items.Pants_01_basic_01` (Console: `addItem("Items.Pants_01_basic_01")`). Switch on **World objects test** and its **Allowed** switch for swapping archives, and open the **Mod log**. Mark.
+2. Swap V1's full path: V shows V1's look. Mark.
+3. Swap the restore archive's full path. Expected: V shows the game's own jeans **at once**, and the Mod log says `9 left by the old archive` (with how many dropped). Open the inventory: the preview shows the game's jeans too. Mark.
+4. Swap V1 again: V1's look comes back. Mark.
+5. Switch **World objects test** off, then quit the game. Remove `EDGEmatA.archive` from `archive\pc\mod`.
 
 ### The world flag and game text (#25, #26)
 

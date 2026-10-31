@@ -6,6 +6,9 @@
 // replaced, put the new files in place, open the handles again, load the archives with the
 // game's own loader into a group of their own, merge them into the mod group, and drop the
 // resources they hold from the resource loader, so the next request reads the new files.
+// A replaced archive's own paths that the new one no longer holds are dropped too (REDnode
+// #29): read from its file table on disk before the new file takes its place, so a path the
+// new archive leaves out loads from the base game or another mod next time.
 //
 // What REDswap adds: it looks every game function up itself and refuses a swap when one is
 // missing (RED4ext's own lookup closes the game), checks the loader's first bytes and the
@@ -17,6 +20,8 @@
 // The 2.5 addresses were found by static reading of the game (docs/world.md, "H3").
 
 #include "swap.hpp"
+
+#include "archive_table.hpp"
 
 #include <RED4ext/ResourceDepot.hpp>
 #include <RED4ext/ResourceLoader.hpp>
@@ -30,6 +35,7 @@
 #include <cstring>
 #include <mutex>
 #include <system_error>
+#include <unordered_set>
 
 namespace redswap
 {
@@ -238,6 +244,9 @@ struct Planned
     bool same = false; // the source is the installed file: reloaded as it is
     bool closed = false;
     bool placed = false;
+    bool loaded = false;               // the game loaded it into the mod group
+    bool oldRead = false;              // the replaced archive's file table was read
+    std::vector<uint64_t> oldHashes;   // the resources the replaced archive held
 };
 
 void ReloadArchiveXL(SwapResult& aResult)
@@ -399,6 +408,21 @@ SwapResult Swap(const std::vector<std::filesystem::path>& aFiles)
     }
     for (auto& p : plan)
     {
+        if (p.existing < 0 || p.same || p.part.empty())
+            continue;
+        if (auto hashes = ArchiveHashes(p.target))
+        {
+            p.oldHashes = std::move(*hashes);
+            p.oldRead = true;
+        }
+        else
+        {
+            LogError("Could not read the file table of %s before replacing it; resources only it held stay cached",
+                     p.target.string().c_str());
+        }
+    }
+    for (auto& p : plan)
+    {
         if (p.same)
         {
             p.placed = true;
@@ -464,6 +488,7 @@ SwapResult Swap(const std::vector<std::filesystem::path>& aFiles)
                     p.group->archives.Emplace(p.group->archives.Begin() + at, archive);
                 break;
             }
+            p.loaded = inHot;
             if (inHot)
                 result.done.push_back({p.given, target, p.same ? "reloaded" : (p.existing >= 0 ? "replaced" : "added")});
             else
@@ -477,25 +502,52 @@ SwapResult Swap(const std::vector<std::filesystem::path>& aFiles)
     }
 
     // 6. Drop what the swapped archives hold from the resource loader, so the next request
-    //    reads the new files.
-    if (loaded.size())
+    //    reads the new files, and what the replaced archives held that the new ones do not, so
+    //    the next request reads it from wherever it is now (#29).
+    std::unordered_set<uint64_t> held;
+    for (const auto& path : loaded)
+        held.insert(path.hash);
+    std::vector<RED4ext::ResourcePath> left;
+    for (const auto& p : plan)
+    {
+        if (!p.loaded || !p.oldRead)
+            continue;
+        for (const auto hash : p.oldHashes)
+        {
+            if (held.insert(hash).second)
+                left.emplace_back(hash);
+        }
+    }
+    result.left = static_cast<uint32_t>(left.size());
+    if (loaded.size() || left.size())
     {
         auto* loader = RED4ext::ResourceLoader::Get();
         std::unique_lock tokens(loader->tokenLock);
-        for (const auto& path : loaded)
-        {
-            auto* token = loader->tokens.Get(path);
+        const auto drop = [&](RED4ext::ResourcePath aPath) {
+            bool dropped = false;
+            auto* token = loader->tokens.Get(aPath);
             if (token && token->instance)
             {
                 // As RED Hot Tools does: the weak reference is let go of without touching the
                 // token's counts, which the game still owns.
                 token->refCount = nullptr;
                 token->instance = nullptr;
-                loader->tokens.Remove(path);
-                ++result.invalidated;
+                loader->tokens.Remove(aPath);
+                dropped = true;
             }
             RED4ext::Handle<RED4ext::CResource> resource;
-            Find().forgetResource(loader->unk48, resource, path);
+            Find().forgetResource(loader->unk48, resource, aPath);
+            return dropped;
+        };
+        for (const auto& path : loaded)
+        {
+            if (drop(path))
+                ++result.invalidated;
+        }
+        for (const auto& path : left)
+        {
+            if (drop(path))
+                ++result.leftInvalidated;
         }
     }
 

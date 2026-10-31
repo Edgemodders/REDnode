@@ -68,7 +68,7 @@ The release workflow sets it from `upload.description` in `nexus.json` ({version
 
 ## Updating the page
 
-The page is kept through Nexus's v3 API (`tools/nexus/nexus.mjs`, on top of `tools/nexus/api.mjs`) with the owner's key: on the dev PC a file in `%APPDATA%\Edgemodders` that Windows encrypts for the owner's user (made once, see `api.mjs`), in CI the organization's `NEXUS_KEY` secret. `nexus.json` holds the page number, the internal mod id, the main file's id, how a new version is uploaded (`upload`: main file, primary, mod manager download on, the old version archived) and the hash of the description last pulled.
+The page is kept through Nexus's v3 API (`tools/nexus/nexus.mjs`, on top of `tools/nexus/api.mjs`) with the owner's key: on the dev PC a file in `%APPDATA%\Edgemodders` that Windows encrypts for the owner's user (made once, see `api.mjs`), in CI the organization's `NEXUS_KEY` secret. `nexus.json` holds the page number, the internal mod id, the main file's id, how a new version is uploaded (`upload`: main file, primary, mod manager download on, the old version archived) and the hash of the description last pulled. A page released with tags of its own, apart from its repo's `v<version>` tags, names their prefix in `"tag"` (such as `"wardrobe-designer-v"`), so a release compares the live description with the one its own previous release pushed.
 
 | Command | What it does |
 |---|---|

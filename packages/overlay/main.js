@@ -2292,7 +2292,7 @@ async function swapArchives(caller, params) {
     if (answer?.error) error = answer.error;
     for (const d of answer?.done ?? []) swapDone.set(path.resolve(d.file).toLowerCase(), d);
     for (const d of answer?.failed ?? []) swapFailed.set(path.resolve(d.file).toLowerCase(), d.why);
-    if (answer) log(`Archives: REDswap swapped ${answer.done.length}, failed ${answer.failed.length}; ${answer.resources} resources, ${answer.invalidated} dropped from the loader; ArchiveXL reload ${answer.extensions ? 'ran' : 'not run'}`);
+    if (answer) log(`Archives: REDswap swapped ${answer.done.length}, failed ${answer.failed.length}; ${answer.resources} resources, ${answer.invalidated} dropped from the loader${answer.left !== undefined ? `; ${answer.left} left by the old archive, ${answer.leftInvalidated} dropped` : ''}; ArchiveXL reload ${answer.extensions ? 'ran' : 'not run'}`);
   } else {
     // Copied only now, so RED Hot Tools' folder watcher cannot start the swap before the pause
     // and the wait; and under another name first, so it never sees half a file.
