@@ -34,6 +34,7 @@ How to keep it:
 
 **Changed**
 
+- An archive swap with the inventory open refreshes the inventory's preview of V on its own (https://github.com/Edgemodders/REDnode/issues/28). With V's clothes in the base slots, the game hides V's own items while the inventory shows, so the preview was skipped and kept the old look until the item was taken off and put on again.
 - `world.move` keeps the new place of the package's own spawns, and a respawn after an archive swap reads where the entity is now, so an entity moved since its spawn (by `world.move`, physics or a script) comes back there, not where it was first spawned (https://github.com/Edgemodders/REDnode/issues/27). Assistants' spawns through MCP do the same.
 
 - The launcher's window is wider (1040 pixels, was 690) to make room for Keys beside Settings; its empty parts stay see-through and click through to the game. A launcher you moved goes back to its corner once.

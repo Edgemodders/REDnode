@@ -79,6 +79,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [Shared keys for packages (K3)](#shared-keys-for-packages-k3) | In the game, with Claude | #23 | Not run | 0.48.1 + Keys test 0.1.0, REDagent 0.4.0, game 2.5 | Awaits its run (0.48.1: Keys slides out beside Settings, step 4). Mock game: 20 checks (Keys test), 8 (REDagent) |
 | [Resizable windows and the Mod Manager (0.49.0)](#resizable-windows-and-the-mod-manager-0490) | In the game | Overlay | Not run | 0.49.0, game 2.5 | Awaits its run. Mock game: 21 checks (scratchpad `mm/check.mjs`); unit test: `window.size` |
 | [A respawn keeps the moved place (#27)](#a-respawn-keeps-the-moved-place-27) | In the game | World | Not run | 0.49.0 + REDswap 1.0.0, World objects test 0.2.3, game 2.5 | Awaits its run. Stand-in host: 7 checks (scratchpad `w27/check.mjs`) |
+| [The inventory's preview on its own (#28)](#the-inventorys-preview-on-its-own-28) | In the game | H2b | Not run | 0.49.1 + REDswap 1.0.0, World objects test 0.2.3, game 2.5 | Awaits its run. Stand-in bridge: 7 checks (scratchpad `w28/check.mjs`) |
 | [The world flag and game text (#25, #26)](#the-world-flag-and-game-text-25-26) | In the game, with Claude | EDGEmobile's requests | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop), with one finding: `world` was right at every step, but went off at a load only when the player went, since the `OnDetach` wrap never sent its event; the Console showed the long refusal as `Uncaught:` only. Both fixed in 0.47.1: its [retest](#world-flag-retest-on-0471) **passed** on 2026-10-30 (laptop): `world` went off at the start of each load and at the main menu, 0.3 s before the player went. 0.47.2 moves the event's work off the worker thread it arrives on; a short check rides with the next test |
 | [Tools Manager starts EDGEmat's server (0.45.1)](mcp.md#edgemats-tools-test) | In the game | E1 | 2026-10-30 | 0.47.0 + Admin Tools 0.1.0, game 2.5 | **Pass** (laptop): the EDGEmat group showed its 10 tools in a fresh session, no assistant asked first |
 | [Roles (#20)](services.md#roles-test) | In the game | Services | 2026-10-29 | 0.45.0 + Roles test 0.1.0, Counter service 0.3.0, game 2.5 | **Pass** (dev PC): all eight steps. Mock game: 15 checks |
@@ -863,6 +864,19 @@ Files: `E:\Modding\Cyberpunk 2077\Projects\H2c_swap\v1\zzz_rednode_box.archive` 
 4. In **4. Swap**, paste v1's full path and press **Swap**. Expected: the Mod log says one world entity refreshed (spawned again), and the box stands **where Move put it, turned the same way**, not at its first spot. Mark.
 5. Press **Move** again, then swap v2's full path: a barrel, at the new place and heading. Mark.
 6. Switch **World objects test** off (its spawns go), then quit the game. Remove `zzz_rednode_box.archive` from `archive\pc\mod`.
+
+### The inventory's preview on its own (#28)
+
+Built 2026-10-30 in REDnode 0.49.1 for EDGEmat's [#28](https://github.com/Edgemodders/REDnode/issues/28). After a swap, the inventory's preview of V is refreshed from its own clothing, whatever V's showed; before, with the inventory open and V's clothes in the base slots, nothing was refreshed (docs/world.md, "H2b preview: on its own"). Checked against a stand-in bridge (scratchpad `w28/check.mjs`, 7 checks).
+
+Files: `E:\Gallery\Files\EDGEmat A\EDGEmatA.archive` (V1) and `E:\Gallery\Files\EDGEmat B\EDGEmatA.archive` (V2), the trousers `Items.Pants_01_basic_01`. V must wear them in the base Legs slot: with Equipment-EX installed, its outfit slots must be empty (or Equipment-EX off in EDGEdeck for this run). The Mod log names the slot, so the run shows which was used.
+
+0. Test timer: Start, Mark after each step.
+1. Load a save. In the launcher, open the **Console** and type `addItem("Items.Pants_01_basic_01")`; equip them. Switch on **World objects test** and its **Allowed** switch for swapping archives, and open the **Mod log**. Mark.
+2. Open the inventory, so the preview of V shows the trousers. Keep it open. In the World objects test's **4. Swap**, paste V2's full path and press **Swap** (the overlay stays over the inventory). Expected: the preview shows V2's look **at once**, and the Mod log says `refreshed the inventory's preview of V (AttachmentSlots.Legs)`. Mark.
+3. Close the inventory. Say whether V shows V2's look, or the old one until the trousers are taken off and put on (open question). Mark.
+4. With the inventory closed, swap V1's full path: V shows V1's look. Open the inventory: the preview shows V1 too. Mark.
+5. Switch **World objects test** off, then quit the game. Remove `EDGEmatA.archive` from `archive\pc\mod` if it was not installed before.
 
 ### The world flag and game text (#25, #26)
 

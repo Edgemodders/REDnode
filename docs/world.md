@@ -1203,6 +1203,12 @@ Built on 2026-10-27. After `refreshWorn` resets V's items, `refreshPreview` in m
 **Its check waits for a swap on game 2.5** ([H3](#h3-rednodes-own-hot-loader-plan) or RED Hot Tools): REDnode 0.40.2 runs only on 2.5, and on 2.5 nothing swaps yet. Until then, Refresh test 0.3.0's steps 2 to 4 on 2.5 with 0.40.1 or 0.40.2 show whether 2.5 finds the preview the same way (unverified on 2.5). Then, once RED Hot Tools supports 2.5: swap a worn garment with the inventory open and with it closed, with no button pressed; the preview should show the new version, and the Mod log should say "refreshed the inventory's preview of V".
 
 
+### H2b preview: on its own (#28, REDnode 0.49.1)
+
+Found by EDGEmat's Wardrobe Designer on 2026-10-30 ([#28](https://github.com/Edgemodders/REDnode/issues/28)): with the inventory open and V's clothes in the base slots, V's own items read `empty_appearance_default` (unverified why; the game seems to hide V while the preview shows the clothes), so `refreshWorn` left them out, and `refreshPreview` ran only for the slots refreshed on V: nothing was refreshed. With Equipment-EX the items sit in `OutfitSlots.*` and keep their appearance, which is why H3a's swaps refreshed both.
+
+Since 0.49.1 `refreshPreview` reads the preview's own items in every clothing slot and resets each that shows, with the same rules as V's (`shownItems` in main.js: with Equipment-EX's slots in use the base slots are left out, and `empty_appearance_*` items are skipped), whatever V's showed. Checked against a stand-in bridge (scratchpad `w28/check.mjs`, 7 checks; the issue's case fails on 0.49.0's code). Open: whether V's own items show the new version when the inventory closes after a swap made with it open (the game applies their appearance again then; unverified).
+
 ## H3 REDnode's own hot loader: plan
 
 Asked for by the owner on 2026-10-27: RED Hot Tools has no build for game 2.5 (upstream unchanged since 2026-10-20), so every swap feature (H1 to H2c) is untestable on 2.5. REDnode swaps archives itself, with the game's own functions, and no longer needs RED Hot Tools. This is the fallback agreed on 2026-10-17 ("try RED Hot Tools first and make our own if it gives trouble"). **Agreed with the owner on 2026-10-27**, with the name REDswap and the plugin shipped beside REDnode's; H3a is built ([H3a: built](#h3a-built-rednode-0410)).

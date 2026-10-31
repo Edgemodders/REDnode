@@ -39,7 +39,7 @@ REDswap (`native/redswap/`, since 0.41.0) is a second plugin that swaps archives
 
 ## Expected log after loading a save
 
-`red4ext/logs/red4ext-*.log` should list `REDnode (version: 0.49.0, author(s): Edgemodders) has been loaded`. The plugin's own lines go to its log in `red4ext/plugins/REDnode/` or the RED4ext log:
+`red4ext/logs/red4ext-*.log` should list `REDnode (version: 0.49.1, author(s): Edgemodders) has been loaded`. The plugin's own lines go to its log in `red4ext/plugins/REDnode/` or the RED4ext log:
 
 ```
 REDnode <version> loading
