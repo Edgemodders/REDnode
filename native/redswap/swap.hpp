@@ -32,15 +32,16 @@ struct SwapResult
     uint32_t invalidated = 0; // of those, loaded ones dropped from the resource loader
     uint32_t left = 0;            // resource paths a replaced archive held and the new ones do not
     uint32_t leftInvalidated = 0; // of those, loaded ones dropped from the resource loader
+    uint32_t leftReloaded = 0;    // of those, loaded again at once from where the game finds them now
     bool extensions = false;  // ArchiveXL asked to reload
     std::string error;        // set when nothing could be swapped at all
 };
 
-// Research switches for a swap, passed by the caller as a first entry "?left=keep&probe=on&axl=off".
+// Research switches for a swap, passed by the caller as a first entry "?left=keep&watch=on&axl=off".
 struct SwapOptions
 {
     bool keepLeft = false; // keep what a replaced archive held and the new one does not (1.0.0's way)
-    bool probe = false;    // load each dropped left path at once and log how the load ends
+    bool watch = false;    // log each left path before the drop and watch its next load for 2 s
     bool archiveXL = true; // ask ArchiveXL to reload after the swap
 };
 

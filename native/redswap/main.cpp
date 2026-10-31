@@ -7,8 +7,8 @@
 //   public static native func REDswap_Swap(files: String) -> String
 //
 // REDswap_Swap takes absolute paths separated by "|" (a character Windows paths never hold),
-// optionally after research switches as a first entry, "?left=keep&probe=on&axl=off", and answers JSON: { "done": [{ file, target, how }], "failed": [{ file, why }],
-// "resources", "invalidated", "left", "leftInvalidated", "extensions", "ms", "error"? }. It runs on the game thread.
+// optionally after research switches as a first entry, "?left=keep&watch=on&axl=off", and answers JSON: { "done": [{ file, target, how }], "failed": [{ file, why }],
+// "resources", "invalidated", "left", "leftInvalidated", "leftReloaded", "extensions", "ms", "error"? }. It runs on the game thread.
 
 #include "swap.hpp"
 
@@ -102,10 +102,10 @@ void REDswap_Swap(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, 
         const auto one = text.substr(start, end == std::string::npos ? std::string::npos : end - start);
         if (!one.empty() && one[0] == '?')
         {
-            // Research switches, "?left=keep&probe=on&axl=off" (a path never starts with "?").
+            // Research switches, "?left=keep&watch=on&axl=off" (a path never starts with "?").
             const auto has = [&](const char* aPair) { return ("&" + one.substr(1) + "&").find(std::string("&") + aPair + "&") != std::string::npos; };
             options.keepLeft = has("left=keep");
-            options.probe = has("probe=on");
+            options.watch = has("watch=on");
             options.archiveXL = !has("axl=off");
             g_sdk->logger->InfoF(g_handle, "Options: %s", one.c_str());
         }
@@ -138,7 +138,7 @@ void REDswap_Swap(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, 
     }
     json += "],\"resources\":" + std::to_string(result.resources) + ",\"invalidated\":" +
             std::to_string(result.invalidated) + ",\"left\":" + std::to_string(result.left) +
-            ",\"leftInvalidated\":" + std::to_string(result.leftInvalidated) + ",\"extensions\":" + (result.extensions ? "true" : "false") +
+            ",\"leftInvalidated\":" + std::to_string(result.leftInvalidated) + ",\"leftReloaded\":" + std::to_string(result.leftReloaded) + ",\"extensions\":" + (result.extensions ? "true" : "false") +
             ",\"ms\":" + std::to_string(ms);
     if (!result.error.empty())
     {
@@ -148,9 +148,9 @@ void REDswap_Swap(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, 
     json += "}";
     g_sdk->logger->InfoF(g_handle,
                          "Swap done in %lld ms: %zu swapped, %zu failed, %u resources (%u dropped), %u left by the old "
-                         "archive (%u dropped)",
+                         "archive (%u dropped, %u loaded again)",
                          ms, result.done.size(), result.failed.size(), result.resources, result.invalidated, result.left,
-                         result.leftInvalidated);
+                         result.leftInvalidated, result.leftReloaded);
     ReturnString(aOut, json);
 }
 

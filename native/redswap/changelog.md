@@ -6,11 +6,11 @@ What changed in each release of REDswap, for its Nexus page (mod 36172) and the 
 
 **Fixed**
 
-- Replacing an archive with one that holds fewer files no longer leaves the files it left out cached with the old archive's version (https://github.com/Edgemodders/REDnode/issues/29). REDswap reads the old archive's file table before the new one takes its place and drops those files from the game's loader too, so they load from the game, or another mod, next time; a mod can restore the game's own look by swapping its file out. The log says how many: `... resources (... dropped), N left by the old archive (N dropped)`.
+- Replacing an archive with one that holds fewer files no longer leaves the files it left out cached with the old archive's version (https://github.com/Edgemodders/REDnode/issues/29). REDswap reads the old archive's file table before the new one takes its place and drops those files from the game's loader too, so they load from the game, or another mod, next time; a mod can restore the game's own look by swapping its file out. Those the game still finds in another archive are loaded again at once, so they are ready before anything asks for them. The log says how many: `... resources (... dropped), N left by the old archive (N dropped, N loaded again)`.
 
 **Other**
 
-- Research switches for the restore's crash in its first test: an entry `?left=keep&probe=on&axl=off` before the paths keeps the left-out files (1.0.0's way), loads each dropped one at once to see how the load ends, or skips ArchiveXL's reload. Each swap that drops left-out files logs their state before the drop and watches the game's next load of them for two seconds.
+- Research switches: an entry `?left=keep&watch=on&axl=off` before the paths keeps the left-out files (1.0.0's way), logs each left-out file before the drop and watches its next load for two seconds, or skips ArchiveXL's reload.
 
 ## 1.0.0 (2026-10-27)
 

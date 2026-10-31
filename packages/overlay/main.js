@@ -2297,11 +2297,11 @@ async function swapArchives(caller, params) {
   if (redswap) {
     // REDswap copies each file into the game folder itself and answers what it did.
     let answer = null;
-    // Research switches for REDswap 1.0.2 and later (#29): "swapLeftPaths": "keep",
-    // "swapProbe": "on", "swapArchiveXL": "off" in the settings.
+    // Research switches for REDswap 1.0.3 and later (#29): "swapLeftPaths": "keep",
+    // "swapWatch": "on", "swapArchiveXL": "off" in the settings.
     const switches = [
       settings.swapLeftPaths === 'keep' && 'left=keep',
-      settings.swapProbe === 'on' && 'probe=on',
+      settings.swapWatch === 'on' && 'watch=on',
       settings.swapArchiveXL === 'off' && 'axl=off',
     ].filter(Boolean);
     const list = [...(switches.length ? [`?${switches.join('&')}`] : []), ...files.map((f) => f.file)];
@@ -2314,7 +2314,7 @@ async function swapArchives(caller, params) {
     if (answer?.error) error = answer.error;
     for (const d of answer?.done ?? []) swapDone.set(path.resolve(d.file).toLowerCase(), d);
     for (const d of answer?.failed ?? []) swapFailed.set(path.resolve(d.file).toLowerCase(), d.why);
-    if (answer) log(`Archives: REDswap swapped ${answer.done.length}, failed ${answer.failed.length}; ${answer.resources} resources, ${answer.invalidated} dropped from the loader${answer.left !== undefined ? `; ${answer.left} left by the old archive, ${answer.leftInvalidated} dropped` : ''}; ArchiveXL reload ${answer.extensions ? 'ran' : 'not run'}`);
+    if (answer) log(`Archives: REDswap swapped ${answer.done.length}, failed ${answer.failed.length}; ${answer.resources} resources, ${answer.invalidated} dropped from the loader${answer.left !== undefined ? `; ${answer.left} left by the old archive, ${answer.leftInvalidated} dropped${answer.leftReloaded !== undefined ? `, ${answer.leftReloaded} loaded again` : ''}` : ''}; ArchiveXL reload ${answer.extensions ? 'ran' : 'not run'}`);
   } else {
     // Copied only now, so RED Hot Tools' folder watcher cannot start the swap before the pause
     // and the wait; and under another name first, so it never sees half a file.

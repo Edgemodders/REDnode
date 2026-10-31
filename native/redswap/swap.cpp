@@ -8,7 +8,8 @@
 // resources they hold from the resource loader, so the next request reads the new files.
 // A replaced archive's own paths that the new one no longer holds are dropped too (REDnode
 // #29): read from its file table on disk before the new file takes its place, so a path the
-// new archive leaves out loads from the base game or another mod next time.
+// new archive leaves out loads from the base game or another mod next time; REDswap asks for
+// each such path again at once, so it is loaded before anything wants it.
 //
 // What REDswap adds: it looks every game function up itself and refuses a swap when one is
 // missing (RED4ext's own lookup closes the game), checks the loader's first bytes and the
@@ -47,6 +48,8 @@ namespace
 RED4ext::v1::PluginHandle g_handle = nullptr;
 const RED4ext::v1::Sdk* g_sdk = nullptr;
 std::mutex g_swapLock;
+// The loads of the last swap's left paths, held until the next swap (step 7).
+std::vector<RED4ext::SharedPtr<RED4ext::ResourceToken<>>> g_reloads;
 
 template<typename... Args>
 void Log(const char* aFormat, Args... aArgs)
@@ -277,8 +280,8 @@ void SetLogger(RED4ext::v1::PluginHandle aHandle, const RED4ext::v1::Sdk* aSdk)
 }
 
 // Diagnostics for the paths a replaced archive left (#29; the restore swap crashed in its first
-// test): their tokens before the drop, and the game's next load of them, watched from a thread
-// of REDswap's own for two seconds.
+// test), with watch=on: their tokens before the drop, and the game's next load of them, watched
+// from a thread of REDswap's own for two seconds.
 constexpr uint32_t LoadByPathHash = 1250309504; // RED4ext.SDK's ResourceLoader_IssueLoadingRequestByPath
 using LoadByPath_t = uintptr_t (*)(RED4ext::ResourceLoader*, RED4ext::SharedPtr<RED4ext::ResourceToken<>>&,
                                    RED4ext::ResourcePath);
@@ -327,7 +330,7 @@ void WatchLeft(std::vector<uint64_t> aPaths, std::vector<RED4ext::SharedPtr<RED4
             {
                 auto state = TokenState(probes[i].instance, probes[i].refCount);
                 if (state != lastProbe[i])
-                    Log("  %d ms: left %llu, REDswap's probe: %s", at, probes[i].instance ? probes[i].instance->path.hash : 0ull, state.c_str());
+                    Log("  %d ms: left %llu, REDswap's load: %s", at, probes[i].instance ? probes[i].instance->path.hash : 0ull, state.c_str());
                 lastProbe[i] = std::move(state);
             }
             std::shared_lock lock(loader->tokenLock);
@@ -595,10 +598,9 @@ SwapResult Swap(const std::vector<std::filesystem::path>& aFiles, const SwapOpti
     result.left = static_cast<uint32_t>(left.size());
     auto* loader = RED4ext::ResourceLoader::Get();
 
-    // Before anything is dropped: each left path's token, the mod archive that holds it now, and
-    // whether the depot finds it (#29's diagnostics).
-    std::vector<uint64_t> leftDropped;
-    if (!left.empty())
+    // watch=on: before anything is dropped, each left path's token, the mod archive that holds
+    // it now, and whether the depot finds it (#29's diagnostics).
+    if (aOptions.watch && !left.empty())
     {
         std::unordered_map<uint64_t, std::string> holder;
         for (auto* group : groups)
@@ -624,6 +626,7 @@ SwapResult Swap(const std::vector<std::filesystem::path>& aFiles, const SwapOpti
     if (aOptions.keepLeft)
         left.clear();
 
+    std::vector<uint64_t> leftDropped;
     if (loaded.size() || left.size())
     {
         std::unique_lock tokens(loader->tokenLock);
@@ -658,27 +661,32 @@ SwapResult Swap(const std::vector<std::filesystem::path>& aFiles, const SwapOpti
         }
     }
 
-    // probe=on: load each dropped left path now, to see whether the load itself ends well.
-    std::vector<RED4ext::SharedPtr<RED4ext::ResourceToken<>>> probes;
-    if (aOptions.probe && !leftDropped.empty())
-    {
-        if (const auto load = reinterpret_cast<LoadByPath_t>(ResolveQuiet(LoadByPathHash)))
-        {
-            for (const auto hash : leftDropped)
-            {
-                RED4ext::SharedPtr<RED4ext::ResourceToken<>> token;
-                load(loader, token, RED4ext::ResourcePath(hash));
-                probes.push_back(token);
-            }
-            Log("Probe: asked the loader for %zu dropped left path(s)", probes.size());
-        }
-        else
-        {
-            LogError("Probe: the loader's request function is not in RED4ext's address list");
-        }
-    }
+    // 7. Load each dropped left path again at once, from wherever the game now finds it, so it is
+    //    ready before anything asks for it. Without this the game's own next request came about
+    //    0.4 s after a swap, when the host refreshes what V wears, and one swap in three runs
+    //    crashed in ArchiveXL's garment code on the mesh that was still loading (#29). A path no
+    //    archive holds any more is not asked for: nothing can load it.
+    std::vector<RED4ext::SharedPtr<RED4ext::ResourceToken<>>> reloads;
     if (!leftDropped.empty())
-        WatchLeft(leftDropped, std::move(probes));
+    {
+        const auto load = reinterpret_cast<LoadByPath_t>(ResolveQuiet(LoadByPathHash));
+        if (!load)
+            LogError("The loader's request function is not in RED4ext's address list; left paths load when the game asks");
+        for (const auto hash : leftDropped)
+        {
+            if (!load || !depot->ResourceExists(RED4ext::ResourcePath(hash)))
+                continue;
+            RED4ext::SharedPtr<RED4ext::ResourceToken<>> token;
+            load(loader, token, RED4ext::ResourcePath(hash));
+            if (token.instance)
+                reloads.push_back(token);
+        }
+        result.leftReloaded = static_cast<uint32_t>(reloads.size());
+    }
+    if (aOptions.watch && !leftDropped.empty())
+        WatchLeft(leftDropped, reloads);
+    // Held until the next swap, so a load is not let go of before the game takes it.
+    g_reloads = std::move(reloads);
 
     if (!result.done.empty() && aOptions.archiveXL)
         ReloadArchiveXL(result);
