@@ -565,7 +565,7 @@ The bindings cost 0.10 to 0.19 ms a frame in this run (5 bindings, 4 sources).
 
 ## UI Tools: plan
 
-Asked for by the owner on 2026-10-29: carry native UI on to where modders build ink widgets and screens from REDnode's own HTML-style tags, plus a **UI Workbench** app to inspect the game's UI, write ink, run it live and save it. Everything below is *proposed*, to agree with the owner.
+Asked for by the owner on 2026-10-29: carry native UI on to where modders build ink widgets and screens from REDnode's own HTML-style tags, plus a **UI Workbench** app to inspect the game's UI, write ink, run it live and save it. **Agreed with the owner on 2026-11-01**, with every recommendation under Open questions: UT1 first, then UT2 and UT3, then I3 and UT4.
 
 **UI Tools** is an optional app pack, like Sound Tools and Admin Tools. Its source lives in this repo in `packs/ui-tools/`, outside the REDnode build, with its own zip, version, changelog and Nexus page, and it installs into `red4ext/plugins/REDnode/apps/`. The **UI Workbench** is its first app, and more can join it. What the apps need from the game (reading trees, picking, the markup) goes into REDnode itself, so any mod can use it.
 
