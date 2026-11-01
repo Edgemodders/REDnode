@@ -663,3 +663,32 @@ A tool window with three tabs. It has the `admin` permission, like the Admin Too
 | Is Try on game widgets worth having? | Yes, but only the few properties above, and only for `admin` packages |
 | The code editor: CodeMirror 6 or Monaco | CodeMirror 6: it is smaller, and it should work in an offscreen window. Monaco's workers there are unverified |
 
+## UT1: build (REDnode 0.51.0)
+
+Built 2026-11-01. Ink markup is in the `rednode` package; the plugin is unchanged, since markup builds the same nodes as the tag functions.
+
+| Part | Where |
+|---|---|
+| The reader: tags, attributes and text with their line and column, entities, comments, `InkMarkupError` | `packages/rednode/src/inkmarkup.ts` (no Node imports, so the docs simulation runs it) |
+| The tags and attributes, checked when read; the template, the view, `set()` | `packages/rednode/src/ink.ts`: `compileMarkup`, `buildMarkup`, `markupView` |
+| `ink.parse(source, handlers?, data?)` and `ink.load(file, handlers?, data?)`, both answering an `InkView` (`mounts`, `data`, `get`, `set`, `unmount`) | `ink.ts`; `load` reads from the package's folder (`rednode.package`'s `dir`), or in the docs simulation over HTTP (`rednode.readFile`) |
+| The **Ink markup** sample: `board.ink.html` and `mod.mjs` | `packages/overlay/apps/ink-markup`, also in the player zip |
+| Previews of markup | `tools/examples/build.mjs` compiles `inkmarkup.ts` with the ink module and copies `.ink.html` files as they are; the simulation's worker reads them |
+
+**What the markup takes.** The top holds `<mount>` tags (`layer`, `anchor`, `x`, `y`, written as they are). Inside: `canvas`, `column`, `row` (`vbox` and `hbox` too), `text`, `rect`, `circle`, `image`, `bar`, `list`, and `widget class="..."` with capitalized attributes as the widget's methods. Attributes are the props by name, kebab names as camel (`text-align`). Each is checked when read: an unknown tag or attribute, a style, tone, anchor or align not in the table, a number that is not one, a tag left open or closed by the wrong name, text outside `<text>`, all refused with the file, line and column. `{name}` reads named data, `{name.field}` a field, `{{` and `}}` are the characters; an attribute that is one `{name}` alone takes the value as it is. In a `<list items="contracts" key="id">`, `{name}` reads the item's field first, then the outer data; `{.}` is the item and `{$index}` its place. `on<event>="name"` must name a function of the handlers given; no event fires until I3.
+
+**How `set()` sends little.** The view keeps, for each node, the props that read data. `set(data)` sends again only the props that read a changed name, and a list whose items, or whose item tag, read one: the list compares items by key, as `ink.list` does.
+
+**Checked** without the game: a stand-in transport (scratchpad `ut1/check.mjs`, 46 checks: the batches for a panel and a list, `set()` sending one text for one changed name and nothing for data nobody reads, data in attributes, `{.}` and `{$index}`, events checked against the handlers, 19 kinds of mistake with their places, `ink.load` from a package folder); the docs preview (the panel drawn, Add, Broken markup's error); and the mock game (scratchpad `ut1/mockcheck.mjs`: the sample loads `board.ink.html` from its own folder in 4.2 ms and the mock plugin gets the batches).
+
+## UT1 test
+
+0. Test timer: Start, Mark after each step.
+1. Load a save. In the launcher, switch on **Ink markup** (no permission switch: it uses only `ink`). Close the overlay (F10): at the HUD's left, a panel titled **CONTRACTS**, a health bar with V's health beside it, `3 contracts, 9000 €$ in all`, and three rows: `#1 Watson 4000 €$`, `#2 Kabuki 3000 €$`, `#3 Japantown 2000 €$`. Its window's log says `Show: board.ink.html loaded in ... ms`. Mark.
+2. Open the overlay, press **Add**, **Rename first** and **Next title**, and close it: a fourth row `#4 Heywood 1000 €$`, the first row reads `Watson prime`, the count `4 contracts, 10000 €$ in all`, and the title **BOUNTY BOARD**. Take some damage: the bar and the number follow. Mark.
+3. Press **Remove first**: Watson's row goes and the others move up. Mark.
+4. Press **Broken markup**: the log says `Broken markup refused: ink markup:3:11: style: "huge" is not one of: title, subtitle, ...`, and the HUD does not change. Mark.
+5. In the launcher's **Settings**, switch on **Hot reload**. In the game folder, open `red4ext\plugins\REDnode\apps\ink-markup\board.ink.html` in a text editor, change the title's `style="label"` to `style="heading"`, and save. The mod restarts, and the panel comes back with a bigger title (the data starts again from three contracts). Change it back and save. Mark.
+6. Save the file once with a mistake: the title's `style="label"` (line 7) spelled `style="lable"`. The log says `Show failed: board.ink.html:7:11: style: "lable" is not one of: title, subtitle, ...` and no panel shows. Put it back and save: the panel is back. Mark.
+7. Switch the Ink markup off, switch **Hot reload** back off if you had it off, and quit. Claude reads the logs: the plugin's `Ink: ink-markup:` lines, one batch per change.
+

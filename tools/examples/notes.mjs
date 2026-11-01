@@ -73,6 +73,18 @@ export const NOTES = {
     tryThis: ['Press Show, then Add at top, Last to top and Rename second.', 'Press Update header a few times.'],
     preview: 'The box stands for the game\'s screen; the Mod log shows each change.',
   },
+  'ink-markup': {
+    group: 'tests',
+    summary: 'A HUD panel written as ink markup: REDnode\'s ink tags as HTML in board.ink.html, with a health bar and a list of contracts, loaded with ink.load and changed with set().',
+    teaches: ['ink.load', '.ink.html', '{name} data', 'view.set', 'InkMarkupError'],
+    how: [
+      '`board.ink.html` holds the same tags as the `ink` functions, written as HTML: `<column gap="10">`, `<text style="label">{title}</text>`, `<list items="contracts" key="id">` with the one tag each item gets. Attributes are the props by name.',
+      '`ink.load(file, handlers, data)` reads the file from the package\'s folder and mounts it. `{name}` reads the named data, and inside a list the item\'s own fields. `view.set(data)` sends only the props and list items that read what changed.',
+      'A mistake in markup throws an `InkMarkupError` with its file, line and column, before anything reaches the game: press Broken markup.',
+    ],
+    tryThis: ['Press Add, Rename first and Next title.', 'Press Broken markup and read the error in the log.'],
+    preview: 'The box stands for the game\'s screen; the Mod log shows each change.',
+  },
   'ink-styles': {
     group: 'tests',
     summary: 'A gallery of the ink API\'s layout and look words on the HUD: every text style and tone, the plain and the game look, align, grow, gap, pad and icons, with buttons that change them live.',

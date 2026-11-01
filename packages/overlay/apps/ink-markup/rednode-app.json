@@ -1,0 +1,12 @@
+{
+  "id": "ink-markup",
+  "name": "Ink markup",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "The test of ink markup (UI Tools, phase UT1): a HUD panel written as REDnode's ink tags in HTML (board.ink.html), loaded with ink.load, with a list of contracts and a health bar; buttons change its data, so only what changed goes to the game. Needs Codeware.",
+  "main": "mod.mjs",
+  "open": false,
+  "requires": {
+    "codeware": ">=1.16"
+  }
+}

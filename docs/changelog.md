@@ -11,6 +11,11 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- Ink markup: a native HUD panel can be written as an `.ink.html` file, with REDnode's ink tags as HTML (`<column gap="10">`, `<text style="label">{title}</text>`, `<list items="contracts" key="id">`), and put on the game's UI with `ink.load("board.ink.html", handlers, data)` or `ink.parse(source)`. `{name}` reads named data and a list item's fields; `view.set(data)` sends only what reads the changed data. A mistake is refused with its file, line and column. The first step of UI Tools. See https://edgemodders.github.io/REDnode/ink.html#ut1-build-rednode-0510
+- A sample, **Ink markup**: a HUD panel with a health bar and a list of contracts from `board.ink.html`. Also in the player zip.
+
 ## 0.50.2 (2026-11-01)
 
 **New**

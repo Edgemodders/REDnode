@@ -1,0 +1,22 @@
+<!-- The Ink markup sample's HUD panel (UI Tools, phase UT1): REDnode's ink tags written as
+     HTML. mod.mjs loads it with ink.load and changes its data with set(); {name} reads the
+     data, and inside the list a contract's own fields. With hot reload on, saving this file
+     restarts the mod and the panel shows the change. -->
+<mount layer="hud" anchor="left" x="80" y="-60">
+  <column gap="10" id="board">
+    <text style="label">{title}</text>
+    <row gap="12" align="center">
+      <text style="small" tone="dim">Health</text>
+      <bar bind="player.health" of="player.healthMax" width="220" height="6" />
+      <text style="small" tone="accent" bind="player.health" format="{{value}}" />
+    </row>
+    <text style="small" tone="dim">{count} contracts, {total} &#8364;$ in all</text>
+    <list items="contracts" key="id" gap="6">
+      <row gap="16" align="center">
+        <text style="small" tone="dim">#{id}</text>
+        <text style="body">{name}</text>
+        <text style="value">{reward} &#8364;$</text>
+      </row>
+    </list>
+  </column>
+</mount>

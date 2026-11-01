@@ -37,12 +37,12 @@ export type { PackageInfo, KernelMcp, KernelBridge, Requirement, AskSharedOption
 export { tweakdb } from "./tweakdb.js";
 export type { TweakId, Flat, RecordTypeName } from "./tweakdb.js";
 export { audio } from "./audio.js";
-export { ink } from "./ink.js";
+export { ink, InkMarkupError } from "./ink.js";
 export { quests, journal } from "./quests.js";
 export type { FactChange, JournalState, JournalEntry, JournalKind } from "./quests.js";
 export { t, LocalText, languageTag, loc } from "./i18n.js";
 export type { Language, TextParams, Loc } from "./i18n.js";
-export type { InkAnchor, InkColor, InkTone, InkTextStyle, InkAlign, InkSource, InkProps, InkTextProps, InkContainerProps, InkImageProps, InkBarProps, InkListProps, InkNode, InkMount, InkMountOptions } from "./ink.js";
+export type { InkAnchor, InkColor, InkTone, InkTextStyle, InkAlign, InkSource, InkProps, InkTextProps, InkContainerProps, InkImageProps, InkBarProps, InkListProps, InkNode, InkMount, InkMountOptions, InkView } from "./ink.js";
 export { archives } from "./archives.js";
 export { admin } from "./admin.js";
 export type { TaskRow, TaskList, ToolInfo, ToolGroup, ToolList } from "./admin.js";

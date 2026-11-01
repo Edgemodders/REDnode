@@ -313,7 +313,13 @@ globalThis[Symbol.for('rednode.transport')] = {
   listen: () => () => {},
   state: async () => ({}),
 };
-export { ink } from '../../../examples/sdk/ink.js';
+// ink.load reads a preview's markup files over HTTP, beside its mod.js.
+globalThis[Symbol.for('rednode.readFile')] = async (file) => {
+  const r = await fetch(new URL(file, self.name));
+  if (!r.ok) throw new Error(`ink: no ${file} in this preview`);
+  return r.text();
+};
+export { ink, InkMarkupError } from '../../../examples/sdk/ink.js';
 export { t, LocalText, languageTag } from '../../../examples/sdk/i18n.js';
 import { currentLanguage, startText } from '../../../examples/sdk/i18n.js';
 

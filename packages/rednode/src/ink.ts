@@ -11,8 +11,11 @@
  * **Needs Codeware** (decided after phase I1). A package that uses `ink` lists
  * `"codeware"` in its `requires`.
  *
- * **Status:** phase I2a: the `hud` layer, containers, text, shapes and images. Layout
- * and theme words, the game's look, bindings, menus and events come in later phases
+ * A tree can also be written as **ink markup**, an `.ink.html` file with the same tags as
+ * HTML ({@link ink.load}, {@link ink.parse}; UI Tools, phase UT1).
+ *
+ * **Status:** the `hud` layer: containers, text, shapes, images, bars and lists, the game's
+ * look, game values bound in the plugin, and markup. Input and menus come in later phases
  * (see the Native game UI page).
  *
  * @module
@@ -20,6 +23,9 @@
 
 import { LocalText, onTextChange } from "./i18n.js";
 import { cleanError, transport } from "./transport.js";
+import { InkMarkupError, readMarkup, type MarkupElement, type MarkupPlace } from "./inkmarkup.js";
+
+export { InkMarkupError } from "./inkmarkup.js";
 
 /** Where a node sits in a canvas (a mount or `ink.canvas`); `x` and `y` move it from there. */
 export type InkAnchor =
@@ -826,6 +832,449 @@ function makeList<T>(
   });
 }
 
+// ---------- ink markup (UT1) ----------
+// An .ink.html file's tags are the tag functions' names, their attributes the props. The
+// markup is read once into a template; a view builds the template's nodes with the tag
+// functions, then follows the named data: set() sends only the props that read what changed.
+
+/**
+ * A tree written as ink markup and put on the game's UI, from {@link ink.parse} or
+ * {@link ink.load}.
+ */
+export interface InkView {
+  /** The mounts its `<mount>` tags made, in order. */
+  readonly mounts: readonly InkMount[];
+  /** The named data the markup reads (`{name}`), as now. */
+  readonly data: Readonly<Record<string, unknown>>;
+  /** A node by its `id`, in any of its mounts. */
+  get(id: string): InkNode | undefined;
+  /**
+   * Changes some named data. Only the props and lists that read a changed name are sent again,
+   * and a list sends only the items that changed.
+   *
+   * @example
+   * ```ts
+   * board.set({ contracts: await fetchContracts() });
+   * ```
+   */
+  set(data: Record<string, unknown>): void;
+  /** Removes its mounts from the game. REDnode also removes them when the mod stops. */
+  unmount(): void;
+}
+
+// "json": a <widget> method's value, read as JSON when it looks like JSON (numbers, arrays).
+// "data": a list's items, taken as they are.
+type Kind = "number" | "boolean" | "sides" | "string" | "of" | "json" | "data" | readonly string[];
+
+const SOURCES: readonly InkSource[] = [
+  "player.health", "player.healthMax", "player.stamina", "player.memory", "player.money", "player.level",
+  "player.streetCred", "player.x", "player.y", "player.z", "game.hour", "game.minute",
+];
+const KINDS: Record<string, Kind> = {
+  id: "string", look: ["game", "plain"], tone: Object.keys(TONES), align: ["left", "center", "right", "top", "bottom", "fill"],
+  grow: "number", anchor: Object.keys(ANCHORS), x: "number", y: "number", width: "number", height: "number",
+  margin: "sides", color: "string", opacity: "number", visible: "boolean",
+  gap: "number", pad: "sides",
+  text: "string", key: "string", bind: SOURCES, format: "string", decimals: "number", style: Object.keys(TEXT_STYLES),
+  size: "number", font: "string", weight: "string", case: ["upper", "lower", "original"], textAlign: ["left", "center", "right"],
+  atlas: "string", part: "string", icon: "string",
+  value: "number", of: "of", track: Object.keys(TONES),
+  direction: ["column", "row"], items: "data",
+  layer: ["hud"], class: "string",
+};
+const BASE_ATTRS = ["id", "look", "tone", "align", "grow", "anchor", "x", "y", "width", "height", "margin", "color", "opacity", "visible"];
+const PANEL_ATTRS = [...BASE_ATTRS, "gap", "pad"];
+// What each tag takes, and what may go inside it.
+const MARKUP_TAGS: Record<string, { attrs: string[]; inside: "nodes" | "text" | "none" | "item" }> = {
+  mount: { attrs: ["layer", "anchor", "x", "y"], inside: "nodes" },
+  canvas: { attrs: PANEL_ATTRS, inside: "nodes" },
+  column: { attrs: PANEL_ATTRS, inside: "nodes" },
+  row: { attrs: PANEL_ATTRS, inside: "nodes" },
+  text: { attrs: [...BASE_ATTRS, "text", "key", "bind", "format", "decimals", "style", "size", "font", "weight", "case", "textAlign"], inside: "text" },
+  rect: { attrs: BASE_ATTRS, inside: "none" },
+  circle: { attrs: BASE_ATTRS, inside: "none" },
+  image: { attrs: [...BASE_ATTRS, "atlas", "part", "icon"], inside: "none" },
+  bar: { attrs: [...BASE_ATTRS, "value", "bind", "of", "track"], inside: "none" },
+  list: { attrs: [...PANEL_ATTRS, "direction", "items", "key"], inside: "item" },
+  widget: { attrs: [...BASE_ATTRS, "class"], inside: "nodes" },
+};
+const ALIASES: Record<string, string> = { vbox: "column", hbox: "row" };
+
+/** A value as written: plain, or with `{name}` parts read from the data. */
+type Part = string | { path: string };
+interface Value {
+  parts: Part[];
+  /** The value is one `{name}` alone: it takes the data's value as it is, not as text. */
+  whole: boolean;
+  names: string[];
+  place: MarkupPlace;
+}
+
+interface Template {
+  tag: string;
+  place: MarkupPlace;
+  props: Record<string, Value>;
+  kinds: Record<string, Kind>;
+  children: Template[];
+  /** For `list`: the one node each item gets. */
+  item?: Template;
+  /** For `widget`: the ink class. */
+  className?: string;
+  events: { event: string; name: string; place: MarkupPlace }[];
+  /** Every data name it, or anything inside it, reads. */
+  names: Set<string>;
+}
+
+const PATH = /^(\.|\$index|[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*)$/;
+
+function camel(name: string): string {
+  return name.replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase());
+}
+
+function splitValue(text: string, place: MarkupPlace, fail: (reason: string, at: MarkupPlace) => never): Value {
+  const parts: Part[] = [];
+  const names: string[] = [];
+  let i = 0;
+  let lit = "";
+  while (i < text.length) {
+    if (text.startsWith("{{", i) || text.startsWith("}}", i)) {
+      lit += text[i];
+      i += 2;
+      continue;
+    }
+    if (text[i] === "}") fail('a "}" with no "{": write }} for the character', place);
+    if (text[i] !== "{") {
+      lit += text[i++];
+      continue;
+    }
+    const end = text.indexOf("}", i);
+    if (end < 0) fail(`"${text.slice(i, i + 20)}" is not closed with }`, place);
+    const path = text.slice(i + 1, end).trim();
+    if (!PATH.test(path)) fail(`{${path}} is not a data name: write {name}, {name.field}, {.} or {$index} (no expressions)`, place);
+    if (lit) parts.push(lit);
+    lit = "";
+    parts.push({ path });
+    if (path !== "." && path !== "$index") names.push(path.split(".")[0]);
+    i = end + 1;
+  }
+  if (lit) parts.push(lit);
+  return { parts, whole: parts.length === 1 && typeof parts[0] !== "string", names, place };
+}
+
+// One attribute's text as its prop's type, or a reason it is not.
+function convert(kind: Kind, value: unknown): { ok: true; value: unknown } | { ok: false; reason: string } {
+  if (value === undefined || value === null) return { ok: true, value: undefined };
+  if (Array.isArray(kind)) {
+    const s = String(value);
+    return kind.includes(s) ? { ok: true, value: s } : { ok: false, reason: `"${s}" is not one of: ${kind.join(", ")}` };
+  }
+  switch (kind) {
+    case "data":
+      return { ok: true, value };
+    case "number": {
+      const n = typeof value === "number" ? value : Number(String(value).trim());
+      return Number.isFinite(n) && String(value).trim() !== "" ? { ok: true, value: n } : { ok: false, reason: `"${value}" is not a number` };
+    }
+    case "boolean":
+      if (typeof value === "boolean") return { ok: true, value };
+      if (value === "true" || value === "") return { ok: true, value: true };
+      if (value === "false") return { ok: true, value: false };
+      return { ok: false, reason: `"${value}" is not true or false` };
+    case "sides": {
+      if (typeof value === "number") return { ok: true, value };
+      if (Array.isArray(value) && value.length === 4 && value.every((v) => typeof v === "number")) return { ok: true, value };
+      const nums = String(value).trim().split(/[\s,]+/).map(Number);
+      if (nums.every(Number.isFinite) && nums.length === 1) return { ok: true, value: nums[0] };
+      if (nums.every(Number.isFinite) && nums.length === 4) return { ok: true, value: nums };
+      return { ok: false, reason: `"${value}" is not one number or four (left top right bottom)` };
+    }
+    case "of": {
+      const n = typeof value === "number" ? value : Number(String(value).trim());
+      if (Number.isFinite(n)) return { ok: true, value: n };
+      return (SOURCES as readonly string[]).includes(String(value))
+        ? { ok: true, value: String(value) }
+        : { ok: false, reason: `"${value}" is not a number or a game value (${SOURCES.join(", ")})` };
+    }
+    default:
+      return { ok: true, value: typeof value === "string" ? value : String(value) };
+  }
+}
+
+function compileMarkup(source: string, handlers: Record<string, unknown> | undefined, file?: string): Template[] {
+  function fail(reason: string, at: MarkupPlace): never {
+    throw new InkMarkupError(reason, at.line, at.column, file);
+  }
+  const tagNames = Object.keys(MARKUP_TAGS).filter((t) => t !== "mount");
+
+  const compile = (el: MarkupElement, parentTag: string): Template => {
+    const tag = ALIASES[el.tag] ?? el.tag;
+    const spec = MARKUP_TAGS[tag];
+    if (!spec) fail(`<${el.tag}> is not an ink tag: use ${tagNames.join(", ")}`, el);
+    if (tag === "mount" && parentTag !== "") fail("<mount> goes at the top of the file, not inside another tag", el);
+    const t: Template = { tag, place: el, props: {}, kinds: {}, children: [], events: [], names: new Set() };
+    for (const a of el.attributes) {
+      const name = camel(a.name);
+      if (/^on[A-Za-z]/.test(a.name)) {
+        if (tag === "mount") fail(`<mount> takes no events`, a);
+        if (a.value === true || !/^[A-Za-z_$][\w$]*$/.test(a.value)) fail(`${a.name} names a function of the handlers: ${a.name}="name"`, a);
+        if (!handlers) fail(`${a.name}="${a.value}" needs handlers: pass the module or object with that function to ink.parse or ink.load`, a);
+        if (typeof handlers[a.value] !== "function") {
+          const offered = Object.keys(handlers).filter((k) => typeof handlers[k] === "function");
+          fail(`${a.name}="${a.value}": the handlers have no function ${a.value}${offered.length ? ` (they have: ${offered.join(", ")})` : ""}`, a);
+        }
+        t.events.push({ event: a.name.slice(2).toLowerCase(), name: a.value, place: a });
+        continue;
+      }
+      const capital = /^[A-Z]/.test(a.name);
+      if (capital && tag !== "widget") fail(`${a.name}: a method call is for <widget> only`, a);
+      if (!capital && !spec.attrs.includes(name)) fail(`<${el.tag}> takes no ${a.name}: it takes ${spec.attrs.join(", ")}`, a);
+      if (tag === "widget" && name === "class") {
+        if (typeof a.value !== "string" || !a.value) fail('class names the ink class: class="inkBorder"', a);
+        t.className = a.value;
+        continue;
+      }
+      const kind: Kind = capital ? "string" : KINDS[name];
+      if (a.value === true) {
+        if (kind !== "boolean") fail(`${a.name} needs a value: ${a.name}="..."`, a);
+        t.props[name] = { parts: ["true"], whole: false, names: [], place: a };
+        t.kinds[name] = kind;
+        continue;
+      }
+      // items names the list's data: items="contracts", or items="{contracts}".
+      const text = tag === "list" && name === "items" && !a.value.includes("{") ? `{${a.value}}` : a.value;
+      const v = splitValue(text, a, fail);
+      if (tag === "list" && name === "key") {
+        if (!PATH.test(a.value) || a.value.includes("{")) fail('key names the field each item is known by: key="id"', a);
+        v.parts = [a.value];
+        v.names = [];
+      }
+      if ((tag === "mount" || (tag === "list" && name === "direction")) && v.names.length) fail(`${a.name} takes no data: write it as it is`, a);
+      if (tag === "list" && name === "items" && !v.whole) fail('items names one piece of data: items="contracts"', a);
+      if (!v.names.length && !v.parts.some((p) => typeof p !== "string")) {
+        // Written as it is: checked now.
+        const c = convert(kind, v.parts.join(""));
+        if (!c.ok) fail(`${a.name}: ${c.reason}`, a);
+      }
+      t.props[name] = v;
+      t.kinds[name] = capital && JSON_LIKE.test(v.parts.join("")) ? "json" : kind;
+      for (const n of v.names) t.names.add(n);
+    }
+    const elements = el.children.filter((c): c is MarkupElement => c.type === "element");
+    const text = el.children.filter((c) => c.type === "text").map((c) => (c as { text: string }).text).join("");
+    if (spec.inside === "text") {
+      if (elements.length) fail(`<text> holds text only, not <${elements[0].tag}>`, elements[0]);
+      const content = text.replace(/\s+/g, " ").trim();
+      if (content) {
+        if (t.props.text) fail("<text> has its text twice: as text= and inside the tag", el);
+        const v = splitValue(content, el.children.find((c) => c.type === "text") as MarkupPlace, fail);
+        t.props.text = v;
+        t.kinds.text = "string";
+        for (const n of v.names) t.names.add(n);
+      }
+    } else {
+      if (text.trim()) {
+        const where = el.children.find((c) => c.type === "text" && c.text.trim()) as MarkupPlace;
+        fail(`text inside <${el.tag}> goes in a <text> tag: <text>${text.trim().slice(0, 30)}</text>`, where);
+      }
+      if (spec.inside === "none" && elements.length) fail(`<${el.tag}> holds nothing: write <${el.tag} ... />`, elements[0]);
+      if (spec.inside === "item") {
+        if (elements.length !== 1) fail(`<list> holds the one tag each item gets (found ${elements.length}): wrap them in a <row> or <column>`, el);
+        if (!t.props.items) fail('<list> needs items: items="contracts"', el);
+        t.item = compile(elements[0], tag);
+        for (const n of t.item.names) t.names.add(n);
+      } else {
+        t.children = elements.map((c) => compile(c, tag));
+        for (const c of t.children) for (const n of c.names) t.names.add(n);
+      }
+    }
+    if (tag === "widget" && !t.className) fail('<widget> needs class="..." naming the ink class', el);
+    return t;
+  };
+
+  const roots = readMarkup(source, file);
+  const out: Template[] = [];
+  for (const c of roots) {
+    if (c.type === "text") {
+      if (c.text.trim()) fail("text goes inside a <mount>", c);
+      continue;
+    }
+    if (c.tag !== "mount") fail(`the top of the file holds <mount> tags, not <${c.tag}>: <mount layer="hud" anchor="top-right">...</mount>`, c);
+    out.push(compile(c, ""));
+  }
+  if (!out.length) fail('no <mount> in the markup: <mount layer="hud">...</mount>', { line: 1, column: 1 });
+  return out;
+}
+
+const JSON_LIKE = /^\s*(\[.*\]|\{.*\}|-?\d+(\.\d+)?|true|false)\s*$/s;
+
+interface Scope {
+  data: Record<string, unknown>;
+  item?: unknown;
+  index?: number;
+  parent?: Scope;
+}
+
+function lookup(path: string, scope: Scope): unknown {
+  if (path === ".") return scope.item;
+  if (path === "$index") return scope.index;
+  const [head, ...rest] = path.split(".");
+  let base: unknown;
+  for (let s: Scope | undefined = scope; s; s = s.parent) {
+    if (s.item !== null && typeof s.item === "object" && head in (s.item as object)) {
+      base = (s.item as Record<string, unknown>)[head];
+      break;
+    }
+    if (!s.parent) base = s.data[head];
+  }
+  return rest.reduce<unknown>((v, k) => (v === null || v === undefined ? undefined : (v as Record<string, unknown>)[k]), base);
+}
+
+function evaluate(t: Template, name: string, scope: Scope, file?: string): unknown {
+  const v = t.props[name];
+  const kind = t.kinds[name];
+  let raw: unknown;
+  if (v.whole) raw = lookup((v.parts[0] as { path: string }).path, scope);
+  else {
+    raw = v.parts.map((p) => (typeof p === "string" ? p : (lookup(p.path, scope) ?? ""))).join("");
+  }
+  if (kind === "json") {
+    try {
+      return typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch {
+      return raw;
+    }
+  }
+  const c = convert(kind, raw);
+  if (!c.ok) throw new InkMarkupError(`${name}: ${c.reason} (from the data)`, v.place.line, v.place.column, file);
+  return c.value;
+}
+
+interface Follow {
+  node: InkNode;
+  template: Template;
+  scope: Scope;
+  /** The props it reads data for, or "items" for a list. */
+  props: string[];
+}
+
+function buildMarkup(t: Template, scope: Scope, follows: Follow[] | null, file?: string): InkNode {
+  const props: Record<string, unknown> = {};
+  for (const name of Object.keys(t.props)) {
+    if (t.tag === "list" && (name === "items" || name === "key")) continue;
+    const value = evaluate(t, name, scope, file);
+    if (value !== undefined) props[name] = value;
+  }
+  const children = () => t.children.map((c) => buildMarkup(c, scope, follows, file));
+  let node: InkNode;
+  switch (t.tag) {
+    case "text": {
+      const { text, ...rest } = props as InkTextProps;
+      node = ink.text(text ?? "", rest);
+      break;
+    }
+    case "canvas":
+    case "column":
+    case "row":
+      node = container(t.tag, [props as InkContainerProps, ...children()]);
+      break;
+    case "rect":
+    case "circle":
+    case "image":
+      node = make(t.tag, props as InkProps);
+      break;
+    case "bar":
+      node = makeBar(props as InkBarProps);
+      break;
+    case "widget":
+      node = make(t.className!, props as InkProps, children());
+      break;
+    case "list": {
+      const keyField = t.props.key ? (t.props.key.parts[0] as string) : undefined;
+      const items = evaluate(t, "items", scope, file);
+      if (items !== undefined && !Array.isArray(items)) {
+        const v = t.props.items;
+        throw new InkMarkupError(`items: the data's ${(v.parts[0] as { path: string }).path} is not an array`, v.place.line, v.place.column, file);
+      }
+      node = makeList<unknown>(
+        { ...(props as InkListProps<unknown>), items: (items as unknown[] | undefined) ?? [] },
+        (item, index) => buildMarkup(t.item!, { data: scope.data, item, index, parent: scope }, null, file),
+        keyField ? (item, index) => (lookup(keyField, { data: {}, item, index }) as string | number) ?? index : (_item, index) => index,
+      );
+      break;
+    }
+    default:
+      throw new Error(`ink: no tag ${t.tag}`);
+  }
+  if (follows) {
+    const read = Object.keys(t.props).filter((n) => t.props[n].names.length && !(t.tag === "list" && n === "key"));
+    if (t.tag === "list" && t.names.size) follows.push({ node, template: t, scope, props: ["items"] });
+    else if (read.length) follows.push({ node, template: t, scope, props: read });
+  }
+  return node;
+}
+
+function markupView(source: string, handlers: Record<string, unknown> | undefined, initial: Record<string, unknown> | undefined, file?: string): InkView {
+  const templates = compileMarkup(source, handlers, file);
+  const data: Record<string, unknown> = { ...(initial ?? {}) };
+  const scope: Scope = { data };
+  const follows: Follow[] = [];
+  const mounts = templates.map((m) => {
+    const opts: InkMountOptions = {};
+    for (const k of ["anchor", "x", "y"] as const) {
+      if (m.props[k]) (opts as Record<string, unknown>)[k] = evaluate(m, k, scope, file);
+    }
+    const layer = (m.props.layer ? evaluate(m, "layer", scope, file) : "hud") as "hud";
+    return ink.mount(layer, opts, ...m.children.map((c) => buildMarkup(c, scope, follows, file)));
+  });
+  return {
+    mounts,
+    get data() {
+      return data;
+    },
+    get(id) {
+      for (const m of mounts) {
+        const found = m.get(id);
+        if (found) return found;
+      }
+      return undefined;
+    },
+    set(next) {
+      Object.assign(data, next);
+      const changed = new Set(Object.keys(next));
+      for (const f of follows) {
+        if (![...(f.props[0] === "items" ? f.template.names : f.props.flatMap((p) => f.template.props[p].names))].some((n) => changed.has(n))) continue;
+        if (f.props[0] === "items") {
+          const items = evaluate(f.template, "items", f.scope, file);
+          (f.node as InkNode<InkListProps<unknown>>).set({ items: Array.isArray(items) ? items : [] });
+          continue;
+        }
+        const update: Record<string, unknown> = {};
+        for (const p of f.props) if (f.template.props[p].names.some((n) => changed.has(n))) update[p] = evaluate(f.template, p, f.scope, file);
+        f.node.set(update);
+      }
+    },
+    unmount() {
+      for (const m of mounts) m.unmount();
+    },
+  };
+}
+
+async function readPackageFile(file: string): Promise<{ text: string; name: string }> {
+  const g = globalThis as Record<PropertyKey, unknown>;
+  // The docs simulation reads a preview's files over HTTP.
+  const read = g[Symbol.for("rednode.readFile")] as ((file: string) => Promise<string>) | undefined;
+  if (read) return { text: await read(file), name: file };
+  const info = g[Symbol.for("rednode.package")] as { dir?: string } | undefined;
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const full = path.isAbsolute(file) ? file : path.resolve(info?.dir ?? process.cwd(), file);
+  try {
+    return { text: await fs.readFile(full, "utf8"), name: path.basename(full) };
+  } catch (err) {
+    throw new Error(`ink: cannot read ${file} (${(err as NodeJS.ErrnoException).code ?? (err as Error).message}): a relative path starts at the package's folder`);
+  }
+}
+
 /**
  * The game's own UI, drawn by the game. Needs Codeware.
  *
@@ -956,5 +1405,72 @@ export const ink = {
    */
   widget(className: string, props: InkProps & Record<string, unknown> = {}, ...children: Child[]): InkNode {
     return make(className, props, children);
+  },
+
+  /**
+   * Puts ink markup on the game's UI: the tags of this module written as HTML, their props as
+   * attributes. The top of the markup holds `<mount>` tags (`layer`, `anchor`, `x`, `y`).
+   *
+   * - **Tags:** `canvas`, `column`, `row` (also `vbox`, `hbox`), `text`, `rect`, `circle`,
+   *   `image`, `bar`, `list`, and `widget class="inkBorder"` for any ink class, whose
+   *   capitalized attributes are its methods. Attributes are the props by name;
+   *   `text-align` is `textAlign`. `margin` and `pad` take one number or four.
+   * - **Text:** inside `<text>...</text>`, or `text="..."`. `LocKey#...` and `key` show the
+   *   game's own text.
+   * - **Data:** `{name}` in text or an attribute reads the named data, `{name.field}` a
+   *   field of it. An attribute that is one `{name}` alone takes the value as it is (a
+   *   number, `true`). `{{` and `}}` are the characters. No expressions.
+   * - **Lists:** `<list items="contracts" key="id">` holds the one tag each item gets; inside
+   *   it `{name}` reads the item's field first, `{.}` is the item itself and `{$index}` its
+   *   place.
+   * - **Events:** `onclick="track"` names a function of `handlers`, checked now. Input on
+   *   ink comes with phase I3: until then no event fires.
+   *
+   * A mistake throws an {@link InkMarkupError} with its line and column.
+   *
+   * @param source The markup.
+   * @param handlers The functions its `on...` attributes name: a module (`import * as
+   *   handlers from "./bounty.mjs"`) or an object.
+   * @param data The named data it reads, changed later with {@link InkView.set}.
+   *
+   * @example
+   * ```ts
+   * const board = ink.parse(`
+   *   <mount layer="hud" anchor="top-right" x="-40" y="120">
+   *     <column gap="6">
+   *       <text style="title">Bounty board</text>
+   *       <list items="contracts" key="id" gap="4">
+   *         <row gap="12">
+   *           <text style="body">{name}</text>
+   *           <text style="value">{reward} €$</text>
+   *         </row>
+   *       </list>
+   *     </column>
+   *   </mount>`, {}, { contracts: [] });
+   *
+   * board.set({ contracts: [{ id: 1, name: "Watson", reward: 1500 }] });
+   * ```
+   */
+  parse(source: string, handlers?: Record<string, unknown>, data?: Record<string, unknown>): InkView {
+    return markupView(source, handlers, data);
+  },
+
+  /**
+   * Reads an ink markup file (`.ink.html`) and puts it on the game's UI, as
+   * {@link ink.parse} does. A relative path starts at the package's folder. Mistakes name the
+   * file, line and column.
+   *
+   * @example
+   * ```ts
+   * import { ink } from "rednode";
+   * import * as handlers from "./bounty.mjs";
+   *
+   * const board = await ink.load("bounty.ink.html", handlers, { contracts: [] });
+   * board.set({ contracts: await fetchContracts() });
+   * ```
+   */
+  async load(file: string, handlers?: Record<string, unknown>, data?: Record<string, unknown>): Promise<InkView> {
+    const { text, name } = await readPackageFile(file);
+    return markupView(text, handlers, data, name);
   },
 };
