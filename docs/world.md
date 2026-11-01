@@ -1331,6 +1331,17 @@ The player saw the spawned box float a little above the ground, near other objec
 
 The fault watch recorded the three swaps with no faults. Still unverified on 2.5: a game-placed entity that uses the swapped mesh, refreshed by appearance (verified on 2.31 in H2c-a).
 
+**Second run, 2026-10-31: steps 7 to 10 passed** (dev PC, game 2.5, REDnode 0.49.5, REDswap 1.0.3, Sound Tools' Hot swap 0.1.1, Equipment-EX on). The override: EDGEwave's katana archive built from 2.5 on 2026-10-31 (`EDGEwave_Katana.archive`, 3 files), swapped from EDGEdeck's library with the mod off in EDGEdeck and no copy in the game folder.
+
+| Step | Result |
+|---|---|
+| 7. Sound swap | REDswap added it in 66 ms; the sound index reloaded in 2.4 ms (the audio thread waited 297 ms), 74,289 sounds before and after, 28 pak entries retired, the old index freed (3,295 KB); no fault |
+| 8. Katana | "I hear the EDGEwave sound" (the player's note); a minute of play with other weapons, the map and a menu: nothing missing or wrong reported |
+| 9. #18 | Through the MCP tools (UIItemsHelper's `GetItemName` overloads are gone in 2.5, so `gameRPGManager::GetItemQuality`, three overloads, stood in): `null` for its `gameItemData` overload refused before the game ("an object the game may use without checking"); `GetItemQuality;Float` with `class: "RPGManager"` and as `gameRPGManager::GetItemQuality;Float` both answered `Epic`; the short name refused as ambiguous, listing the three; V's health set to its own value (496.4) through `StatPoolsSystem.RequestSettingStatPoolValue` with instigator `{"$null": true}`, read back 496.4, the game answering after |
+| 10. Quit | The override removed from `archive\pc\mod` |
+
+H3b is done: REDswap swaps archives, world refreshes and sound archives on game 2.5 with no RED Hot Tools, and #12 and #18 are closed.
+
 ## H2c World objects: plan
 
 Proposed and **agreed with the owner on 2026-10-23**, with the three recommendations below. H2c finishes H2 for things in the world. The owner's aim (2026-10-22): scenes built and stored in EDGEbuilder, with NPCs, props and the rest, load into the game from EDGEbuilder, and a swapped archive shows on them as it does on what V wears. EDGEquest needs the same pieces for quest NPCs and places (EDGEbuilder's [#3](https://github.com/Edgemodders/EDGEbuilder/issues/3)).
