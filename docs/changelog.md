@@ -11,6 +11,8 @@ How to keep it:
 
 ## Unreleased
 
+## 0.50.2 (2026-11-01)
+
 **New**
 
 - A page that covers the whole game view at any aspect ratio (https://github.com/Edgemodders/REDnode/issues/32): `"fill": "screen"` in `rednode-app.json` makes the page 1080 high and as wide as the view (1920 at 16:9, 2580 at 21:9, 3840 at 32:9), at the top-left, and resizes it when the game's resolution changes. For an editor's see-through canvas over the world, such as EDGEbuilder's. See https://edgemodders.github.io/REDnode/overlay-apps.html#a-page-that-covers-the-whole-game-view
