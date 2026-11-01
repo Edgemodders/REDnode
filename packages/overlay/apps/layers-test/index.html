@@ -6,9 +6,10 @@
 <script src="rednode://ui/rednode-ui.js"></script>
 <script type="importmap">{ "imports": { "rednode": "rednode://sdk/index.js" } }</script>
 <style>
-  /* The whole page is a faint tint: alpha above REDnode's click-through threshold,
-     so it takes the mouse everywhere, as an editing viewport does. */
-  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: rgba(25, 243, 255, .04); }
+  /* "fill": "screen": the page covers the whole game view at any screen shape. It is a faint
+     tint, alpha above REDnode's click-through threshold, so it takes the mouse everywhere, as
+     an editing viewport does. The draggable window moves inside the page; the tint stays. */
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: rgba(25, 243, 255, .04); }
   rn-window { position: absolute; left: 50%; top: 40px; transform: translateX(-50%); width: 460px; }
   .line { font-size: 14px; }
 </style>

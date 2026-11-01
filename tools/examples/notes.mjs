@@ -175,7 +175,7 @@ export const NOTES = {
     teaches: ['ui.solo', 'ui.onSolo', '"solo" permission'],
     how: [
       'Solo mode is for full-screen tools such as editors: other packages hide while it is on, and REDnode\'s own tool windows stay above.',
-      'The page is 1920 by 1080; the preview shrinks it to fit.',
+      'The page fills the game view ("fill": "screen"), and its window moves inside it, the tint staying put; the preview shrinks it to fit.',
     ],
   },
   'pointer-test': {

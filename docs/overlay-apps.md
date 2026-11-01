@@ -577,6 +577,8 @@ With `"fill": "screen"` the page covers the whole game view at any aspect ratio,
 }
 ```
 
+A `<rn-window draggable>` on such a page moves inside the page: its title bar carries the window over the page, and whatever else the page draws (a tint, a viewport) stays where it is. The place is kept for the page across starts, and the title bar offers **Reset position** once it has moved. Since REDnode 0.50.1; before it, the drag moved the whole page.
+
 ### Frames from another address
 
 A page can show another page in an `<iframe>`: one served from `http://127.0.0.1:<port>`, another site, or a sandboxed frame (`sandbox` without `allow-same-origin`). Chromium runs such a frame in a process of its own, and since REDnode 0.50.0 the overlay passes the mouse, the wheel and keys into it: a press goes to the frame under the cursor (through CSS transforms such as `scale(.8)`, and into frames inside frames), a drag stays with the frame it started in, and keys go to the frame clicked last. The input is real input, so hover, focus, text selection and pointer capture work in the frame as in the window's own page. Nothing changes for a page with no such frame. The **Frame test** sample shows it.

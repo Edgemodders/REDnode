@@ -85,6 +85,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [#29 restore: stress run (REDswap 1.0.3)](#29-restore-stress-run-redswap-103) | In the game | REDswap | 2026-10-31 | 0.49.5 + REDswap 1.0.3, World objects test 0.2.3, game 2.5 | **Pass** (dev PC): six restores, no crash, no fault; each `4 dropped, 1 loaded again`; V in the game's own trousers after each (checked in the inventory) |
 | [Frames from another address (#31)](#frames-from-another-address-31) | In the game | Overlay | Not run | 0.50.0 + Frame test 0.1.0, game 2.5 | Awaits its run. Mock game: 11 checks (scratchpad `w31/check.mjs`, input through the mock's control file) |
 | [A page that covers the whole game view (#32)](#a-page-that-covers-the-whole-game-view-32) | In the game | Overlay | Not run | 0.50.0 + Fill test 0.1.0, game 2.5 | Awaits its run. Mock game: 5 checks (scratchpad `w32/check.mjs`: 21:9, 32:9 and 16:9 screen events) |
+| [Solo mask and Ask answers (0.50.1)](#solo-mask-and-ask-answers-0501) | In the game | Overlay, REDagent | Not run | 0.50.1 + Layers test 0.2.0, REDagent 0.4.1, game 2.5 | Awaits its run. Mock game: 10 checks for the in-page drag (scratchpad `mask/check.mjs`, 21:9) |
 | [The world flag and game text (#25, #26)](#the-world-flag-and-game-text-25-26) | In the game, with Claude | EDGEmobile's requests | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop), with one finding: `world` was right at every step, but went off at a load only when the player went, since the `OnDetach` wrap never sent its event; the Console showed the long refusal as `Uncaught:` only. Both fixed in 0.47.1: its [retest](#world-flag-retest-on-0471) **passed** on 2026-10-30 (laptop): `world` went off at the start of each load and at the main menu, 0.3 s before the player went. 0.47.2 moves the event's work off the worker thread it arrives on; a short check rides with the next test |
 | [Tools Manager starts EDGEmat's server (0.45.1)](mcp.md#edgemats-tools-test) | In the game | E1 | 2026-10-30 | 0.47.0 + Admin Tools 0.1.0, game 2.5 | **Pass** (laptop): the EDGEmat group showed its 10 tools in a fresh session, no assistant asked first |
 | [Roles (#20)](services.md#roles-test) | In the game | Services | 2026-10-29 | 0.45.0 + Roles test 0.1.0, Counter service 0.3.0, game 2.5 | **Pass** (dev PC): all eight steps. Mock game: 15 checks |
@@ -981,6 +982,18 @@ Built 2026-10-31 in REDnode 0.50.0 for EDGEbuilder's [#32](https://github.com/Ed
 2. In the game's settings (Video), switch to **Windowed** with a resolution of another shape, such as 1280 x 1024 (5:4) or 1680 x 1050 (16:10), and apply. Open the overlay (F10): the lines still touch the edges, the size reads `1350 x 1080` for 5:4 or `1728 x 1080` for 16:10, and the panel keeps to the right edge. Mark.
 3. Switch back to your usual mode and resolution: the size returns to `1920 x 1080`. Mark.
 4. Close the Fill test and quit. Claude reads the logs: `The game view is ...` lines in the plugin's and the host's log, one per change.
+
+### Solo mask and Ask answers (0.50.1)
+
+Built 2026-11-01 in REDnode 0.50.1 and REDagent 0.4.1, for two bugs the user and EDGEweb found. **The mask:** in solo mode, dragging the Layers test's window by its title bar dragged the full-screen tint with it, since the tint and the window were one 1920 x 1080 page that the drag moved whole. The UI kit now moves a draggable `rn-window` inside a page that fills the screen (`"fill": "screen"`), its place kept in the page's localStorage (`rn-place:*`) with **Reset position** in the title bar; Layers test 0.2.0 fills the screen. **The answers:** REDagent streamed and returned the text of every turn, so the note the model wrote before a tool call ran into the answer ("Need player ref.V has **539,168 eddies**"), and its briefing allowed Markdown, which the Ask mod shows raw. It now holds a turn's text until it is 160 characters long or the turn ends without a tool call, drops a held note at its tool call, returns only the last turn's text, and asks for plain text. Checked in the mock game for the drag (10 checks); the answers only in the game.
+
+0. Test timer: Start, Mark after each step.
+1. In the Mod Manager, select **Layers test** and switch on its **solo mode** permission. Then switch the Layers test on: a faint tint covers the whole screen. Mark.
+2. Press **Solo on**. Drag the Layers test's window by its title bar to another place: the window moves, the tint stays over the whole screen. Mark.
+3. Press **Solo off**, close the Layers test, and open it again: the window opens where you left it. Its title bar's **Reset position** puts it back at the top middle. Mark.
+4. Close the Layers test. In the Mod Manager, select **Ask mod**, switch on its **questions to the AI assistant** permission, and switch the Ask mod on. Ask: `How many eddies do I have?` The answer is one clean sentence with no note before it and no `**` marks. Mark.
+5. Ask something that needs no lookup, such as `What is REDnode?`: the answer streams in as before. Mark.
+6. Quit. Claude reads the logs.
 
 ### The world flag and game text (#25, #26)
 

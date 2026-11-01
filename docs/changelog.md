@@ -16,6 +16,11 @@ How to keep it:
 - A page that covers the whole game view at any aspect ratio (https://github.com/Edgemodders/REDnode/issues/32): `"fill": "screen"` in `rednode-app.json` makes the page 1080 high and as wide as the view (1920 at 16:9, 2580 at 21:9, 3840 at 32:9), at the top-left, and resizes it when the game's resolution changes. For an editor's see-through canvas over the world, such as EDGEbuilder's. See https://edgemodders.github.io/REDnode/overlay-apps.html#a-page-that-covers-the-whole-game-view
 - Frames from another address get the mouse and keys (https://github.com/Edgemodders/REDnode/issues/31): a page that shows a page from `http://127.0.0.1:<port>`, another site or a sandboxed frame in an `<iframe>` can now be used in the game. Clicks, the wheel, hover, drags and typing reach the frame, through CSS transforms and frames inside frames, as real input. See https://edgemodders.github.io/REDnode/overlay-apps.html#frames-from-another-address
 - Two test samples: **Fill test** and **Frame test**.
+- On a page that covers the game view, a draggable window (`<rn-window draggable>`) moves inside the page, its place kept across starts, with **Reset position** in its title bar. The page and whatever else it draws stay put.
+
+**Fixed**
+
+- Dragging the **Layers test**'s window moved its full-screen tint with it. It now covers the game view with `"fill": "screen"`, so the tint stays and only the window moves.
 
 ## 0.49.5 (2026-10-31)
 

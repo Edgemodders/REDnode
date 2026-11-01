@@ -255,7 +255,7 @@ header { display: flex; align-items: center; gap: 10px; padding: 9px 12px 8px 14
 :host(.unfocused) header { background: var(--rn-title-bg-dim); }
 /* Only the title area is the drag handle, so controls in the status slot stay clickable. */
 .grip { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; align-self: stretch; }
-.grip[data-rednode-drag] { cursor: move; }
+.grip[data-rednode-drag], .grip.moves { cursor: move; }
 .mark { width: 8px; height: 8px; background: var(--rn-title-mark); flex: none; }
 :host(.unfocused) .mark { background: var(--rn-dim); }
 h1 { margin: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 15px var(--rn-display); letter-spacing: .1em; text-transform: var(--rn-title-case); }
@@ -285,6 +285,7 @@ footer:empty { display: none; }
 <div class="body" part="body"><slot></slot></div><footer><slot name="footer"></slot></footer><div class="resize" part="resize" hidden title="Drag to resize"></div>`,
       );
       this.setupResize();
+      this.setupMove();
       this.$('.close').addEventListener('click', () => {
         playSound(soundFor(this, 'press'));
         const ev = new CustomEvent('close', { cancelable: true, bubbles: true, composed: true });
@@ -301,6 +302,7 @@ footer:empty { display: none; }
       window.rednode?.windowInfo?.().then(
         (info) => {
           this._info = info;
+          this.updateGrip();
           this.renderActions();
         },
         () => {},
@@ -312,6 +314,7 @@ footer:empty { display: none; }
         if (m.event === 'focus') this.classList.toggle('unfocused', !m.focused);
         if (m.event === 'window-info') {
           this._info = m.info;
+          this.updateGrip();
           this.renderActions();
         }
         if (m.event === 'developer') this.renderActions();
@@ -366,6 +369,7 @@ footer:empty { display: none; }
         list.push({ id: 'pin', name: info.onHud ? 'Unpin from HUD' : 'Pin to HUD', on: info.onHud, run: run('pin-hud', !info.onHud) });
       }
       if (whole && info.canReset) list.push({ id: 'reset', name: info.resizable ? 'Reset position and size' : 'Reset position', run: run('reset') });
+      if (this.movesInPage() && this.savedPlace()) list.push({ id: 'reset', name: 'Reset position', run: () => this.resetPlace() });
       if (document.documentElement.hasAttribute('rn-developer') && window.rednode?.debug && !this.hasAttribute('no-debug')) {
         list.push({ id: 'debug', name: 'Debug', run: () => window.rednode.debug().catch(() => {}) });
       }
@@ -419,6 +423,99 @@ footer:empty { display: none; }
         const size = drag.want ?? this._info?.size ?? null;
         send();
         this.emit('resize-end', size);
+      };
+      grip.addEventListener('pointerup', end);
+      grip.addEventListener('lostpointercapture', end);
+    }
+
+    // A draggable window on a page that covers the game view ("fill": "screen") cannot move
+    // the page, which stays on the whole screen with whatever else it draws (a tint, a
+    // viewport): its title bar moves the window inside the page instead, and the place is
+    // kept per page. Elsewhere the title bar is a drag handle and the plugin moves the whole
+    // overlay window.
+    movesInPage() {
+      return this.bool('draggable') && !!this._info?.fill;
+    }
+    updateGrip() {
+      const grip = this.$('.grip');
+      const inPage = this.movesInPage();
+      grip.toggleAttribute('data-rednode-drag', this.bool('draggable') && !inPage);
+      grip.classList.toggle('moves', inPage);
+      if (inPage && !this._placeRestored) {
+        this._placeRestored = true;
+        const saved = this.savedPlace();
+        if (saved) requestAnimationFrame(() => this.placeAt(saved.x, saved.y));
+      }
+    }
+    placeKey() {
+      return `rn-place:${location.pathname}:${this.getAttribute('title') || ''}`;
+    }
+    savedPlace() {
+      try {
+        const p = JSON.parse(localStorage.getItem(this.placeKey()) || 'null');
+        return p && Number.isFinite(p.x) && Number.isFinite(p.y) ? p : null;
+      } catch {
+        return null;
+      }
+    }
+    // Puts the window's top-left corner at a page point, its title bar kept on the page.
+    placeAt(x, y) {
+      const r = this.getBoundingClientRect();
+      const page = document.documentElement;
+      x = Math.min(Math.max(x, 80 - r.width), Math.max(0, page.clientWidth - 80));
+      y = Math.min(Math.max(y, 0), Math.max(0, page.clientHeight - 32));
+      if (this._style0 === undefined) {
+        this._style0 = this.getAttribute('style');
+        // Placed by its left and top from now on: a size that came from stretching (inset,
+        // right and bottom) is kept as it is.
+        const cs = getComputedStyle(this);
+        if (cs.right !== 'auto' && cs.left !== 'auto') this.style.width = `${r.width}px`;
+        if (cs.bottom !== 'auto' && cs.top !== 'auto' && !this.hasAttribute('rolled')) this.style.height = `${r.height}px`;
+        if (cs.position !== 'absolute' && cs.position !== 'fixed') this.style.position = 'absolute';
+      }
+      const base = this.offsetParent?.getBoundingClientRect() ?? { left: 0, top: 0 };
+      Object.assign(this.style, { left: `${Math.round(x - base.left)}px`, top: `${Math.round(y - base.top)}px`, right: 'auto', bottom: 'auto', transform: 'none', margin: '0' });
+      return { x: Math.round(x), y: Math.round(y) };
+    }
+    resetPlace() {
+      try {
+        localStorage.removeItem(this.placeKey());
+      } catch {
+        // storage is a convenience
+      }
+      if (this._style0 !== undefined) {
+        if (this._style0 === null) this.removeAttribute('style');
+        else this.setAttribute('style', this._style0);
+        this._style0 = undefined;
+      }
+      this.renderActions();
+    }
+    setupMove() {
+      const grip = this.$('.grip');
+      let drag = null;
+      grip.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || !this.movesInPage()) return;
+        e.preventDefault();
+        grip.setPointerCapture?.(e.pointerId);
+        const r = this.getBoundingClientRect();
+        drag = { x: e.clientX, y: e.clientY, left: r.left, top: r.top, place: null };
+      });
+      grip.addEventListener('pointermove', (e) => {
+        if (!drag) return;
+        drag.place = this.placeAt(drag.left + e.clientX - drag.x, drag.top + e.clientY - drag.y);
+      });
+      const end = () => {
+        if (!drag) return;
+        const place = drag.place;
+        drag = null;
+        if (!place) return;
+        try {
+          localStorage.setItem(this.placeKey(), JSON.stringify(place));
+        } catch {
+          // storage is a convenience
+        }
+        this.emit('move-end', place);
+        this.renderActions();
       };
       grip.addEventListener('pointerup', end);
       grip.addEventListener('lostpointercapture', end);
@@ -585,9 +682,7 @@ footer:empty { display: none; }
     attributeChangedCallback(name) {
       if (name === 'title') this.restoreRollup();
       this.$('h1').textContent = this.getAttribute('title') || '';
-      const grip = this.$('.grip');
-      if (this.bool('draggable')) grip.setAttribute('data-rednode-drag', '');
-      else grip.removeAttribute('data-rednode-drag');
+      this.updateGrip();
       this.$('.close').hidden = !this.bool('closable');
       if (name.startsWith('no-')) this.renderActions();
     }
