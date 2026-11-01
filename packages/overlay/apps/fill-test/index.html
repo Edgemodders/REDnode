@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fill test</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<style>
+  /* "fill": "screen" in the manifest: the page covers the whole game view, 1080 high and
+     as wide as the view. Only the frame and the panel are drawn; the rest is see-through
+     and lets clicks through to the game. */
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: transparent; }
+  .edge { position: fixed; background: var(--rn-accent); }
+  .top { left: 0; right: 0; top: 0; height: 4px; }
+  .bottom { left: 0; right: 0; bottom: 0; height: 4px; }
+  .left { top: 0; bottom: 0; left: 0; width: 4px; }
+  .right { top: 0; bottom: 0; right: 0; width: 4px; }
+  .size { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 10px 18px;
+    background: var(--rn-bg); border: 1px solid var(--rn-line); font: 600 22px var(--rn-mono); color: var(--rn-fg); }
+  .panel { position: fixed; right: 16px; top: 16px; bottom: 16px; width: 320px; }
+  .panel rn-window { position: absolute; inset: 0; }
+  .log { font: 12px var(--rn-mono); color: var(--rn-dim); white-space: pre-wrap; }
+</style>
+</head>
+<body theme="hud">
+  <div class="edge top"></div><div class="edge bottom"></div><div class="edge left"></div><div class="edge right"></div>
+  <div class="size" id="size">-</div>
+  <div class="panel">
+    <rn-window title="Fill test">
+      <p>This panel keeps to the right edge of the screen. The accent lines mark the page's four edges: each should touch the screen's edge.</p>
+      <div class="log" id="log"></div>
+    </rn-window>
+  </div>
+<script>
+  const lines = [];
+  function show(why) {
+    const text = `${innerWidth} x ${innerHeight}`;
+    document.getElementById('size').textContent = text;
+    lines.push(`${new Date().toLocaleTimeString()} ${why}: ${text}`);
+    document.getElementById('log').textContent = lines.slice(-12).join('\n');
+    console.log(`[fill-test] ${why}: ${text}`);
+  }
+  show('opened');
+  addEventListener('resize', () => show('resized'));
+</script>
+</body>
+</html>

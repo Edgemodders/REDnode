@@ -563,6 +563,24 @@ With `"resizable": true` in the manifest, the player can resize the window by th
 }
 ```
 
+### A page that covers the whole game view
+
+With `"fill": "screen"` the page covers the whole game view at any aspect ratio, for an editor's see-through canvas over the world or a full-screen app. Pages are scaled with the screen's height, so the page is always 1080 pixels high and as wide as the view: 1920 at 16:9, 1728 at 16:10, 2580 at 21:9, 3840 at 32:9 (pages are at most 4096 wide, so a wider view, such as three screens side by side, is covered up to 4096). It sits at the top-left, cannot be dragged or resized, and keeps no saved place. Lay the page out from `innerWidth`, and follow its `resize` event: REDnode resizes it when the game's resolution changes. Its pixels stay 1:1 with the game's view, so a point from `CameraSystem.ProjectPoint` maps onto the page's width. `width` and `height` in the manifest are the size until the game has told REDnode its view (about the first frame).
+
+```json
+{
+  "id": "world-editor",
+  "entry": "index.html",
+  "width": 1920,
+  "height": 1080,
+  "fill": "screen"
+}
+```
+
+### Frames from another address
+
+A page can show another page in an `<iframe>`: one served from `http://127.0.0.1:<port>`, another site, or a sandboxed frame (`sandbox` without `allow-same-origin`). Chromium runs such a frame in a process of its own, and since REDnode 0.50.0 the overlay passes the mouse, the wheel and keys into it: a press goes to the frame under the cursor (through CSS transforms such as `scale(.8)`, and into frames inside frames), a drag stays with the frame it started in, and keys go to the frame clicked last. The input is real input, so hover, focus, text selection and pointer capture work in the frame as in the window's own page. Nothing changes for a page with no such frame. The **Frame test** sample shows it.
+
 ## Pointer lock
 
 A page can hold the cursor in place and get the mouse's raw movement, as a 3D editor's camera or a game's view needs. Use the web's own Pointer Lock API; REDnode's plugin does the holding in the game.

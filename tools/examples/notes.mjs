@@ -365,6 +365,28 @@ export const NOTES = {
     tryThis: ['Press secrets.shared, then secrets.askShared.', 'Press Keep an own key, then Ask, offering it.', 'Press secrets.shared("openai").'],
     preview: 'A preview has no keys: every read gives null, and the ask only logs what the game would show.',
   },
+  'frame-test': {
+    group: 'tests',
+    summary: 'Two sandboxed frames, which Chromium runs in processes of their own, one scaled to 0.8 with a frame inside it. Each has a button, a hover box, a text field, a slider and a wheel counter, and reports every event to the window\'s log.',
+    teaches: ['iframe', 'sandbox', 'postMessage'],
+    how: [
+      'A frame from another address, or a sandboxed one, runs in another process than the window\'s page. REDnode passes the mouse and keys into it through DevTools, so clicks, hover, typing, drags and the wheel work there as in the page.',
+      'Each frame tells the page what it got with `parent.postMessage`, and the page writes it to its log. A click marked "(trusted)" came as real input.',
+    ],
+    tryThis: ['Click the button in each frame, and in the frame inside Frame B.', 'Type in a field and press Enter.', 'Drag a slider past the frame\'s edge.', 'Turn the wheel over the wheel box.'],
+    preview: 'In the preview your own browser gives the frames their input.',
+  },
+  'fill-test': {
+    group: 'tests',
+    summary: 'A see-through page that covers the whole game view at any aspect ratio, with `"fill": "screen"`: a frame on its four edges, its size in the middle, and a panel kept at the right edge.',
+    teaches: ['"fill": "screen"', 'innerWidth', 'resize event'],
+    how: [
+      'The manifest says `"fill": "screen"`. REDnode makes the page 1080 high and as wide as the game view in the same scale: 1920 at 16:9, 2580 at 21:9, 3840 at 32:9. It sits at the top-left, cannot be dragged or resized, and keeps no saved place.',
+      'The page lays out from `innerWidth` and follows `resize`, which comes when the game\'s resolution changes. Only the frame, the size and the panel are drawn, so clicks elsewhere reach the game.',
+    ],
+    tryThis: ['Open it from the launcher and check that the four accent lines touch the screen\'s edges.', 'Change the game\'s resolution or window size and watch the size follow.'],
+    preview: 'The preview is a browser window, so the page takes the preview\'s size rather than a game view\'s.',
+  },
   'world-objects-test': {
     group: 'tests',
     summary: 'Spawn a person and a prop, list what is near V with the files each uses, load an EDGEbuilder scene around V, and swap an archive to see what its refresh does to the world.',

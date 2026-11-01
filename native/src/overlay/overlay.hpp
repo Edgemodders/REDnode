@@ -67,7 +67,9 @@ struct Screen
     float backBufferWidth = 0, backBufferHeight = 0;
 };
 Screen GetScreen();
-void SetScreen(const Screen& aScreen);
+void SetScreen(const Screen& aScreen); // tells the host when the size changes ({"event":"screen"})
+void ResendScreen();                   // tells a host that just connected
+
 
 // link.cpp
 void StartLink();

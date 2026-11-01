@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Frame test</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<style>
+  html, body { margin: 0; width: 800px; height: 560px; overflow: hidden; background: transparent; }
+  rn-window { position: absolute; inset: 0; }
+  .frames { display: flex; gap: 16px; align-items: flex-start; }
+  .box { width: 360px; height: 300px; }
+  /* A sandboxed frame (scripts only, no same origin) runs in a process of its own, as a page
+     from another address does: the case #31 is about. */
+  iframe { border: 1px solid var(--rn-line); background: #fff; }
+  #a { width: 360px; height: 300px; }
+  #b { width: 450px; height: 375px; transform: scale(.8); transform-origin: 0 0; }
+  .log { height: 150px; overflow: auto; font: 12px var(--rn-mono); color: var(--rn-dim); white-space: pre-wrap; border: 1px solid var(--rn-line); padding: 6px; }
+</style>
+</head>
+<body theme="hud">
+<rn-window title="Frame test" closable>
+  <div class="frames">
+    <div class="box"><iframe id="a" sandbox="allow-scripts" title="Frame A"></iframe></div>
+    <div class="box"><iframe id="b" sandbox="allow-scripts" title="Frame B, scaled 0.8"></iframe></div>
+  </div>
+  <div class="log" id="log"></div>
+</rn-window>
+<script>
+  // The frame inside Frame B, one level further down. Written into Frame B's own script as a
+  // JSON string with every "<" escaped, so no closing script tag in it ends that script early.
+  const innerSrc = '<!doctype html><body style="margin:0;padding:6px;font:13px sans-serif"><b>Inner frame</b> ' +
+    '<button id="ib">Inner click (0)</button><script>let n=0;ib.onclick=(e)=>{n++;ib.textContent="Inner click ("+n+")";' +
+    'parent.parent.postMessage({frame:"Inner",what:"click "+n+(e.isTrusted?" (trusted)":" (synthetic)")},"*");};' +
+    'const b=ib.getBoundingClientRect();parent.parent.postMessage({frame:"Inner",what:"ready",rect:[b.left,b.top,b.width,b.height]},"*");<\/script>';
+  const innerJs = JSON.stringify(innerSrc).replace(/</g, '\\u003c');
+  // What each frame runs: it reports its events to this page with postMessage. withInner adds
+  // a sandboxed frame inside it.
+  const frameSource = (name, withInner) => `<!doctype html><html><body style="margin:0;font:14px sans-serif;padding:8px">
+<b>${name}</b>
+<div style="display:flex;gap:8px;margin:6px 0"><button id="btn">Click me (0)</button>
+<div id="hov" style="width:70px;height:28px;background:#ddd;line-height:28px;text-align:center">hover</div></div>
+<input id="txt" placeholder="Type here" style="width:200px"><br>
+<input id="rng" type="range" min="0" max="100" value="0" style="width:220px"> <span id="rv">0</span><br>
+<div id="whl" style="height:40px;overflow:auto;border:1px solid #aaa;margin-top:4px">wheel: 0</div>
+${withInner ? '<iframe id="inner" sandbox="allow-scripts" style="width:300px;height:110px;margin-top:6px;border:1px solid #888"></iframe>' : ''}
+<script>
+  const say = (what) => parent.postMessage({ frame: ${JSON.stringify(name)}, what }, '*');
+  let clicks = 0, wheel = 0;
+  btn.onclick = (e) => { clicks++; btn.textContent = 'Click me (' + clicks + ')'; say('click ' + clicks + (e.isTrusted ? ' (trusted)' : ' (synthetic)')); };
+  hov.onpointerenter = () => { hov.style.background = '#f66'; say('hover in'); };
+  hov.onpointerleave = () => { hov.style.background = '#ddd'; say('hover out'); };
+  txt.oninput = () => say('text: ' + txt.value);
+  txt.onkeydown = (e) => { if (e.key === 'Enter') say('Enter in the field'); };
+  rng.oninput = () => { rv.textContent = rng.value; };
+  rng.onchange = () => say('slider dragged to ' + rng.value);
+  whl.onwheel = (e) => { wheel += e.deltaY < 0 ? 1 : -1; whl.textContent = 'wheel: ' + wheel; say('wheel ' + (e.deltaY < 0 ? 'up' : 'down')); };
+  ${withInner ? `inner.srcdoc = ${innerJs};` : ''}
+<\/script></body></html>`;
+  document.getElementById('a').srcdoc = frameSource('Frame A', false);
+  document.getElementById('b').srcdoc = frameSource('Frame B (scaled 0.8)', true);
+
+  const lines = [];
+  window.frameTestLog = lines; // read by the mock check
+  window.frameTestRects = {}; // where a frame's button is, from its ready message
+  addEventListener('message', (e) => {
+    if (!e.data || !e.data.frame) return;
+    if (e.data.rect) window.frameTestRects[e.data.frame] = e.data.rect;
+    const line = `${new Date().toLocaleTimeString()} ${e.data.frame}: ${e.data.what}`;
+    lines.push(line);
+    console.log(`[frame-test] ${e.data.frame}: ${e.data.what}`);
+    const log = document.getElementById('log');
+    log.textContent = lines.slice(-40).join('\n');
+    log.scrollTop = log.scrollHeight;
+  });
+</script>
+</body>
+</html>

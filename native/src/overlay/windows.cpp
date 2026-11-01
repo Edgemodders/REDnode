@@ -309,6 +309,28 @@ Screen GetScreen()
     return g_screen;
 }
 
+// The game view's size, told to the host when it changes and when the host connects, so a
+// page that covers the whole view (a manifest's "fill": "screen", #32) can follow it.
+namespace
+{
+std::atomic<uint64_t> g_sentScreen{0};
+
+void SendScreen(const Screen& aScreen)
+{
+    SendJson("{\"event\":\"screen\",\"width\":" + std::to_string(std::lround(aScreen.width)) +
+             ",\"height\":" + std::to_string(std::lround(aScreen.height)) +
+             ",\"backBufferWidth\":" + std::to_string(std::lround(aScreen.backBufferWidth)) +
+             ",\"backBufferHeight\":" + std::to_string(std::lround(aScreen.backBufferHeight)) + "}");
+}
+} // namespace
+
+void ResendScreen()
+{
+    const Screen s = GetScreen();
+    if (s.width > 0)
+        SendScreen(s);
+}
+
 void SetScreen(const Screen& aScreen)
 {
     {
@@ -317,6 +339,13 @@ void SetScreen(const Screen& aScreen)
     }
     if (aScreen.width <= 0)
         return;
+    const uint64_t key = (uint64_t(std::lround(aScreen.backBufferWidth)) << 32) | uint64_t(std::lround(aScreen.backBufferHeight));
+    if (g_sentScreen.exchange(key) != key)
+    {
+        Log("Overlay: the game view is %.0f x %.0f (%.0f x %.0f reference pixels)", aScreen.backBufferWidth,
+            aScreen.backBufferHeight, aScreen.width, aScreen.height);
+        SendScreen(aScreen);
+    }
     std::scoped_lock lock(g_mutex);
     for (auto& w : g_windows)
     {

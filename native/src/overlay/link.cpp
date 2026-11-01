@@ -257,6 +257,7 @@ void ReaderLoop()
             SendJson(std::string("{\"event\":\"hello\",\"plugin\":\"REDnode " REDNODE_VERSION "\",\"mode\":") +
                      JsonString(ModeName(GetMode())) + "}");
             ResendGameState();
+            ResendScreen();
 
             for (;;)
             {

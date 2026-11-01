@@ -33,6 +33,7 @@ const { scanGame, checkRequires, validRange, key: gamefilesKey } = require('./ga
 const { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED } = require('./redbridge');
 const bridgeInstall = require('./bridge-install');
 const { createAttached } = require('./attached');
+const { hasRemoteFrames, createRouter } = require('./frames');
 const { createLookup } = require('./gameapi-lookup');
 const { soundPaksIn, hotToolsLookupMisses, archiveHashes } = require('./archive-index');
 const { gameSoundWav, eventSounds, soundIndex: gameSoundIndex } = require('./game-sounds');
@@ -365,6 +366,8 @@ function readManifest(dir) {
     }
   }
   if (m.resizable !== undefined && typeof m.resizable !== 'boolean') problems.push('resizable must be true or false');
+  if (m.fill !== undefined && m.fill !== 'screen') problems.push('fill must be "screen"');
+  if (m.fill === 'screen' && m.resizable === true) problems.push('a window that fills the screen cannot also be resizable');
   for (const k of ['minWidth', 'minHeight']) {
     if (m[k] !== undefined && (!Number.isInteger(m[k]) || m[k] < 1 || m[k] > 4096)) problems.push(`${k} must be a whole number from 1 to 4096`);
   }
@@ -424,6 +427,9 @@ function readManifest(dir) {
     height: m.height,
     // A resizable window gets a grip in its corner (the UI kit's rn-window); the smallest size defaults to the manifest's, at most 320 x 200.
     resizable: m.resizable === true && (m.kind ?? 'window') === 'window',
+    // "fill": "screen" (#32): the page covers the whole game view at any aspect ratio, sized by the host from the plugin's
+    // screen event (1080 high, as wide as the view in reference pixels), at the top-left, not draggable, no saved place.
+    fill: m.fill === 'screen' ? 'screen' : null,
     minWidth: Math.min(m.minWidth ?? Math.min(m.width ?? 320, 320), m.width ?? 4096),
     minHeight: Math.min(m.minHeight ?? Math.min(m.height ?? 200, 200), m.height ?? 4096),
     anchor: m.anchor ?? 'top-left',
@@ -889,6 +895,7 @@ function windowInfo(w) {
     canPin: !!owner && !owner.pinned && owner.manifest.kind !== 'hud',
     canReset: !!positions[spaceKey(w)],
     resizable: !!w.app.manifest.resizable,
+    fill: w.app.manifest.fill,
     size: sizeOf(w),
     minSize: { width: w.app.manifest.minWidth, height: w.app.manifest.minHeight },
   };
@@ -1189,7 +1196,36 @@ function savedPlace(m) {
 // A window's size now: the manifest's, or the player's for a resizable window.
 function sizeOf(w) {
   const m = w.app.manifest;
+  if (m.fill === 'screen') return fillSize(m);
   return w.size ?? { width: m.width, height: m.height };
+}
+
+// The game view in reference pixels (1080 high), from the plugin's screen event; null until the first.
+let gameScreen = null;
+
+// The size of a window that fills the screen: the game view, or the manifest's size until the plugin has told it.
+// Pages are at most 4096 pixels wide, enough for 32:9 (3840).
+function fillSize(m) {
+  if (!gameScreen) return { width: m.width, height: m.height };
+  return { width: Math.min(4096, Math.max(1, gameScreen.width)), height: Math.min(4096, Math.max(1, gameScreen.height)) };
+}
+
+// The game view changed (or the plugin connected): windows that fill the screen follow it.
+function onScreen(m) {
+  const width = Math.round(Number(m.width) || 0);
+  const height = Math.round(Number(m.height) || 0);
+  if (width < 1 || height < 1) return;
+  const changed = !gameScreen || gameScreen.width !== width || gameScreen.height !== height;
+  gameScreen = { width, height, backBufferWidth: Number(m.backBufferWidth) || 0, backBufferHeight: Number(m.backBufferHeight) || 0 };
+  if (!changed) return;
+  log(`The game view is ${gameScreen.backBufferWidth} x ${gameScreen.backBufferHeight} (${width} x ${height} reference pixels)`);
+  for (const w of windows.values()) {
+    if (w.app.manifest.fill !== 'screen' || w.win.isDestroyed()) continue;
+    const size = fillSize(w.app.manifest);
+    w.win.setContentSize(size.width, size.height);
+    if (connected) openInGame(w);
+    toPage(w, { event: 'window-info', info: windowInfo(w) });
+  }
 }
 
 // The size a resizable window was left at, kept with its position.
@@ -1208,8 +1244,8 @@ function clampSize(m, width, height) {
 // Tells the plugin about a window. A saved position wins over the manifest's anchor.
 function openInGame(w) {
   const m = w.app.manifest;
-  const saved = savedPlace(m);
-  const place = saved ? { anchor: 'top-left', x: saved.x, y: saved.y } : { anchor: m.anchor, x: m.x, y: m.y };
+  const saved = m.fill === 'screen' ? null : savedPlace(m);
+  const place = m.fill === 'screen' ? { anchor: 'top-left', x: 0, y: 0 } : saved ? { anchor: 'top-left', x: saved.x, y: saved.y } : { anchor: m.anchor, x: m.x, y: m.y };
   sendJson({
     cmd: 'window.open',
     window: w.id,
@@ -1217,7 +1253,7 @@ function openInGame(w) {
     ...sizeOf(w),
     kind: m.kind,
     hideWith: m.hideWith,
-    draggable: m.kind !== 'hud',
+    draggable: m.kind !== 'hud' && m.fill !== 'screen',
     onHud: shownInPassive(w),
     layer: windowLayer(w),
     hidden: windowHidden(w),
@@ -1316,9 +1352,25 @@ function heldButtons(w) {
   return w.held ? [...w.held].map((b) => `${b}ButtonDown`) : [];
 }
 
+// A window's router for input into frames in another process (#31), made when it first has one.
+function frameRouter(w) {
+  if (w.frames) return w.frames.active() ? w.frames : null;
+  if (!hasRemoteFrames(w.win.webContents)) return null;
+  w.frames = createRouter(w.win.webContents, log);
+  return w.frames;
+}
+
 function onInput(m) {
   const w = windows.get(m.window);
   if (!w || w.win.isDestroyed()) return;
+  const router = frameRouter(w);
+  if (router) router.push(m, (one) => (w.win.isDestroyed() ? null : inputTo(w, one, router)));
+  else inputTo(w, m, null);
+}
+
+// One input message for a window: to the page by sendInputEvent, or through the router to a
+// frame in another process under the cursor (or the frame clicked last, for keys).
+async function inputTo(w, m, router) {
   const wc = w.win.webContents;
   switch (m.type) {
     case 'mouseMove':
@@ -1329,7 +1381,7 @@ function onInput(m) {
       // The plugin sends a leave only with no button held: a safety net for a lost mouseUp.
       if (m.type === 'mouseLeave') w.held?.clear();
       if (m.dx !== undefined) toPage(w, { event: 'pointer-move', dx: m.dx, dy: m.dy });
-      else wc.sendInputEvent({ type: m.type, x: m.x, y: m.y, modifiers: heldButtons(w) });
+      else if (!(router && (await router.mouse(m, w.held ?? new Set())))) wc.sendInputEvent({ type: m.type, x: m.x, y: m.y, modifiers: heldButtons(w) });
       break;
     case 'mouseDown':
     case 'mouseUp':
@@ -1339,9 +1391,11 @@ function onInput(m) {
       w.held ??= new Set();
       if (m.type === 'mouseDown') w.held.add(m.button);
       else w.held.delete(m.button);
+      if (router && (await router.mouse(m, w.held))) break;
       wc.sendInputEvent({ type: m.type, x: m.x, y: m.y, button: m.button, clickCount: 1, modifiers: heldButtons(w) });
       break;
     case 'mouseWheel':
+      if (router && (await router.mouse(m, w.held ?? new Set()))) break;
       wc.sendInputEvent({ type: 'mouseWheel', x: m.x, y: m.y, deltaX: 0, deltaY: m.delta });
       break;
     case 'keyDown':
@@ -1365,6 +1419,7 @@ function onInput(m) {
         break;
       }
       const modifiers = [ctrlDown && 'control', shiftDown && 'shift'].filter(Boolean);
+      if (router && (await router.key(m.type, m.vk, modifiers))) break;
       if (keyCode) wc.sendInputEvent({ type: m.type, keyCode, modifiers });
       break;
     }
@@ -1374,7 +1429,7 @@ function onInput(m) {
         break;
       }
       // Control characters (Ctrl+V makes 0x16) would arrive as junk; real keys came as keyDown.
-      if (m.code >= 32) wc.sendInputEvent({ type: 'char', keyCode: String.fromCharCode(m.code) });
+      if (m.code >= 32 && !(router && (await router.char(m.code)))) wc.sendInputEvent({ type: 'char', keyCode: String.fromCharCode(m.code) });
       break;
     default:
       break;
@@ -1409,12 +1464,15 @@ function onGameMessage(m) {
     case 'capture':
       onCapture(m);
       return;
+    case 'screen':
+      onScreen(m);
+      return;
     case 'focus':
       onFocus(m.window);
       return;
     case 'moved': {
       const w = windows.get(m.window);
-      if (w) {
+      if (w && w.app.manifest.fill !== 'screen') {
         const { width, height } = w.app.manifest;
         const first = !positions[w.app.manifest.id];
         positions[w.app.manifest.id] = { x: m.x, y: m.y, width, height, ...(w.size ? { size: w.size } : {}) };
@@ -4719,9 +4777,10 @@ function openApp(entry) {
   const m = entry.manifest;
   const id = nextWindowId++;
   const size = savedSize(m);
+  const first = m.fill === 'screen' ? fillSize(m) : size;
   const win = new BrowserWindow({
-    width: size?.width ?? m.width,
-    height: size?.height ?? m.height,
+    width: first?.width ?? m.width,
+    height: first?.height ?? m.height,
     x: windowed ? 60 + windows.size * 80 : undefined,
     y: windowed ? 60 + windows.size * 80 : undefined,
     show: windowed, // never show an off-screen window: that would take OS focus from the game
@@ -4749,6 +4808,7 @@ function openApp(entry) {
     });
   }
   win.on('closed', () => {
+    windows.get(id)?.frames?.dispose();
     windows.delete(id);
     windowStats.delete(id);
   });
@@ -4781,6 +4841,7 @@ function closeApp(appId) {
     if (target && !target.win.isDestroyed() && target.win.webContents.isDevToolsOpened()) target.win.webContents.closeDevTools();
   }
   sendJson({ cmd: 'window.close', window: w.id });
+  w.frames?.dispose();
   windows.delete(w.id);
   windowStats.delete(w.id);
   pendingFrames.delete(w.id);
