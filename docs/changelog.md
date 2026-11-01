@@ -11,6 +11,8 @@ How to keep it:
 
 ## Unreleased
 
+## 0.49.5 (2026-10-31)
+
 **New**
 
 - The **Console**, built into REDnode: a command line for the game, like a browser's developer console, opened from the launcher. Type JavaScript with the whole `rednode` package ready (`game`, `api`, `tweakdb`, `world` and the rest, no imports), and Enter runs it: top-level `await`, variables kept between entries, results you can fold open, game objects you can call from the next entry (`$1`, `$_`), errors in red, history with Up and Down, Tab completion. Shortcuts for routine jobs: `addItem("Items.Pants_01_basic_01")`, `removeItem`, `pos()`, `tp(x, y, z)`; `help()` lists them. The code runs in the Console's own Node mod, so an endless loop stops only the Console: **Stop** starts it again. No Cyber Engine Tweaks needed.
@@ -47,7 +49,7 @@ How to keep it:
 
 **Fixed**
 
-- An archive swap through REDswap that replaces an archive with one holding fewer files now lets the files it left out load from the game, or another mod, again (https://github.com/Edgemodders/REDnode/issues/29). Before, they kept the old archive's version until the game restarted, so a mod could not restore the game's own look by swapping its file out. Comes with REDswap 1.0.1.
+- An archive swap through REDswap that replaces an archive with one holding fewer files now lets the files it left out load from the game, or another mod, again (https://github.com/Edgemodders/REDnode/issues/29). Before, they kept the old archive's version until the game restarted, so a mod could not restore the game's own look by swapping its file out. Comes with REDswap 1.0.3.
 - A drag inside an overlay page now holds on when the cursor leaves the element it started on: mouse moves tell the page which button is held (`buttons` is 1 while the left button is down), so `setPointerCapture` works. Before, a page's own drags, such as a resize grip, stopped after a few pixels.
 - The Console showed only `Uncaught:` for an error whose first line is longer than 80 characters, such as "V is not in the world yet: ...": the whole message shows now.
 - A static function's full name now works with `class` (`api.$static("UIItemsHelper", "GetItemName;TweakDBIDgameItemData", ...)`, or the MCP tools' `class` and `fn`), with or without the class in front.

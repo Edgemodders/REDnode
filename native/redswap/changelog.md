@@ -4,6 +4,8 @@ What changed in each release of REDswap, for its Nexus page (mod 36172) and the 
 
 ## Unreleased
 
+## 1.0.3 (2026-10-31)
+
 **Fixed**
 
 - Replacing an archive with one that holds fewer files no longer leaves the files it left out cached with the old archive's version (https://github.com/Edgemodders/REDnode/issues/29). REDswap reads the old archive's file table before the new one takes its place and drops those files from the game's loader too, so they load from the game, or another mod, next time; a mod can restore the game's own look by swapping its file out. Those the game still finds in another archive are loaded again at once, so they are ready before anything asks for them. The log says how many: `... resources (... dropped), N left by the old archive (N dropped, N loaded again)`.
