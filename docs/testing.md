@@ -83,9 +83,10 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [A swap restores the game's own files (#29)](#a-swap-restores-the-games-own-files-29) | In the game | REDswap | 2026-10-31 | 0.49.3 + REDswap 1.0.1, then 0.49.5 + REDswap 1.0.3, World objects test 0.2.3, game 2.5 | **Pass** on REDswap 1.0.3 ([stress run](#29-restore-stress-run-redswap-103)). On 1.0.1 (dev PC): the game crashed 0.5 s after the restore swap, when the inventory preview loaded the jeans mesh again and got none (a null mesh in the appearance lookup). Cause open; see the section. Unit tests: the file table reader (8 checks) |
 | [#29 diagnostics: the restore's crash](#29-diagnostics-the-restores-crash) | In the game | REDswap | 2026-10-31 | 0.49.4 + REDswap 1.0.2, World objects test 0.2.3, game 2.5 | Session 1 (probe on), 2026-10-31: **no crash**, but not the crash run's conditions: EDGEquest_Q2, deployed at 17:35, holds the jeans mesh's path, so the jeans loaded from its copy (a resource in 100 ms). Session 2 (no switches, EDGEquest_Q2 off: the crash run's conditions): **no crash**, and V showed the game's own trousers after the restore. The crash looks like a race (unverified) |
 | [#29 restore: stress run (REDswap 1.0.3)](#29-restore-stress-run-redswap-103) | In the game | REDswap | 2026-10-31 | 0.49.5 + REDswap 1.0.3, World objects test 0.2.3, game 2.5 | **Pass** (dev PC): six restores, no crash, no fault; each `4 dropped, 1 loaded again`; V in the game's own trousers after each (checked in the inventory) |
-| [Frames from another address (#31)](#frames-from-another-address-31) | In the game | Overlay | Not run | 0.50.0 + Frame test 0.1.0, game 2.5 | Awaits its run. Mock game: 11 checks (scratchpad `w31/check.mjs`, input through the mock's control file) |
-| [A page that covers the whole game view (#32)](#a-page-that-covers-the-whole-game-view-32) | In the game | Overlay | Not run | 0.50.0 + Fill test 0.1.0, game 2.5 | Awaits its run. Mock game: 5 checks (scratchpad `w32/check.mjs`: 21:9, 32:9 and 16:9 screen events) |
-| [Solo mask and Ask answers (0.50.1)](#solo-mask-and-ask-answers-0501) | In the game | Overlay, REDagent | Not run | 0.50.1 + Layers test 0.2.0, REDagent 0.4.1, game 2.5 | Awaits its run. Mock game: 10 checks for the in-page drag (scratchpad `mask/check.mjs`, 21:9) |
+| [Frames from another address (#31)](#frames-from-another-address-31) | In the game | Overlay | Passed (fix in 0.50.2 to check) | 0.50.1 + Frame test 0.1.0, game 2.5 | Passed on the dev PC on 2026-11-01, EDGEphone too; the host logged about 50 `input failed: No node found` (events dropped), fixed in 0.50.2. Mock game: 12 checks (scratchpad `w31/check.mjs`) |
+| [A page that covers the whole game view (#32)](#a-page-that-covers-the-whole-game-view-32) | In the game | Overlay | Partly run | 0.50.1 + Fill test 0.1.0, game 2.5 | 2026-11-01, dev PC: the page filled the view and followed 3840 x 2160 to windowed 1920 x 1080 and back, but both are 16:9, so a view of another shape is unchecked in the game. Mock game: 5 checks (scratchpad `w32/check.mjs`: 21:9, 32:9 and 16:9 screen events) |
+| [Frame input and a view of another shape (0.50.2)](#frame-input-and-a-view-of-another-shape-0502) | In the game | Overlay | Not run | 0.50.2, game 2.5 | Awaits its run. Mock game: #31's 12 checks |
+| [Solo mask and Ask answers (0.50.1)](#solo-mask-and-ask-answers-0501) | In the game | Overlay, REDagent | Passed | 0.50.1 + Layers test 0.2.0, REDagent 0.4.1, game 2.5 | Passed on the dev PC on 2026-11-01. Mock game: 10 checks for the in-page drag (scratchpad `mask/check.mjs`, 21:9) |
 | [The world flag and game text (#25, #26)](#the-world-flag-and-game-text-25-26) | In the game, with Claude | EDGEmobile's requests | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop), with one finding: `world` was right at every step, but went off at a load only when the player went, since the `OnDetach` wrap never sent its event; the Console showed the long refusal as `Uncaught:` only. Both fixed in 0.47.1: its [retest](#world-flag-retest-on-0471) **passed** on 2026-10-30 (laptop): `world` went off at the start of each load and at the main menu, 0.3 s before the player went. 0.47.2 moves the event's work off the worker thread it arrives on; a short check rides with the next test |
 | [Tools Manager starts EDGEmat's server (0.45.1)](mcp.md#edgemats-tools-test) | In the game | E1 | 2026-10-30 | 0.47.0 + Admin Tools 0.1.0, game 2.5 | **Pass** (laptop): the EDGEmat group showed its 10 tools in a fresh session, no assistant asked first |
 | [Roles (#20)](services.md#roles-test) | In the game | Services | 2026-10-29 | 0.45.0 + Roles test 0.1.0, Counter service 0.3.0, game 2.5 | **Pass** (dev PC): all eight steps. Mock game: 15 checks |
@@ -973,6 +974,8 @@ Built 2026-10-31 in REDnode 0.50.0 for EDGEmobile's [#31](https://github.com/Edg
 6. If EDGEmobile's **EDGEphone** is installed: open it and tap a few things on its screen: they answer. Mark.
 7. Close the Frame test and quit. Claude reads the host log: one `Frames: this window has a frame in another process` line per window with such a frame, and no `Frames: input failed`.
 
+**First run, 0.50.1 (2026-11-01 16:56, dev PC, 4K, with the solo mask and Ask tests): passed on screen, one fault in the log.** Steps 1 to 7 all as described, and EDGEmobile's EDGEphone answered taps (step 6). The host log had the `Frames: this window has a frame in another process` lines (three windows), but also about 50 `Frames: input failed: No node found at given location` in the four seconds after the Frame test opened and one during step 2: when `DOM.getNodeForLocation` finds no node under the point (most likely the page still loading), the whole event was dropped, the page's own share included. Reproduced in the mock game with moves off the page (3 failures). **REDnode 0.50.2** gives such an event to whoever holds the point so far (the page at the top level) and logs nothing; the mock check, with that step added, passes all 12.
+
 ### A page that covers the whole game view (#32)
 
 Built 2026-10-31 in REDnode 0.50.0 for EDGEbuilder's [#32](https://github.com/Edgemodders/REDnode/issues/32). The plugin sends `{"event":"screen"}` with the game view in reference pixels (always 1080 high) and the back buffer's size when the host connects and whenever the size changes, and logs `Overlay: the game view is W x H`. A manifest with `"fill": "screen"` gets a page of that size at the top-left: not draggable, not resizable, no saved place, resized when the event changes (`fillSize`, `onScreen` in main.js). Pages stay at most 4096 wide, enough for 32:9. Checked in the mock game: 5 checks (21:9, 32:9, then 16:9).
@@ -982,6 +985,8 @@ Built 2026-10-31 in REDnode 0.50.0 for EDGEbuilder's [#32](https://github.com/Ed
 2. In the game's settings (Video), switch to **Windowed** with a resolution of another shape, such as 1280 x 1024 (5:4) or 1680 x 1050 (16:10), and apply. Open the overlay (F10): the lines still touch the edges, the size reads `1350 x 1080` for 5:4 or `1728 x 1080` for 16:10, and the panel keeps to the right edge. Mark.
 3. Switch back to your usual mode and resolution: the size returns to `1920 x 1080`. Mark.
 4. Close the Fill test and quit. Claude reads the logs: `The game view is ...` lines in the plugin's and the host's log, one per change.
+
+**First run, 0.50.1 (2026-11-01 16:59, dev PC): partly run.** The lines touched the edges, the size and the panel showed, and the page followed each change: the plugin logged the view at 3840 x 2160, then 1920 x 1080 (windowed), then 3840 x 2160 again. Both sizes are 16:9, so the reference size stayed `1920 x 1080` and the page never changed shape: step 2's other shape (5:4 or 16:10) is still to run in the game. The mock game covers 21:9 and 32:9.
 
 ### Solo mask and Ask answers (0.50.1)
 
@@ -994,6 +999,18 @@ Built 2026-11-01 in REDnode 0.50.1 and REDagent 0.4.1, for two bugs the user and
 4. Close the Layers test. In the Mod Manager, select **Ask mod**, switch on its **questions to the AI assistant** permission, and switch the Ask mod on. Ask: `How many eddies do I have?` The answer is one clean sentence with no note before it and no `**` marks. Mark.
 5. Ask something that needs no lookup, such as `What is REDnode?`: the answer streams in as before. Mark.
 6. Quit. Claude reads the logs.
+
+**First run, 0.50.1 + REDagent 0.4.1 (2026-11-01 17:01, dev PC): passed.** Solo mode on and off (host log `Solo mode: layers-test`, then `ended by the package`), the window moved without its tint, opened again where it was left, and **Reset position** put it back (`Reset the position of layers-test`). Ask mod: `How many eddies do I have?` came back as one clean sentence ($0.079) and `What is REDnode?` streamed in ($0.009). One ask before it, at 17:04:07, was refused with "No assistant is running": REDagent was not on yet; the next ask started it.
+
+### Frame input and a view of another shape (0.50.2)
+
+Built 2026-11-01 in REDnode 0.50.2, after the first runs above: a frame window's events with no node under them now reach the page instead of being dropped, and #32's other shape is still to see in the game.
+
+0. Test timer: Start, Mark after each step.
+1. Load a save. In the launcher, open **Frame test** at once, moving the cursor over it while it loads. Press Frame A's **Click me**: it counts 1. Mark.
+2. Close the Frame test. Open **Fill test**. In the game's settings (Video), switch to **Windowed** at **1680 x 1050** (or 1280 x 1024) and apply. Press F10: the lines touch all four edges, the size reads `1728 x 1080` (or `1350 x 1080`), and the panel keeps to the right edge. Mark.
+3. Switch back to your usual mode and resolution: `1920 x 1080` again. Mark.
+4. Close the Fill test and quit. Claude reads the logs: no `Frames: input failed`, and a `The game view is ...` line with the other shape.
 
 ### The world flag and game text (#25, #26)
 

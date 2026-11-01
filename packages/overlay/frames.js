@@ -113,7 +113,9 @@ function createRouter(wc, log) {
     const maps = [];
     let outer = null;
     for (let depth = 0; depth < NESTING; depth++) {
-      const hit = await send('DOM.getNodeForLocation', { x: Math.round(px), y: Math.round(py), ignorePointerEventsNone: true }, session);
+      // No node there (off the document, or a page still loading): whoever holds the point so far gets it.
+      const hit = await send('DOM.getNodeForLocation', { x: Math.round(px), y: Math.round(py), ignorePointerEventsNone: true }, session).catch(() => null);
+      if (!hit) break;
       const { node } = await send('DOM.describeNode', { backendNodeId: hit.backendNodeId }, session);
       if (!node || !/^(IFRAME|FRAME)$/i.test(node.nodeName) || !node.frameId) break;
       const child = sessions.get(node.frameId);
