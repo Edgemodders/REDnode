@@ -1551,10 +1551,11 @@ export type InkBox = [number, number, number, number] | null;
 export interface InkLayerInfo {
   /** Its class, such as `inkHUDLayer` or `inkMenuLayer`. */
   name: string;
-  active: boolean;
-  interactive: boolean;
+  /** Null when the game's layer could not be reached from its window (then only name, window and size are known). */
+  active: boolean | null;
+  interactive: boolean | null;
   /** Its input context. */
-  input: string;
+  input: string | null;
   /** Its size in ink pixels. */
   size: [number, number];
   /** Its window's widget id, for {@link ink.read}. */

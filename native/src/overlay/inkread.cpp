@@ -321,11 +321,37 @@ struct Entry
 
 struct Layer
 {
-    Obj object;
+    Obj window;
+    Handle<ink::Layer> native; // the game's layer, from the window's layer proxy; null if it has none
     ink::Layer* layer = nullptr;
     std::string name;
     std::vector<Entry> entries;
 };
+
+// The game's layer behind a window, through the window's layer proxy (RED4ext.SDK's structs).
+// The window's own proxy first, then its first children's (unverified which of them has one).
+Handle<ink::Layer> NativeLayer(const Obj& aWindow)
+{
+    ink::Widget* w = AsWidget(aWindow);
+    if (w && w->layerProxy)
+    {
+        if (auto layer = w->layerProxy->layer.Lock())
+            return layer;
+    }
+    int looked = 0;
+    for (const auto& child : Children(aWindow))
+    {
+        ink::Widget* c = AsWidget(child);
+        if (c && c->layerProxy)
+        {
+            if (auto layer = c->layerProxy->layer.Lock())
+                return layer;
+        }
+        if (++looked == 4)
+            break;
+    }
+    return {};
+}
 
 std::vector<Layer> Layers(std::string& aError)
 {
@@ -343,21 +369,44 @@ std::vector<Layer> Layers(std::string& aError)
         aError = "Codeware did not list the ink layers" + (aError.empty() ? std::string() : ": " + aError);
         return out;
     }
+    // Codeware lists the game's inkLayerWrapper objects (found in game 2.5 with Codeware 1.21):
+    // the layer's name and window come from the wrapper's own functions, the layer itself from
+    // the window. A list of the layers themselves is taken as well.
+    static const CClass* wrapperClass = ClassOf("inkLayerWrapper");
     static const CClass* layerClass = ClassOf("inkLayer");
     static const CClass* hudClass = ClassOf("inkHUDLayer");
     for (const auto& item : list.items)
     {
         Obj object = RefObject(item);
         DropRefArg(item);
-        if (!object || !layerClass || !object->GetType()->IsA(layerClass))
+        if (!object)
             continue;
         Layer l;
-        l.object = object;
-        l.layer = reinterpret_cast<ink::Layer*>(object.GetPtr());
-        l.name = ClassName(object);
-        if (hudClass && object->GetType()->IsA(hudClass))
+        if (wrapperClass && object->GetType()->IsA(wrapperClass))
         {
-            auto* hud = reinterpret_cast<ink::HUDLayer*>(object.GetPtr());
+            std::string error;
+            Value name;
+            if (CallNativeValue(object, nullptr, "GetLayerName", Args(), name, error) &&
+                name.kind == Value::Kind::String)
+                l.name = name.text;
+            CallNative(object, nullptr, "GetVirtualWindow", Args(), &l.window, error);
+            l.native = NativeLayer(l.window);
+        }
+        else if (layerClass && object->GetType()->IsA(layerClass))
+        {
+            l.native = Handle<ink::Layer>(*reinterpret_cast<const Handle<ink::Layer>*>(&object));
+            l.window = Obj(*reinterpret_cast<const Handle<IScriptable>*>(&l.native->window));
+        }
+        else
+        {
+            continue;
+        }
+        l.layer = l.native.GetPtr();
+        if (l.layer && l.name.empty())
+            l.name = l.layer->GetType()->GetName().ToString();
+        if (l.layer && hudClass && l.layer->GetType()->IsA(hudClass))
+        {
+            auto* hud = reinterpret_cast<ink::HUDLayer*>(l.layer);
             for (const auto& e : hud->entries)
             {
                 Entry entry;
@@ -365,8 +414,7 @@ std::vector<Layer> Layers(std::string& aError)
                 entry.window = Obj(*reinterpret_cast<const Handle<IScriptable>*>(&e.window));
                 entry.root = Obj(*reinterpret_cast<const Handle<IScriptable>*>(&e.rootWidget));
                 entry.slot = Obj(*reinterpret_cast<const Handle<IScriptable>*>(&e.slotWidget));
-                if (entry.window && l.layer->window && entry.window.GetPtr() == reinterpret_cast<IScriptable*>(
-                                                                                     l.layer->window.GetPtr()))
+                if (entry.window && l.window && entry.window.GetPtr() == l.window.GetPtr())
                     entry.window = {};
                 l.entries.push_back(std::move(entry));
             }
@@ -378,7 +426,7 @@ std::vector<Layer> Layers(std::string& aError)
 
 Obj WindowOf(const Layer& aLayer)
 {
-    return Obj(*reinterpret_cast<const Handle<IScriptable>*>(&aLayer.layer->window));
+    return aLayer.window;
 }
 
 std::string LayersJson(std::string& aError)
@@ -393,10 +441,14 @@ std::string LayersJson(std::string& aError)
         out += first ? "" : ",";
         first = false;
         Obj window = WindowOf(l);
-        out += "{\"name\":" + JsonString(l.name) + ",\"active\":" + (l.layer->active ? "true" : "false") +
-               ",\"interactive\":" + (l.layer->isInteractive ? "true" : "false") +
-               ",\"input\":" + JsonString(l.layer->inputContext.ToString()) + ",\"size\":[" + Num(l.layer->size.X) +
-               "," + Num(l.layer->size.Y) + "],\"window\":" + (window ? JsonString(IdOf(window)) : "null") +
+        // Without the game's layer (a window with no layer proxy): what the window says, active unknown.
+        ink::Widget* w = AsWidget(window);
+        const RED4ext::Vector2 size = l.layer ? l.layer->size : w ? w->size : RED4ext::Vector2{};
+        out += "{\"name\":" + JsonString(l.name) +
+               ",\"active\":" + (!l.layer ? "null" : l.layer->active ? "true" : "false") +
+               ",\"interactive\":" + (!l.layer ? "null" : l.layer->isInteractive ? "true" : "false") +
+               ",\"input\":" + (l.layer ? JsonString(l.layer->inputContext.ToString()) : "null") + ",\"size\":[" +
+               Num(size.X) + "," + Num(size.Y) + "],\"window\":" + (window ? JsonString(IdOf(window)) : "null") +
                ",\"children\":" + std::to_string(Children(window).size());
         if (!l.entries.empty())
         {
@@ -747,7 +799,7 @@ std::string AtJson(const Value& aParams, std::string& aError)
     picker.y = y->number;
     for (const auto& l : layers)
     {
-        if (!l.layer->active || l.name == "inkWatermarksLayer")
+        if ((l.layer && !l.layer->active) || l.name == "inkWatermarksLayer")
             continue;
         Look(picker, WindowOf(l), 0, 0, 0, l.name, {});
         for (const auto& e : l.entries)
