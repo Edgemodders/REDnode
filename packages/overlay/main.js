@@ -3933,13 +3933,13 @@ ipcMain.handle('rednode:apps:role', (event, role, id) => {
   return appList();
 });
 
-function onService(id, msg) {
+function onService(id, msg, fromPage = false) {
   const entry = apps.get(id);
   if (!entry) throw new Error('Unknown package');
   const caller = { id, name: entry.manifest.name };
   switch (msg?.op) {
     case 'connect':
-      return services.connect(id, String(msg.provider ?? ''));
+      return services.connect(id, String(msg.provider ?? ''), { fromPage });
     case 'use': {
       const role = String(msg.role ?? '');
       return services.connect(id, providerOf(role, id)).then((info) => ({ ...info, role }));
@@ -3973,7 +3973,7 @@ ipcMain.handle('rednode:service', async (event, msg) => {
   const id = packageOf(event);
   if (msg?.op === 'emit') throw new Error('Only a package\'s Node mod can send service events: emit from its service file or main');
   try {
-    return await onService(id, msg);
+    return await onService(id, msg, true);
   } catch (err) {
     throw new Error(err.message); // without Electron's remote-method wrapper, which cleanError strips anyway
   }
@@ -4094,6 +4094,42 @@ ipcMain.handle('rednode:tasks:restart', (event, id) => {
   }
   if (entry.manifest.entry && settings.apps[id]?.open !== false) openApp(entry);
   return true;
+});
+
+// Switches a package on or off, as the launcher's switch does: the UI Workbench's Run and Stop
+// of a project (UT3a). REDnode's own apps are refused. A package in a folder made a moment ago
+// may not be found yet: the caller asks again.
+ipcMain.handle('rednode:tasks:set-open', (event, id, open) => {
+  const who = fromAdmin(event);
+  const entry = apps.get(id);
+  if (!entry || entry.pinned) throw new Error(`No package "${id}" yet`);
+  if (entry.builtin) throw new Error(`${entry.manifest.name} is part of REDnode`);
+  setPackageOpen(id, !!open);
+  log(`${open ? 'Switched on' : 'Switched off'}: ${id}, by ${who}`);
+  notifyLauncher();
+  return { id, open: !!open, running: isMod(entry.manifest) ? mods.isEnabled(id) : !!open };
+});
+
+// A folder of the player's own under Documents\REDnode, made if needed and watched as a
+// development folder (#16), so the packages in it are found, started and hot reloaded: the
+// UI Workbench's projects (UT3a). The name is a single folder name.
+ipcMain.handle('rednode:tasks:projects-folder', (event, name) => {
+  const who = fromAdmin(event);
+  const leaf = String(name ?? '').trim();
+  if (!leaf || /[\\/:*?"<>|]|^\.+$/.test(leaf)) throw new Error('Give a folder name, such as "UI projects"');
+  // REDNODE_DOCUMENTS stands in for Documents in the mock game's checks, which must not make
+  // folders in the player's own.
+  const dir = path.join(process.env.REDNODE_DOCUMENTS || app.getPath('documents'), 'REDnode', leaf);
+  fs.mkdirSync(dir, { recursive: true });
+  if (!devFolders().includes(dir)) {
+    try {
+      changeDevFolders('add', dir);
+      log(`Projects folder ${dir} watched, for ${who}`);
+    } catch (err) {
+      if (!/already watches/.test(err.message)) throw err; // inside a folder already watched
+    }
+  }
+  return dir;
 });
 
 // The channel between a package's pages and its own Node mod (channel in the rednode package).

@@ -93,7 +93,13 @@ export interface ToolList {
 }
 
 interface AdminBridge {
-  tasks: { list(): Promise<TaskList>; end(id: string): Promise<unknown>; restart(id: string): Promise<unknown> };
+  tasks: {
+    list(): Promise<TaskList>;
+    end(id: string): Promise<unknown>;
+    restart(id: string): Promise<unknown>;
+    setOpen(id: string, open: boolean): Promise<{ id: string; open: boolean; running: boolean }>;
+    projectsFolder(name: string): Promise<string>;
+  };
   tools: { list(): Promise<ToolList>; set(what: string, id: string | null, on: boolean): Promise<ToolList> };
 }
 
@@ -149,6 +155,35 @@ export const admin = {
     return run(async () => {
       await bridge().tasks.restart(id);
     });
+  },
+
+  /**
+   * Switches a package on or off, as the launcher's switch does: its mod starts or stops and
+   * its window opens or closes, kept across starts. REDnode's own apps are refused. A package
+   * in a folder made a moment ago is found within a second or so: ask again on "No package".
+   *
+   * @example
+   * ```ts
+   * await admin.setOpen("my-panel", true); // Run
+   * await admin.setOpen("my-panel", false); // Stop
+   * ```
+   */
+  setOpen(id: string, open: boolean): Promise<{ id: string; open: boolean; running: boolean }> {
+    return run(() => bridge().tasks.setOpen(id, open));
+  },
+
+  /**
+   * A folder of the player's own, `Documents\REDnode\<name>`, made if needed and watched as a
+   * development folder: the packages put in it are found, started when switched on and hot
+   * reloaded, as in the apps folder. Answers its full path.
+   *
+   * @example
+   * ```ts
+   * const dir = await admin.projectsFolder("UI projects");
+   * ```
+   */
+  projectsFolder(name: string): Promise<string> {
+    return run(() => bridge().tasks.projectsFolder(name));
   },
 
   /** Every tool an assistant can see through REDnode's MCP server, with the player's switches. */

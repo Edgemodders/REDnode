@@ -860,3 +860,37 @@ Proposed on 2026-11-02, to agree with the owner. The editor in the game: write n
 | Interactive projects (buttons that do something) | After I3 Input, in UT4, as agreed: until then `on...` handlers are checked but nothing fires |
 | The pack's first version | 0.1.0, released with UT3c |
 
+**Agreed with the owner on 2026-11-02** with every recommendation.
+
+## UT3a: build (REDnode 0.54.0, UI Workbench 0.2.0)
+
+Built on 2026-11-02, after the owner agreed the plan with every recommendation. The Workbench gets two tabs beside Inspect:
+
+| Tab | What |
+|---|---|
+| **Projects** | New (a name; a project from the template, opened in Edit), Open, Rename (the name; its id and folder stay), Delete (asks twice; the project moves to the folder's `.trash`, which REDnode does not scan). A running project is marked. The folder is shown at the bottom |
+| **Edit** | The open project's `panel.ink.html` and `mod.mjs` side by side in CodeMirror 6, with highlighting, completion of ink markup's tags and attributes, and errors shown at their line as you type (the markup through `ink.check`, the script's syntax through acorn). **Save** (or Ctrl+S) writes both; **Run** saves and switches the project on, so its mod runs and its panel shows in the game; saving while it runs restarts it; **Stop** switches it off. An unsaved change shows as a dot after the name |
+
+| Part | Where |
+|---|---|
+| A project: `rednode-app.json` (id from the name, `main: mod.mjs`, needs Codeware), `panel.ink.html` and `mod.mjs` (`ink.load` with handlers and data), from a template | `packs/ui-tools/apps/ui-workbench/service.mjs` |
+| The projects folder `Documents\REDnode\UI projects`, made and watched as a development folder at the first use (`REDNODE_DOCUMENTS` stands in for Documents in the mock game's checks) | `rednode:tasks:projects-folder` in main.js, `admin.projectsFolder` |
+| Switching a package on or off for an `admin` page, as the launcher does (REDnode's own apps refused, each change logged with who asked) | `rednode:tasks:set-open` in main.js, `admin.setOpen` |
+| A package's own page may connect to its own service (its Node mod still calls its functions directly) | `services.js`, `onService` in main.js |
+| `ink.check(source, handlers?)`: markup checked without mounting, the first error with its line and column; `ink.markupTags()` for an editor's completion | `packages/rednode/src/ink.ts` |
+| The editor: CodeMirror 6.0.2 (with lang-html 6.4.12, lang-javascript 6.2.5) and acorn 8.19.0, MIT, bundled once into `vendor/editor.js` (678 KB) with their licences in `vendor/LICENSES.txt` | `tools/ui-tools/build-editor.mjs`, `editor-entry.mjs` |
+| The Workbench asks for the `admin` permission; Inspect works without it, Edit and Projects say how to allow it | `rednode-app.json`, `workbench-edit.js` |
+
+Found on the way, in the mock game: CodeMirror finds an editor's root by walking up through slots, so inside `rn-window` it mounted its styles in the window's shadow root and the editor, in the page, drew its text off the panes; the editors are given `root: document`. Checked in the mock game: 21 checks (scratchpad `ut3/check.mjs`: the folder made and watched, New from the template, errors at their line for markup and script, Save, Run with the project's mod putting its panel on the HUD, a save while running restarting it, Stop, Rename, Delete to the trash), and the Inspect tab's 40 again.
+
+### UT3a test
+
+0. Test timer: Start, Mark after each step.
+1. Load a save. In the launcher's **Mod Manager**, select **UI Workbench**, and under **Permissions** read the warning and switch **Allowed** on for **managing REDnode** (the `admin` permission). Switch the Workbench on. Open its **Projects** tab: it says no project yet, and names the folder (`Documents\REDnode\UI projects`). Mark.
+2. Type `My Panel` and press **New**: the Edit tab opens on its markup and script. Mark.
+3. Press **Run**: after a moment a panel with "My Panel" and "Made in the UI Workbench." shows at the left of the HUD (close the overlay with F10 to see it). Mark.
+4. In the markup, change `Made in the UI Workbench.` to some text of your own and press **Save** (or Ctrl+S): the panel shows the new text. Mark.
+5. Change `style="label"` to `style="lable"`: within a moment the markup's title bar says `line 6: style: "lable" is not one of ...` and the word is underlined. Put it back. In the script, delete the `{}` after `const handlers =`: the script's title bar shows a syntax error with its line. Put it back. Mark.
+6. Press **Stop**: the panel goes. Mark.
+7. In **Projects**, **Rename** the project (type a new name, Enter), then **Delete** it (press twice): it goes from the list. Switch the Workbench off and quit. Claude reads the host's `Switched on: my-panel` and `Switched off` lines.
+

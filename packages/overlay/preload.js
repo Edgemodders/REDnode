@@ -165,6 +165,10 @@ contextBridge.exposeInMainWorld('rednode', {
     list: () => ipcRenderer.invoke('rednode:tasks:list'),
     end: (id) => ipcRenderer.invoke('rednode:tasks:end', id),
     restart: (id) => ipcRenderer.invoke('rednode:tasks:restart', id),
+    /** Switches a package on or off, as the launcher does (the UI Workbench's Run and Stop). */
+    setOpen: (id, open) => ipcRenderer.invoke('rednode:tasks:set-open', id, open),
+    /** A folder under Documents\REDnode, made and watched as a development folder. */
+    projectsFolder: (name) => ipcRenderer.invoke('rednode:tasks:projects-folder', name),
   },
   /** For the host's builder page, which shows windows built by Node mods. Other pages get an error. */
   builder: {

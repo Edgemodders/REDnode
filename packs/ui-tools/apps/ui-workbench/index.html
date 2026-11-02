@@ -52,6 +52,23 @@
   .snippet { color: var(--rn-ok); overflow: hidden; text-overflow: ellipsis; }
   .group { color: var(--rn-accent-2); }
 
+  /* Edit and Projects (UT3a). */
+  .status { font: 12px var(--rn-mono); color: var(--rn-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 520px; }
+  .projname { font: 600 15px var(--rn-display); }
+  .editsplit { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .editpane { display: flex; flex-direction: column; overflow: hidden; }
+  .panehead { padding: 6px 8px; border-bottom: 1px solid var(--rn-line); font: 12px var(--rn-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .err { color: var(--rn-danger); margin-left: 8px; }
+  .editor { flex: 1; min-height: 0; overflow: hidden; }
+  .editor .cm-editor { height: 100%; }
+  .projpane { height: 520px; }
+  .projrow { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--rn-line); font: 13px var(--rn-body); }
+  .projrow.open { background: var(--rn-panel-2); }
+  .projrow .pname { font: 600 14px var(--rn-display); min-width: 220px; }
+  .projrow .pmeta { font: 12px var(--rn-mono); color: var(--rn-dim); flex: 1; }
+  .projrow .running { color: var(--rn-ok); font: 12px var(--rn-mono); }
+  .projfolder { margin-top: 6px; font: 12px var(--rn-mono); }
+
   #detail { padding: 8px 10px; font: 13px var(--rn-body); }
   #detail h3 { margin: 0 0 6px; font: 600 15px var(--rn-display); }
   #detail table { border-collapse: collapse; width: 100%; }
@@ -78,7 +95,8 @@
   <div id="hint">Pick: point at a piece of the game's UI and click it. Right-click sets the one under the cursor aside. Esc leaves.</div>
 
   <rn-window id="bench" title="UI Workbench" draggable closable>
-    <rn-tabs id="tabs"><rn-tab label="Inspect" active></rn-tab></rn-tabs>
+    <rn-tabs id="tabs"><rn-tab label="Inspect" active></rn-tab><rn-tab label="Edit"></rn-tab><rn-tab label="Projects"></rn-tab></rn-tabs>
+    <div id="tabInspect">
     <div class="bar">
       <rn-button id="refresh" title="Read the game's layers again">Refresh</rn-button>
       <rn-button id="pick" title="Click a piece of the game's UI to find its widgets">Pick</rn-button>
@@ -92,6 +110,43 @@
         <div id="tree"><div class="empty">Reading the game's layers...</div></div>
       </div>
       <div class="pane" id="detail"><div class="empty">Select a widget in the tree, or press Pick and click the game's UI.</div></div>
+    </div>
+    </div>
+
+    <!-- Edit: the open project's markup and script, Save, Run and Stop (UT3a; workbench-edit.js). -->
+    <div id="tabEdit" hidden>
+      <div class="bar">
+        <span id="editName" class="projname">No project open</span>
+        <rn-button id="save" variant="ghost" disabled title="Save the markup and the script (Ctrl+S)">Save</rn-button>
+        <rn-button id="run" disabled title="Save, and show the project in the game as a mod of its own">Run</rn-button>
+        <rn-button id="stop" variant="ghost" disabled title="Take the project out of the game">Stop</rn-button>
+        <span class="grow"></span>
+        <span id="editStatus" class="status"></span>
+      </div>
+      <div class="split editsplit">
+        <div class="pane editpane">
+          <div class="panehead">panel.ink.html <span class="dim">ink markup</span> <span id="markupError" class="err"></span></div>
+          <div id="markupEditor" class="editor"></div>
+        </div>
+        <div class="pane editpane">
+          <div class="panehead">mod.mjs <span class="dim">script</span> <span id="scriptError" class="err"></span></div>
+          <div id="scriptEditor" class="editor"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Projects: new, open, rename, delete (UT3a; workbench-edit.js). -->
+    <div id="tabProjects" hidden>
+      <div class="bar">
+        <rn-input id="newName" placeholder="A new project's name"></rn-input>
+        <rn-button id="newProject">New</rn-button>
+        <span class="grow"></span>
+        <span id="projStatus" class="status"></span>
+      </div>
+      <div class="pane projpane">
+        <div id="projects"><div class="empty">Reading the projects...</div></div>
+      </div>
+      <div class="dim projfolder" id="projFolder"></div>
     </div>
   </rn-window>
 
@@ -678,5 +733,7 @@
 
   loadLayers();
 </script>
+<!-- The Edit and Projects tabs, and the switching of tabs (UT3a). -->
+<script type="module" src="workbench-edit.js"></script>
 </body>
 </html>

@@ -1,17 +1,21 @@
 {
   "id": "ui-workbench",
   "name": "UI Workbench",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "author": "Edgemodders",
-  "description": "Inspect the game's own UI: its ink layers and HUD pieces as a tree, any widget's class, path, box on screen, controllers, source file and properties, and Pick, which finds the widgets under a click and outlines them. Reads only. Part of REDnode UI Tools.",
+  "description": "Inspect the game's own UI (its ink layers and HUD pieces as a tree, any widget's class, path, box, controllers, source file and properties, and Pick under the cursor), and write native UI of your own: projects of ink markup and a script, run live in the game. Inspect reads only; Edit and Projects need the admin permission, to run your projects. Part of REDnode UI Tools.",
   "entry": "index.html",
+  "service": "service.mjs",
   "width": 1920,
   "height": 1080,
   "fill": "screen",
   "anchor": "top-left",
   "open": false,
+  "permissions": [
+    "admin"
+  ],
   "requires": {
-    "rednode": ">=0.53.7",
+    "rednode": ">=0.54.0",
     "codeware": ">=1.16"
   }
 }

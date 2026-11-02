@@ -1475,6 +1475,37 @@ export const ink = {
   },
 
   /**
+   * Checks ink markup without putting anything on the game's UI, as {@link ink.parse} would
+   * read it: answers null when it reads, or the first {@link InkMarkupError}, with its line and
+   * column. Give `handlers` (the names its `on...` attributes may use) to check those too. An
+   * editor checks as the modder types with it.
+   *
+   * @example
+   * ```ts
+   * const error = ink.check(source, ["track"]);
+   * if (error) console.log(`line ${error.line}, column ${error.column}: ${error.reason}`);
+   * ```
+   */
+  check(source: string, handlers?: string[] | Record<string, unknown>, file?: string): InkMarkupError | null {
+    const named = Array.isArray(handlers) ? Object.fromEntries(handlers.map((n) => [n, () => {}])) : handlers;
+    try {
+      compileMarkup(source, named, file);
+      return null;
+    } catch (err) {
+      if (err instanceof InkMarkupError) return err;
+      throw err;
+    }
+  },
+
+  /** The tags ink markup knows, with the attributes each takes: for an editor's completion. */
+  markupTags(): Record<string, string[]> {
+    const out: Record<string, string[]> = {};
+    for (const [tag, spec] of Object.entries(MARKUP_TAGS)) out[tag] = [...spec.attrs, ...(tag === "mount" ? [] : ["on"])];
+    for (const [alias, tag] of Object.entries(ALIASES)) out[alias] = out[tag];
+    return out;
+  },
+
+  /**
    * The game's own ink layers (needs Codeware), in their order, each with its window. The HUD
    * layer also lists its entries: each HUD piece the game spawned, with its root widget, its
    * game controller and the `.inkwidget` file it came from (a path hash). Reads only.

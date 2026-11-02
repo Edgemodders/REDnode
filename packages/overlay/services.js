@@ -135,9 +135,11 @@ function createServices(host) {
      * A caller connects: from then on it gets the provider's events. Answers what the
      * provider offers. Waits for a provider that is starting.
      */
-    async connect(callerId, provider) {
+    async connect(callerId, provider, { fromPage = false } = {}) {
       if (typeof provider !== 'string' || !provider) throw new Error('service.connect needs a package id, such as "edgebuilder"');
-      if (provider === callerId) throw new Error('A package cannot connect to its own service: call its functions directly');
+      // A package's Node mod calls its own functions directly; its pages, in another process,
+      // reach them only through the service (the UI Workbench's page and its project files).
+      if (provider === callerId && !fromPage) throw new Error('A package cannot connect to its own service: call its functions directly');
       await whenReady(provider);
       if (callerId) {
         const set = subscribers.get(provider) ?? new Set();
