@@ -61,6 +61,7 @@
 #include "jvalue.hpp"
 #include "overlay.hpp"
 
+#include <RED4ext/CNamePool.hpp>
 #include <RED4ext/ResourcePath.hpp>
 #include <RED4ext/TweakDB.hpp>
 #include <RED4ext/ResourceReference.hpp>
@@ -546,7 +547,9 @@ bool FromJson(const rtti::IType* aType, void* aMem, const Value& aValue, std::st
     case Kind::Name:
         if (!Expect(aValue.kind == Value::Kind::String, aType, "a string", aError))
             return false;
-        *static_cast<CName*>(aMem) = CName(aValue.text.c_str());
+        // Into the game's name pool, so the name reads back as text (a hash alone named the ink
+        // driver's mounts "" in the UI Workbench, UT2).
+        *static_cast<CName*>(aMem) = CNamePool::Add(aValue.text.c_str());
         return true;
     case Kind::Simple:
         if (name == "String")

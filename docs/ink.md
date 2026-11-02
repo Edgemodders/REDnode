@@ -768,3 +768,25 @@ The other notes of that run: the **Waiting for the game** message never showed, 
 2. Pick something in the middle of the screen and something on the right (the quest tracker): each time the tree opens to it. Open a picked widget's children from its row. Mark.
 3. Switch the UI Workbench off and quit. Claude reads the `Ink entry` lines to work out where the game draws each entry's window.
 
+**0.53.5's run (2026-11-02): passed, with two findings.** The tree opened to each pick, through the HUD entries too. But the `Ink entry` lines were all 0: the workbench's first read came at the main menu, before the HUD had slots, and they were logged once a session. And the Ink markup sample's panel could not be picked: a pick there (live, through MCP `window_text`) chose `CityOverlayPane`, a 900 x 1200 canvas deep in the metro map's HUD piece, drawn with its `visible` flag on but under a parent at opacity 0; deepest first, such unseen layouts of other HUD pieces filled the 60 hits ahead of a small panel near the top of its own tree. The panel's mount also showed as "(no name)": names passed to the game were only hashed (`CName(text)`), not added to its name pool, so they read back empty.
+
+REDnode 0.53.6 with UI Workbench 0.1.4:
+
+| Change | Where |
+|---|---|
+| Pick and `ink.boxes` skip a widget, and all under it, when its opacity and its parents' together come to 0, and keep only boxes with a size | `Look` in inkread.cpp |
+| Hits come the smallest box first (the most particular widget), then the deepest | inkread.cpp, the Workbench, the mock and the docs simulation |
+| A name passed to the game goes into its name pool (`CNamePool::Add`), so it reads back: the ink driver's mounts are named `rednode:<package>:<mount>` in the tree, and any CName passed through `api` reads back too | `FromJson` in reflect.cpp |
+| An `Ink entry` line whenever an entry's slot numbers change, not once a session | inkread.cpp |
+| The tree's own filter at the top of the tree panel (asked for by the player): name, class, controller or text, over the rows read so far; a row stays when it or a row under it matches, and the parents of a match stay open while it has text | the Workbench |
+
+Mock game: 33 checks (with an opacity-0 layout over the HUD and the filter).
+
+### UT2 polish retest (0.53.6)
+
+0. Test timer: Start, Mark after each step.
+1. Load a save, with the **Ink markup** sample on (no permission switch). Switch on **UI Workbench** (no permission switch). Press **Pick** and click a line of the Ink markup panel (CONTRACTS): its text widget is picked and the tree opens to it, under a mount named `rednode:ink-markup:m1`. Mark.
+2. Pick the consumables icon and something in the middle of the screen: each picks the piece under the cursor. Mark.
+3. Type a name in the tree's filter (for example `consumable`, after opening the HUD layer): only the matching rows and the rows above them stay. Empty it: the tree is as before. Mark.
+4. Switch the UI Workbench off and quit. Claude reads the `Ink entry` lines (the slots once the HUD is up) to work out the offset.
+

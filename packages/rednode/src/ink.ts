@@ -1525,7 +1525,9 @@ export const ink = {
   },
 
   /**
-   * The game's visible widgets under a point on screen, on every active layer, deepest first:
+   * The game's drawn widgets under a point on screen, on every active layer, the smallest box
+   * first (the most particular widget; then the deepest), leaving out what is not drawn (its or its
+   * parents' opacity is 0):
    * what an inspector's Pick finds. `x` and `y` are in the game's ink pixels (the layers'
    * `size`). Reads only.
    *
@@ -1540,7 +1542,7 @@ export const ink = {
   },
 
   /**
-   * Every visible widget of the game with a box on screen, on every active layer, deepest
+   * Every drawn widget of the game with a box on screen, on every active layer, the smallest
    * first, in one call (about 7 ms for 1,600 widgets in game 2.5). A page that highlights what
    * is under the cursor reads these once and tests each mouse move itself, instead of asking
    * the game on every move. Boxes are in ink pixels, as {@link ink.at}'s. Reads only.

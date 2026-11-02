@@ -1230,7 +1230,7 @@ function inkRead(method, q) {
   };
   look('w1', 0);
   look('w6', 0);
-  hits.sort((a, b) => b.depth - a.depth || a.box[2] * a.box[3] - b.box[2] * b.box[3]);
+  hits.sort((a, b) => a.box[2] * a.box[3] - b.box[2] * b.box[3] || b.depth - a.depth);
   if (all) return { widgets: hits.map(({ path: _, ...rest }) => rest), looked, ms: 0.5 };
   return { hits, looked, ms: 0.6 };
 }

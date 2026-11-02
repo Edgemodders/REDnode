@@ -17,10 +17,10 @@
 //        library file's hash, its layer, the HUD entry) and every property, plus "ref" for api.
 //   ink.at {"x":..,"y":..}
 //     -> {"hits":[{"id","class","name","box","layer","entry","depth","path"}],"looked":N,"ms":t}
-//     The visible widgets whose box holds the point, on every active layer, deepest first.
+//     The drawn widgets whose box holds the point, on every active layer, the smallest box first.
 //   ink.boxes {}
 //     -> {"widgets":[{"id","class","name","box","layer","entry","depth"}],"looked":N,"ms":t}
-//     Every visible widget with a box, deepest first: a page that picks finds what is under the
+//     Every drawn widget with a box, the smallest first: a page that picks finds what is under the
 //     cursor on each move from these, without asking the game each time.
 //
 // Widget ids ("w12") stay the same for a widget while it lives, so a tree can be read again.
@@ -72,7 +72,8 @@ std::unordered_map<IScriptable*, uint32_t>& g_ids = *new std::unordered_map<IScr
 std::unordered_map<uint32_t, WeakHandle<IScriptable>>& g_widgets =
     *new std::unordered_map<uint32_t, WeakHandle<IScriptable>>();
 uint32_t g_nextId = 1;
-bool g_entriesLogged = false; // the HUD entries' slots, logged at the first ink.layers of a session
+// Each HUD entry's slot numbers as last logged, to log them again only when they change.
+std::unordered_map<std::string, std::string>& g_entryLines = *new std::unordered_map<std::string, std::string>();
 
 const CClass* ClassOf(const char* aName)
 {
@@ -511,7 +512,8 @@ std::string LayersJson(std::string& aError)
                        ",\"controller\":" + (controller ? JsonString(ClassName(controller)) : "null") +
                        ",\"library\":" + JsonString(library);
                 // Where its own window is drawn: the slot's box, the window's size, and the slot's
-                // size over the window's (reported, not applied: see PlaceOf). Logged once a session.
+                // size over the window's (reported, not applied: see PlaceOf). Logged when they
+                // change (at the main menu they are all 0, as 0.53.5's run found).
                 if (e.window)
                 {
                     Box slot;
@@ -522,14 +524,18 @@ std::string LayersJson(std::string& aError)
                     out += ",\"slot\":" + BoxJson(slot) + ",\"windowSize\":" +
                            (ew ? "[" + Num(ww) + "," + Num(wh) + "]" : std::string("null")) + ",\"scale\":[" +
                            Num(scale.sx) + "," + Num(scale.sy) + "]";
-                    if (!g_entriesLogged)
-                        Log("Ink entry %s: slot %s, window %.0f x %.0f, slot over window %.3f x %.3f", e.name.c_str(),
-                            BoxJson(slot).c_str(), ww, wh, scale.sx, scale.sy);
+                    char line[256];
+                    std::snprintf(line, sizeof(line), "slot %s, window %.0f x %.0f, slot over window %.3f x %.3f",
+                                  BoxJson(slot).c_str(), ww, wh, scale.sx, scale.sy);
+                    if (std::string& last = g_entryLines[e.name]; last != line)
+                    {
+                        last = line;
+                        Log("Ink entry %s: %s", e.name.c_str(), line);
+                    }
                 }
                 out += "}";
             }
             out += "]";
-            g_entriesLogged = true;
         }
         out += "}";
     }
@@ -835,21 +841,27 @@ struct Picker
     std::vector<Hit> hits;
 };
 
+// aOpacity is the parents' opacity together: a widget whose own and parents' opacity come to 0
+// is not drawn, though its visible flag is on (the metro map's HUD piece, UT2: its unseen
+// layout filled Pick's list and hid the Ink markup panel), so it and its children are skipped.
 void Look(Picker& aPicker, const Obj& aWidget, int aDepth, const Place& aPlace, const std::string& aLayer,
-          const std::string& aEntry)
+          const std::string& aEntry, double aOpacity = 1)
 {
     if (aPicker.looked >= MaxLooked)
         return;
     ink::Widget* w = AsWidget(aWidget);
     if (!w || !w->visible)
         return;
+    const double opacity = aOpacity * w->opacity;
+    if (opacity <= 0.001)
+        return;
     aPicker.looked += 1;
     const Box box = BoxOf(aWidget, aPlace);
-    if (aPicker.all ? box.known && box.w > 0 && box.h > 0 : box.Holds(aPicker.x, aPicker.y))
+    if (box.known && box.w > 0 && box.h > 0 && (aPicker.all || box.Holds(aPicker.x, aPicker.y)))
         aPicker.hits.push_back({aWidget, box, aDepth, aLayer, aEntry});
-    // Children can draw outside their parent's box, so every visible child is looked at.
+    // Children can draw outside their parent's box, so every drawn child is looked at.
     for (const auto& child : Children(aWidget))
-        Look(aPicker, child, aDepth + 1, aPlace, aLayer, aEntry);
+        Look(aPicker, child, aDepth + 1, aPlace, aLayer, aEntry, opacity);
 }
 
 // ink.at, or ink.boxes with aAll: every visible widget's box, for a page to find what is under
@@ -883,12 +895,14 @@ std::string AtJson(const Value& aParams, bool aAll, std::string& aError)
             Look(picker, e.window, 0, PlaceOf(e), l.name, e.name);
         }
     }
-    // Deepest first; at the same depth (a HUD entry's own window beside the layer's), the smaller
-    // box, the more particular widget.
+    // The smallest box first, the most particular widget under the point; at the same size, the
+    // deepest. (Deepest first, UT2's first order, put deep full-screen layouts of other HUD pieces
+    // ahead of a small panel near the top of its own tree.)
     std::stable_sort(picker.hits.begin(), picker.hits.end(), [](const Hit& a, const Hit& b) {
-        if (a.depth != b.depth)
-            return a.depth > b.depth;
-        return a.box.w * a.box.h < b.box.w * b.box.h;
+        const double areaA = a.box.w * a.box.h, areaB = b.box.w * b.box.h;
+        if (areaA != areaB)
+            return areaA < areaB;
+        return a.depth > b.depth;
     });
     if (!aAll && picker.hits.size() > MaxHits)
         picker.hits.resize(MaxHits);
@@ -940,6 +954,6 @@ void ClearInkRead()
 {
     g_widgets.clear();
     g_ids.clear();
-    g_entriesLogged = false;
+    g_entryLines.clear();
 }
 } // namespace rednode::overlay::detail

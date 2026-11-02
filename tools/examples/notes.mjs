@@ -491,7 +491,7 @@ export const NOTES = {
     how: [
       'The page covers the whole game view (`"fill": "screen"`) and is see-through, so the game takes the mouse wherever it draws nothing. The workbench is a window that moves inside the page.',
       '`ink.layers()` lists the game\'s layers and the HUD\'s pieces; opening a row reads one level with `ink.read({ id }, { depth: 1 })`, and selecting one reads it in full with `ink.inspect(id)`. Widget ids stay the same while a widget lives.',
-      '**Pick** lays a faint sheet over the game that takes one click, turns the page\'s pixels into the game\'s ink pixels (a layer\'s `size`), and asks `ink.at(x, y)` for the visible widgets there, deepest first. Their boxes come back in ink pixels and are drawn here scaled to the page.',
+      '**Pick** lays a faint sheet over the game that takes one click, turns the page\'s pixels into the game\'s ink pixels (a layer\'s `size`), and asks `ink.at(x, y)` for the drawn widgets there, the smallest box first. Their boxes come back in ink pixels and are drawn here scaled to the page.',
       'Esc leaves Pick through the web\'s Keyboard Lock (`navigator.keyboard.lock(["Escape"])`), which REDnode gives to a page that asks; a right-click does too.',
       'Everything here reads: nothing in the game changes. Part of REDnode UI Tools; its editor comes next.',
     ],

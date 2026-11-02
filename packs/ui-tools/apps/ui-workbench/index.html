@@ -32,12 +32,17 @@
   #status { font: 12px var(--rn-mono); color: var(--rn-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; height: 560px; }
   .pane { border: 1px solid var(--rn-line); overflow: auto; min-height: 0; }
+  .treepane { display: flex; flex-direction: column; overflow: hidden; }
+  .treebar { padding: 6px; border-bottom: 1px solid var(--rn-line); }
+  .treebar rn-input { display: block; }
 
-  #tree { font: 13px var(--rn-mono); padding: 4px 0; }
+  #tree { font: 13px var(--rn-mono); padding: 4px 0; overflow: auto; flex: 1; min-height: 0; }
+  /* While filtering, the parents of a match are open, whatever their arrow says. */
+  #tree.filtering .kids.has-match { display: block !important; }
   .row { display: flex; align-items: baseline; gap: 6px; padding: 1px 6px; cursor: default; white-space: nowrap; }
   .row:hover { background: var(--rn-panel-2); }
   .row.selected { background: var(--rn-accent); color: var(--rn-on-accent); }
-  .row.selected .dim, .row.selected .badge { color: var(--rn-on-accent); }
+  .row.selected .dim, .row.selected .badge, .row.selected .snippet { color: var(--rn-on-accent); }
   .arrow { width: 12px; flex: none; text-align: center; color: var(--rn-dim); }
   .arrow.open::before { content: '▾'; }
   .arrow.shut::before { content: '▸'; }
@@ -77,12 +82,14 @@
     <div class="bar">
       <rn-button id="refresh" title="Read the game's layers again">Refresh</rn-button>
       <rn-button id="pick" title="Click a piece of the game's UI to find its widgets">Pick</rn-button>
-      <rn-input id="filter" placeholder="Filter the read widgets"></rn-input>
       <span class="grow"></span>
       <span id="status"></span>
     </div>
     <div class="split">
-      <div class="pane" id="tree"><div class="empty">Reading the game's layers...</div></div>
+      <div class="pane treepane">
+        <div class="treebar"><rn-input id="filter" placeholder="Filter the tree: name, class, controller or text"></rn-input></div>
+        <div id="tree"><div class="empty">Reading the game's layers...</div></div>
+      </div>
       <div class="pane" id="detail"><div class="empty">Select a widget in the tree, or press Pick and click the game's UI.</div></div>
     </div>
   </rn-window>
@@ -142,7 +149,7 @@
     row.style.paddingLeft = `${6 + opts.level * 14}px`;
     const arrow = el('span', `arrow ${opts.expandable ? 'shut' : ''}`);
     row.append(arrow, label);
-    const kids = el('div');
+    const kids = el('div', 'kids');
     kids.hidden = true;
     wrap.append(row, kids);
     let loaded = false;
@@ -159,6 +166,7 @@
         }
       }
       kids.hidden = !kids.hidden;
+      if (filterText) filterTree(filterText); // rows read now are filtered too
       arrow.className = `arrow ${kids.hidden ? 'shut' : 'open'}`;
     };
     arrow.addEventListener('click', (e) => {
@@ -447,7 +455,7 @@
   }
 
   function showHits(hits) {
-    const part = section('hits', `Under the cursor (${hits.length}), deepest first`);
+    const part = section('hits', `Under the cursor (${hits.length}), smallest first`);
     for (const h of hits) {
       const d = el('div', 'hit', `${h.name || '(no name)'}  ${h.class}  ${h.entry ? `[${h.entry}]` : `[${h.layer}]`}`);
       d.title = h.path;
@@ -487,7 +495,7 @@
 
   function showHover(clientX, clientY) {
     const [x, y] = toInk(clientX, clientY);
-    // The boxes come deepest first, and smaller first at the same depth, as ink.at's hits do.
+    // The boxes come smallest first (the most particular widget), as ink.at's hits do.
     const w = boxes.find((b) => b.box && x >= b.box[0] && y >= b.box[1] && x < b.box[0] + b.box[2] && y < b.box[1] + b.box[3]);
     hover.replaceChildren();
     if (!w) {
@@ -569,9 +577,28 @@
     outline([]);
     loadLayers();
   });
+  // The tree's filter, over the rows read so far: a row stays when it or a row under it matches,
+  // and the parents of a match are open while the filter has text.
+  function filterTree(q) {
+    tree.classList.toggle('filtering', !!q);
+    const walk = (wrap) => {
+      const [row, kids] = wrap.children;
+      if (!row?.classList.contains('row')) return false;
+      let below = false;
+      for (const child of kids?.children ?? []) if (walk(child)) below = true;
+      kids?.classList.toggle('has-match', !!q && below);
+      const self = !!q && (row.dataset.search ?? row.textContent.toLowerCase()).includes(q);
+      wrap.style.display = !q || self || below ? '' : 'none';
+      return self || below;
+    };
+    let found = 0;
+    for (const wrap of tree.children) if (walk(wrap)) found += 1;
+    if (q) status(found ? `Filter "${q}": matches under ${found} layer(s), among the rows read so far` : `Filter "${q}": nothing among the rows read so far`);
+  }
+  let filterText = '';
   $('filter').addEventListener('input', (e) => {
-    const q = String(e.detail?.value ?? $('filter').value).toLowerCase();
-    for (const { row } of rows.values()) row.style.display = !q || row.dataset.search.includes(q) ? '' : 'none';
+    filterText = String(e.detail?.value ?? $('filter').value).trim().toLowerCase();
+    filterTree(filterText);
   });
 
   // A save load rebuilds the game's UI, and the ids read before it are gone: read the layers again.
