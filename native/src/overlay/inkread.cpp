@@ -26,9 +26,10 @@
 // Widget ids ("w12") stay the same for a widget while it lives, so a tree can be read again.
 // Boxes come from inkWidgetUtils.LocalToGlobal at the widget's corner and at its size; for a
 // HUD entry with a window of its own, the game draws that window into the entry's slot, so its
-// boxes are placed at the slot and scaled by the slot's size over the window's (0.53.4; RED Hot
-// Tools' Ink Inspector adds only the slot's place, and 0.53.3 did too: boxes in dpad_hint came
-// out too large and too far right). ink.layers gives each entry's slot, window size and scale.
+// boxes are placed at the slot's place, as RED Hot Tools' Ink Inspector does. They came out some
+// 15 page pixels off in dpad_hint (0.53.3); scaling by the slot's size over the window's (0.53.4)
+// moved them far off, so it is reported (ink.layers' slot, windowSize, scale, and a log line per
+// entry once a session), not applied, until the numbers are read in game.
 // The structs (ink::Layer, ink::HUDLayer's entries, ink::Widget) are RED4ext.SDK's for game 2.5.
 
 #include "jvalue.hpp"
@@ -71,6 +72,7 @@ std::unordered_map<IScriptable*, uint32_t>& g_ids = *new std::unordered_map<IScr
 std::unordered_map<uint32_t, WeakHandle<IScriptable>>& g_widgets =
     *new std::unordered_map<uint32_t, WeakHandle<IScriptable>>();
 uint32_t g_nextId = 1;
+bool g_entriesLogged = false; // the HUD entries' slots, logged at the first ink.layers of a session
 
 const CClass* ClassOf(const char* aName)
 {
@@ -444,9 +446,11 @@ Obj WindowOf(const Layer& aLayer)
     return aLayer.window;
 }
 
-// A HUD entry's own window on screen: its slot's place, and the slot's size over the window's
-// (no scale when either size is unknown). The slot is a widget of the layer's window.
-Place PlaceOf(const Entry& aEntry, Box* aSlot = nullptr)
+// A HUD entry's own window on screen: at its slot's place, not scaled. 0.53.4 also scaled by the
+// slot's size over the window's, and boxes in the consumables' and ammo counter's windows went
+// elsewhere (the scale is far from 1 there, the offset only some pixels): until the numbers are
+// read in game (aScale gives the slot's size over the window's, to report), the place alone.
+Place PlaceOf(const Entry& aEntry, Box* aSlot = nullptr, Place* aScale = nullptr)
 {
     Place place;
     if (!aEntry.slot)
@@ -459,10 +463,10 @@ Place PlaceOf(const Entry& aEntry, Box* aSlot = nullptr)
     place.x = slot.x;
     place.y = slot.y;
     ink::Widget* window = AsWidget(aEntry.window);
-    if (window && window->size.X > 0 && window->size.Y > 0 && slot.w > 0 && slot.h > 0)
+    if (aScale && window && window->size.X > 0 && window->size.Y > 0 && slot.w > 0 && slot.h > 0)
     {
-        place.sx = slot.w / window->size.X;
-        place.sy = slot.h / window->size.Y;
+        aScale->sx = slot.w / window->size.X;
+        aScale->sy = slot.h / window->size.Y;
     }
     return place;
 }
@@ -506,19 +510,26 @@ std::string LayersJson(std::string& aError)
                        ",\"root\":" + (e.root ? JsonString(IdOf(e.root)) : "null") +
                        ",\"controller\":" + (controller ? JsonString(ClassName(controller)) : "null") +
                        ",\"library\":" + JsonString(library);
-                // Where its own window is drawn: the slot's box and the window's size, and the scale.
+                // Where its own window is drawn: the slot's box, the window's size, and the slot's
+                // size over the window's (reported, not applied: see PlaceOf). Logged once a session.
                 if (e.window)
                 {
                     Box slot;
-                    const Place place = PlaceOf(e, &slot);
+                    Place scale;
+                    PlaceOf(e, &slot, &scale);
                     ink::Widget* ew = AsWidget(e.window);
+                    const double ww = ew ? ew->size.X : 0, wh = ew ? ew->size.Y : 0;
                     out += ",\"slot\":" + BoxJson(slot) + ",\"windowSize\":" +
-                           (ew ? "[" + Num(ew->size.X) + "," + Num(ew->size.Y) + "]" : std::string("null")) +
-                           ",\"scale\":[" + Num(place.sx) + "," + Num(place.sy) + "]";
+                           (ew ? "[" + Num(ww) + "," + Num(wh) + "]" : std::string("null")) + ",\"scale\":[" +
+                           Num(scale.sx) + "," + Num(scale.sy) + "]";
+                    if (!g_entriesLogged)
+                        Log("Ink entry %s: slot %s, window %.0f x %.0f, slot over window %.3f x %.3f", e.name.c_str(),
+                            BoxJson(slot).c_str(), ww, wh, scale.sx, scale.sy);
                 }
                 out += "}";
             }
             out += "]";
+            g_entriesLogged = true;
         }
         out += "}";
     }
@@ -782,6 +793,23 @@ std::string WidgetJson(const Value& aParams, std::string& aError)
                       ",\"entry\":" + (entry.empty() ? "null" : JsonString(entry)) +
                       ",\"library\":" + JsonString(LibraryOf(widget)) + ",\"ref\":{\"$ref\":" +
                       Num(ref.Get("$ref")->number) + "}";
+    // Its parents from the window down, for an inspector to open its tree to it.
+    std::vector<Obj> up;
+    for (Obj at = parent; at && up.size() < 200;)
+    {
+        up.push_back(at);
+        ink::Widget* aw = AsWidget(at);
+        at = aw ? ParentOf(aw) : Obj{};
+    }
+    out += ",\"ancestors\":[";
+    for (size_t i = up.size(); i-- > 0;)
+    {
+        ink::Widget* aw = AsWidget(up[i]);
+        out += std::string(i + 1 == up.size() ? "" : ",") + "{\"id\":" + JsonString(IdOf(up[i])) +
+               ",\"name\":" + JsonString(aw ? aw->name.ToString() : "") + ",\"class\":" + JsonString(ClassName(up[i])) +
+               "}";
+    }
+    out += "]";
     const std::string text = TextOf(widget);
     if (!text.empty())
         out += ",\"text\":" + JsonString(text);
@@ -912,5 +940,6 @@ void ClearInkRead()
 {
     g_widgets.clear();
     g_ids.clear();
+    g_entriesLogged = false;
 }
 } // namespace rednode::overlay::detail

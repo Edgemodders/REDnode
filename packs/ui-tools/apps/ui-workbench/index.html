@@ -130,7 +130,10 @@
   }
 
   // ---------- the tree ----------
-  const rows = new Map(); // widget id -> { node, row, kids }
+  const rows = new Map(); // widget id -> { node, row, r }
+  const layerRows = new Map(); // a layer's window id -> { r, l, group: its HUD entries row }
+  const entryRows = new Map(); // a HUD entry's own window id -> { r, layer, e }
+  let lastLayers = [];
   let selectedRow = null;
 
   function rowFor(label, opts) {
@@ -188,8 +191,44 @@
       select: (row) => select(n.id, row),
     });
     r.row.dataset.search = `${n.name} ${n.class} ${n.text ?? ''} ${n.controller ?? ''}`.toLowerCase();
-    rows.set(n.id, { node: n, row: r.row });
+    rows.set(n.id, { node: n, row: r.row, r });
     container.append(r.wrap);
+  }
+
+  // Opens a row's children, reading them the first time.
+  async function open(r) {
+    if (r && r.kids.hidden) await r.toggle();
+  }
+
+  // Opens the tree down to a widget from ink.inspect (its ancestors, from its window down) and
+  // marks its row: after a pick, its children are then a click away.
+  async function reveal(w) {
+    if (!w?.ancestors) return;
+    const chain = [...w.ancestors.map((a) => a.id), w.id];
+    const top = chain[0];
+    const layer = layerRows.get(top);
+    if (layer) {
+      await open(layer.r); // the layer's window: its children are the layer row's
+      chain.shift();
+    } else {
+      // A HUD entry's own window: the HUD layer, its entries, then the entry.
+      const entry = entryRows.get(top);
+      if (!entry) return;
+      await open(entry.layer.r);
+      await open(entry.layer.group);
+      await open(entryRows.get(top).r); // its row exists once the entries are listed
+    }
+    for (let i = 0; i < chain.length; i++) {
+      const found = rows.get(chain[i]);
+      if (!found) return;
+      if (i < chain.length - 1) await open(found.r);
+      else {
+        if (selectedRow) selectedRow.classList.remove('selected');
+        selectedRow = found.row;
+        selectedRow.classList.add('selected');
+        selectedRow.scrollIntoView({ block: 'center' });
+      }
+    }
   }
 
   // At the start the game may not answer yet (the host starts before the game is ready, and the
@@ -209,8 +248,11 @@
     }
     const sized = layers.find((l) => l.name === 'inkHUDLayer' && l.size[0] > 0) ?? layers.find((l) => l.size[0] > 0);
     inkSize = sized?.size ?? null;
+    lastLayers = layers;
     tree.replaceChildren();
     rows.clear();
+    layerRows.clear();
+    entryRows.clear();
     for (const l of layers) {
       const label = el('span');
       label.append(el('span', 'group', l.name), ' ', el('span', 'dim', `${l.children} ${l.children === 1 ? 'child' : 'children'}${l.active ? ', active' : ''}`));
@@ -225,9 +267,10 @@
               level: 1,
               expandable: true,
               load: async (gk) => {
-                for (const e of l.entries) addEntry(gk, e);
+                for (const e of l.entries) addEntry(gk, e, layerRows.get(l.window));
               },
             });
+            layerRows.get(l.window).group = g;
             kids.append(g.wrap);
           }
           if (l.children > 0) {
@@ -238,12 +281,17 @@
         },
         select: (row) => l.window && select(l.window, row),
       });
+      if (l.window) {
+        layerRows.set(l.window, { r, l, group: null });
+        // Its entries are known before the group row is opened, for reveal.
+        for (const e of l.entries ?? []) if (e.window) entryRows.set(e.window, { r: null, layer: layerRows.get(l.window), e });
+      }
       tree.append(r.wrap);
     }
     status(`${layers.length} layers, ink size ${inkSize ? inkSize.join(' x ') : 'unknown'}`);
   }
 
-  function addEntry(container, e) {
+  function addEntry(container, e, layer) {
     const label = el('span', e.enabled ? '' : 'hidden-widget');
     label.append(el('span', 'name', e.name), ' ', el('span', 'dim', e.controller ?? ''));
     if (!e.enabled) label.append(' ', el('span', 'badge', 'off'));
@@ -261,6 +309,7 @@
       },
       select: (row) => (e.root ? select(e.root, row) : showEntry(e, row)),
     });
+    if (e.window) entryRows.set(e.window, { r, layer, e });
     container.append(r.wrap);
   }
 
@@ -366,6 +415,13 @@
     line('controllers', w.controllers.join(', '));
     line('layer', w.layer);
     line('HUD entry', w.entry);
+    // The entry's own window and where the game draws it: to see why a box sits off.
+    const entry = w.entry && lastLayers.flatMap((l) => l.entries ?? []).find((e) => e.name === w.entry);
+    if (entry?.slot !== undefined) {
+      line('entry slot', entry.slot ? entry.slot.map((n) => Math.round(n)).join(', ') : 'unknown');
+      line('entry window', entry.windowSize ? entry.windowSize.map((n) => Math.round(n)).join(' x ') : 'unknown');
+      line('slot / window', entry.scale ? entry.scale.map((n) => n.toFixed(3)).join(' x ') : 'unknown');
+    }
     line('library', w.library && `${w.library} (the .inkwidget file's path hash)`);
     line('children', `${w.children.length}`);
     line('api ref', `{"$ref": ${w.ref.$ref}}`);
@@ -400,6 +456,7 @@
       d.addEventListener('click', async () => {
         await select(h.id);
         showDetail(current, hits);
+        reveal(current);
       });
       part.append(d);
     }
@@ -500,6 +557,7 @@
     }
     await select(found.hits[0].id);
     showDetail(current, found.hits);
+    await reveal(current);
   });
   $('sheet').addEventListener('contextmenu', (e) => e.preventDefault());
   document.addEventListener('keydown', (e) => {

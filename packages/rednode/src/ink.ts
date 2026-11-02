@@ -1588,6 +1588,12 @@ export interface InkLayerInfo {
     controller: string | null;
     /** The `.inkwidget` file it was spawned from, as a path hash. */
     library: string;
+    /** With its own window: the slot on the HUD the game draws that window into. */
+    slot?: InkBox;
+    /** With its own window: the window's size, in ink pixels. */
+    windowSize?: [number, number] | null;
+    /** With its own window: the slot's size over the window's. */
+    scale?: [number, number];
   }[];
 }
 
@@ -1640,6 +1646,8 @@ export interface InkWidgetInfo {
   entry: string | null;
   /** The `.inkwidget` file it or a parent was spawned from, as a path hash. */
   library: string;
+  /** Its parents, from its window down to its own parent, to open a tree to it. */
+  ancestors: { id: string; name: string; class: string }[];
   /** An `api` reference to the widget. */
   ref: { $ref: number };
   text?: string;
