@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Input test</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<style>
+  html, body { margin: 0; background: transparent; }
+  rn-window { position: absolute; inset: 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  #board { height: 120px; border: 1px dashed var(--rn-line); display: grid; place-items: center; outline: none;
+    color: var(--rn-dim); font: 14px var(--rn-mono); user-select: none; }
+  #board:focus { border-color: var(--rn-accent); color: var(--rn-text); }
+  #pad { height: 120px; border: 1px solid var(--rn-line); display: grid; place-items: center; color: var(--rn-dim); font: 14px var(--rn-mono); }
+  #field { width: 100%; box-sizing: border-box; }
+  #log { height: 210px; overflow: auto; font: 12px var(--rn-mono); white-space: pre-wrap; border: 1px solid var(--rn-line); padding: 6px; }
+  .row { display: flex; gap: 10px; align-items: center; }
+</style>
+</head>
+<body>
+<rn-window title="Input test" draggable closable>
+  <div class="grid">
+    <div id="pad">Click here with Ctrl, Shift or Alt held</div>
+    <div id="board" tabindex="0">Board: click, then Ctrl+Z, Ctrl+Y, Ctrl+C, Ctrl+A</div>
+  </div>
+  <p class="row"><input id="field" placeholder="A text field: type, then Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+Z here"></p>
+  <p class="row">
+    <rn-button id="esc" variant="ghost">Take Esc</rn-button>
+    <span id="escState">Esc leaves the overlay</span>
+  </p>
+  <div id="log"></div>
+</rn-window>
+<script>
+  // Input test (#33, #34). Every event this page hears goes to the log on screen and to the
+  // page's console (MCP window_console), so a run can be read after.
+  const logBox = document.getElementById('log');
+  window.inputLog = [];
+  const say = (text) => {
+    window.inputLog.push(text);
+    console.log(`[input-test] ${text}`);
+    logBox.textContent = `${new Date().toLocaleTimeString()}  ${text}\n` + logBox.textContent;
+  };
+  const mods = (e) => ['ctrl', 'shift', 'alt'].filter((k) => e[`${k}Key`]).join('+') || 'none';
+
+  // #33, 1: Ctrl, Shift and Alt on mouse events.
+  const pad = document.getElementById('pad');
+  pad.addEventListener('mousedown', (e) => say(`click: mods ${mods(e)}`));
+  pad.addEventListener('wheel', (e) => say(`wheel: mods ${mods(e)}`));
+
+  // #33, 2: a board with its own edit keys. It takes them with preventDefault, so REDnode
+  // runs nothing; the text field below has none of its own, so REDnode edits its text.
+  const board = document.getElementById('board');
+  let steps = 0;
+  board.addEventListener('keydown', (e) => {
+    if (!e.ctrlKey) return;
+    const k = e.code.replace('Key', '');
+    const name = { Z: e.shiftKey ? 'redo' : 'undo', Y: 'redo', C: 'copy', A: 'select all' }[k];
+    if (!name) return;
+    e.preventDefault();
+    steps += name === 'undo' ? -1 : name === 'redo' ? 1 : 0;
+    say(`board: its own ${name} (Ctrl+${e.shiftKey ? 'Shift+' : ''}${k}), history step ${steps}`);
+  });
+  const field = document.getElementById('field');
+  field.addEventListener('input', () => say(`field: "${field.value}"`));
+  document.addEventListener('copy', () => say(`copy event: "${String(getSelection())}"`));
+  document.addEventListener('selectionchange', () => {
+    if (document.activeElement === field && field.selectionEnd > field.selectionStart) say(`field: selected ${field.selectionEnd - field.selectionStart} characters`);
+  });
+
+  // #34: Esc for the page, with the web's Keyboard Lock API.
+  let taken = false;
+  const escButton = document.getElementById('esc');
+  const escState = document.getElementById('escState');
+  escButton.addEventListener('click', async () => {
+    try {
+      if (taken) navigator.keyboard.unlock();
+      else await navigator.keyboard.lock(['Escape']);
+      taken = !taken;
+      escButton.textContent = taken ? 'Give Esc back' : 'Take Esc';
+      escState.textContent = taken ? 'Esc comes to this page' : 'Esc leaves the overlay';
+      say(taken ? 'Esc taken: navigator.keyboard.lock(["Escape"])' : 'Esc given back: navigator.keyboard.unlock()');
+    } catch (err) {
+      say(`keyboard lock failed: ${err.message}`);
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') say(`Escape: keydown, mods ${mods(e)}`);
+  });
+  say('ready');
+</script>
+</body>
+</html>

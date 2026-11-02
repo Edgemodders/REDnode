@@ -85,6 +85,18 @@ export const NOTES = {
     tryThis: ['Press Add, Rename first and Next title.', 'Press Broken markup and read the error in the log.'],
     preview: 'The box stands for the game\'s screen; the Mod log shows each change.',
   },
+  'input-test': {
+    group: 'tests',
+    summary: 'Keys and modifiers reaching a page: Ctrl, Shift and Alt on clicks, a board with its own Ctrl+Z, Ctrl+Y, Ctrl+C and Ctrl+A beside a text field where they edit text, and Take Esc with the web\'s Keyboard Lock API.',
+    teaches: ['ctrlKey, shiftKey, altKey', 'preventDefault on edit keys', 'navigator.keyboard.lock'],
+    how: [
+      'Clicks and the wheel carry `ctrlKey`, `shiftKey` and `altKey`, read from Windows at each event in the game.',
+      'The board takes Ctrl+Z and the rest with `preventDefault()`, so only its own history moves; in the text field nobody takes them, and Chromium edits the text.',
+      '`navigator.keyboard.lock(["Escape"])` asks for Esc: in the game Esc then comes to the page instead of leaving the overlay, until `navigator.keyboard.unlock()`. F10 always leaves.',
+    ],
+    tryThis: ['Click the left box with Ctrl, Shift or Alt held.', 'Click the board, then press Ctrl+Z; type in the field, then Ctrl+A, Ctrl+C, Ctrl+V.'],
+    preview: 'In the preview the browser\'s own keys apply; in the game, Take Esc keeps Esc from closing the overlay.',
+  },
   'ink-styles': {
     group: 'tests',
     summary: 'A gallery of the ink API\'s layout and look words on the HUD: every text style and tone, the plain and the game look, align, grow, gap, pad and icons, with buttons that change them live.',

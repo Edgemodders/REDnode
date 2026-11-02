@@ -1,0 +1,12 @@
+{
+  "id": "input-test",
+  "name": "Input test",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "Checks keys and modifiers reaching a page (#33, #34): Ctrl, Shift and Alt on clicks, a board with its own Ctrl+Z, Ctrl+Y, Ctrl+C and Ctrl+A beside a text field where they edit text, and Take Esc, which asks for Esc with the web's Keyboard Lock API. Every event shows in the log.",
+  "entry": "index.html",
+  "width": 760,
+  "height": 600,
+  "anchor": "center",
+  "open": false
+}

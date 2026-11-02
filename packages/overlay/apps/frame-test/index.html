@@ -31,7 +31,7 @@
   const innerSrc = '<!doctype html><body style="margin:0;padding:6px;font:13px sans-serif"><b>Inner frame</b> ' +
     '<button id="ib">Inner click (0)</button><script>let n=0;ib.onclick=(e)=>{n++;ib.textContent="Inner click ("+n+")";' +
     'parent.parent.postMessage({frame:"Inner",what:"click "+n+(e.isTrusted?" (trusted)":" (synthetic)")},"*");};' +
-    'const b=ib.getBoundingClientRect();parent.parent.postMessage({frame:"Inner",what:"ready",rect:[b.left,b.top,b.width,b.height]},"*");<\/script>';
+    'addEventListener("load",()=>{const b=ib.getBoundingClientRect();parent.parent.postMessage({frame:"Inner",what:"ready",rect:[b.left,b.top,b.width,b.height]},"*");});<\/script>';
   const innerJs = JSON.stringify(innerSrc).replace(/</g, '\\u003c');
   // What each frame runs: it reports its events to this page with postMessage. withInner adds
   // a sandboxed frame inside it.

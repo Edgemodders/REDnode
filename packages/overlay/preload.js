@@ -59,6 +59,8 @@ contextBridge.exposeInMainWorld('rednode', {
   windowInfo: () => ipcRenderer.invoke('rednode:app:info'),
   /** Asks the plugin to hold the cursor for this window (true) or let it go (false); used by the page's Pointer Lock API. */
   pointerLock: (on) => ipcRenderer.invoke('rednode:app:pointer-lock', !!on),
+  /** Asks the plugin for Esc (true): it then goes to this page instead of leaving interactive mode; used by the page's Keyboard Lock API (#34). */
+  keyboardLock: (on) => ipcRenderer.invoke('rednode:app:keyboard-lock', !!on),
   /** A title-bar action on this window: 'space' (to a space's name or '*'), 'pin-hud' (true or false), 'reset', 'size' ({ width, height }, a resizable window only). Answers the window info. */
   windowAction: (action, arg) => ipcRenderer.invoke('rednode:app:action', action, arg),
   /** Installed apps and mods. Only the built-in launcher and Mod Manager may use these; other apps get an error. */
@@ -286,5 +288,22 @@ if (location.protocol !== 'devtools:') {
       if (locked || pending) api.pointerLock(false).catch(() => {});
     };
     Object.defineProperty(Document.prototype, 'pointerLockElement', { configurable: true, get: () => locked });
+
+    // The web's Keyboard Lock API (#34): navigator.keyboard.lock(['Escape']), or lock() with
+    // no list, asks for Esc; unlock() gives it back. While asked, Esc goes to this page as a
+    // key when it has focus, instead of leaving interactive mode. F10 always leaves. Other keys
+    // reach the page anyway. A page load gives Esc back.
+    if (api.keyboardLock) {
+      const kb = navigator.keyboard ?? {};
+      const proto = navigator.keyboard ? Object.getPrototypeOf(navigator.keyboard) : kb;
+      proto.lock = function (codes) {
+        if (codes !== undefined && !Array.isArray(codes)) return Promise.reject(new TypeError('keyboard.lock takes a list of key codes'));
+        return api.keyboardLock(codes === undefined || codes.includes('Escape')).then(() => undefined);
+      };
+      proto.unlock = function () {
+        api.keyboardLock(false).catch(() => {});
+      };
+      if (!navigator.keyboard) Object.defineProperty(Navigator.prototype, 'keyboard', { configurable: true, get: () => kb });
+    }
   })()`);
 }

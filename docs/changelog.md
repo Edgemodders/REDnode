@@ -15,6 +15,16 @@ How to keep it:
 
 - Ink markup: a native HUD panel can be written as an `.ink.html` file, with REDnode's ink tags as HTML (`<column gap="10">`, `<text style="label">{title}</text>`, `<list items="contracts" key="id">`), and put on the game's UI with `ink.load("board.ink.html", handlers, data)` or `ink.parse(source)`. `{name}` reads named data and a list item's fields; `view.set(data)` sends only what reads the changed data. A mistake is refused with its file, line and column. The first step of UI Tools. See https://edgemodders.github.io/REDnode/ink.html#ut1-build-rednode-0510
 - A sample, **Ink markup**: a HUD panel with a health bar and a list of contracts from `board.ink.html`. Also in the player zip.
+- Esc for a page that asks for it (https://github.com/Edgemodders/REDnode/issues/34): with the web's Keyboard Lock API, `navigator.keyboard.lock(["Escape"])`, Esc comes to the focused page as a key instead of leaving interactive mode, so an editor can cancel a drag or a move with it; `navigator.keyboard.unlock()` gives it back. F10 always leaves. See https://edgemodders.github.io/REDnode/overlay-apps.html#keys-and-modifiers
+- A test sample, **Input test**: modifiers on clicks, a page's own edit keys beside a text field's, and Take Esc.
+
+**Changed**
+
+- Ctrl+Z, Ctrl+Y, Ctrl+A, Ctrl+C, Ctrl+V and Ctrl+X reach the page as keys (https://github.com/Edgemodders/REDnode/issues/33): a text field edits as before, and a page with its own undo or copy hears them and takes them with `preventDefault()`. Before, the overlay ran the editing command itself and the page never heard the key.
+
+**Fixed**
+
+- Clicks, moves and the wheel in overlay windows now carry Ctrl, Shift and Alt (`ctrlKey`, `shiftKey`, `altKey`), read from Windows at each event, so Ctrl+click, Shift+drag and Alt+click work (https://github.com/Edgemodders/REDnode/issues/33).
 
 ## 0.50.2 (2026-11-01)
 

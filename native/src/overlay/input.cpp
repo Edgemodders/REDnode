@@ -1,6 +1,7 @@
 // Game window hook: the F10 hotkey, and input for overlay windows in interactive mode.
 //
-// F10 cycles passive -> interactive -> hidden. Esc leaves interactive mode.
+// F10 cycles passive -> interactive -> hidden. Esc leaves interactive mode, unless the
+// focused page asked for it (the Keyboard Lock API, #34).
 // In interactive mode mouse and keyboard messages go to windows.cpp, which
 // routes them to the right overlay window, and are not passed to the game.
 // The game hides and locks the cursor, so the overlay keeps a virtual cursor
@@ -152,7 +153,7 @@ LRESULT HandleRawInput(HWND aWnd, WPARAM aWParam, LPARAM aLParam, bool aInteract
             {
                 UnlockPointer("Esc"); // as in a browser: Esc ends the lock and goes no further
             }
-            else if (down && k.VKey == VK_ESCAPE)
+            else if (down && k.VKey == VK_ESCAPE && !FocusWantsEscape())
             {
                 SetMode(Mode::Passive);
             }
@@ -230,7 +231,7 @@ LRESULT CALLBACK WndProc(HWND aWnd, UINT aMsg, WPARAM aWParam, LPARAM aLParam)
             {
                 if (aWParam == VK_ESCAPE && PointerLocked())
                     UnlockPointer("Esc");
-                else if (aWParam == VK_ESCAPE)
+                else if (aWParam == VK_ESCAPE && !FocusWantsEscape())
                     SetMode(Mode::Passive);
                 else
                     OnKey(true, UINT(aWParam));

@@ -143,9 +143,12 @@ function createRouter(wc, log) {
     return locate(x, y);
   }
 
+  // DevTools' modifier bits: Alt 1, Ctrl 2, Shift 8.
+  const modBits = (modifiers) => (modifiers.includes('alt') ? 1 : 0) | (modifiers.includes('control') ? 2 : 0) | (modifiers.includes('shift') ? 8 : 0);
+
   function mouseEvent(t, type, m, buttons, extra) {
     const [x, y] = t.map(m.x, m.y);
-    return send('Input.dispatchMouseEvent', { type, x, y, buttons, ...extra }, t.session);
+    return send('Input.dispatchMouseEvent', { type, x, y, buttons, modifiers: modBits(m.mods ?? []), ...extra }, t.session);
   }
 
   const bits = (held) => [...held].reduce((sum, b) => sum | (BUTTON_BITS[b] ?? 0), 0);
@@ -212,7 +215,7 @@ function createRouter(wc, log) {
   async function key(type, vk, modifiers) {
     if (!focus || focus.gone || !attached) return false;
     const name = KEYS[vk] ?? (vk >= 0x30 && vk <= 0x5a ? String.fromCharCode(vk).toLowerCase() : '');
-    const mods = (modifiers.includes('alt') ? 1 : 0) | (modifiers.includes('control') ? 2 : 0) | (modifiers.includes('shift') ? 8 : 0);
+    const mods = modBits(modifiers);
     const params = { windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, key: name, modifiers: mods };
     if (type === 'keyDown') {
       // Enter needs its text to submit or break a line; other keys type through char.
@@ -257,7 +260,10 @@ function createRouter(wc, log) {
     }
   }
 
-  return { mouse, key, char, push, dispose, active: () => !failed };
+  /** Whether keys go to a frame in another process (the frame clicked last). */
+  const hasFocus = () => !!(focus && !focus.gone && attached);
+
+  return { mouse, key, char, push, dispose, hasFocus, active: () => !failed };
 }
 
 module.exports = { hasRemoteFrames, createRouter, mapper };

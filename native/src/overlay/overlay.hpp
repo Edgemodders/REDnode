@@ -139,6 +139,8 @@ void OnLeaveInteractive();
 // Pointer lock (request #11): a page holds the cursor in place and gets the mouse's raw
 // movement. True while a window holds it; the cursor is then neither moved nor drawn.
 bool PointerLocked();
+// The focused window asked for Esc (keys.lock, #34): Esc goes to it instead of leaving interactive mode.
+bool FocusWantsEscape();
 // Raw mouse movement while the pointer is locked: sent to the window that holds it.
 void OnMouseDelta(float aDx, float aDy);
 // Ends the pointer lock, if any, and tells the host why.

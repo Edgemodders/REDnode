@@ -1259,6 +1259,7 @@ function openInGame(w) {
     hidden: windowHidden(w),
   });
   sendJson({ cmd: 'window.drag', window: w.id, regions: w.dragRegions });
+  if (w.escapeLock) sendJson({ cmd: 'keys.lock', window: w.id, escape: true });
   repaint(w.win.webContents); // send a full frame now
 }
 
@@ -1336,20 +1337,31 @@ function keyName(vk) {
 
 let ctrlDown = false;
 let shiftDown = false;
+let altDown = false;
 let swallowChar = false;
-// Editing shortcuts, run by the host on the focused page.
+// Editing shortcuts for a frame in another process, run by the host. A page gets Ctrl+V and
+// the rest as keys, with their modifiers, and Chromium runs the editing command unless the
+// page takes the key (preventDefault), as in a browser (#33; checked in the mock game: the
+// host running them as well copied and pasted twice).
 const EDIT_KEYS = {
   V: (wc) => wc.paste(),
   C: (wc) => wc.copy(),
   X: (wc) => wc.cut(),
   A: (wc) => wc.selectAll(),
-  Z: (wc) => (shiftDown ? wc.redo() : wc.undo()),
+  Z: (wc, shift) => (shift ? wc.redo() : wc.undo()),
   Y: (wc) => wc.redo(),
 };
 
 // The held mouse buttons of a window, as sendInputEvent modifiers.
 function heldButtons(w) {
   return w.held ? [...w.held].map((b) => `${b}ButtonDown`) : [];
+}
+
+// Ctrl, Shift and Alt for an input message (#33): the plugin reads them from Windows at each
+// event ("mods"); an older plugin sent none, so the keys heard so far stand in.
+function keyMods(m) {
+  if (Array.isArray(m.mods)) return m.mods.filter((k) => k === 'control' || k === 'shift' || k === 'alt');
+  return [ctrlDown && 'control', shiftDown && 'shift', altDown && 'alt'].filter(Boolean);
 }
 
 // A window's router for input into frames in another process (#31), made when it first has one.
@@ -1381,7 +1393,7 @@ async function inputTo(w, m, router) {
       // The plugin sends a leave only with no button held: a safety net for a lost mouseUp.
       if (m.type === 'mouseLeave') w.held?.clear();
       if (m.dx !== undefined) toPage(w, { event: 'pointer-move', dx: m.dx, dy: m.dy });
-      else if (!(router && (await router.mouse(m, w.held ?? new Set())))) wc.sendInputEvent({ type: m.type, x: m.x, y: m.y, modifiers: heldButtons(w) });
+      else if (!(router && (await router.mouse(m, w.held ?? new Set())))) wc.sendInputEvent({ type: m.type, x: m.x, y: m.y, modifiers: [...heldButtons(w), ...keyMods(m)] });
       break;
     case 'mouseDown':
     case 'mouseUp':
@@ -1392,20 +1404,23 @@ async function inputTo(w, m, router) {
       if (m.type === 'mouseDown') w.held.add(m.button);
       else w.held.delete(m.button);
       if (router && (await router.mouse(m, w.held))) break;
-      wc.sendInputEvent({ type: m.type, x: m.x, y: m.y, button: m.button, clickCount: 1, modifiers: heldButtons(w) });
+      wc.sendInputEvent({ type: m.type, x: m.x, y: m.y, button: m.button, clickCount: 1, modifiers: [...heldButtons(w), ...keyMods(m)] });
       break;
     case 'mouseWheel':
       if (router && (await router.mouse(m, w.held ?? new Set()))) break;
-      wc.sendInputEvent({ type: 'mouseWheel', x: m.x, y: m.y, deltaX: 0, deltaY: m.delta });
+      wc.sendInputEvent({ type: 'mouseWheel', x: m.x, y: m.y, deltaX: 0, deltaY: m.delta, modifiers: keyMods(m) });
       break;
     case 'keyDown':
     case 'keyUp': {
-      // The plugin sends Ctrl and Shift as keys of their own; keep their state, so
-      // shortcuts work: the editing ones are run directly, which is reliable.
+      // The plugin sends Ctrl, Shift and Alt as keys of their own too; their state stands in
+      // for a plugin that sends no "mods".
       if (m.vk === 17) ctrlDown = m.type === 'keyDown';
       if (m.vk === 16) shiftDown = m.type === 'keyDown';
+      if (m.vk === 18) altDown = m.type === 'keyDown';
+      const modifiers = keyMods(m);
+      const ctrl = modifiers.includes('control');
       // Ctrl+1 to 9: switch to that space. The key is not passed on, nor the digit it types.
-      if (ctrlDown && m.vk >= 0x31 && m.vk <= 0x39) {
+      if (ctrl && m.vk >= 0x31 && m.vk <= 0x39) {
         if (m.type === 'keyDown') {
           const name = spaces().names[m.vk - 0x31];
           if (name) switchSpace(name);
@@ -1414,11 +1429,12 @@ async function inputTo(w, m, router) {
         break;
       }
       const keyCode = keyName(m.vk);
-      if (m.type === 'keyDown' && ctrlDown && EDIT_KEYS[keyCode]) {
-        EDIT_KEYS[keyCode](wc);
+      if (m.type === 'keyDown' && ctrl && EDIT_KEYS[keyCode] && router?.hasFocus()) {
+        // A frame in another process: the host runs it, as before #33 (whether DevTools' keys
+        // would run the command there is unverified).
+        EDIT_KEYS[keyCode](wc, modifiers.includes('shift'));
         break;
       }
-      const modifiers = [ctrlDown && 'control', shiftDown && 'shift'].filter(Boolean);
       if (router && (await router.key(m.type, m.vk, modifiers))) break;
       if (keyCode) wc.sendInputEvent({ type: m.type, keyCode, modifiers });
       break;
@@ -3441,6 +3457,26 @@ ipcMain.handle('rednode:app:action', (event, action, arg) => {
 
 // Pointer lock (#11): a page asks the plugin to hold the cursor for its window. The answer
 // comes back as {event: 'pointer-lock', locked}; the page's Pointer Lock API follows it.
+// Esc for the page (#34), through the web's Keyboard Lock API in preload.js: while on, Esc goes
+// to the focused page instead of leaving interactive mode. A page load ends it.
+ipcMain.handle('rednode:app:keyboard-lock', (event, on) => {
+  const w = windowFor(event.sender);
+  if (!w) throw new Error('Unknown window');
+  setEscapeLock(w, !!on);
+  if (!w.escapeHooked) {
+    w.escapeHooked = true;
+    w.win.webContents.on('did-navigate', () => setEscapeLock(w, false));
+  }
+  return true;
+});
+
+function setEscapeLock(w, on) {
+  if (!!w.escapeLock === on) return;
+  w.escapeLock = on;
+  log(`${w.app.manifest.id}: ${on ? 'takes Esc (Keyboard Lock)' : 'gives Esc back'}`);
+  if (connected) sendJson({ cmd: 'keys.lock', window: w.id, escape: on });
+}
+
 ipcMain.handle('rednode:app:pointer-lock', (event, on) => {
   const w = windowFor(event.sender);
   if (!w) throw new Error('Unknown window');

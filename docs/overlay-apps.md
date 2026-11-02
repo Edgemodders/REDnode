@@ -601,6 +601,30 @@ addEventListener('pointerup', (e) => {
 
 While locked, the cursor stays where the lock began and is hidden, and every mouse movement arrives as `pointermove` (and `mousemove`) on the locked element, with `movementX` and `movementY`. Buttons and the wheel work as usual, the middle button included. The lock ends with `document.exitPointerLock()`, Esc, leaving interactive mode (F10), or the window closing; `pointerlockchange` tells the page each time. Only the window the player is using may take the lock. The [Pointer lock test](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/pointer-test) sample turns a camera with it.
 
+## Keys and modifiers
+
+Keys reach the focused page as in a browser. Since REDnode 0.52.0:
+
+- **Ctrl, Shift and Alt on the mouse.** Clicks, moves and the wheel carry `ctrlKey`, `shiftKey` and `altKey`, read from Windows at each event, so Ctrl+click, Shift+drag and Alt+click work.
+- **Edit keys reach the page.** Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z, Ctrl+A, Ctrl+C, Ctrl+V and Ctrl+X arrive as `keydown` events. A text field edits as usual; a page with its own undo or its own copy takes the key with `preventDefault()`, and nothing else happens. Before 0.52.0 the overlay ran the editing command itself and the page never heard the key.
+- **Esc for the page.** Esc normally leaves interactive mode, so a page never hears it. A page in the middle of something (a drag, a move, a box select) can ask for Esc with the web's Keyboard Lock API; while it has focus, Esc then comes to it as a key. F10 always leaves interactive mode, so the player is never stuck. A page load gives Esc back.
+
+```js
+async function startMove() {
+  await navigator.keyboard.lock(['Escape']); // Esc now comes to this page
+  moving = true;
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && moving) cancelMove();
+});
+function endMove() {
+  moving = false;
+  navigator.keyboard.unlock(); // Esc leaves the overlay again
+}
+```
+
+`lock()` with no list asks for Esc too; other keys reach the page anyway. The [Input test](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/input-test) sample shows all three.
+
 ## Staying on top and solo mode
 
 REDnode's own windows (the launcher tab, Mod log, Mod Manager, debuggers) live in a **tool layer**, above every package's windows: a full-screen package cannot cover them. A package can ask to join them with `"permissions": ["front"]`; the player allows it in the Mod Manager. The Test timer does this.

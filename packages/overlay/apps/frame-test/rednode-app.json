@@ -1,7 +1,7 @@
 {
   "id": "frame-test",
   "name": "Frame test",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Edgemodders",
   "description": "Checks input into frames in another process (#31): two sandboxed frames, one scaled to 0.8 with a frame inside it, each with a button, a hover box, a text field, a slider and a wheel counter. Every event they get shows in the log.",
   "entry": "index.html",

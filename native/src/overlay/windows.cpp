@@ -27,12 +27,16 @@
 //                                         mouse's raw movement (mouseMove with dx, dy), as the web's
 //                                         Pointer Lock does
 //   {"cmd":"pointer.unlock","window":1}
+//   {"cmd":"keys.lock","window":1,"escape":true}   the page asks for Esc (the web's Keyboard Lock
+//                                         API, #34): while it has focus, Esc goes to it as a key
+//                                         instead of leaving interactive mode; F10 still leaves
 //   {"cmd":"window.drag","window":1,"regions":[x,y,w,h, ...]}   page pixels
 //   {"cmd":"window.size","window":1,"width":800,"height":500}   a resizable window's new size; its
 //                                         top-left corner stays, and "moved" answers where it is
 //   {"cmd":"window.close","window":1}
 // Plugin -> host events:
-//   {"event":"input","window":1,"type":"mouseMove","x":..,"y":..}   page pixels
+//   {"event":"input","window":1,"type":"mouseMove","x":..,"y":..}   page pixels; mouse and key
+//                                         input carries "mods":["control","shift","alt"] while held (#33)
 //   {"event":"focus","window":1}     0 when no window has focus
 //   {"event":"moved","window":1,"x":..,"y":..}   after a drag, reference pixels
 //   {"event":"pointer-lock","window":1,"locked":true|false,"why":".."}   the lock began or ended
@@ -74,6 +78,7 @@ struct Window
     bool hidden = false;              // another package asked for the screen (solo mode)
     uint32_t width = 0, height = 0;
     bool draggable = true;
+    bool wantsEscape = false;         // the page asked for Esc (keys.lock, #34)
     std::vector<DragRegion> dragRegions;
 
     // The whole current image, kept so changed rectangles can be merged into it.
@@ -222,6 +227,22 @@ uint8_t ParseLayer(const std::string& aJson)
     return json::String(aJson, "layer", layer) && layer == "tool" ? 1 : 0;
 }
 
+// The modifier keys held now, read from Windows at each event (#33): the host cannot keep them
+// from key events alone, since a key let go while the game is not in front (Alt+Tab) never
+// arrives. Empty when none is held.
+std::string Mods()
+{
+    std::string mods;
+    const auto add = [&](int aVk, const char* aName) {
+        if (GetAsyncKeyState(aVk) & 0x8000)
+            mods += std::string(mods.empty() ? "" : ",") + "\"" + aName + "\"";
+    };
+    add(VK_CONTROL, "control");
+    add(VK_SHIFT, "shift");
+    add(VK_MENU, "alt");
+    return mods.empty() ? std::string() : ",\"mods\":[" + mods + "]";
+}
+
 std::string MouseJson(uint32_t aWindow, const char* aType, float aX, float aY, const char* aButton = nullptr,
                       int aDelta = 0)
 {
@@ -231,7 +252,7 @@ std::string MouseJson(uint32_t aWindow, const char* aType, float aX, float aY, c
         json += std::string(",\"button\":\"") + aButton + "\"";
     if (aDelta)
         json += ",\"delta\":" + std::to_string(aDelta);
-    return json + "}";
+    return json + Mods() + "}";
 }
 
 void Send(Actions& aActions, std::string aJson)
@@ -446,6 +467,13 @@ void HandleWindowCommand(const std::string& aJson)
                 Log("Overlay: pointer locked by window %u", w->id);
                 Send(actions, "{\"event\":\"pointer-lock\",\"window\":" + std::to_string(w->id) + ",\"locked\":true}");
             }
+        }
+        else if (cmd == "keys.lock" && w)
+        {
+            const bool escape = json::Bool(aJson, "escape", false);
+            if (escape != w->wantsEscape)
+                Log("Overlay: window %u %s Esc", w->id, escape ? "takes" : "gives back");
+            w->wantsEscape = escape;
         }
         else if (cmd == "pointer.unlock" && w)
         {
@@ -858,7 +886,7 @@ void OnKey(bool aDown, UINT aVk)
     }
     if (focus)
         SendJson("{\"event\":\"input\",\"window\":" + std::to_string(focus) + ",\"type\":\"" +
-                 (aDown ? "keyDown" : "keyUp") + "\",\"vk\":" + std::to_string(aVk) + "}");
+                 (aDown ? "keyDown" : "keyUp") + "\",\"vk\":" + std::to_string(aVk) + Mods() + "}");
 }
 
 void OnChar(wchar_t aChar)
@@ -879,6 +907,13 @@ bool PointerLocked()
 {
     std::scoped_lock lock(g_mutex);
     return g_lock != 0;
+}
+
+bool FocusWantsEscape()
+{
+    std::scoped_lock lock(g_mutex);
+    const Window* w = Find(g_focus);
+    return w && w->wantsEscape && !w->hidden;
 }
 
 void OnMouseDelta(float aDx, float aDy)
