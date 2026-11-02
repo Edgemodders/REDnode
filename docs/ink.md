@@ -812,3 +812,5 @@ Mock game: 40 checks (set aside and Pick inside added).
 4. Press **Pick**, point at something with another widget drawn over it, and right-click: the one under it shows; click to pick it. Mark.
 5. Switch the UI Workbench off and quit. Claude reads the `Ink entry` lines.
 
+**Passed in game on 2026-11-02** (REDnode 0.53.7, UI Workbench 0.1.5, dev PC, game 2.5): every step as expected. The Ink markup panel's lines are picked and revealed under `rednode:ink-markup:m1`, the consumables icon's outline sits on it, Pick inside offers only the selected widget's children, and a right-click sets the widget on top aside. With the off-screen layers left out a pick looks at about 450 widgets instead of 1,640, in 2.6 ms instead of 7.7 ms. The `Ink entry` lines read the slots at 0, 0 with no size, after a Refresh in game too: an entry's own window already gives screen places through `LocalToGlobal`, so adding the slot's place adds nothing, and the offset seen since 0.53.3 came from the sizes, which `DrawnSize` fixed. **UT2 is done.** Next in the agreed plan: UT3 Workbench (the editor).
+
