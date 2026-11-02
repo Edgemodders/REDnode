@@ -75,13 +75,14 @@
   <div id="marks"></div>
   <div id="hover"></div>
   <div id="tip"></div>
-  <div id="hint">Pick: point at a piece of the game's UI and click it. Esc or right-click leaves Pick.</div>
+  <div id="hint">Pick: point at a piece of the game's UI and click it. Right-click sets the one under the cursor aside. Esc leaves.</div>
 
   <rn-window id="bench" title="UI Workbench" draggable closable>
     <rn-tabs id="tabs"><rn-tab label="Inspect" active></rn-tab></rn-tabs>
     <div class="bar">
       <rn-button id="refresh" title="Read the game's layers again">Refresh</rn-button>
       <rn-button id="pick" title="Click a piece of the game's UI to find its widgets">Pick</rn-button>
+      <rn-button id="pickInside" variant="ghost" disabled title="Pick only among the selected widget's children and theirs">Pick inside</rn-button>
       <span class="grow"></span>
       <span id="status"></span>
     </div>
@@ -327,6 +328,7 @@
     selectedRow = row;
     row.classList.add('selected');
     current = null;
+    $('pickInside').setAttribute('disabled', '');
     outline([]);
     detail.replaceChildren();
     const part = section('widget', `HUD entry ${e.name}`);
@@ -357,6 +359,7 @@
       return;
     }
     current = w;
+    $('pickInside').toggleAttribute('disabled', !w.children.length);
     showDetail(w);
     outline([{ box: w.box, label: w.name || w.class }]);
   }
@@ -472,17 +475,40 @@
 
   // ---------- Pick ----------
   // While picking, the widget under the cursor is outlined and named as the mouse moves. The
-  // boxes of every visible widget are read once (ink.boxes, a few ms) and again every 1.5 s, so
+  // boxes of every drawn widget are read once (ink.boxes, a few ms) and again every 1.5 s, so
   // a move asks the game nothing; the click asks ink.at for the exact list.
+  // Pick inside: only the selected widget's descendants, read with ink.read, and picked here.
+  // A right-click sets the widget under the cursor aside until the pick ends, so the one under
+  // it shows: for a widget drawn over others that are not its children.
   let picking = false;
+  let scope = null; // the widget Pick inside looks in
   let boxes = [];
   let boxTimer = null;
+  const setAside = new Set();
+  let hovered = null;
   const hover = $('hover');
   const tip = $('tip');
 
+  const holds = (b, x, y) => b.box && x >= b.box[0] && y >= b.box[1] && x < b.box[0] + b.box[2] && y < b.box[1] + b.box[3];
+  const area = (b) => b.box[2] * b.box[3];
+
+  // A tree from ink.read as the boxes Pick tests: what is drawn (its own and its parents'
+  // opacity above 0, visible), with a size; the smallest first, then the deepest, as ink.at.
+  function boxesOf(root) {
+    const out = [];
+    const walk = (n, depth, opacity) => {
+      const o = opacity * (n.opacity ?? 1);
+      if (n.visible === false || o <= 0.001) return;
+      if (n.box && n.box[2] > 0 && n.box[3] > 0) out.push({ id: n.id, class: n.class, name: n.name, box: n.box, layer: current?.layer, entry: current?.entry, depth });
+      for (const c of n.children ?? []) walk(c, depth + 1, o);
+    };
+    walk(root, 0, 1);
+    return out.sort((a, b) => area(a) - area(b) || b.depth - a.depth);
+  }
+
   async function readBoxes() {
     try {
-      boxes = (await ink.boxes()).widgets;
+      boxes = scope ? boxesOf((await ink.read({ id: scope.id }, { max: 20000 })).root) : (await ink.boxes()).widgets;
     } catch (err) {
       status(err.message);
     }
@@ -491,13 +517,19 @@
   function hideHover() {
     hover.replaceChildren();
     tip.style.display = 'none';
+    hovered = null;
+  }
+
+  function under(x, y) {
+    return boxes.filter((b) => holds(b, x, y) && !setAside.has(b.id));
   }
 
   function showHover(clientX, clientY) {
     const [x, y] = toInk(clientX, clientY);
     // The boxes come smallest first (the most particular widget), as ink.at's hits do.
-    const w = boxes.find((b) => b.box && x >= b.box[0] && y >= b.box[1] && x < b.box[0] + b.box[2] && y < b.box[1] + b.box[3]);
+    const w = under(x, y)[0] ?? null;
     hover.replaceChildren();
+    hovered = w;
     if (!w) {
       tip.style.display = 'none';
       return;
@@ -509,6 +541,7 @@
       hover.append(m);
     }
     tip.replaceChildren(w.name || w.id, ' ', el('span', 'dim', w.class.replace(/^ink/, '').replace(/Widget$/, '')));
+    if (setAside.size) tip.append(' ', el('span', 'dim', `(${setAside.size} set aside)`));
     tip.style.display = 'block';
     // Beside the cursor, kept on the page.
     const left = Math.min(clientX + 16, innerWidth - tip.offsetWidth - 4);
@@ -517,12 +550,20 @@
     tip.style.top = `${Math.max(4, top)}px`;
   }
 
-  async function setPicking(on) {
+  function hint() {
+    $('hint').textContent = `${scope ? `Pick inside ${scope.name || scope.class}` : 'Pick'}: point at a piece of the game's UI and click it. Right-click sets the one under the cursor aside${setAside.size ? ` (${setAside.size} set aside)` : ''}. Esc leaves.`;
+  }
+
+  async function setPicking(on, inside = null) {
     picking = on;
+    scope = on ? inside : null;
+    setAside.clear();
     document.body.classList.toggle('picking', on);
-    $('pick').textContent = on ? 'Picking...' : 'Pick';
+    $('pick').textContent = on && !inside ? 'Picking...' : 'Pick';
+    $('pickInside').textContent = on && inside ? 'Picking inside...' : 'Pick inside';
     clearInterval(boxTimer);
     if (on) {
+      hint();
       if (!inkSize) await loadLayers();
       await readBoxes();
       boxTimer = setInterval(readBoxes, 1500);
@@ -534,42 +575,69 @@
       if (on) await navigator.keyboard?.lock(['Escape']);
       else navigator.keyboard?.unlock();
     } catch {
-      // Esc stays with REDnode: right-click still leaves Pick
+      // Esc stays with REDnode: the Pick button still leaves Pick
     }
+  }
+
+  async function pickAt(clientX, clientY) {
+    if (!inkSize) await loadLayers();
+    const [x, y] = toInk(clientX, clientY);
+    const wasScope = scope;
+    const local = under(x, y);
+    const aside = new Set(setAside);
+    setPicking(false);
+    let hits;
+    if (wasScope) {
+      hits = local;
+      status(`Pick inside ${wasScope.name || wasScope.class} at ${Math.round(x)}, ${Math.round(y)}: ${hits.length} widgets`);
+    } else {
+      status('Looking under the cursor...');
+      let found;
+      try {
+        found = await ink.at(x, y);
+      } catch (err) {
+        status(err.message);
+        return;
+      }
+      hits = found.hits.filter((h) => !aside.has(h.id));
+      status(`Pick at ${Math.round(x)}, ${Math.round(y)}: ${hits.length} widgets${aside.size ? ` (${aside.size} set aside)` : ''}, ${found.looked} looked at in ${Math.round(found.ms)} ms`);
+    }
+    if (!hits.length) {
+      detail.replaceChildren(el('div', 'empty', 'No drawn widget of the game is under that point.'));
+      outline([]);
+      return;
+    }
+    await select(hits[0].id);
+    showDetail(current, hits);
+    await reveal(current);
   }
 
   $('sheet').addEventListener('mousemove', (e) => picking && showHover(e.clientX, e.clientY));
   $('sheet').addEventListener('mouseleave', hideHover);
-  $('sheet').addEventListener('mousedown', async (e) => {
+  $('sheet').addEventListener('mousedown', (e) => {
     e.preventDefault();
-    if (e.button !== 0) {
-      setPicking(false);
+    if (e.button === 2) {
+      // Set aside the one under the cursor; with nothing under it, leave Pick.
+      if (!hovered) {
+        setPicking(false);
+        return;
+      }
+      setAside.add(hovered.id);
+      status(`Set aside ${hovered.name || hovered.id} for this pick (${setAside.size} in all)`);
+      hint();
+      showHover(e.clientX, e.clientY);
       return;
     }
-    if (!inkSize) await loadLayers();
-    const [x, y] = toInk(e.clientX, e.clientY);
-    setPicking(false);
-    status('Looking under the cursor...');
-    let found;
-    try {
-      found = await ink.at(x, y);
-    } catch (err) {
-      status(err.message);
-      return;
-    }
-    status(`Pick at ${Math.round(x)}, ${Math.round(y)}: ${found.hits.length} widgets, ${found.looked} looked at in ${Math.round(found.ms)} ms`);
-    if (!found.hits.length) {
-      detail.replaceChildren(el('div', 'empty', 'No visible widget of the game is under that point.'));
-      outline([]);
-      return;
-    }
-    await select(found.hits[0].id);
-    showDetail(current, found.hits);
-    await reveal(current);
+    if (e.button === 0) pickAt(e.clientX, e.clientY);
   });
   $('sheet').addEventListener('contextmenu', (e) => e.preventDefault());
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && picking) setPicking(false);
+  });
+
+  $('pickInside').addEventListener('click', () => {
+    if (picking) setPicking(false);
+    else if (current?.children.length) setPicking(true, current);
   });
 
   $('pick').addEventListener('click', () => setPicking(!picking));

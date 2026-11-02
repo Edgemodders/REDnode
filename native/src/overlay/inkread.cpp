@@ -258,13 +258,29 @@ struct Place
     double x = 0, y = 0, sx = 1, sy = 1;
 };
 
+// The size a widget is drawn at: its desired size (what its content needs, worked out by the
+// layout) when it fits its content or has no size of its own, else its size. Found in game
+// (0.53.6): REDnode's own ink panels and many of the game's have a size of 0 x 0 and a desired
+// size of what they show (the Ink markup sample's column: 0 x 0, desired 401 x 323).
+RED4ext::Vector2 DrawnSize(const ink::Widget* aWidget)
+{
+    const RED4ext::Vector2& size = aWidget->size;
+    const RED4ext::Vector2& desired = aWidget->desiredSize;
+    if (aWidget->fitToContent || size.X <= 0 || size.Y <= 0)
+        return {desired.X > 0 ? desired.X : size.X, desired.Y > 0 ? desired.Y : size.Y};
+    return size;
+}
+
 // A widget's box on screen, in a window placed by aPlace.
 Box BoxOf(const Obj& aWidget, const Place& aPlace = {})
 {
     Box box;
     ink::Widget* w = AsWidget(aWidget);
     double x0, y0, x1, y1;
-    if (!w || !ToGlobal(aWidget, 0, 0, x0, y0) || !ToGlobal(aWidget, w->size.X, w->size.Y, x1, y1))
+    if (!w)
+        return box;
+    const RED4ext::Vector2 drawn = DrawnSize(w);
+    if (!ToGlobal(aWidget, 0, 0, x0, y0) || !ToGlobal(aWidget, drawn.X, drawn.Y, x1, y1))
         return box;
     box.x = aPlace.x + std::min(x0, x1) * aPlace.sx;
     box.y = aPlace.y + std::min(y0, y1) * aPlace.sy;
@@ -864,6 +880,15 @@ void Look(Picker& aPicker, const Obj& aWidget, int aDepth, const Place& aPlace, 
         Look(aPicker, child, aDepth + 1, aPlace, aLayer, aEntry, opacity);
 }
 
+// The layers the game draws on the screen. The others draw onto surfaces in the world (signs,
+// screens, adverts) or not at all, though active, their 1024 x 1024 windows at 0, 0 (found in
+// game, 0.53.6: they came first under every pick).
+bool OnScreen(const std::string& aLayer)
+{
+    return aLayer != "inkWatermarksLayer" && aLayer != "inkOffscreenLayer" && aLayer != "inkAdvertisementsLayer" &&
+           aLayer != "inkStreetSignsLayer" && aLayer != "inkWorldLayer";
+}
+
 // ink.at, or ink.boxes with aAll: every visible widget's box, for a page to find what is under
 // the cursor on each move without asking the game (no paths, which cost a walk up each).
 std::string AtJson(const Value& aParams, bool aAll, std::string& aError)
@@ -885,7 +910,7 @@ std::string AtJson(const Value& aParams, bool aAll, std::string& aError)
     picker.y = aAll ? 0 : y->number;
     for (const auto& l : layers)
     {
-        if ((l.layer && !l.layer->active) || l.name == "inkWatermarksLayer")
+        if ((l.layer && !l.layer->active) || !OnScreen(l.name))
             continue;
         Look(picker, WindowOf(l), 0, Place{}, l.name, {});
         for (const auto& e : l.entries)

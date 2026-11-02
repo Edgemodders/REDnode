@@ -790,3 +790,25 @@ Mock game: 33 checks (with an opacity-0 layout over the HUD and the filter).
 3. Type a name in the tree's filter (for example `consumable`, after opening the HUD layer): only the matching rows and the rows above them stay. Empty it: the tree is as before. Mark.
 4. Switch the UI Workbench off and quit. Claude reads the `Ink entry` lines (the slots once the HUD is up) to work out the offset.
 
+**0.53.6's run (2026-11-02): the Ink markup panel still could not be picked.** Read live (MCP `window_text`, `api_read`): the first hits were the windows of `inkOffscreenLayer`, `inkAdvertisementsLayer` and `inkStreetSignsLayer`, active but drawn onto surfaces in the world, 1024 x 1024 at 0, 0; and none of the panel's widgets was among them, because their `size` is 0 x 0: the panel's column has a desired size of 401 x 323 (what its content needs, worked out by the layout) and no size of its own, so its box had no size and was dropped. The consumables icon has `fitToContent` on, so its 400 x 188 was not its drawn size either, likely the offset seen since 0.53.3. The `Ink entry` lines were still all 0 (logged at the main menu; none after the load).
+
+REDnode 0.53.7 with UI Workbench 0.1.5:
+
+| Change | Where |
+|---|---|
+| A box takes the widget's desired size when it fits its content or has no size of its own (`DrawnSize`) | inkread.cpp |
+| Pick and `ink.boxes` look only at the layers drawn on screen: not `inkOffscreenLayer`, `inkAdvertisementsLayer`, `inkStreetSignsLayer`, `inkWorldLayer`, `inkWatermarksLayer` (`OnScreen`) | inkread.cpp |
+| **Pick inside** (asked for by the player): with a widget selected, Pick only among its children and theirs, read with `ink.read` and picked in the page | the Workbench |
+| **Right-click sets aside** (asked for by the player): while picking, a right-click sets the widget under the cursor aside until the pick ends, so the one beneath it shows and a click picks it; for a widget drawn over others that are not its children. Esc leaves Pick | the Workbench |
+
+Mock game: 40 checks (set aside and Pick inside added).
+
+### UT2 polish retest (0.53.7)
+
+0. Test timer: Start, Mark after each step.
+1. Load a save with the **Ink markup** sample on (no permission switch). Switch on **UI Workbench** (no permission switch) and press **Refresh**. Press **Pick** and point at a line of the CONTRACTS panel: the outline sits on the line; click it: the tree opens to it under `rednode:ink-markup:m1`. Mark.
+2. Pick the consumables icon: the outline sits on the icon. Mark.
+3. Select the HUD layer's `Root` canvas, press **Pick inside**, and pick something on the HUD: only widgets under that Root are offered. Mark.
+4. Press **Pick**, point at something with another widget drawn over it, and right-click: the one under it shows; click to pick it. Mark.
+5. Switch the UI Workbench off and quit. Claude reads the `Ink entry` lines.
+
