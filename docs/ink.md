@@ -814,3 +814,49 @@ Mock game: 40 checks (set aside and Pick inside added).
 
 **Passed in game on 2026-11-02** (REDnode 0.53.7, UI Workbench 0.1.5, dev PC, game 2.5): every step as expected. The Ink markup panel's lines are picked and revealed under `rednode:ink-markup:m1`, the consumables icon's outline sits on it, Pick inside offers only the selected widget's children, and a right-click sets the widget on top aside. With the off-screen layers left out a pick looks at about 450 widgets instead of 1,640, in 2.6 ms instead of 7.7 ms. The `Ink entry` lines read the slots at 0, 0 with no size, after a Refresh in game too: an entry's own window already gives screen places through `LocalToGlobal`, so adding the slot's place adds nothing, and the offset seen since 0.53.3 came from the sizes, which `DrawnSize` fixed. **UT2 is done.** Next in the agreed plan: UT3 Workbench (the editor).
 
+## UT3 Workbench: plan
+
+Proposed on 2026-11-02, to agree with the owner. The editor in the game: write native UI in ink markup and a script, run it live, turn a picked game panel into source, try a change on a game widget, keep the work as projects and export it as a mod. It ends with UI Tools' first release on its own page ([mod 36958](https://www.nexusmods.com/cyberpunk2077/mods/36958); release scaffolding in `packs/ui-tools/nexus/`).
+
+### What the player does
+
+| Step | In the Workbench |
+|---|---|
+| Start | **Projects** tab: **New** (a name; it starts from a small panel), or open one |
+| Write | **Edit** tab: the markup (`panel.ink.html`) and the script (`mod.mjs`, its handlers and data) side by side, with errors shown at their line as you type |
+| Run | **Run**: the project runs as a mod of its own and its panel shows in the game; **Stop** takes it away. Saving while it runs restarts it (REDnode's hot reload) |
+| Start from the game | In **Inspect**, pick a game panel and press **To source**: its tree as markup in a new project, which runs as a copy of the game's panel |
+| Try | On a picked game widget, change its visibility, opacity, colour, text, size or margin live, to find what controls a look. Never kept: **Reset** puts it back, and stopping the Workbench resets everything |
+| Keep | **Export**: the project as a mod folder or zip, ready to install |
+
+### How it is built
+
+| Part | How | Where |
+|---|---|---|
+| A project is a package | A folder with `rednode-app.json`, `panel.ink.html` and `mod.mjs` (`ink.load("panel.ink.html", handlers, data)`), in a projects folder. So it runs exactly as the modder's mod will: its own Node mod, its own clean-up, and a crash in it leaves the Workbench running | `packs/ui-tools/apps/ui-workbench` |
+| The projects folder | `Documents\REDnode\UI projects`, added to REDnode's development folders the first time the Workbench saves (scanned and hot reloaded like the apps folder; #16) | the host |
+| Files | The Workbench gets a Node mod of its own beside its page, which reads and writes only inside the projects folder | `ui-workbench/mod.mjs` |
+| Run and Stop | A new host op for `admin` pages: switch a package on or off, as the launcher does. The Workbench asks for the `admin` permission (its first permission switch) | `main.js`, `admin.ts` |
+| The editor | CodeMirror 6 (MIT), built once into a single file vendored in the app, with HTML and JavaScript highlighting, completion of the markup's tags and attributes from `MARKUP_TAGS`, and the line-and-column errors of `ink.parse` shown in place | `tools/ui-tools/build-editor.mjs`, `ui-workbench/vendor/` |
+| To source | `ink.read` with `props: true` gives each node the props markup needs (size or desired size, layout, colour, opacity, text and font size, image atlas and part); the page turns the tree into tags (`inkCanvas` to `canvas`, panels to `column` and `row`, `inkText` to `text`...), any other class as `widget class=` | `inkread.cpp`, the page |
+| Try | `ink.try(id, prop, value)` in the plugin for admin packages: it keeps each widget's first value, and puts them back on **Reset**, when the package stops, and at a save load | `inkread.cpp`, `main.js` |
+| Export | A zip of the project folder, written to `Documents\REDnode\UI exports`, with the path shown and copied | the Workbench's mod |
+
+### Phases
+
+| Phase | What | Test |
+|---|---|---|
+| **UT3a Edit and Run** | Projects tab (new, open, rename, delete), Edit tab with the editor and errors in place, Run, Stop, run again on save; the host's run op and the projects folder | Make a project, change its markup and script, Run it on the HUD, break the markup and see the error at its line, Stop |
+| **UT3b To source and Try** | `props` in `ink.read`, To source into a new project, `ink.try` with Reset | Pick a HUD panel, To source, Run the copy beside the original; Try opacity and text on a game widget, Reset |
+| **UT3c Export and release** | Export, the editor part of the Nexus description and `docs/ui-tools.md`, screenshots, the pack's first release (REDnode and UI Tools together) | Export a project, install the export as a mod of its own, run it |
+
+### Open questions
+
+| Question | Recommendation |
+|---|---|
+| Where projects live | `Documents\REDnode\UI projects`, outside the game folder, so a game reinstall or EDGEdeck's deploys never touch them |
+| The `admin` permission for Run, Stop and Try | Yes: they start and stop packages and change the game's own widgets. Inspect still works without it |
+| The editor | CodeMirror 6 vendored (about 400 KB). A plain text box is the fallback if it does not work in the offscreen window (unverified) |
+| Interactive projects (buttons that do something) | After I3 Input, in UT4, as agreed: until then `on...` handlers are checked but nothing fires |
+| The pack's first version | 0.1.0, released with UT3c |
+
