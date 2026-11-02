@@ -388,8 +388,9 @@ int main()
     Check(PointerLocked() && SentContains(R"("window":30,"locked":true)"), "the window in use locks the pointer");
     g_sent.clear();
     OnMouseDelta(12, -5);
-    Check(SentContains(R"("window":30,"type":"mouseMove","x":400,"y":300,"dx":12,"dy":-5)"),
+    Check(SentContains(R"("window":30,"type":"mouseMove","x":400,"y":300,)") && SentContains(R"("dx":12,"dy":-5})"),
           "locked, raw movement goes to the window, at the place the lock began");
+    Check(SentContains(R"("mods":[)"), "input always carries mods, empty too (#33: none held is not an older plugin)");
     OnMouseButton(false, "right");
     Check(SentContains(R"("window":30,"type":"mouseUp")"), "buttons still reach the locked window");
     g_sent.clear();

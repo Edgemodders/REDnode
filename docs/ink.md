@@ -692,3 +692,5 @@ Built 2026-11-01. Ink markup is in the `rednode` package; the plugin is unchange
 6. Save the file once with a mistake: the title's `style="label"` (line 7) spelled `style="lable"`. The log says `Show failed: board.ink.html:7:11: style: "lable" is not one of: title, subtitle, ...` and no panel shows. Put it back and save: the panel is back. Mark.
 7. Switch the Ink markup off, switch **Hot reload** back off if you had it off, and quit. Claude reads the logs: the plugin's `Ink: ink-markup:` lines, one batch per change.
 
+**UT1 passed in game on 2026-11-02** (REDnode 0.52.0, dev PC, game 2.5). Every step as expected; the mod log has each one in order: `Show: board.ink.html loaded in 3.1 ms` (2.9 to 3.4 ms on each restart), Add, Rename first and Next title, Remove first, `Broken markup refused: ink markup:3:11: style: "huge" is not one of: ...`, hot reloads with the bigger title, and `Show failed: board.ink.html:7:11: style: "lable" ...`. A half-typed save in between was refused with its place too (`board.ink.html:8:15: "1" cannot start an attribute name in <text>`) and the next save showed the panel again. Next: UT2 Read and pick.
+

@@ -36,7 +36,7 @@
 //   {"cmd":"window.close","window":1}
 // Plugin -> host events:
 //   {"event":"input","window":1,"type":"mouseMove","x":..,"y":..}   page pixels; mouse and key
-//                                         input carries "mods":["control","shift","alt"] while held (#33)
+//                                         input carries "mods": those of control, shift, alt held, [] for none (#33)
 //   {"event":"focus","window":1}     0 when no window has focus
 //   {"event":"moved","window":1,"x":..,"y":..}   after a drag, reference pixels
 //   {"event":"pointer-lock","window":1,"locked":true|false,"why":".."}   the lock began or ended
@@ -240,7 +240,9 @@ std::string Mods()
     add(VK_CONTROL, "control");
     add(VK_SHIFT, "shift");
     add(VK_MENU, "alt");
-    return mods.empty() ? std::string() : ",\"mods\":[" + mods + "]";
+    // Always sent, empty too: with no "mods" the host takes the keys it heard so far, and a key
+    // let go while no window had focus stayed held there (End came as Shift+End in testing).
+    return ",\"mods\":[" + mods + "]";
 }
 
 std::string MouseJson(uint32_t aWindow, const char* aType, float aX, float aY, const char* aButton = nullptr,
