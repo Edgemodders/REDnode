@@ -694,3 +694,30 @@ Built 2026-11-01. Ink markup is in the `rednode` package; the plugin is unchange
 
 **UT1 passed in game on 2026-11-02** (REDnode 0.52.0, dev PC, game 2.5). Every step as expected; the mod log has each one in order: `Show: board.ink.html loaded in 3.1 ms` (2.9 to 3.4 ms on each restart), Add, Rename first and Next title, Remove first, `Broken markup refused: ink markup:3:11: style: "huge" is not one of: ...`, hot reloads with the bigger title, and `Show failed: board.ink.html:7:11: style: "lable" ...`. A half-typed save in between was refused with its place too (`board.ink.html:8:15: "1" cannot start an attribute name in <text>`) and the next save showed the panel again. Next: UT2 Read and pick.
 
+## UT2: build (REDnode 0.53.0)
+
+Built on 2026-11-02. Read and pick, the inspector. Everything here reads the game's UI and changes nothing.
+
+**How it reads.** RED Hot Tools' Ink Inspector hooks every widget's draw and the game's pointer handlers, through raw game addresses (several of its ink ones are gone in 2.5). REDnode reads instead through the game's own reflected functions and RED4ext.SDK's structs for 2.5, as the ink driver does: Codeware's `GetInkSystem().GetLayers()` for the layers, the SDK's `ink::Layer` (active, input context, window) and `ink::HUDLayer` entries (each HUD piece: name, its own window, root widget, game controller, `.inkwidget` file), the widgets' `children` properties for the tree, and `inkWidgetUtils.LocalToGlobal` at a widget's corner and at its size for its box on screen. The file a widget came from is its layer proxy's resource (`ink::Widget::layerProxy`), as a path hash. The library *item* name RED Hot Tools shows needs its spawn hooks, so it is left for later.
+
+| Part | Where |
+|---|---|
+| `ink.layers`, `ink.read`, `ink.inspect`, `ink.at`: bridge methods on the game thread. Widget ids (`w12`) stay the same while a widget lives. Each read and pick logs a line with its count and time (`Ink read: ...`, `Ink pick at ...`) | `native/src/overlay/inkread.cpp` |
+| `PropertiesJson` (every property of an object, objects as their class name) and `RefObject` | `native/src/overlay/reflect.cpp` |
+| `ink.layers()`, `ink.read()`, `ink.inspect()`, `ink.at()` and their types | `packages/rednode/src/ink.ts` |
+| **REDnode UI Tools** pack 0.1.0, `"unreleased": true` (the release run leaves it out until its first release with UT3) | `packs/ui-tools/` |
+| **UI Workbench** 0.1.0, the Inspect tab: a page that covers the game view (`"fill": "screen"`) with the workbench as a window inside it. The tree of layers, HUD entries and widgets, read a level at a time; a widget's details with its properties; **Pick**, a faint sheet over the game that takes one click, finds the widgets under it (deepest first) and outlines them; **Read all** to time a whole screen. Esc (the Keyboard Lock of #34) or a right-click leaves Pick | `packs/ui-tools/apps/ui-workbench` |
+
+Checked in the mock game: 17 checks (scratchpad `ut2/check.mjs`, with a stand-in UI tree in the mock: layers, HUD entries with their own window, the details, the outline's place, Pick's hits with a hidden widget left out, Esc and a right-click leaving Pick). Unverified until the test: that the boxes match what is drawn (ink pixels to the page's, a HUD entry's slot), the cost of a pick on a full screen, and which layers are active in menus.
+
+## UT2 test
+
+0. Test timer: Start, Mark after each step.
+1. Load a save. In the launcher, switch on **UI Workbench** (no permission switch). It covers the game view, with its window at the upper left. Its status line says `N layers, ink size W x H`. Mark.
+2. Open **inkHUDLayer** with its arrow, then **HUD entries**: the HUD's pieces (healthbar, minimap and others) with their controllers. Open the healthbar's entry a level or two. Mark.
+3. Press **Pick** and click V's health bar. An outline goes round the widget picked, the list **Under the cursor** shows what is there, deepest first, and the status line says `Pick at x, y: N widgets, M looked at in T ms`. Does the outline sit on the health bar? Mark.
+4. Pick the minimap, and something in the middle of the screen (the crosshair). Click rows of **Under the cursor**: each one's outline shows while the mouse is over it. Mark.
+5. In the tree, find a widget marked **hidden** and select it: its details show, with its outline where it would be. Mark.
+6. Close the overlay, open the **Perks** screen (the Character menu), and open the overlay again. Press **Refresh**, open **inkMenuLayer**, select its top widget and press **Read all**: the status line says how many widgets were read and in how long. Then **Pick** a perk icon. Mark.
+7. Pick in the inventory too, if you like. Close the menu. Switch the UI Workbench off and quit. Claude reads the plugin's `Ink read:` and `Ink pick at` lines.
+

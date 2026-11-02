@@ -28,8 +28,16 @@ const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const args = process.argv.slice(2);
 const draft = args.includes('--draft');
 const packsDir = join(repo, 'packs');
+// --all leaves out a pack whose pack.json says "unreleased": true (one still being built, such
+// as UI Tools before its editor), so it never stops REDnode's release run.
+const unreleased = (d) => JSON.parse(readFileSync(join(packsDir, d, 'pack.json'), 'utf8')).unreleased === true;
 const ids = args.includes('--all')
-  ? readdirSync(packsDir).filter((d) => existsSync(join(packsDir, d, 'pack.json')))
+  ? readdirSync(packsDir).filter((d) => {
+      if (!existsSync(join(packsDir, d, 'pack.json'))) return false;
+      if (draft || !unreleased(d)) return true;
+      console.log(`packs/${d}: "unreleased" in pack.json, left out`);
+      return false;
+    })
   : [args.find((a) => !a.startsWith('--')) ?? 'sound-tools'];
 
 for (const id of ids) build(id);

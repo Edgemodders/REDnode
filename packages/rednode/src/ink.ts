@@ -1473,4 +1473,170 @@ export const ink = {
     const { text, name } = await readPackageFile(file);
     return markupView(text, handlers, data, name);
   },
+
+  /**
+   * The game's own ink layers (needs Codeware), in their order, each with its window. The HUD
+   * layer also lists its entries: each HUD piece the game spawned, with its root widget, its
+   * game controller and the `.inkwidget` file it came from (a path hash). Reads only.
+   *
+   * @example
+   * ```ts
+   * const { layers } = await ink.layers();
+   * const hud = layers.find((l) => l.name === "inkHUDLayer");
+   * console.log(hud?.entries?.map((e) => e.name));
+   * ```
+   */
+  async layers(): Promise<{ layers: InkLayerInfo[] }> {
+    return (await transport().call("ink.layers", {}).catch(rethrow)) as { layers: InkLayerInfo[] };
+  },
+
+  /**
+   * Reads a tree of the game's own widgets in one call: a layer's window, a widget by its id
+   * from an earlier read, or an `api` reference. Each node has its class, name, visibility,
+   * box on screen, controller and text; `children` stops at `depth` or `max` nodes (`count`
+   * says how many it has). Reads only.
+   *
+   * @example
+   * ```ts
+   * const { root, nodes, ms } = await ink.read({ layer: "inkMenuLayer" }, { depth: 3 });
+   * console.log(`${nodes} widgets in ${ms} ms`, root.children?.map((c) => c.name));
+   * ```
+   */
+  async read(
+    from: { id: string } | { layer: string } | { ref: { $ref: number } },
+    options: { depth?: number; max?: number; boxes?: boolean } = {},
+  ): Promise<InkReadResult> {
+    return (await transport().call("ink.read", { ...from, ...options }).catch(rethrow)) as InkReadResult;
+  },
+
+  /**
+   * One of the game's widgets in full: its class and parents' classes, path, box, controllers,
+   * where it came from (layer, HUD entry, library file hash) and every property. `ref` is an
+   * `api` reference to it, for calling its methods. Reads only.
+   *
+   * @example
+   * ```ts
+   * const w = await ink.inspect("w42");
+   * console.log(w.path, w.controllers, w.properties.opacity);
+   * ```
+   */
+  async inspect(id: string): Promise<InkWidgetInfo> {
+    return (await transport().call("ink.inspect", { id }).catch(rethrow)) as InkWidgetInfo;
+  },
+
+  /**
+   * The game's visible widgets under a point on screen, on every active layer, deepest first:
+   * what an inspector's Pick finds. `x` and `y` are in the game's ink pixels (the layers'
+   * `size`). Reads only.
+   *
+   * @example
+   * ```ts
+   * const { hits } = await ink.at(200, 900);
+   * console.log(hits[0]?.path);
+   * ```
+   */
+  async at(x: number, y: number): Promise<{ hits: InkHit[]; looked: number; ms: number }> {
+    return (await transport().call("ink.at", { x, y }).catch(rethrow)) as { hits: InkHit[]; looked: number; ms: number };
+  },
 };
+
+function rethrow(err: unknown): never {
+  throw cleanError(err);
+}
+
+/** A widget's box on screen, `[x, y, width, height]` in ink pixels; null when it could not be read. */
+export type InkBox = [number, number, number, number] | null;
+
+/** An ink layer of the game, from {@link ink.layers}. */
+export interface InkLayerInfo {
+  /** Its class, such as `inkHUDLayer` or `inkMenuLayer`. */
+  name: string;
+  active: boolean;
+  interactive: boolean;
+  /** Its input context. */
+  input: string;
+  /** Its size in ink pixels. */
+  size: [number, number];
+  /** Its window's widget id, for {@link ink.read}. */
+  window: string | null;
+  children: number;
+  /** The HUD layer's pieces. */
+  entries?: {
+    name: string;
+    enabled: boolean;
+    /** Its own window, when it is not in the layer's. */
+    window: string | null;
+    root: string | null;
+    controller: string | null;
+    /** The `.inkwidget` file it was spawned from, as a path hash. */
+    library: string;
+  }[];
+}
+
+/** A widget in a tree read by {@link ink.read}. */
+export interface InkTreeNode {
+  /** Its id, the same for as long as the widget lives. */
+  id: string;
+  class: string;
+  name: string;
+  visible: boolean;
+  opacity: number;
+  box?: InkBox;
+  /** Its logic controller's class. */
+  controller?: string;
+  /** A text widget's text, cut at 120 characters. */
+  text?: string;
+  /** How many children it has. */
+  count: number;
+  /** Its children, unless the read stopped above them. */
+  children?: InkTreeNode[];
+}
+
+/** What {@link ink.read} answers. */
+export interface InkReadResult {
+  root: InkTreeNode;
+  nodes: number;
+  /** True when `depth` or `max` left children out. */
+  cut: boolean;
+  ms: number;
+}
+
+/** One widget in full, from {@link ink.inspect}. */
+export interface InkWidgetInfo {
+  id: string;
+  class: string;
+  /** Its class and its parents' classes, nearest first. */
+  classes: string[];
+  name: string;
+  /** Its parents' names and its own, from the window down. */
+  path: string;
+  depth: number;
+  parent: string | null;
+  children: string[];
+  box: InkBox;
+  visible: boolean;
+  /** Its logic controller first, then the others. */
+  controllers: string[];
+  layer: string;
+  /** The HUD entry it belongs to. */
+  entry: string | null;
+  /** The `.inkwidget` file it or a parent was spawned from, as a path hash. */
+  library: string;
+  /** An `api` reference to the widget. */
+  ref: { $ref: number };
+  text?: string;
+  /** Every property, by name; objects as their class name. */
+  properties: Record<string, unknown>;
+}
+
+/** A widget under a point, from {@link ink.at}. */
+export interface InkHit {
+  id: string;
+  class: string;
+  name: string;
+  box: InkBox;
+  layer: string;
+  entry: string | null;
+  depth: number;
+  path: string;
+}

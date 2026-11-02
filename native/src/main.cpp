@@ -237,6 +237,7 @@ bool OnRunningExit(RED4ext::CGameApplication* aApp)
     // loaded; at DLL unload some of them are not (0.27.1 crashed at quit).
     rednode::overlay::ClearGameRefs();
     rednode::overlay::detail::ClearInk();
+    rednode::overlay::detail::ClearInkRead();
     return true;
 }
 } // namespace

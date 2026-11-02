@@ -308,6 +308,15 @@ bool CallNativeValue(RED4ext::Handle<RED4ext::IScriptable>& aSelf, const char* a
                      const json::Value& aArgs, json::Value& aOut, std::string& aError);
 json::Value RefArg(const RED4ext::Handle<RED4ext::IScriptable>& aObject); // an object as a call argument
 void DropRefArg(const json::Value& aRef);                                  // and let go of it after
+RED4ext::Handle<RED4ext::IScriptable> RefObject(const json::Value& aRef);  // {"$ref":n} to its object, or null
+// Every property of an object's class and its parents, as a JSON object; objects in it as their
+// class name (the inspector, ink.inspect).
+std::string PropertiesJson(const RED4ext::Handle<RED4ext::IScriptable>& aObject);
+// inkread.cpp: reading the game's own UI for the inspector (UT2): ink.layers, ink.read,
+// ink.inspect and ink.at, on the game thread.
+bool IsInkReadMethod(const std::string& aMethod);
+std::string InkRead(const std::string& aMethod, const json::Value& aParams, std::string& aError);
+void ClearInkRead(); // game thread: forget the widget ids (the game is stopping)
 // ink.cpp: the ink driver (I2a): ink.apply, ink.clear and ink.state, on the game thread.
 bool IsInkMethod(const std::string& aMethod);
 std::string Ink(const std::string& aMethod, const json::Value& aParams, std::string& aError);

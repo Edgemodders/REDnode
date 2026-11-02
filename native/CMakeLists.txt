@@ -51,6 +51,7 @@ add_library(REDnode SHARED
   src/overlay/opus.cpp
   src/overlay/soundtrace.cpp
   src/overlay/ink.cpp
+  src/overlay/inkread.cpp
 )
 target_link_libraries(REDnode PRIVATE RED4ext::SDK d3d12 d3dcompiler)
 target_include_directories(REDnode SYSTEM PRIVATE ${miniaudio_SOURCE_DIR})

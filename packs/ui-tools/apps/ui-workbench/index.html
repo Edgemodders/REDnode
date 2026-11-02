@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UI Workbench</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<script type="importmap">{ "imports": { "rednode": "rednode://sdk/index.js" } }</script>
+<style>
+  /* "fill": "screen": the page covers the game view and is see-through, so the game takes the
+     mouse wherever the page draws nothing. The workbench is a window that moves inside the
+     page; Pick lays a faint sheet over the game to take the click, and outlines are drawn here. */
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: transparent; }
+  #sheet { position: absolute; inset: 0; background: rgba(25, 243, 255, .05); display: none; }
+  body.picking #sheet { display: block; }
+  #marks { position: absolute; inset: 0; pointer-events: none; }
+  .mark { position: absolute; box-sizing: border-box; border: 2px solid var(--rn-accent); box-shadow: 0 0 0 1px rgba(0, 0, 0, .6); }
+  .mark.hint { border: 1px dashed var(--rn-accent-2); box-shadow: none; }
+  .mark .tag { position: absolute; left: -2px; bottom: 100%; padding: 1px 6px; white-space: nowrap;
+    font: 12px var(--rn-mono); background: var(--rn-accent); color: var(--rn-on-accent); }
+  #hint { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); padding: 6px 14px; display: none;
+    font: 14px var(--rn-body); background: var(--rn-panel); border: 1px solid var(--rn-accent); color: var(--rn-fg); }
+  body.picking #hint { display: block; }
+
+  rn-window#bench { position: absolute; left: 40px; top: 80px; width: 980px; }
+  .bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .bar .grow { flex: 1; }
+  .bar rn-input { width: 220px; }
+  #status { font: 12px var(--rn-mono); color: var(--rn-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; height: 560px; }
+  .pane { border: 1px solid var(--rn-line); overflow: auto; min-height: 0; }
+
+  #tree { font: 13px var(--rn-mono); padding: 4px 0; }
+  .row { display: flex; align-items: baseline; gap: 6px; padding: 1px 6px; cursor: default; white-space: nowrap; }
+  .row:hover { background: var(--rn-panel-2); }
+  .row.selected { background: var(--rn-accent); color: var(--rn-on-accent); }
+  .row.selected .dim, .row.selected .badge { color: var(--rn-on-accent); }
+  .arrow { width: 12px; flex: none; text-align: center; color: var(--rn-dim); }
+  .arrow.open::before { content: '▾'; }
+  .arrow.shut::before { content: '▸'; }
+  .dim { color: var(--rn-dim); }
+  .badge { font-size: 11px; color: var(--rn-accent-2); }
+  .hidden-widget > .name { opacity: .55; }
+  .snippet { color: var(--rn-ok); overflow: hidden; text-overflow: ellipsis; }
+  .group { color: var(--rn-accent-2); }
+
+  #detail { padding: 8px 10px; font: 13px var(--rn-body); }
+  #detail h3 { margin: 0 0 6px; font: 600 15px var(--rn-display); }
+  #detail table { border-collapse: collapse; width: 100%; }
+  #detail td { padding: 2px 6px 2px 0; vertical-align: top; font: 12px var(--rn-mono); overflow-wrap: anywhere; }
+  #detail td:first-child { color: var(--rn-dim); white-space: nowrap; width: 1%; }
+  #detail .section { margin: 10px 0 4px; color: var(--rn-accent-2); font: 600 12px var(--rn-display); letter-spacing: .06em; text-transform: uppercase; }
+  #detail .actions { display: flex; gap: 6px; margin: 6px 0; flex-wrap: wrap; }
+  .hit { padding: 2px 4px; font: 12px var(--rn-mono); cursor: default; }
+  .hit:hover { background: var(--rn-panel-2); }
+  .empty { color: var(--rn-dim); padding: 10px; }
+</style>
+</head>
+<body>
+  <div id="sheet"></div>
+  <div id="marks"></div>
+  <div id="hint">Pick: click a piece of the game's UI. Esc or right-click leaves Pick.</div>
+
+  <rn-window id="bench" title="UI Workbench" draggable closable>
+    <rn-tabs id="tabs"><rn-tab label="Inspect" active></rn-tab></rn-tabs>
+    <div class="bar">
+      <rn-button id="refresh" title="Read the game's layers again">Refresh</rn-button>
+      <rn-button id="pick" title="Click a piece of the game's UI to find its widgets">Pick</rn-button>
+      <rn-input id="filter" placeholder="Filter the read widgets"></rn-input>
+      <span class="grow"></span>
+      <span id="status"></span>
+    </div>
+    <div class="split">
+      <div class="pane" id="tree"><div class="empty">Reading the game's layers...</div></div>
+      <div class="pane" id="detail"><div class="empty">Select a widget in the tree, or press Pick and click the game's UI.</div></div>
+    </div>
+  </rn-window>
+
+<script type="module">
+  import { ink, ui } from 'rednode';
+
+  const $ = (id) => document.getElementById(id);
+  const tree = $('tree');
+  const detail = $('detail');
+  const marks = $('marks');
+  const status = (text) => {
+    $('status').textContent = text;
+    console.log(`[ui-workbench] ${text}`);
+  };
+  const el = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  };
+
+  // ---------- ink pixels and page pixels ----------
+  // Boxes come in the game's ink pixels (a layer's size); the page covers the game view, so a
+  // box is drawn at the same place scaled to the page's size.
+  let inkSize = null;
+  const toPage = (box) => {
+    if (!box || !inkSize) return null;
+    const sx = innerWidth / inkSize[0];
+    const sy = innerHeight / inkSize[1];
+    return { x: box[0] * sx, y: box[1] * sy, w: box[2] * sx, h: box[3] * sy };
+  };
+  const toInk = (x, y) => (inkSize ? [x * inkSize[0] / innerWidth, y * inkSize[1] / innerHeight] : [x, y]);
+
+  function outline(boxes) {
+    marks.replaceChildren();
+    for (const { box, label, hint } of boxes) {
+      const r = toPage(box);
+      if (!r) continue;
+      const m = el('div', hint ? 'mark hint' : 'mark');
+      Object.assign(m.style, { left: `${r.x}px`, top: `${r.y}px`, width: `${Math.max(r.w, 2)}px`, height: `${Math.max(r.h, 2)}px` });
+      if (label) m.append(el('span', 'tag', label));
+      marks.append(m);
+    }
+  }
+
+  // ---------- the tree ----------
+  const rows = new Map(); // widget id -> { node, row, kids }
+  let selectedRow = null;
+
+  function rowFor(label, opts) {
+    const wrap = el('div');
+    const row = el('div', 'row');
+    row.style.paddingLeft = `${6 + opts.level * 14}px`;
+    const arrow = el('span', `arrow ${opts.expandable ? 'shut' : ''}`);
+    row.append(arrow, label);
+    const kids = el('div');
+    kids.hidden = true;
+    wrap.append(row, kids);
+    let loaded = false;
+    const toggle = async () => {
+      if (!opts.expandable) return;
+      if (kids.hidden && !loaded) {
+        loaded = true;
+        try {
+          await opts.load(kids);
+        } catch (err) {
+          loaded = false;
+          status(err.message);
+          return;
+        }
+      }
+      kids.hidden = !kids.hidden;
+      arrow.className = `arrow ${kids.hidden ? 'shut' : 'open'}`;
+    };
+    arrow.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggle();
+    });
+    row.addEventListener('dblclick', toggle);
+    row.addEventListener('click', () => opts.select?.(row));
+    return { wrap, row, kids, toggle };
+  }
+
+  function widgetLabel(n) {
+    const span = el('span', n.visible === false ? 'hidden-widget' : '');
+    span.append(el('span', 'name', n.name || '(no name)'), ' ', el('span', 'dim', n.class.replace(/^ink/, '').replace(/Widget$/, '')));
+    if (n.visible === false) span.append(' ', el('span', 'badge', 'hidden'));
+    if (n.controller) span.append(' ', el('span', 'badge', n.controller));
+    if (n.text) span.append(' ', el('span', 'snippet', `"${n.text}"`));
+    if (n.count) span.append(' ', el('span', 'dim', `(${n.count})`));
+    return span;
+  }
+
+  function addWidget(container, n, level) {
+    const r = rowFor(widgetLabel(n), {
+      level,
+      expandable: n.count > 0,
+      load: async (kids) => {
+        const children = n.children ?? (await ink.read({ id: n.id }, { depth: 1 })).root.children ?? [];
+        for (const c of children) addWidget(kids, c, level + 1);
+      },
+      select: (row) => select(n.id, row),
+    });
+    r.row.dataset.search = `${n.name} ${n.class} ${n.text ?? ''} ${n.controller ?? ''}`.toLowerCase();
+    rows.set(n.id, { node: n, row: r.row });
+    container.append(r.wrap);
+  }
+
+  async function loadLayers() {
+    status('Reading the layers...');
+    let layers;
+    try {
+      ({ layers } = await ink.layers());
+    } catch (err) {
+      tree.replaceChildren(el('div', 'empty', err.message));
+      status(err.message);
+      return;
+    }
+    const sized = layers.find((l) => l.name === 'inkHUDLayer' && l.size[0] > 0) ?? layers.find((l) => l.size[0] > 0);
+    inkSize = sized?.size ?? null;
+    tree.replaceChildren();
+    rows.clear();
+    for (const l of layers) {
+      const label = el('span');
+      label.append(el('span', 'group', l.name), ' ', el('span', 'dim', `${l.children} ${l.children === 1 ? 'child' : 'children'}${l.active ? ', active' : ''}`));
+      const r = rowFor(label, {
+        level: 0,
+        expandable: !!l.window && (l.children > 0 || !!l.entries?.length),
+        load: async (kids) => {
+          if (l.entries?.length) {
+            const group = el('span');
+            group.append(el('span', 'group', 'HUD entries'), ' ', el('span', 'dim', `(${l.entries.length})`));
+            const g = rowFor(group, {
+              level: 1,
+              expandable: true,
+              load: async (gk) => {
+                for (const e of l.entries) addEntry(gk, e);
+              },
+            });
+            kids.append(g.wrap);
+          }
+          if (l.children > 0) {
+            const { root, nodes, ms } = await ink.read({ id: l.window }, { depth: 1 });
+            status(`${l.name}: ${nodes} widgets read in ${Math.round(ms)} ms`);
+            for (const c of root.children ?? []) addWidget(kids, c, 1);
+          }
+        },
+        select: (row) => l.window && select(l.window, row),
+      });
+      tree.append(r.wrap);
+    }
+    status(`${layers.length} layers, ink size ${inkSize ? inkSize.join(' x ') : 'unknown'}`);
+  }
+
+  function addEntry(container, e) {
+    const label = el('span', e.enabled ? '' : 'hidden-widget');
+    label.append(el('span', 'name', e.name), ' ', el('span', 'dim', e.controller ?? ''));
+    if (!e.enabled) label.append(' ', el('span', 'badge', 'off'));
+    if (e.window) label.append(' ', el('span', 'badge', 'own window'));
+    const top = e.window ?? e.root;
+    const r = rowFor(label, {
+      level: 2,
+      expandable: !!top,
+      load: async (kids) => {
+        const { root } = await ink.read({ id: top }, { depth: 1 });
+        addWidget(kids, root, 3);
+      },
+      select: (row) => e.root && select(e.root, row),
+    });
+    container.append(r.wrap);
+  }
+
+  // ---------- one widget ----------
+  let current = null;
+
+  async function select(id, row) {
+    if (selectedRow) selectedRow.classList.remove('selected');
+    selectedRow = row ?? rows.get(id)?.row ?? null;
+    selectedRow?.classList.add('selected');
+    let w;
+    try {
+      w = await ink.inspect(id);
+    } catch (err) {
+      detail.replaceChildren(el('div', 'empty', err.message));
+      return;
+    }
+    current = w;
+    showDetail(w);
+    outline([{ box: w.box, label: w.name || w.class }]);
+  }
+
+  function showDetail(w, hits) {
+    detail.replaceChildren();
+    if (hits) showHits(hits);
+    detail.append(el('h3', '', `${w.name || '(no name)'}  ·  ${w.class}`));
+    const actions = el('div', 'actions');
+    const copy = (label, text) => {
+      const b = el('rn-button', '', label);
+      b.setAttribute('variant', 'ghost');
+      b.addEventListener('click', () => ui.copy(text).then(() => status(`Copied ${label.toLowerCase()}`)));
+      actions.append(b);
+    };
+    copy('Path', w.path);
+    copy('JSON', JSON.stringify(w, null, 2));
+    if (w.children.length) {
+      const all = el('rn-button', '', 'Read all');
+      all.setAttribute('variant', 'ghost');
+      all.title = 'Read every widget under it in one call, and time it';
+      all.addEventListener('click', async () => {
+        status('Reading everything under it...');
+        try {
+          const r = await ink.read({ id: w.id }, { max: 20000, boxes: true });
+          status(`${w.name || w.class}: ${r.nodes} widgets read in ${Math.round(r.ms)} ms${r.cut ? ' (stopped at 20000)' : ''}`);
+        } catch (err) {
+          status(err.message);
+        }
+      });
+      actions.append(all);
+    }
+    if (w.parent) {
+      const up = el('rn-button', '', 'Parent');
+      up.setAttribute('variant', 'ghost');
+      up.addEventListener('click', () => select(w.parent));
+      actions.append(up);
+    }
+    detail.append(actions);
+    const table = el('table');
+    const line = (k, v) => {
+      if (v === undefined || v === null || v === '') return;
+      const tr = el('tr');
+      tr.append(el('td', '', k), el('td', '', typeof v === 'string' ? v : JSON.stringify(v)));
+      table.append(tr);
+    };
+    line('id', w.id);
+    line('path', w.path);
+    line('classes', w.classes.join(' < '));
+    line('box', w.box ? w.box.map((n) => Math.round(n)).join(', ') : 'unknown');
+    line('visible', String(w.visible));
+    line('text', w.text);
+    line('controllers', w.controllers.join(', '));
+    line('layer', w.layer);
+    line('HUD entry', w.entry);
+    line('library', w.library && `${w.library} (the .inkwidget file's path hash)`);
+    line('children', `${w.children.length}`);
+    line('api ref', `{"$ref": ${w.ref.$ref}}`);
+    detail.append(table);
+
+    detail.append(el('div', 'section', 'Properties'));
+    const filter = el('rn-input');
+    filter.setAttribute('placeholder', 'Filter properties');
+    const props = el('table');
+    const fill = (q) => {
+      props.replaceChildren();
+      for (const [k, v] of Object.entries(w.properties)) {
+        const text = typeof v === 'string' ? v : JSON.stringify(v);
+        if (q && !`${k} ${text}`.toLowerCase().includes(q)) continue;
+        const tr = el('tr');
+        tr.append(el('td', '', k), el('td', '', text.length > 400 ? `${text.slice(0, 400)}...` : text));
+        props.append(tr);
+      }
+    };
+    filter.addEventListener('input', (e) => fill(String(e.detail?.value ?? filter.value).toLowerCase()));
+    fill('');
+    detail.append(filter, props);
+  }
+
+  function showHits(hits) {
+    detail.append(el('div', 'section', `Under the cursor (${hits.length}), deepest first`));
+    for (const h of hits) {
+      const d = el('div', 'hit', `${h.name || '(no name)'}  ${h.class}  ${h.entry ? `[${h.entry}]` : `[${h.layer}]`}`);
+      d.title = h.path;
+      d.addEventListener('mouseenter', () => outline([{ box: current?.box, label: current?.name }, { box: h.box, hint: true }]));
+      d.addEventListener('mouseleave', () => outline([{ box: current?.box, label: current?.name }]));
+      d.addEventListener('click', async () => {
+        await select(h.id);
+        showDetail(current, hits);
+      });
+      detail.append(d);
+    }
+  }
+
+  // ---------- Pick ----------
+  let picking = false;
+
+  async function setPicking(on) {
+    picking = on;
+    document.body.classList.toggle('picking', on);
+    $('pick').textContent = on ? 'Picking...' : 'Pick';
+    try {
+      if (on) await navigator.keyboard?.lock(['Escape']);
+      else navigator.keyboard?.unlock();
+    } catch {
+      // Esc stays with REDnode: right-click still leaves Pick
+    }
+  }
+
+  $('sheet').addEventListener('mousedown', async (e) => {
+    e.preventDefault();
+    if (e.button !== 0) {
+      setPicking(false);
+      return;
+    }
+    if (!inkSize) await loadLayers();
+    const [x, y] = toInk(e.clientX, e.clientY);
+    setPicking(false);
+    status('Looking under the cursor...');
+    let found;
+    try {
+      found = await ink.at(x, y);
+    } catch (err) {
+      status(err.message);
+      return;
+    }
+    status(`Pick at ${Math.round(x)}, ${Math.round(y)}: ${found.hits.length} widgets, ${found.looked} looked at in ${Math.round(found.ms)} ms`);
+    if (!found.hits.length) {
+      detail.replaceChildren(el('div', 'empty', 'No visible widget of the game is under that point.'));
+      outline([]);
+      return;
+    }
+    await select(found.hits[0].id);
+    showDetail(current, found.hits);
+  });
+  $('sheet').addEventListener('contextmenu', (e) => e.preventDefault());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && picking) setPicking(false);
+  });
+
+  $('pick').addEventListener('click', () => setPicking(!picking));
+  $('refresh').addEventListener('click', () => {
+    outline([]);
+    loadLayers();
+  });
+  $('filter').addEventListener('input', (e) => {
+    const q = String(e.detail?.value ?? $('filter').value).toLowerCase();
+    for (const { row } of rows.values()) row.style.display = !q || row.dataset.search.includes(q) ? '' : 'none';
+  });
+
+  loadLayers();
+</script>
+</body>
+</html>

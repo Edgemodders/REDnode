@@ -1,0 +1,12 @@
+{
+  "id": "ui-tools",
+  "name": "REDnode UI Tools",
+  "version": "0.1.0",
+  "unreleased": true,
+  "rednode": ">=0.53.0",
+  "summary": "An optional app pack for UI modders: the UI Workbench inspects the game's own UI (layers, widget trees, Pick under the cursor) and, from UT3, writes, runs and exports ink markup.",
+  "guide": "https://edgemodders.github.io/REDnode/ink.html#ui-tools-plan",
+  "apps": [
+    "ui-workbench"
+  ]
+}

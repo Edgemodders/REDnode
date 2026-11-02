@@ -17,6 +17,7 @@ How to keep it:
 - A sample, **Ink markup**: a HUD panel with a health bar and a list of contracts from `board.ink.html`. Also in the player zip.
 - Esc for a page that asks for it (https://github.com/Edgemodders/REDnode/issues/34): with the web's Keyboard Lock API, `navigator.keyboard.lock(["Escape"])`, Esc comes to the focused page as a key instead of leaving interactive mode, so an editor can cancel a drag or a move with it; `navigator.keyboard.unlock()` gives it back. F10 always leaves. See https://edgemodders.github.io/REDnode/overlay-apps.html#keys-and-modifiers
 - A test sample, **Input test**: modifiers on clicks, a page's own edit keys beside a text field's, and Take Esc.
+- Reading the game's own UI (needs Codeware): `ink.layers()` lists the game's ink layers and HUD pieces, `ink.read()` reads a tree of widgets in one call (class, name, visibility, box on screen, controller, text), `ink.inspect(id)` gives one widget in full (path, controllers, the `.inkwidget` file it came from, every property, and an `api` reference), and `ink.at(x, y)` finds the visible widgets under a point. Reads only. They are what REDnode UI Tools' UI Workbench is built on. See https://edgemodders.github.io/REDnode/ink.html#ut2-build-rednode-0530
 
 **Changed**
 

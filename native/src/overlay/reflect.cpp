@@ -125,6 +125,9 @@ std::unordered_map<IScriptable*, uint32_t> g_refIds;
 uint32_t g_nextRef = 1;
 // Set while a call's answer is converted: objects nothing else holds are kept (see Invoke).
 bool g_keepFresh = false;
+// Set while the inspector reads properties (PropertiesJson): objects as their class name, so a
+// read hands out no references.
+bool g_handleNames = false;
 
 // Forgets references to objects the game has deleted.
 void PruneRefs()
@@ -273,6 +276,11 @@ void HandleToJson(const Handle<IScriptable>& aObject, std::string& aOut)
     if (!aObject)
     {
         aOut += "null";
+        return;
+    }
+    if (g_handleNames)
+    {
+        aOut += JsonString(Str(aObject->GetType()->GetName()));
         return;
     }
     // An object only the answer holds would be freed with it, so the reference keeps it.
@@ -1631,6 +1639,36 @@ void DropRefArg(const json::Value& aRef)
     auto it = g_refs.find(uint32_t(id->number));
     if (it != g_refs.end() && --it->second.count == 0)
         g_refs.erase(it); // g_refIds is pruned with the rest
+}
+
+Handle<IScriptable> RefObject(const json::Value& aRef)
+{
+    std::string error;
+    return aRef.kind == Value::Kind::Object ? FromRef(aRef, error) : Handle<IScriptable>{};
+}
+
+std::string PropertiesJson(const Handle<IScriptable>& aObject)
+{
+    if (!aObject)
+        return "null";
+    std::vector<const CClass*> chain;
+    for (const CClass* c = aObject->GetType(); c; c = c->parent)
+        chain.push_back(c);
+    std::string out = "{";
+    bool first = true;
+    g_handleNames = true;
+    for (auto it = chain.rbegin(); it != chain.rend(); ++it)
+    {
+        for (const CProperty* p : (*it)->props)
+        {
+            out += first ? "" : ",";
+            first = false;
+            out += JsonString(Str(p->name)) + ":";
+            ToJson(p->type, p->GetValuePtr<void>(aObject.GetPtr()), out, 0);
+        }
+    }
+    g_handleNames = false;
+    return out + "}";
 }
 
 // ---------- the world near V (H2c-b) ----------
