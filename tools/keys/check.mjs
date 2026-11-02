@@ -93,7 +93,7 @@ try {
   check(keys.envName('my-tool') === 'MY_TOOL_API_KEY', 'envName for another service');
 
   keys.setKey('my-tool', 'FAKE-other-service-key');
-  check(keys.listServices().join(',') === 'anthropic,gemini,openai,elevenlabs,my-tool', 'listServices: the known ones, then the rest', keys.listServices().join(','));
+  check(keys.listServices().join(',') === 'anthropic,gemini,openai,elevenlabs,tripo,my-tool', 'listServices: the known ones, then the rest', keys.listServices().join(','));
 
   t = Date.now();
   await keys.promises.setKey('elevenlabs', 'FAKE-eleven-async-5678');

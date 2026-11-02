@@ -7,7 +7,7 @@
 //   setKey('gemini', typed);                            // a tool's own "Set key", when it is missing
 //
 // Where: %APPDATA%\Edgemodders\keys\<service>.txt, one file per service. Service ids are
-// lowercase letters, digits and dashes: anthropic, gemini, openai, elevenlabs, or any other.
+// lowercase letters, digits and dashes: anthropic, gemini, openai, elevenlabs, tripo, or any other.
 //
 // Format: Windows DPAPI for the current user, written as PowerShell's ConvertFrom-SecureString
 // writes it (one line of hex). Only the same Windows user on the same PC can read it. A key can
@@ -39,6 +39,7 @@ export const SERVICES = {
   gemini: { name: 'Google Gemini', env: 'GEMINI_API_KEY' },
   openai: { name: 'OpenAI', prefix: 'sk-', env: 'OPENAI_API_KEY' },
   elevenlabs: { name: 'ElevenLabs', env: 'ELEVENLABS_API_KEY' },
+  tripo: { name: 'Tripo', env: 'TRIPO_API_KEY' },
 };
 
 const ID = /^[a-z0-9][a-z0-9-]{0,39}$/;

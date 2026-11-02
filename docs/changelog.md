@@ -24,6 +24,7 @@ How to keep it:
 
 **Changed**
 
+- Keys knows **Tripo** (`tripo`, the 3D service EDGEmat's Wardrobe Designer uses), so a player can set its key before any tool asks for it (https://github.com/Edgemodders/REDnode/issues/23).
 - Ctrl+Z, Ctrl+Y, Ctrl+A, Ctrl+C, Ctrl+V and Ctrl+X reach the page as keys (https://github.com/Edgemodders/REDnode/issues/33): a text field edits as before, and a page with its own undo or copy hears them and takes them with `preventDefault()`. Before, the overlay ran the editing command itself and the page never heard the key.
 
 **Fixed**

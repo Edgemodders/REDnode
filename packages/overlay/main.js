@@ -179,7 +179,7 @@ const PERMISSIONS = {
 // "keys:<service>" (#23, K3): one of the player's shared keys, such as "keys:anthropic", read
 // with secrets.shared and asked for with secrets.askShared.
 const KEYS_PERMISSION = /^keys:([a-z0-9][a-z0-9-]{0,39})$/;
-const KEY_NAMES = { anthropic: 'Anthropic', gemini: 'Google Gemini', openai: 'OpenAI', elevenlabs: 'ElevenLabs' };
+const KEY_NAMES = { anthropic: 'Anthropic', gemini: 'Google Gemini', openai: 'OpenAI', elevenlabs: 'ElevenLabs', tripo: 'Tripo' };
 const serviceName = (service) => KEY_NAMES[service] ?? service;
 function permissionWhat(name) {
   const k = KEYS_PERMISSION.exec(name);

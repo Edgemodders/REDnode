@@ -19,7 +19,7 @@ The files are the shared contract. REDnode's Keys view (K2) is the in-game way t
 | | |
 |---|---|
 | Where | `%APPDATA%\Edgemodders\keys\<service>.txt`, one file per service |
-| Service ids | Lowercase letters, digits and dashes, up to 40 (the Keys view takes up to 24 and refuses what looks like a key): `anthropic`, `gemini`, `openai`, `elevenlabs`, or any other a tool needs |
+| Service ids | Lowercase letters, digits and dashes, up to 40 (the Keys view takes up to 24 and refuses what looks like a key): `anthropic`, `gemini`, `openai`, `elevenlabs`, `tripo`, or any other a tool needs |
 | Format | Windows DPAPI for the current user, written as PowerShell's `ConvertFrom-SecureString` writes it: one line of hex |
 | Who can read it | Only the same Windows user on the same PC. Any program that user runs can read it, as with VS Code's secret storage or an environment variable |
 | Environment | A variable wins when set: `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ELEVENLABS_API_KEY`; for another id, its name in capitals with `_API_KEY` (`my-tool` is `MY_TOOL_API_KEY`). For CI, and for clients that pass keys |
@@ -126,3 +126,4 @@ On other systems than Windows the library reads environment variables only; `set
 | `edgewave-voice` | `elevenlabs` | Through `secrets.askShared` | EDGEwave's session, after K3 |
 | EDGEmat's MCP server and extension | `gemini`, `openai` | **Set Image Service Key...** | EDGEmat's own issue, after K1 |
 | EDGEwave (VS Code) | `elevenlabs` | Its key prompt | Later |
+| EDGEmat's Wardrobe Designer (Reshape) | `openai`, `tripo` | Through `secrets.askShared` | EDGEmat's W3 |
