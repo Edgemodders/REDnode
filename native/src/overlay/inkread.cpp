@@ -25,8 +25,10 @@
 //
 // Widget ids ("w12") stay the same for a widget while it lives, so a tree can be read again.
 // Boxes come from inkWidgetUtils.LocalToGlobal at the widget's corner and at its size; for a
-// HUD entry with a window of its own, the entry's slot adds its place (as RED Hot Tools' Ink
-// Inspector does). That they match what is drawn is unverified until the UT2 test.
+// HUD entry with a window of its own, the game draws that window into the entry's slot, so its
+// boxes are placed at the slot and scaled by the slot's size over the window's (0.53.4; RED Hot
+// Tools' Ink Inspector adds only the slot's place, and 0.53.3 did too: boxes in dpad_hint came
+// out too large and too far right). ink.layers gives each entry's slot, window size and scale.
 // The structs (ink::Layer, ink::HUDLayer's entries, ink::Widget) are RED4ext.SDK's for game 2.5.
 
 #include "jvalue.hpp"
@@ -244,18 +246,27 @@ struct Box
     }
 };
 
-// A widget's box on screen; aOffset is a HUD entry's slot, for widgets in its own window.
-Box BoxOf(const Obj& aWidget, double aOffsetX, double aOffsetY)
+// Where a window's own space lands on screen: none for a layer's window; for a HUD entry with a
+// window of its own, the game draws that window into the entry's slot, at the slot's place and
+// scaled to the slot's size (0.53.2's run: boxes in dpad_hint were too large and too far right
+// with the place alone).
+struct Place
+{
+    double x = 0, y = 0, sx = 1, sy = 1;
+};
+
+// A widget's box on screen, in a window placed by aPlace.
+Box BoxOf(const Obj& aWidget, const Place& aPlace = {})
 {
     Box box;
     ink::Widget* w = AsWidget(aWidget);
     double x0, y0, x1, y1;
     if (!w || !ToGlobal(aWidget, 0, 0, x0, y0) || !ToGlobal(aWidget, w->size.X, w->size.Y, x1, y1))
         return box;
-    box.x = std::min(x0, x1) + aOffsetX;
-    box.y = std::min(y0, y1) + aOffsetY;
-    box.w = std::abs(x1 - x0);
-    box.h = std::abs(y1 - y0);
+    box.x = aPlace.x + std::min(x0, x1) * aPlace.sx;
+    box.y = aPlace.y + std::min(y0, y1) * aPlace.sy;
+    box.w = std::abs(x1 - x0) * aPlace.sx;
+    box.h = std::abs(y1 - y0) * aPlace.sy;
     box.known = true;
     return box;
 }
@@ -433,6 +444,29 @@ Obj WindowOf(const Layer& aLayer)
     return aLayer.window;
 }
 
+// A HUD entry's own window on screen: its slot's place, and the slot's size over the window's
+// (no scale when either size is unknown). The slot is a widget of the layer's window.
+Place PlaceOf(const Entry& aEntry, Box* aSlot = nullptr)
+{
+    Place place;
+    if (!aEntry.slot)
+        return place;
+    const Box slot = BoxOf(aEntry.slot);
+    if (aSlot)
+        *aSlot = slot;
+    if (!slot.known)
+        return place;
+    place.x = slot.x;
+    place.y = slot.y;
+    ink::Widget* window = AsWidget(aEntry.window);
+    if (window && window->size.X > 0 && window->size.Y > 0 && slot.w > 0 && slot.h > 0)
+    {
+        place.sx = slot.w / window->size.X;
+        place.sy = slot.h / window->size.Y;
+    }
+    return place;
+}
+
 std::string LayersJson(std::string& aError)
 {
     auto layers = Layers(aError);
@@ -471,7 +505,18 @@ std::string LayersJson(std::string& aError)
                        ",\"window\":" + (e.window ? JsonString(IdOf(e.window)) : "null") +
                        ",\"root\":" + (e.root ? JsonString(IdOf(e.root)) : "null") +
                        ",\"controller\":" + (controller ? JsonString(ClassName(controller)) : "null") +
-                       ",\"library\":" + JsonString(library) + "}";
+                       ",\"library\":" + JsonString(library);
+                // Where its own window is drawn: the slot's box and the window's size, and the scale.
+                if (e.window)
+                {
+                    Box slot;
+                    const Place place = PlaceOf(e, &slot);
+                    ink::Widget* ew = AsWidget(e.window);
+                    out += ",\"slot\":" + BoxJson(slot) + ",\"windowSize\":" +
+                           (ew ? "[" + Num(ew->size.X) + "," + Num(ew->size.Y) + "]" : std::string("null")) +
+                           ",\"scale\":[" + Num(place.sx) + "," + Num(place.sy) + "]";
+                }
+                out += "}";
             }
             out += "]";
         }
@@ -480,11 +525,11 @@ std::string LayersJson(std::string& aError)
     return out + "]}";
 }
 
-// The slot offset of the HUD entry whose window holds aWidget, or 0 when none does.
+// The place of each HUD entry's own window, to find the one a widget is in.
 struct Offsets
 {
-    std::unordered_map<IScriptable*, std::pair<double, double>> byWindow; // an entry's own window
-    std::unordered_map<IScriptable*, std::string> names;                  // its name
+    std::unordered_map<IScriptable*, Place> byWindow;     // an entry's own window
+    std::unordered_map<IScriptable*, std::string> names; // its name
 };
 
 Offsets EntryOffsets(const std::vector<Layer>& aLayers)
@@ -496,10 +541,7 @@ Offsets EntryOffsets(const std::vector<Layer>& aLayers)
         {
             if (!e.window)
                 continue;
-            double x = 0, y = 0;
-            if (e.slot)
-                ToGlobal(e.slot, 0, 0, x, y);
-            out.byWindow[e.window.GetPtr()] = {x, y};
+            out.byWindow[e.window.GetPtr()] = PlaceOf(e);
             out.names[e.window.GetPtr()] = e.name;
         }
     }
@@ -532,7 +574,7 @@ struct Reader
     int depth = MaxDepth;
     bool cut = false;
     bool boxes = true;
-    double offsetX = 0, offsetY = 0;
+    Place place; // the window's place, for a HUD entry's own window
 };
 
 void NodeJson(Reader& aReader, const Obj& aWidget, int aDepth, std::string& aOut)
@@ -546,7 +588,7 @@ void NodeJson(Reader& aReader, const Obj& aWidget, int aDepth, std::string& aOut
         aOut += ",\"name\":" + JsonString(w->name.ToString()) + ",\"visible\":" + (w->visible ? "true" : "false") +
                 ",\"opacity\":" + Num(w->opacity);
         if (aReader.boxes)
-            aOut += ",\"box\":" + BoxJson(BoxOf(aWidget, aReader.offsetX, aReader.offsetY));
+            aOut += ",\"box\":" + BoxJson(BoxOf(aWidget, aReader.place));
         if (w->logicController)
             aOut += ",\"controller\":" +
                     JsonString(ClassName(Obj(*reinterpret_cast<const Handle<IScriptable>*>(&w->logicController))));
@@ -652,10 +694,7 @@ std::string ReadJson(const Value& aParams, std::string& aError)
         std::string ignored;
         const auto offsets = EntryOffsets(Layers(ignored));
         if (auto it = offsets.byWindow.find(TopOf(root).GetPtr()); it != offsets.byWindow.end())
-        {
-            reader.offsetX = it->second.first;
-            reader.offsetY = it->second.second;
-        }
+            reader.place = it->second;
     }
     std::string node;
     NodeJson(reader, root, 0, node);
@@ -697,12 +736,11 @@ std::string WidgetJson(const Value& aParams, std::string& aError)
     const auto layers = Layers(ignored);
     const auto offsets = EntryOffsets(layers);
     const Obj top = TopOf(widget);
-    double ox = 0, oy = 0;
+    Place place;
     std::string entry;
     if (auto it = offsets.byWindow.find(top.GetPtr()); it != offsets.byWindow.end())
     {
-        ox = it->second.first;
-        oy = it->second.second;
+        place = it->second;
         entry = offsets.names.at(top.GetPtr());
     }
     for (const auto& l : layers)
@@ -739,7 +777,7 @@ std::string WidgetJson(const Value& aParams, std::string& aError)
                       ",\"classes\":" + classes + ",\"name\":" + JsonString(w->name.ToString()) +
                       ",\"path\":" + JsonString(path) + ",\"depth\":" + std::to_string(depth) +
                       ",\"parent\":" + (parent ? JsonString(IdOf(parent)) : "null") + ",\"children\":" + children +
-                      ",\"box\":" + BoxJson(BoxOf(widget, ox, oy)) + ",\"visible\":" + (w->visible ? "true" : "false") +
+                      ",\"box\":" + BoxJson(BoxOf(widget, place)) + ",\"visible\":" + (w->visible ? "true" : "false") +
                       ",\"controllers\":" + controllers + ",\"layer\":" + JsonString(LayerOf(widget)) +
                       ",\"entry\":" + (entry.empty() ? "null" : JsonString(entry)) +
                       ",\"library\":" + JsonString(LibraryOf(widget)) + ",\"ref\":{\"$ref\":" +
@@ -769,7 +807,7 @@ struct Picker
     std::vector<Hit> hits;
 };
 
-void Look(Picker& aPicker, const Obj& aWidget, int aDepth, double aOx, double aOy, const std::string& aLayer,
+void Look(Picker& aPicker, const Obj& aWidget, int aDepth, const Place& aPlace, const std::string& aLayer,
           const std::string& aEntry)
 {
     if (aPicker.looked >= MaxLooked)
@@ -778,12 +816,12 @@ void Look(Picker& aPicker, const Obj& aWidget, int aDepth, double aOx, double aO
     if (!w || !w->visible)
         return;
     aPicker.looked += 1;
-    const Box box = BoxOf(aWidget, aOx, aOy);
+    const Box box = BoxOf(aWidget, aPlace);
     if (aPicker.all ? box.known && box.w > 0 && box.h > 0 : box.Holds(aPicker.x, aPicker.y))
         aPicker.hits.push_back({aWidget, box, aDepth, aLayer, aEntry});
     // Children can draw outside their parent's box, so every visible child is looked at.
     for (const auto& child : Children(aWidget))
-        Look(aPicker, child, aDepth + 1, aOx, aOy, aLayer, aEntry);
+        Look(aPicker, child, aDepth + 1, aPlace, aLayer, aEntry);
 }
 
 // ink.at, or ink.boxes with aAll: every visible widget's box, for a page to find what is under
@@ -809,15 +847,12 @@ std::string AtJson(const Value& aParams, bool aAll, std::string& aError)
     {
         if ((l.layer && !l.layer->active) || l.name == "inkWatermarksLayer")
             continue;
-        Look(picker, WindowOf(l), 0, 0, 0, l.name, {});
+        Look(picker, WindowOf(l), 0, Place{}, l.name, {});
         for (const auto& e : l.entries)
         {
             if (!e.window)
                 continue;
-            double ox = 0, oy = 0;
-            if (e.slot)
-                ToGlobal(e.slot, 0, 0, ox, oy);
-            Look(picker, e.window, 0, ox, oy, l.name, e.name);
+            Look(picker, e.window, 0, PlaceOf(e), l.name, e.name);
         }
     }
     // Deepest first; at the same depth (a HUD entry's own window beside the layer's), the smaller
