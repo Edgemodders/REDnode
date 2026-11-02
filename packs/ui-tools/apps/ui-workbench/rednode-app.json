@@ -11,7 +11,7 @@
   "anchor": "top-left",
   "open": false,
   "requires": {
-    "rednode": ">=0.53.0",
+    "rednode": ">=0.53.7",
     "codeware": ">=1.16"
   }
 }

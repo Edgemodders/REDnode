@@ -1,0 +1,78 @@
+[center][img]https://raw.githubusercontent.com/Edgemodders/REDnode/main/packs/ui-tools/nexus/brand/banner.png[/img][/center]
+
+[center][size=5][b][color=#fcee0a]Read Night City's own UI. Pick any widget. Build native UI of your own.[/color][/b][/size][/center]
+
+[center][size=3]REDnode UI Tools is an app pack for UI modders. Its UI Workbench shows the game's own interface, the ink widgets the engine draws, as a live tree: point at any piece of the HUD or a menu and it tells you what it is, where it came from and every property it has. Then write native UI of your own in ink markup, HTML-style tags the game draws as its own.[/size][/center]
+
+[line]
+
+[quote][size=4][b][color=#fcee0a]STATUS: PREVIEW[/color][/b][/size]
+Built in the open and tested in the game on game version 2.5. It runs on [url=https://www.nexusmods.com/cyberpunk2077/mods/35419]REDnode[/url] and [url=https://www.nexusmods.com/cyberpunk2077/mods/7780]Codeware[/url], which you need first. Everything it does reads the game's UI; nothing it shows changes the game.
+[b]UI modders:[/b] this is for you. [b]Players:[/b] you do not need it to play UI mods.[/quote][line]
+
+[i][color=#19f3ff]Screenshot 1: the UI Workbench over the HUD, a widget picked and outlined, its details on the right[/color][/i]
+
+[size=5][b][color=#fcee0a]What is in the pack[/color][/b][/size]
+
+[size=4][b][color=#19f3ff]UI Workbench: Inspect[/color][/b][/size]
+Every ink layer of the game as a tree: the HUD with each of its pieces (the health bar, the minimap, the quest tracker...), the menus, notifications. Open any widget to see its children.
+[list]
+[*][b]Pick:[/b] point at the HUD or a menu. The widget under the cursor is outlined and named as you move; click it, and the tree opens down to it with its row selected. Only what the game draws is offered, the smallest widget under the cursor first.[/*]
+[*][b]Right-click while picking[/b] sets the widget on top aside, so the one under it can be picked.[/*]
+[*][b]Pick inside:[/b] with a widget selected, pick only among its children.[/*]
+[*][b]Details:[/b] a widget's class, path, box on screen, controllers, the .inkwidget file it was spawned from, and every property, each part folding away. Copy its path or all of it as JSON.[/*]
+[*][b]Filter[/b] the tree by name, class, controller or text.[/*]
+[*]HUD pieces the game has not spawned yet (a boss health bar, a car's HUD) are listed and say so.[/*]
+[/list][i][color=#19f3ff]Screenshot 2: Pick in a menu, with the tree opened to the widget[/color][/i]
+
+[size=4][b][color=#19f3ff]UI Workbench: Edit[/color][/b][/size]
+[i][color=#19f3ff]To be written with phase UT3: the editor (markup and script, Run and Stop, To source from a picked panel, projects and Export).[/color][/i]
+
+[i][color=#19f3ff]Screenshot 3: the editor with a panel of ink markup running on the HUD[/color][/i]
+
+[size=5][b][color=#fcee0a]Requirements[/color][/b][/size]
+
+[list]
+[*][url=https://www.nexusmods.com/cyberpunk2077/mods/35419]REDnode[/url] 0.53.7 or later, with what it needs (RED4ext, redscript).[/*]
+[*][url=https://www.nexusmods.com/cyberpunk2077/mods/7780]Codeware[/url] 1.16 or later.[/*]
+[*]Cyberpunk 2077 on PC, game version 2.5.[/*]
+[/list][size=5][b][color=#fcee0a]Install[/color][/b][/size]
+
+[list]
+[*][b]Vortex:[/b] Mod Manager Download, then enable and deploy.[/*]
+[*][b]By hand:[/b] extract the zip into the game folder, so the app lands in [i]red4ext/plugins/REDnode/apps/[/i].[/*]
+[/list]In the game, press [b]F10[/b] and open the [b]Mod Manager[/b] from the launcher (the [b]REDNODE[/b] tab at the lower left). Switch on the [b]UI Workbench[/b]; it starts switched off and asks for no permission.
+
+[b]Uninstall:[/b] remove it in your mod manager, or delete the [i]ui-workbench[/i] folder from [i]red4ext/plugins/REDnode/apps/[/i]. REDnode itself stays.
+
+[size=5][b][color=#fcee0a]For mod makers[/color][/b][/size]
+
+Everything the Workbench reads is in REDnode's [b]rednode[/b] package, for your own mods: [i]ink.layers[/i] for the game's layers and HUD pieces, [i]ink.read[/i] for a tree of widgets in one call, [i]ink.inspect[/i] for one widget in full, [i]ink.at[/i] and [i]ink.boxes[/i] for what is under a point. Native UI of your own is written with [i]ink.load[/i] and [i]ink.parse[/i] in ink markup, or with the [i]ink[/i] functions. See the [url=https://edgemodders.github.io/REDnode/ink.html]native UI docs[/url].
+
+[size=5][b][color=#fcee0a]Questions[/color][/b][/size]
+
+[b]Does it slow the game down?[/b]
+A pick reads about 450 widgets in under 3 ms. While Pick is on, the boxes are read again every 1.5 s; moving the mouse asks the game nothing.
+
+[b]Why can I not click a HUD piece in the tree?[/b]
+The game makes many HUD pieces only when they are needed (a video, a boss fight, a vehicle). Until then there is nothing to show; select it again after Refresh once it is on screen.
+
+[b]Is it free?[/b]
+Yes, and open source under the MIT license, in [url=https://github.com/Edgemodders/REDnode]REDnode's repo[/url].
+
+[line]
+
+[size=5][b][color=#fcee0a]Links[/color][/b][/size]
+
+[list]
+[*]REDnode: [url=https://www.nexusmods.com/cyberpunk2077/mods/35419]Nexus page[/url], [url=https://edgemodders.github.io/REDnode/]docs[/url], [url=https://edgemodders.github.io/REDnode/ui-tools.html]UI Tools guide[/url][/*]
+[*]Source and issues: [url=https://github.com/Edgemodders/REDnode]github.com/Edgemodders/REDnode[/url][/*]
+[*]EDGEmodders: [url=https://edgemodders.ai/]edgemodders.ai[/url][/*]
+[*]Community Discord: [url=https://discord.gg/63qP3Erw43]discord.gg/63qP3Erw43[/url][/*]
+[/list][size=5][b][color=#fcee0a]Credits[/color][/b][/size]
+[list]
+[*][b]Codeware[/b] by psiberx: the game's ink layers reach REDnode through it.[/*]
+[*][b]RED Hot Tools[/b] by psiberx, whose Ink Inspector showed what an inspector of the game's UI can be.[/*]
+[*][b]RED4ext[/b] and its SDK, whose descriptions of the game's types the Workbench reads through.[/*]
+[*]The Cyberpunk 2077 modding community, whose research into ink this builds on.[/*]
+[/list][size=2]REDnode UI Tools is not affiliated with CD PROJEKT RED. Cyberpunk 2077 is a trademark of CD PROJEKT.[/size]

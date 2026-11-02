@@ -1,0 +1,17 @@
+{
+  "page": 36958,
+  "upload": {
+    "name": "REDnode UI Tools",
+    "category": "main",
+    "primary": true,
+    "modManager": true,
+    "archivePrevious": true,
+    "description": "REDnode UI Tools {version}: the UI Workbench, to inspect the game's own UI and write native UI in ink markup. Needs REDnode 0.53.7 or later and Codeware, on game 2.5."
+  },
+  "mod": "14315126034526",
+  "pulled": {
+    "sha256": "e88e9f9149515b2c8b8b2d5c00bc829cf0233541f0d737c25f86055af384ab8a",
+    "at": "2026-11-02T13:39:23.310Z",
+    "version": "1.0"
+  }
+}

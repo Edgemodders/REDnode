@@ -57,6 +57,8 @@ nav:
     url: /sound-tools.html
   - title: Admin Tools
     url: /admin-tools.html
+  - title: UI Tools
+    url: /ui-tools.html
   - title: Shared keys
     url: /keys.html
   - title: Localization

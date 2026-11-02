@@ -96,6 +96,7 @@ jobs:
           foreach ($page in Get-ChildItem packs/*/nexus/nexus.json) {
             $id = $page.Directory.Parent.Name
             $pack = Get-Content "packs/$id/pack.json" -Raw | ConvertFrom-Json
+            if ($pack.unreleased) { Write-Host "packs/${id}: unreleased, left out"; continue } # pack.json "unreleased": true (UI Tools until UT3)
             node tools/release/notes.mjs $pack.version --nexus --changelog "packs/$id/changelog.md" --out "$env:RUNNER_TEMP/$id-nexus-notes.txt"
             if ($LASTEXITCODE) { exit $LASTEXITCODE }
           }
@@ -114,6 +115,7 @@ jobs:
           foreach ($page in Get-ChildItem packs/*/nexus/nexus.json) {
             $id = $page.Directory.Parent.Name
             $pack = Get-Content "packs/$id/pack.json" -Raw | ConvertFrom-Json
+            if ($pack.unreleased) { Write-Host "packs/${id}: unreleased, left out"; continue } # pack.json "unreleased": true (UI Tools until UT3)
             node tools/nexus/nexus.mjs check "packs/$id/nexus" --version $pack.version
             if ($LASTEXITCODE) { exit $LASTEXITCODE }
           }
@@ -182,6 +184,7 @@ jobs:
           foreach ($page in Get-ChildItem packs/*/nexus/nexus.json) {
             $id = $page.Directory.Parent.Name
             $pack = Get-Content "packs/$id/pack.json" -Raw | ConvertFrom-Json
+            if ($pack.unreleased) { Write-Host "packs/${id}: unreleased, left out"; continue } # pack.json "unreleased": true (UI Tools until UT3)
             $zip = "native/build/release/$($pack.name -replace '\s+', '-')-$($pack.version).zip"
             node tools/nexus/nexus.mjs release "packs/$id/nexus" --version $pack.version --zip $zip --notes "$env:RUNNER_TEMP/$id-nexus-notes.txt"
             if ($LASTEXITCODE) { exit $LASTEXITCODE }
