@@ -1598,3 +1598,26 @@ Same game and REDnode 0.40.1. Every step passed:
 | Switch the app off | "Removed 2 entities world-objects-test spawned (the mod stopped)" |
 
 **H2c-b passed in game**, except the refresh after an archive swap, which waits for RED Hot Tools on game 2.5 (agreed to ship unverified).
+
+## A spawn that times out (#35)
+
+Asked for by EDGEbuilder ([#35](https://github.com/Edgemodders/REDnode/issues/35), 2026-11-02): when `world.spawn` timed out waiting for the entity to attach, the entity had been created, but the caller got no id and the package's own list (`world.spawned()`, `world.move`, the respawn after a swap) never had it. The host did remove it when the package stopped (it notes every `REDnodeWorld.Spawn`), but until then it stayed in the game, and showed up when V got near.
+
+Built in REDnode 0.53.0 (`packages/rednode/src/world.ts`), both shapes the request offered:
+
+| Case | Now |
+|---|---|
+| A spawn that is not in the world within `timeoutMs` (10 s by default) | Removed before the call throws, so the error means nothing was spawned; it says `wait: false` keeps it |
+| `world.spawn({ ..., wait: false })` | Resolves as soon as the entity is created, with `entity: null`, and is this package's spawn at once: move, remove, the respawn after a swap and the clean-up at stop all work. A person is made to hold their place and stay friendly once they attach |
+| `world.spawned()` | Each entry has `attached`: true while it is in the world (`Entity/AfterAttach`, false again at `Entity/Detach`) |
+| `world.load(scene, { wait: false })` | Spawns every object without waiting, so a scene far from V loads in full |
+
+The MCP server's `world_spawn` already returned the id with `inWorld: false` and kept it, so it is unchanged. Checked against a stand-in host: 14 checks (scratchpad `w35/check.mjs`: a timeout removes and lists nothing, `wait: false` returns at once and lists, move works before the attach, attach and detach, a person settled only once in, a removed spawn's late attach settles nothing, `world.load` with `wait: false`). World objects test 0.2.4 has **Far, waiting** and **Far, wait: false**, which spawn a box 4 km ahead of V.
+
+### #35 test
+
+0. Test timer: Start, Mark after each step.
+1. Load a save. In the launcher, switch on **World objects test** (these steps need no permission switch; its **archives** switch is only for Swap). Press **Spawn a prop**: a box in front of V, and a log line with its id. Mark.
+2. Press **Far, waiting**: about 3 s later the log says `refused as it should be: world.spawn: the entity was created but not in the world after 3000 ms ..., so it was removed`. Mark.
+3. Press **Far, wait: false**: at once, the log says `... entity null, listed and not in the world yet`. Press **Spawned**: the far box says `not in the world yet`, the near box `in the world`. Mark.
+4. Switch the World objects test off and quit. Claude reads the host's `Removed 2 entities world-objects-test spawned (the package stopped)`: the near box and the far one kept with `wait: false`, and not the one that timed out (0.52 and before would have left it in the game, untracked by the package).

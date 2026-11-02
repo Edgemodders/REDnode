@@ -1145,8 +1145,90 @@ export async function hostCall(method, params = {}) {
       blip();
       log('info', `audio.play("${params.name}"): game sound events only play in the game; this page plays a tone`, 'sim');
       return true;
+    case 'ink.layers':
+    case 'ink.read':
+    case 'ink.inspect':
+    case 'ink.at':
+      return inkRead(method, params);
     default:
       throw new Error(`${method}: not simulated on this page`);
   }
+}
+
+// The game's own UI for ink.layers, ink.read, ink.inspect and ink.at (UT2): a small HUD with a
+// health bar and a minimap, made up. In the game these read thousands of real widgets.
+const INK = (() => {
+  const t = {};
+  const add = (id, cls, name, box, kids = [], more = {}) => (t[id] = { id, class: cls, name, visible: true, opacity: 1, box, kids, ...more });
+  add('w1', 'inkVirtualWindow', 'Root', [0, 0, 1920, 1080], ['w2']);
+  add('w2', 'inkCanvasWidget', 'hud', [0, 0, 1920, 1080], ['w3', 'w7']);
+  add('w3', 'inkCanvasWidget', 'healthbar', [40, 40, 420, 60], ['w4', 'w5'], { controller: 'healthbarWidgetLogicController' });
+  add('w4', 'inkTextWidget', 'hp', [50, 50, 120, 36], [], { text: '400 / 400' });
+  add('w5', 'inkRectangleWidget', 'fill', [180, 58, 270, 20]);
+  add('w7', 'inkTextWidget', 'combatHint', [40, 110, 300, 30], [], { visible: false, text: 'In combat' });
+  add('w6', 'inkVirtualWindow', 'minimapWindow', [1600, 40, 280, 280], ['w8']);
+  add('w8', 'inkCanvasWidget', 'minimap', [1600, 40, 280, 280]);
+  add('w10', 'inkVirtualWindow', 'Root', [0, 0, 1920, 1080]);
+  return t;
+})();
+
+function inkRead(method, q) {
+  const parentOf = (id) => Object.values(INK).find((n) => n.kids.includes(id))?.id ?? null;
+  const path = (id) => {
+    const names = [];
+    for (let at = id; at; at = parentOf(at)) names.unshift(INK[at].name);
+    return names.join('/');
+  };
+  const node = (id, depth) => {
+    const n = INK[id];
+    const out = { id, class: n.class, name: n.name, visible: n.visible, opacity: n.opacity, box: n.box, count: n.kids.length };
+    if (n.controller) out.controller = n.controller;
+    if (n.text) out.text = n.text;
+    if (depth > 0 && n.kids.length) out.children = n.kids.map((k) => node(k, depth - 1));
+    return out;
+  };
+  if (method === 'ink.layers') {
+    return { layers: [
+      { name: 'inkHUDLayer', active: true, interactive: false, input: 'None', size: [1920, 1080], window: 'w1', children: 1, entries: [
+        { name: 'healthbar', enabled: true, window: null, root: 'w3', controller: 'healthbarWidgetGameController', library: '0x1f3a5c7e9b2d4f60' },
+        { name: 'minimap', enabled: true, window: 'w6', root: 'w8', controller: 'MinimapContainerController', library: '0x6e2c8a4f1d3b5a79' },
+      ] },
+      { name: 'inkMenuLayer', active: false, interactive: true, input: 'UI', size: [1920, 1080], window: 'w10', children: 0 },
+    ] };
+  }
+  const id = q.id ?? (q.layer === 'inkHUDLayer' ? 'w1' : null);
+  if (method === 'ink.read') {
+    if (!INK[id]) throw new Error(`widget ${id} is gone: read the tree again`);
+    let nodes = 0;
+    const count = (n) => { nodes += 1; (n.children ?? []).forEach(count); };
+    const root = node(id, q.depth ?? 99);
+    count(root);
+    return { root, nodes, cut: false, ms: 0.4 };
+  }
+  if (method === 'ink.inspect') {
+    const n = INK[id];
+    if (!n) throw new Error(`widget ${id} is gone: read the tree again`);
+    return {
+      id, class: n.class, classes: [n.class, n.kids.length ? 'inkCompoundWidget' : 'inkLeafWidget', 'inkWidget', 'IScriptable'], name: n.name,
+      path: path(id), depth: path(id).split('/').length - 1, parent: parentOf(id), children: n.kids, box: n.box, visible: n.visible,
+      controllers: n.controller ? [n.controller] : [], layer: 'inkHUDLayer', entry: id === 'w8' ? 'minimap' : id === 'w3' ? 'healthbar' : null,
+      library: '0x1f3a5c7e9b2d4f60', ref: { $ref: 1 }, ...(n.text ? { text: n.text } : {}),
+      properties: { name: n.name, visible: n.visible, opacity: n.opacity, size: { X: n.box[2], Y: n.box[3] }, tintColor: { Red: 1, Green: 0.33, Blue: 0.33, Alpha: 1 }, logicController: n.controller ?? null },
+    };
+  }
+  const hits = [];
+  let looked = 0;
+  const look = (wid, depth) => {
+    const n = INK[wid];
+    if (!n.visible) return;
+    looked += 1;
+    const [x, y, w, h] = n.box;
+    if (q.x >= x && q.y >= y && q.x < x + w && q.y < y + h) hits.push({ id: wid, class: n.class, name: n.name, box: n.box, layer: 'inkHUDLayer', entry: wid === 'w6' || wid === 'w8' ? 'minimap' : null, depth, path: path(wid) });
+    n.kids.forEach((k) => look(k, depth + 1));
+  };
+  look('w1', 0);
+  look('w6', 0);
+  hits.sort((a, b) => b.depth - a.depth);
+  return { hits, looked, ms: 0.6 };
 }
 export const hostState = () => ({ connected: sim.connected, mode: sim.overlay, overlay: sim.overlay, windowed: false });

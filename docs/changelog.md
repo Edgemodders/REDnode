@@ -19,12 +19,15 @@ How to keep it:
 - A test sample, **Input test**: modifiers on clicks, a page's own edit keys beside a text field's, and Take Esc.
 - Reading the game's own UI (needs Codeware): `ink.layers()` lists the game's ink layers and HUD pieces, `ink.read()` reads a tree of widgets in one call (class, name, visibility, box on screen, controller, text), `ink.inspect(id)` gives one widget in full (path, controllers, the `.inkwidget` file it came from, every property, and an `api` reference), and `ink.at(x, y)` finds the visible widgets under a point. Reads only. They are what REDnode UI Tools' UI Workbench is built on. See https://edgemodders.github.io/REDnode/ink.html#ut2-build-rednode-0530
 
+- `world.spawn({ ..., wait: false })` resolves as soon as the entity is created, without waiting for it to be in the world (far from V, or still streaming in), and keeps it as the package's spawn: move, remove, the respawn after a swap and the clean-up at stop all work. `world.spawned()` says whether each one is in the world (`attached`), and `world.load(scene, { wait: false })` loads a far scene in full (https://github.com/Edgemodders/REDnode/issues/35).
+
 **Changed**
 
 - Ctrl+Z, Ctrl+Y, Ctrl+A, Ctrl+C, Ctrl+V and Ctrl+X reach the page as keys (https://github.com/Edgemodders/REDnode/issues/33): a text field edits as before, and a page with its own undo or copy hears them and takes them with `preventDefault()`. Before, the overlay ran the editing command itself and the page never heard the key.
 
 **Fixed**
 
+- A `world.spawn` that times out before the entity is in the world now removes the entity before it throws, so a failed spawn leaves nothing behind. Before, the entity stayed in the game with no id given back, and showed up when V got near (https://github.com/Edgemodders/REDnode/issues/35).
 - Clicks, moves and the wheel in overlay windows now carry Ctrl, Shift and Alt (`ctrlKey`, `shiftKey`, `altKey`), read from Windows at each event, so Ctrl+click, Shift+drag and Alt+click work (https://github.com/Edgemodders/REDnode/issues/33).
 
 ## 0.50.2 (2026-11-01)

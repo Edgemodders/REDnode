@@ -4,7 +4,8 @@
 //
 //   1 Spawn     a person by TweakDB record (stands still, friendly, through world.spawn), a
 //               prop by mesh alone, the package's spawn list, a move of the newest spawn (#27:
-//               a swap's respawn must keep the moved place)
+//               a swap's respawn must keep the moved place); far from V (#35): a spawn that
+//               times out is removed, and one with wait: false is kept until it comes in
 //   2 Near V    world.near: the entities around V with the files they use, read in the game
 //               in one call; only those that use a given file
 //   3 Scene     writes an EDGEbuilder scene around V into this app's folder, loads it with
@@ -85,8 +86,29 @@ const spawnProp = () =>
 const listSpawned = () =>
   step('Spawned', async () => {
     const list = world.spawned();
-    for (const s of list) say(`  ${s.id.hash}  ${s.options.record ?? s.options.mesh ?? s.options.template}${s.scene ? `  (scene ${s.scene})` : ''}`);
+    for (const s of list) say(`  ${s.id.hash}  ${s.options.record ?? s.options.mesh ?? s.options.template}  ${s.attached ? 'in the world' : 'not in the world yet'}${s.scene ? `  (scene ${s.scene})` : ''}`);
     return `${list.length} listed`;
+  });
+
+// #35: a box 4 km ahead of V, where the game does not stream it in. Waiting, it times out and
+// is removed; with wait: false it is listed at once and comes in when V gets there.
+const FAR = 4000;
+const farWaiting = () =>
+  step('Far, waiting', async () => {
+    const at = await inFront(FAR);
+    try {
+      const { id } = await world.spawn({ mesh: BOX, ...at, timeoutMs: 3000 });
+      return `${id.hash} came in after all, 4 km away`;
+    } catch (err) {
+      return `refused as it should be: ${err.message}`;
+    }
+  });
+const farLater = () =>
+  step('Far, wait: false', async () => {
+    const at = await inFront(FAR);
+    const { id, entity } = await world.spawn({ mesh: BOX, ...at, wait: false });
+    const s = world.spawned().find((e) => e.id.hash === id.hash);
+    return `${id.hash} at once, entity ${entity === null ? 'null' : 'given'}, listed ${s ? (s.attached ? 'and in the world' : 'and not in the world yet') : 'NOT'}`;
   });
 
 // Moves the newest spawn 2 m to its right and turns it a quarter, as an editor's gizmo would.
@@ -227,6 +249,10 @@ ui.window({
       ui.button('Move', moveNewest, { variant: 'ghost' }),
       ui.button('Spawned', listSpawned, { variant: 'ghost' }),
       ui.button('Remove spawned', removeAll, { variant: 'ghost' }),
+    ),
+    ui.row(
+      ui.button('Far, waiting', farWaiting, { variant: 'ghost' }),
+      ui.button('Far, wait: false', farLater, { variant: 'ghost' }),
     ),
     ui.heading('2. Near V'),
     ui.slider('Radius (m)', (v) => (radius = v), { min: 5, max: 60, step: 5, value: radius }),

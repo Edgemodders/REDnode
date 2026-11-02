@@ -64,8 +64,20 @@ export interface SpawnOptions {
   components?: GameRef[];
   /** More tags for the entity, for your own bookkeeping. */
   tags?: string[];
-  /** How long to wait for the entity to be in the world. Default 10 seconds. */
+  /**
+   * How long to wait for the entity to be in the world. Default 10 seconds. If it is not in
+   * by then, it is removed and `world.spawn` throws: nothing was spawned.
+   */
   timeoutMs?: number;
+  /**
+   * `false` resolves as soon as the entity is created, with `entity: null`, without waiting
+   * for it to be in the world (far from V, or still streaming in). It is this package's spawn
+   * all the same: {@link world.move}, {@link world.remove}, the respawn after an archive swap
+   * and the clean-up when the package stops all work. {@link world.spawned} says when it is
+   * in (`attached`), and so does `world.on("Entity/AfterAttach")`. A person is made to hold
+   * their place and stay friendly once they attach. Default `true`.
+   */
+  wait?: boolean;
 }
 
 /** A spawned entity. */
@@ -118,6 +130,8 @@ export interface EntityFiles {
 export interface SpawnedEntry {
   id: EntityId;
   options: SpawnOptions;
+  /** True while the entity is in the world (it attached, and has not detached since). */
+  attached: boolean;
   /** The scene it belongs to, when {@link world.load} spawned it. */
   scene?: string;
 }
@@ -164,11 +178,23 @@ const HOLD_SECONDS = 86400;
 const mine = new Map<string, SpawnedEntry>();
 const scenes = new Map<string, string[]>(); // scene name -> id hashes
 const respawnHandlers = new Set<(before: EntityId, after: EntityId) => void>();
+const unsettled = new Set<string>(); // people spawned with wait: false, settled once they attach
 let listening = false;
 
 function listen(): void {
   if (listening) return;
   listening = true;
+  // Whether each spawn is in the world, for spawned() and for people spawned with wait: false.
+  game.on<GameEvent>("Entity/AfterAttach", (e) => {
+    const entry = e.entityId ? mine.get(String(e.entityId)) : undefined;
+    if (!entry) return;
+    entry.attached = true;
+    if (unsettled.delete(entry.id.hash)) settleLater(entry);
+  });
+  game.on<GameEvent>("Entity/Detach", (e) => {
+    const entry = e.entityId ? mine.get(String(e.entityId)) : undefined;
+    if (entry) entry.attached = false;
+  });
   transport().listen((m) => {
     if (m.event !== "world-refresh" || !Array.isArray(m.entities)) return;
     for (const hash of m.entities as string[]) {
@@ -227,6 +253,14 @@ async function settlePerson(entity: GameRef, options: SpawnOptions): Promise<voi
   }
 }
 
+// A person spawned with wait: false, once in the world: hold and stay friendly, as spawn does.
+function settleLater(entry: SpawnedEntry): void {
+  world
+    .entity(entry.id)
+    .then((entity) => (entity ? settlePerson(entity, entry.options) : undefined))
+    .catch(() => {});
+}
+
 function planOptions(p: ScenePlan): SpawnOptions {
   return {
     ...(p.template ? { template: p.template } : {}),
@@ -274,6 +308,17 @@ export const world = {
    * Spawns an entity and resolves once it is in the world (Codeware's
    * `Entity/AfterAttach`). Components are attached while it assembles, before the
    * game gathers its components, the moment Codeware documents for it.
+   *
+   * If it is not in the world within `timeoutMs`, it is removed and the call throws, so a
+   * failed spawn leaves nothing behind. With `wait: false` it resolves at once, `entity`
+   * null, and the entity comes in when the game streams it in (far from V, for example).
+   *
+   * @example
+   * ```ts
+   * // A preview far from V: kept, and shown once V gets near.
+   * const { id } = await world.spawn({ mesh: "base\\environment\\props\\crate_a.mesh", position: far, wait: false });
+   * world.spawned().find((s) => s.id.hash === id.hash)?.attached; // false until it comes in
+   * ```
    */
   async spawn(options: SpawnOptions): Promise<Spawned> {
     if ((options.template ? 1 : 0) + (options.record ? 1 : 0) + (options.mesh && !options.template ? 1 : 0) !== 1) {
@@ -313,17 +358,33 @@ export const world = {
     try {
       const id = (await script("Spawn", spec, components)) as EntityId | null;
       if (!id || id.hash === "0") throw new Error(`world.spawn failed: no entity was created (${NEEDS_CODEWARE}, and a loaded game)`);
+      if (options.wait === false) {
+        // Listed now, so it can be moved and removed; the listener in listen() follows it from here.
+        const entry: SpawnedEntry = { id, options, attached: attached.has(id.hash) };
+        mine.set(id.hash, entry);
+        if (isPerson(options)) {
+          if (entry.attached) settleLater(entry);
+          else unsettled.add(id.hash);
+        }
+        return { id, entity: null };
+      }
       const timeout = options.timeoutMs ?? 10000;
       const until = Date.now() + timeout;
       while (!attached.has(id.hash)) {
         const left = until - Date.now();
-        if (left <= 0) throw new Error(`world.spawn: the entity was created but not in the world after ${timeout} ms (it may be out of view or still loading)`);
+        if (left <= 0) {
+          // Created but not in: removed, so a failed spawn leaves nothing behind (#35).
+          await script("Delete", id).catch(() => false);
+          throw new Error(
+            `world.spawn: the entity was created but not in the world after ${timeout} ms (it may be out of view or still loading), so it was removed. Pass wait: false to keep it until it comes in`,
+          );
+        }
         await new Promise<void>((resolve) => {
           wake = resolve;
           setTimeout(resolve, Math.min(left, 250));
         });
       }
-      mine.set(id.hash, { id, options });
+      mine.set(id.hash, { id, options, attached: true });
       const entity = await world.entity(id);
       if (entity && isPerson(options)) await settlePerson(entity, options);
       return { id, entity };
@@ -376,7 +437,9 @@ export const world = {
    * Loads an EDGEbuilder scene into the running game: its meshes, entities and NPCs (lights
    * are not spawned yet). Pass the scene, or a `.scene.json` file's path (absolute, or in
    * your package's folder). People stand where placed and stay friendly to V. Loading a
-   * scene of the same name again replaces it.
+   * scene of the same name again replaces it. With `wait: false`, objects are spawned without
+   * waiting for each to be in the world, as {@link world.spawn} does with it, so a scene far
+   * from V loads in full and shows once V gets near.
    *
    * @example
    * ```ts
@@ -385,7 +448,7 @@ export const world = {
    * await world.unload(r.name);
    * ```
    */
-  async load(scene: Scene | string, options: { name?: string } = {}): Promise<LoadResult> {
+  async load(scene: Scene | string, options: { name?: string; wait?: boolean } = {}): Promise<LoadResult> {
     const started = Date.now();
     let read: SceneRead;
     try {
@@ -402,7 +465,7 @@ export const world = {
     const skipped = [...read.skipped];
     for (const plan of read.plans) {
       try {
-        const { id } = await world.spawn(planOptions(plan));
+        const { id } = await world.spawn({ ...planOptions(plan), ...(options.wait === false ? { wait: false } : {}) });
         ids.push(id.hash);
         const entry = mine.get(id.hash);
         if (entry) entry.scene = name;
@@ -439,6 +502,7 @@ export const world = {
   /** Removes an entity spawned with {@link world.spawn}. */
   async remove(id: EntityId | string): Promise<boolean> {
     mine.delete(idOf(id).hash);
+    unsettled.delete(idOf(id).hash);
     return (await script("Delete", idOf(id))) === true;
   },
 

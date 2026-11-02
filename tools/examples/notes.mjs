@@ -418,6 +418,7 @@ export const NOTES = {
     how: [
       'H2c-b\'s test app: each button calls one part of the world API and logs what came back and how long it took.',
       '**Spawn a person** uses `world.spawn({ record })`: a `Character.*` record stands where it was placed and stays friendly to V, with no other call. **Spawn a prop** uses `world.spawn({ mesh })`: a mesh on its own. **Keep in saves** passes `keep`. **Move** shifts the newest spawn 2 m east and turns it a quarter with `world.move`, which also keeps the new place, so the respawn after a swap brings it back there.',
+      '**Far, waiting** spawns a box 4 km ahead of V, where the game does not stream it in: after its `timeoutMs` the call throws and the box is removed, so nothing is left behind. **Far, wait: false** passes `wait: false`: the call resolves at once and the box is listed in **Spawned** as not in the world yet, until V gets near.',
       '**Near V** is `world.near`: every entity within the radius, nearest first, read in the game in one call; **With files** adds the files each one uses, and **Using this file** keeps only those that use a given depot path.',
       '**Load a scene here** writes an EDGEbuilder scene file around V into the app\'s folder (`node:fs`) and loads it with `world.load`: two props and a person, and a light, which is skipped for now.',
       '**Swap** calls `archives.reload` and lists what its refresh did: this app\'s spawns that use a swapped file are spawned again (`world.onRespawn` says so), and the game\'s entities near V change appearance and back. Switching the app off removes everything it spawned.',
@@ -482,6 +483,20 @@ export const NOTES = {
     ],
     tryThis: ['Type katana.', 'Open w_melee_katana_equip with ▸ and play its recordings one by one.', 'Save one with ☆, then open the Scratch tab.', 'Search 746693166: the event that plays that sound opens with it marked.'],
     preview: 'The catalogue on this page is made up and plays a tone: in the game it holds over 23,000 events and plays the real recordings.',
+  },
+  'ui-workbench': {
+    group: 'game',
+    summary: 'Inspect the game\'s own UI: its ink layers and HUD pieces as a tree, any widget\'s class, path, box on screen, controllers, source file and properties, and Pick, which finds the widgets under a click and outlines them.',
+    teaches: ['ink.layers', 'ink.read', 'ink.inspect', 'ink.at', '"fill": "screen"', 'navigator.keyboard.lock'],
+    how: [
+      'The page covers the whole game view (`"fill": "screen"`) and is see-through, so the game takes the mouse wherever it draws nothing. The workbench is a window that moves inside the page.',
+      '`ink.layers()` lists the game\'s layers and the HUD\'s pieces; opening a row reads one level with `ink.read({ id }, { depth: 1 })`, and selecting one reads it in full with `ink.inspect(id)`. Widget ids stay the same while a widget lives.',
+      '**Pick** lays a faint sheet over the game that takes one click, turns the page\'s pixels into the game\'s ink pixels (a layer\'s `size`), and asks `ink.at(x, y)` for the visible widgets there, deepest first. Their boxes come back in ink pixels and are drawn here scaled to the page.',
+      'Esc leaves Pick through the web\'s Keyboard Lock (`navigator.keyboard.lock(["Escape"])`), which REDnode gives to a page that asks; a right-click does too.',
+      'Everything here reads: nothing in the game changes. Part of REDnode UI Tools; its editor comes next.',
+    ],
+    tryThis: ['Open inkHUDLayer, then HUD entries.', 'Press Pick and click the health bar at the upper left of the preview.', 'Select the hidden combatHint text in the tree.'],
+    preview: 'The UI on this page is a small made-up HUD: in the game the tree holds the game\'s real widgets, thousands on a menu screen.',
   },
   taskmanager: {
     group: 'overlay',
