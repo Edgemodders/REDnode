@@ -1615,8 +1615,14 @@ bool CallNativeValue(Handle<IScriptable>& aSelf, const char* aClass, const std::
         aError = Str(fn->fullName) + " answers an object: use CallNative";
         return false;
     }
+    // Objects inside the answer (an array of handles) that only the answer holds are kept by
+    // their reference, as rtti.call does, or they are freed with it: Codeware's GetLayers makes
+    // its inkLayerWrappers anew each call (UT2's retest found 0 layers). The caller drops them
+    // with DropRefArg.
     std::string json;
+    g_keepFresh = true;
     ToJson(ret->type, ret->mem, json, 0);
+    g_keepFresh = false;
     return json::Parse(json, aOut, aError);
 }
 
