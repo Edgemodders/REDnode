@@ -249,6 +249,9 @@
     if (!e.enabled) label.append(' ', el('span', 'badge', 'off'));
     if (e.window) label.append(' ', el('span', 'badge', 'own window'));
     const top = e.window ?? e.root;
+    // The game spawns many HUD pieces only when needed (video_player while a video plays,
+    // boss_healthbar in a boss fight): until then the entry has no widgets to show.
+    if (!top) label.append(' ', el('span', 'dim', 'not spawned'));
     const r = rowFor(label, {
       level: 2,
       expandable: !!top,
@@ -256,9 +259,30 @@
         const { root } = await ink.read({ id: top }, { depth: 1 });
         addWidget(kids, root, 3);
       },
-      select: (row) => e.root && select(e.root, row),
+      select: (row) => (e.root ? select(e.root, row) : showEntry(e, row)),
     });
     container.append(r.wrap);
+  }
+
+  // A HUD entry with no widgets now: what the game knows of it.
+  function showEntry(e, row) {
+    if (selectedRow) selectedRow.classList.remove('selected');
+    selectedRow = row;
+    row.classList.add('selected');
+    current = null;
+    outline([]);
+    detail.replaceChildren();
+    const part = section('widget', `HUD entry ${e.name}`);
+    part.append(el('div', 'empty', e.window
+      ? 'Its window has no root widget now.'
+      : 'Not spawned now: the game makes this HUD piece only when it is needed (a video, a boss fight, a vehicle...). Select it again once it is on screen, after Refresh.'));
+    const table = el('table');
+    for (const [k, v] of [['name', e.name], ['enabled', String(e.enabled)], ['controller', e.controller ?? 'none yet'], ['library', `${e.library} (the .inkwidget file's path hash)`]]) {
+      const tr = el('tr');
+      tr.append(el('td', '', k), el('td', '', v));
+      table.append(tr);
+    }
+    part.append(table);
   }
 
   // ---------- one widget ----------
