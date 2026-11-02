@@ -1149,6 +1149,7 @@ export async function hostCall(method, params = {}) {
     case 'ink.read':
     case 'ink.inspect':
     case 'ink.at':
+    case 'ink.boxes':
       return inkRead(method, params);
     default:
       throw new Error(`${method}: not simulated on this page`);
@@ -1216,6 +1217,7 @@ function inkRead(method, q) {
       properties: { name: n.name, visible: n.visible, opacity: n.opacity, size: { X: n.box[2], Y: n.box[3] }, tintColor: { Red: 1, Green: 0.33, Blue: 0.33, Alpha: 1 }, logicController: n.controller ?? null },
     };
   }
+  const all = method === 'ink.boxes';
   const hits = [];
   let looked = 0;
   const look = (wid, depth) => {
@@ -1223,12 +1225,13 @@ function inkRead(method, q) {
     if (!n.visible) return;
     looked += 1;
     const [x, y, w, h] = n.box;
-    if (q.x >= x && q.y >= y && q.x < x + w && q.y < y + h) hits.push({ id: wid, class: n.class, name: n.name, box: n.box, layer: 'inkHUDLayer', entry: wid === 'w6' || wid === 'w8' ? 'minimap' : null, depth, path: path(wid) });
+    if (all || (q.x >= x && q.y >= y && q.x < x + w && q.y < y + h)) hits.push({ id: wid, class: n.class, name: n.name, box: n.box, layer: 'inkHUDLayer', entry: wid === 'w6' || wid === 'w8' ? 'minimap' : null, depth, path: path(wid) });
     n.kids.forEach((k) => look(k, depth + 1));
   };
   look('w1', 0);
   look('w6', 0);
-  hits.sort((a, b) => b.depth - a.depth);
+  hits.sort((a, b) => b.depth - a.depth || a.box[2] * a.box[3] - b.box[2] * b.box[3]);
+  if (all) return { widgets: hits.map(({ path: _, ...rest }) => rest), looked, ms: 0.5 };
   return { hits, looked, ms: 0.6 };
 }
 export const hostState = () => ({ connected: sim.connected, mode: sim.overlay, overlay: sim.overlay, windowed: false });

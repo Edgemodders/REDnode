@@ -6,4 +6,4 @@ An optional app pack for REDnode. Its first release comes with the UI Workbench'
 
 **New**
 
-- **UI Workbench**, with its Inspect tab: the game's ink layers and HUD pieces as a tree, a widget's class, path, box, controllers, source file and every property, and **Pick**, which finds the widgets under a click and outlines them over the game. Reads only. Needs REDnode 0.53.0 and Codeware.
+- **UI Workbench**, with its Inspect tab: the game's ink layers and HUD pieces as a tree, a widget's class, path, box, controllers, source file and every property, and **Pick**, which outlines and names the widget under the cursor as it moves and, on a click, lists the widgets there and selects the deepest. The details fold into three parts that stay as you left them. It waits for the game at the start and reads the layers again after each save load. Reads only. Needs REDnode 0.53.0 and Codeware.

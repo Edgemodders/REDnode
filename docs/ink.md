@@ -725,3 +725,33 @@ Checked in the mock game: 17 checks (scratchpad `ut2/check.mjs`, with a stand-in
 
 **Retest, 0.53.1: still 0 layers.** The wrappers are made anew by each `GetLayers` call and only its answer held them; `CallNativeValue` (the plugin's own path) gave objects in an answer only a weak reference, unlike `rtti.call`, which keeps the ones nothing else holds, so they were freed before the reader looked at them. REDnode 0.53.2 keeps them the same way in `CallNativeValue` (the reader drops them after). Retest from step 1 with 0.53.2.
 
+**UT2 passed in game on 2026-11-02** (third run, REDnode 0.53.2, UI Workbench 0.1.0, dev PC, game 2.5 at 3840 x 2160; the overlay's pages are 1920 x 1080 reference pixels, the ink layers 3840 x 2160). Every step as expected:
+
+| What | Found |
+|---|---|
+| Layers | 13 (Codeware's wrappers), the HUD layer with its entries |
+| Pick on the HUD | 60 hits (the most kept), 1,640 to 1,648 widgets looked at in 7.4 to 7.7 ms |
+| Pick on the perks screen | 19 to 29 hits, 1,277 to 1,355 widgets in 5.9 to 11.6 ms |
+| Esc while picking | taken and given back each time (the Keyboard Lock of #34) |
+
+The player's notes: the outline is not quite centred on the picked widget (unverified by how much; to measure with MCP `game_image` in the next run); the cursor seemed to freeze for a few seconds a couple of times; at the first start, before a save loaded, the status said the game did not answer within 5 seconds, and Refresh showed the tree. The freezes are not the picks (7 ms each): the plugin logged 27 times the game left the front in the 9 minutes, 2 to 14 s each, and while it is not in front Windows sends the mouse elsewhere, so the overlay's cursor stops (the cause of the focus loss is open: a click on another monitor would do it).
+
+The player asked for three changes, built in REDnode 0.53.3 with UI Workbench 0.1.1:
+
+| Change | How |
+|---|---|
+| The details fold | Three parts, **Under the cursor**, the widget (its actions and attributes) and **Properties**, each a fold that stays as the player left it for the next widget |
+| Pick highlights as it hovers | The new `ink.boxes` (every visible widget's box in one call, deepest first, then the smaller box at the same depth) is read when Pick starts and every 1.5 s; each move finds the widget under the cursor in the page, outlines it and names it (name, else id, and class) in a tip beside the cursor. Moves ask the game nothing. `ink.at` now orders hits the same way (the minimap's own window over the HUD's full-screen canvas) |
+| No answer at the start | The workbench asks again every 3 s until the game answers, and reads the layers again after each save load (`game.onState`'s `world`) |
+
+Checked in the mock game: 25 checks (scratchpad `ut2/check.mjs`, now with a first `ink.layers` left unanswered, the folds, the hover tip and outline, and the moves asking nothing).
+
+### UT2 polish test (0.53.3)
+
+0. Test timer: Start, Mark after each step.
+1. Start the game and, before loading a save, switch on **UI Workbench** (no permission switch). The status says `Waiting for the game...` until the game answers, then lists the layers; after a save loads it reads them again by itself. Mark.
+2. Load a save if you have not. Press **Pick** and move the mouse over the HUD: the widget under the cursor is outlined and a tip beside the cursor names it. Over the minimap the tip names the minimap's own widgets. Click the health bar. Mark.
+3. On the right, fold **Under the cursor**, the widget part and **Properties** with their titles, and select another widget in the tree: each part stays as you left it. Mark.
+4. Pick the health bar again and, with its outline on screen, tell Claude (without quitting) so Claude can take a picture of the game and measure how far off the outline is. Mark.
+5. Switch the UI Workbench off and quit. Claude reads `Ink boxes:` and `Ink pick at` lines, and how often the game left the front.
+

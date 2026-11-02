@@ -18,6 +18,10 @@
 //   ink.at {"x":..,"y":..}
 //     -> {"hits":[{"id","class","name","box","layer","entry","depth","path"}],"looked":N,"ms":t}
 //     The visible widgets whose box holds the point, on every active layer, deepest first.
+//   ink.boxes {}
+//     -> {"widgets":[{"id","class","name","box","layer","entry","depth"}],"looked":N,"ms":t}
+//     Every visible widget with a box, deepest first: a page that picks finds what is under the
+//     cursor on each move from these, without asking the game each time.
 //
 // Widget ids ("w12") stay the same for a widget while it lives, so a tree can be read again.
 // Boxes come from inkWidgetUtils.LocalToGlobal at the widget's corner and at its size; for a
@@ -760,6 +764,7 @@ struct Hit
 struct Picker
 {
     double x = 0, y = 0;
+    bool all = false; // ink.boxes: every visible widget with a box, wherever it is
     size_t looked = 0;
     std::vector<Hit> hits;
 };
@@ -774,19 +779,21 @@ void Look(Picker& aPicker, const Obj& aWidget, int aDepth, double aOx, double aO
         return;
     aPicker.looked += 1;
     const Box box = BoxOf(aWidget, aOx, aOy);
-    if (box.Holds(aPicker.x, aPicker.y))
+    if (aPicker.all ? box.known && box.w > 0 && box.h > 0 : box.Holds(aPicker.x, aPicker.y))
         aPicker.hits.push_back({aWidget, box, aDepth, aLayer, aEntry});
     // Children can draw outside their parent's box, so every visible child is looked at.
     for (const auto& child : Children(aWidget))
         Look(aPicker, child, aDepth + 1, aOx, aOy, aLayer, aEntry);
 }
 
-std::string AtJson(const Value& aParams, std::string& aError)
+// ink.at, or ink.boxes with aAll: every visible widget's box, for a page to find what is under
+// the cursor on each move without asking the game (no paths, which cost a walk up each).
+std::string AtJson(const Value& aParams, bool aAll, std::string& aError)
 {
     const auto start = std::chrono::steady_clock::now();
     const Value* x = aParams.Get("x");
     const Value* y = aParams.Get("y");
-    if (!x || !y || x->kind != Value::Kind::Number || y->kind != Value::Kind::Number)
+    if (!aAll && (!x || !y || x->kind != Value::Kind::Number || y->kind != Value::Kind::Number))
     {
         aError = "x and y are required";
         return {};
@@ -795,8 +802,9 @@ std::string AtJson(const Value& aParams, std::string& aError)
     if (!aError.empty())
         return {};
     Picker picker;
-    picker.x = x->number;
-    picker.y = y->number;
+    picker.all = aAll;
+    picker.x = aAll ? 0 : x->number;
+    picker.y = aAll ? 0 : y->number;
     for (const auto& l : layers)
     {
         if ((l.layer && !l.layer->active) || l.name == "inkWatermarksLayer")
@@ -812,23 +820,37 @@ std::string AtJson(const Value& aParams, std::string& aError)
             Look(picker, e.window, 0, ox, oy, l.name, e.name);
         }
     }
-    std::stable_sort(picker.hits.begin(), picker.hits.end(),
-                     [](const Hit& a, const Hit& b) { return a.depth > b.depth; });
-    if (picker.hits.size() > MaxHits)
+    // Deepest first; at the same depth (a HUD entry's own window beside the layer's), the smaller
+    // box, the more particular widget.
+    std::stable_sort(picker.hits.begin(), picker.hits.end(), [](const Hit& a, const Hit& b) {
+        if (a.depth != b.depth)
+            return a.depth > b.depth;
+        return a.box.w * a.box.h < b.box.w * b.box.h;
+    });
+    if (!aAll && picker.hits.size() > MaxHits)
         picker.hits.resize(MaxHits);
-    Log("Ink pick at %.0f, %.0f: %zu hit(s), %zu widgets looked at in %.1f ms", picker.x, picker.y,
-        picker.hits.size(), picker.looked, Elapsed(start));
-    std::string out = "{\"hits\":[";
+    if (aAll)
+        Log("Ink boxes: %zu widgets with a box, %zu looked at in %.1f ms", picker.hits.size(), picker.looked,
+            Elapsed(start));
+    else
+        Log("Ink pick at %.0f, %.0f: %zu hit(s), %zu widgets looked at in %.1f ms", picker.x, picker.y,
+            picker.hits.size(), picker.looked, Elapsed(start));
+    std::string out = aAll ? "{\"widgets\":[" : "{\"hits\":[";
     for (size_t i = 0; i < picker.hits.size(); ++i)
     {
         const auto& h = picker.hits[i];
         ink::Widget* w = AsWidget(h.widget);
-        int depth = 0;
         out += std::string(i ? "," : "") + "{\"id\":" + JsonString(IdOf(h.widget)) +
                ",\"class\":" + JsonString(ClassName(h.widget)) + ",\"name\":" + JsonString(w->name.ToString()) +
                ",\"box\":" + BoxJson(h.box) + ",\"layer\":" + JsonString(h.layer) +
                ",\"entry\":" + (h.entry.empty() ? "null" : JsonString(h.entry)) + ",\"depth\":" +
-               std::to_string(h.depth) + ",\"path\":" + JsonString(PathOf(h.widget, depth)) + "}";
+               std::to_string(h.depth);
+        if (!aAll)
+        {
+            int depth = 0;
+            out += ",\"path\":" + JsonString(PathOf(h.widget, depth));
+        }
+        out += "}";
     }
     return out + "],\"looked\":" + std::to_string(picker.looked) + ",\"ms\":" + Num(Elapsed(start)) + "}";
 }
@@ -836,7 +858,8 @@ std::string AtJson(const Value& aParams, std::string& aError)
 
 bool IsInkReadMethod(const std::string& aMethod)
 {
-    return aMethod == "ink.layers" || aMethod == "ink.read" || aMethod == "ink.inspect" || aMethod == "ink.at";
+    return aMethod == "ink.layers" || aMethod == "ink.read" || aMethod == "ink.inspect" || aMethod == "ink.at" ||
+           aMethod == "ink.boxes";
 }
 
 std::string InkRead(const std::string& aMethod, const json::Value& aParams, std::string& aError)
@@ -847,7 +870,7 @@ std::string InkRead(const std::string& aMethod, const json::Value& aParams, std:
         return ReadJson(aParams, aError);
     if (aMethod == "ink.inspect")
         return WidgetJson(aParams, aError);
-    return AtJson(aParams, aError);
+    return AtJson(aParams, aMethod == "ink.boxes", aError);
 }
 
 void ClearInkRead()

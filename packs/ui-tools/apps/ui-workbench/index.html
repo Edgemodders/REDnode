@@ -17,6 +17,10 @@
   .mark.hint { border: 1px dashed var(--rn-accent-2); box-shadow: none; }
   .mark .tag { position: absolute; left: -2px; bottom: 100%; padding: 1px 6px; white-space: nowrap;
     font: 12px var(--rn-mono); background: var(--rn-accent); color: var(--rn-on-accent); }
+  #hover { position: absolute; inset: 0; pointer-events: none; }
+  #tip { position: absolute; pointer-events: none; display: none; padding: 3px 8px; white-space: nowrap;
+    font: 12px var(--rn-mono); background: var(--rn-panel); border: 1px solid var(--rn-accent-2); color: var(--rn-fg); }
+  #tip .dim { color: var(--rn-dim); }
   #hint { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); padding: 6px 14px; display: none;
     font: 14px var(--rn-body); background: var(--rn-panel); border: 1px solid var(--rn-accent); color: var(--rn-fg); }
   body.picking #hint { display: block; }
@@ -48,7 +52,13 @@
   #detail table { border-collapse: collapse; width: 100%; }
   #detail td { padding: 2px 6px 2px 0; vertical-align: top; font: 12px var(--rn-mono); overflow-wrap: anywhere; }
   #detail td:first-child { color: var(--rn-dim); white-space: nowrap; width: 1%; }
-  #detail .section { margin: 10px 0 4px; color: var(--rn-accent-2); font: 600 12px var(--rn-display); letter-spacing: .06em; text-transform: uppercase; }
+  #detail details { border-bottom: 1px solid var(--rn-line); padding-bottom: 6px; margin-bottom: 4px; }
+  #detail summary { list-style: none; cursor: default; padding: 6px 0 4px; color: var(--rn-accent-2);
+    font: 600 12px var(--rn-display); letter-spacing: .06em; text-transform: uppercase; }
+  #detail summary::-webkit-details-marker { display: none; }
+  #detail summary::before { content: '▸ '; }
+  #detail details[open] > summary::before { content: '▾ '; }
+  #detail summary:hover { color: var(--rn-fg); }
   #detail .actions { display: flex; gap: 6px; margin: 6px 0; flex-wrap: wrap; }
   .hit { padding: 2px 4px; font: 12px var(--rn-mono); cursor: default; }
   .hit:hover { background: var(--rn-panel-2); }
@@ -58,7 +68,9 @@
 <body>
   <div id="sheet"></div>
   <div id="marks"></div>
-  <div id="hint">Pick: click a piece of the game's UI. Esc or right-click leaves Pick.</div>
+  <div id="hover"></div>
+  <div id="tip"></div>
+  <div id="hint">Pick: point at a piece of the game's UI and click it. Esc or right-click leaves Pick.</div>
 
   <rn-window id="bench" title="UI Workbench" draggable closable>
     <rn-tabs id="tabs"><rn-tab label="Inspect" active></rn-tab></rn-tabs>
@@ -76,7 +88,7 @@
   </rn-window>
 
 <script type="module">
-  import { ink, ui } from 'rednode';
+  import { game, ink, ui } from 'rednode';
 
   const $ = (id) => document.getElementById(id);
   const tree = $('tree');
@@ -180,14 +192,19 @@
     container.append(r.wrap);
   }
 
+  // At the start the game may not answer yet (the host starts before the game is ready, and the
+  // first save may still be loading): the workbench asks again every 3 s until it does.
+  let retry = null;
   async function loadLayers() {
+    clearTimeout(retry);
     status('Reading the layers...');
     let layers;
     try {
       ({ layers } = await ink.layers());
     } catch (err) {
-      tree.replaceChildren(el('div', 'empty', err.message));
-      status(err.message);
+      tree.replaceChildren(el('div', 'empty', `Waiting for the game: ${err.message}`));
+      status('Waiting for the game...');
+      retry = setTimeout(loadLayers, 3000);
       return;
     }
     const sized = layers.find((l) => l.name === 'inkHUDLayer' && l.size[0] > 0) ?? layers.find((l) => l.size[0] > 0);
@@ -263,10 +280,21 @@
     outline([{ box: w.box, label: w.name || w.class }]);
   }
 
+  // The details' three parts fold, each remembered as the player left it.
+  const opened = { hits: true, widget: true, props: true };
+  function section(key, title) {
+    const d = el('details');
+    d.open = opened[key];
+    d.addEventListener('toggle', () => (opened[key] = d.open));
+    d.append(el('summary', '', title));
+    detail.append(d);
+    return d;
+  }
+
   function showDetail(w, hits) {
     detail.replaceChildren();
     if (hits) showHits(hits);
-    detail.append(el('h3', '', `${w.name || '(no name)'}  ·  ${w.class}`));
+    const part = section('widget', `${w.name || '(no name)'} · ${w.class.replace(/^ink/, '').replace(/Widget$/, '')}`);
     const actions = el('div', 'actions');
     const copy = (label, text) => {
       const b = el('rn-button', '', label);
@@ -297,7 +325,7 @@
       up.addEventListener('click', () => select(w.parent));
       actions.append(up);
     }
-    detail.append(actions);
+    part.append(actions);
     const table = el('table');
     const line = (k, v) => {
       if (v === undefined || v === null || v === '') return;
@@ -317,9 +345,9 @@
     line('library', w.library && `${w.library} (the .inkwidget file's path hash)`);
     line('children', `${w.children.length}`);
     line('api ref', `{"$ref": ${w.ref.$ref}}`);
-    detail.append(table);
+    part.append(table);
 
-    detail.append(el('div', 'section', 'Properties'));
+    const propsPart = section('props', `Properties (${Object.keys(w.properties).length})`);
     const filter = el('rn-input');
     filter.setAttribute('placeholder', 'Filter properties');
     const props = el('table');
@@ -335,11 +363,11 @@
     };
     filter.addEventListener('input', (e) => fill(String(e.detail?.value ?? filter.value).toLowerCase()));
     fill('');
-    detail.append(filter, props);
+    propsPart.append(filter, props);
   }
 
   function showHits(hits) {
-    detail.append(el('div', 'section', `Under the cursor (${hits.length}), deepest first`));
+    const part = section('hits', `Under the cursor (${hits.length}), deepest first`);
     for (const h of hits) {
       const d = el('div', 'hit', `${h.name || '(no name)'}  ${h.class}  ${h.entry ? `[${h.entry}]` : `[${h.layer}]`}`);
       d.title = h.path;
@@ -349,17 +377,70 @@
         await select(h.id);
         showDetail(current, hits);
       });
-      detail.append(d);
+      part.append(d);
     }
   }
 
   // ---------- Pick ----------
+  // While picking, the widget under the cursor is outlined and named as the mouse moves. The
+  // boxes of every visible widget are read once (ink.boxes, a few ms) and again every 1.5 s, so
+  // a move asks the game nothing; the click asks ink.at for the exact list.
   let picking = false;
+  let boxes = [];
+  let boxTimer = null;
+  const hover = $('hover');
+  const tip = $('tip');
+
+  async function readBoxes() {
+    try {
+      boxes = (await ink.boxes()).widgets;
+    } catch (err) {
+      status(err.message);
+    }
+  }
+
+  function hideHover() {
+    hover.replaceChildren();
+    tip.style.display = 'none';
+  }
+
+  function showHover(clientX, clientY) {
+    const [x, y] = toInk(clientX, clientY);
+    // The boxes come deepest first, and smaller first at the same depth, as ink.at's hits do.
+    const w = boxes.find((b) => b.box && x >= b.box[0] && y >= b.box[1] && x < b.box[0] + b.box[2] && y < b.box[1] + b.box[3]);
+    hover.replaceChildren();
+    if (!w) {
+      tip.style.display = 'none';
+      return;
+    }
+    const r = toPage(w.box);
+    if (r) {
+      const m = el('div', 'mark hint');
+      Object.assign(m.style, { left: `${r.x}px`, top: `${r.y}px`, width: `${Math.max(r.w, 2)}px`, height: `${Math.max(r.h, 2)}px` });
+      hover.append(m);
+    }
+    tip.replaceChildren(w.name || w.id, ' ', el('span', 'dim', w.class.replace(/^ink/, '').replace(/Widget$/, '')));
+    tip.style.display = 'block';
+    // Beside the cursor, kept on the page.
+    const left = Math.min(clientX + 16, innerWidth - tip.offsetWidth - 4);
+    const top = clientY + 20 + tip.offsetHeight > innerHeight ? clientY - tip.offsetHeight - 8 : clientY + 20;
+    tip.style.left = `${Math.max(4, left)}px`;
+    tip.style.top = `${Math.max(4, top)}px`;
+  }
 
   async function setPicking(on) {
     picking = on;
     document.body.classList.toggle('picking', on);
     $('pick').textContent = on ? 'Picking...' : 'Pick';
+    clearInterval(boxTimer);
+    if (on) {
+      if (!inkSize) await loadLayers();
+      await readBoxes();
+      boxTimer = setInterval(readBoxes, 1500);
+    } else {
+      boxes = [];
+      hideHover();
+    }
     try {
       if (on) await navigator.keyboard?.lock(['Escape']);
       else navigator.keyboard?.unlock();
@@ -368,6 +449,8 @@
     }
   }
 
+  $('sheet').addEventListener('mousemove', (e) => picking && showHover(e.clientX, e.clientY));
+  $('sheet').addEventListener('mouseleave', hideHover);
   $('sheet').addEventListener('mousedown', async (e) => {
     e.preventDefault();
     if (e.button !== 0) {
@@ -407,6 +490,13 @@
   $('filter').addEventListener('input', (e) => {
     const q = String(e.detail?.value ?? $('filter').value).toLowerCase();
     for (const { row } of rows.values()) row.style.display = !q || row.dataset.search.includes(q) ? '' : 'none';
+  });
+
+  // A save load rebuilds the game's UI, and the ids read before it are gone: read the layers again.
+  let inWorld = null;
+  game.onState((s) => {
+    if (inWorld === false && s.world) loadLayers();
+    inWorld = !!s.world;
   });
 
   loadLayers();

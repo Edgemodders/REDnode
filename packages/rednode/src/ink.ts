@@ -1538,6 +1538,23 @@ export const ink = {
   async at(x: number, y: number): Promise<{ hits: InkHit[]; looked: number; ms: number }> {
     return (await transport().call("ink.at", { x, y }).catch(rethrow)) as { hits: InkHit[]; looked: number; ms: number };
   },
+
+  /**
+   * Every visible widget of the game with a box on screen, on every active layer, deepest
+   * first, in one call (about 7 ms for 1,600 widgets in game 2.5). A page that highlights what
+   * is under the cursor reads these once and tests each mouse move itself, instead of asking
+   * the game on every move. Boxes are in ink pixels, as {@link ink.at}'s. Reads only.
+   *
+   * @example
+   * ```ts
+   * const { widgets } = await ink.boxes();
+   * const under = (x: number, y: number) =>
+   *   widgets.find((w) => w.box && x >= w.box[0] && y >= w.box[1] && x < w.box[0] + w.box[2] && y < w.box[1] + w.box[3]);
+   * ```
+   */
+  async boxes(): Promise<{ widgets: Omit<InkHit, "path">[]; looked: number; ms: number }> {
+    return (await transport().call("ink.boxes", {}).catch(rethrow)) as { widgets: Omit<InkHit, "path">[]; looked: number; ms: number };
+  },
 };
 
 function rethrow(err: unknown): never {
