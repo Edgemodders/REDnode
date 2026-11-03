@@ -963,3 +963,12 @@ Checked outside the game: the converter against a stand-in HUD piece (16 checks,
 6. Press **Reset**: the widget is back as it was. Try two changes again, on another widget, then press **Reset all**: both are back. Mark.
 7. Try one more change, then switch the Workbench off: the change goes back as it closes. Switch it on again and delete the copied project in **Projects**. Switch it off, quit and tell Claude, who reads the plugin's `Ink reset:` lines and the host's `Put back` line.
 
+**UT3b passed in game on 2026-11-03** (REDnode 0.56.0 with UI Workbench 0.3.0, dev PC, game 2.5), every step as expected. The health bar hides itself out of combat, so the run copied the **quest tracker** instead (the steps above were run with it). To source read 40 widgets in 0.5 ms and wrote 25, with 3 hidden ones left out: the quest name, objectives, icons (atlas and part) and texts in their colours and sizes; the only approximation listed was a colour brighter than white. The plugin logged `Ink reset: ui-workbench put back 4 change(s)` for Reset, then one each for the later resets, and the host `Put back 1 change(s) it tried on the game's widgets` when the Workbench was switched off.
+
+Found, for UT3c:
+
+| Finding | What to do |
+|---|---|
+| **Parent** led up to the tracker's own window (`inkVirtualWindow`, named `UNINITIALIZED_WIDGET`, the game's default name), so the copy was named `uninitialized-widget-copy` and wrapped in a 3840 x 2160 `<widget class="inkVirtualWindow">` | To source starts inside a window (its content); `UNINITIALIZED_WIDGET` is left out as an id and never names a project |
+| **Run** saves the files even when nothing changed, so the copy started, then restarted at once (`Changed: ... (mod.mjs). Reloading.` right after `Switched on`). Seen since UT3a | Run saves only unsaved changes |
+
