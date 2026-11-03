@@ -312,8 +312,11 @@ RED4ext::Handle<RED4ext::IScriptable> RefObject(const json::Value& aRef);  // {"
 // Every property of an object's class and its parents, as a JSON object; objects in it as their
 // class name (the inspector, ink.inspect).
 std::string PropertiesJson(const RED4ext::Handle<RED4ext::IScriptable>& aObject);
+// Only the named properties, those the object has (ink.read's props, for To source).
+std::string PropertiesJson(const RED4ext::Handle<RED4ext::IScriptable>& aObject, const std::vector<const char*>& aNames);
 // inkread.cpp: reading the game's own UI for the inspector (UT2): ink.layers, ink.read,
-// ink.inspect and ink.at, on the game thread.
+// ink.inspect and ink.at, on the game thread; and ink.try and ink.reset (UT3b), which change a game
+// widget's property for an admin package and put it back.
 bool IsInkReadMethod(const std::string& aMethod);
 std::string InkRead(const std::string& aMethod, const json::Value& aParams, std::string& aError);
 void ClearInkRead(); // game thread: forget the widget ids (the game is stopping)

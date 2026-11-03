@@ -1680,6 +1680,40 @@ std::string PropertiesJson(const Handle<IScriptable>& aObject)
     return out + "}";
 }
 
+std::string PropertiesJson(const Handle<IScriptable>& aObject, const std::vector<const char*>& aNames)
+{
+    if (!aObject)
+        return "null";
+    std::string out = "{";
+    bool first = true;
+    g_handleNames = true;
+    for (const char* name : aNames)
+    {
+        const CName wanted(name);
+        for (const CClass* c = aObject->GetType(); c; c = c->parent)
+        {
+            const CProperty* found = nullptr;
+            for (const CProperty* p : c->props)
+            {
+                if (p->name == wanted)
+                {
+                    found = p;
+                    break;
+                }
+            }
+            if (!found)
+                continue;
+            out += first ? "" : ",";
+            first = false;
+            out += JsonString(name) + ":";
+            ToJson(found->type, found->GetValuePtr<void>(aObject.GetPtr()), out, 0);
+            break;
+        }
+    }
+    g_handleNames = false;
+    return out + "}";
+}
+
 // ---------- the world near V (H2c-b) ----------
 //   world.near   {"radius":15, "files":false, "hashes":["0x...", ...]}
 //                -> {"looked":N, "ms":t, "entities":[{"entity":{"$ref":n, "$type":"..."}, "type":"...",

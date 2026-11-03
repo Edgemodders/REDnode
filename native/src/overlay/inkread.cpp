@@ -1,5 +1,6 @@
 // Reading the game's own UI (UT2, docs/ink.md "UT2: build"): what the UI Workbench's Inspect
-// tab shows. Reads only: nothing here changes a widget. On the game thread, as the ink driver.
+// tab shows. On the game thread, as the ink driver. Everything here only reads, except ink.try
+// (UT3b), which changes one property of a game widget and keeps the value it had, for ink.reset.
 //
 //   ink.layers {}
 //     -> {"layers":[{"name":"inkHUDLayer","active":true,"interactive":false,"input":"...",
@@ -18,6 +19,16 @@
 //   ink.at {"x":..,"y":..}
 //     -> {"hits":[{"id","class","name","box","layer","entry","depth","path"}],"looked":N,"ms":t}
 //     The drawn widgets whose box holds the point, on every active layer, the smallest box first.
+//   ink.read's "props":true adds each node's "drawn" size and "props": layout, render transform,
+//     size, tint, opacity, child margin, a text's font size, style, case and alignment, an image's
+//     atlas (hash) and part: what To source turns into ink markup. Texts come whole.
+//   ink.try {"package","id","prop","value"} -> {"id","prop","was","now"}
+//     Sets visible, opacity, tint, size, margin, padding, translation, text or fontSize through the
+//     widget's native setter, in the game's own types ({"Red","Green","Blue","Alpha"}, {"X","Y"},
+//     {"left","top","right","bottom"}). The first try keeps the value it had.
+//   ink.reset {"package","id"?,"prop"?} or {"all":true} -> {"reset","gone","errors"}
+//     Puts back what was tried. The host calls it when the package stops, and with all at its start.
+//   ink.tried {"package"} -> {"tried":[{"id","prop","was"}]}
 //   ink.boxes {}
 //     -> {"widgets":[{"id","class","name","box","layer","entry","depth"}],"looked":N,"ms":t}
 //     Every drawn widget with a box, the smallest first: a page that picks finds what is under the
@@ -607,8 +618,15 @@ struct Reader
     int depth = MaxDepth;
     bool cut = false;
     bool boxes = true;
-    Place place; // the window's place, for a HUD entry's own window
+    bool props = false; // each node's props for To source (UT3b)
+    Place place;        // the window's place, for a HUD entry's own window
 };
+
+// The properties ink markup can say, read for To source: layout and look, a text's font, an
+// image's atlas and part.
+const std::vector<const char*> SourceProps = {"fitToContent", "layout", "renderTransform", "size", "tintColor",
+                                              "opacity", "childMargin", "fontSize", "fontStyle", "letterCase",
+                                              "textHorizontalAlignment", "textureAtlas", "texturePart"};
 
 void NodeJson(Reader& aReader, const Obj& aWidget, int aDepth, std::string& aOut)
 {
@@ -625,11 +643,17 @@ void NodeJson(Reader& aReader, const Obj& aWidget, int aDepth, std::string& aOut
         if (w->logicController)
             aOut += ",\"controller\":" +
                     JsonString(ClassName(Obj(*reinterpret_cast<const Handle<IScriptable>*>(&w->logicController))));
+        if (aReader.props)
+        {
+            const RED4ext::Vector2 drawn = DrawnSize(w);
+            aOut += ",\"drawn\":[" + Num(drawn.X) + "," + Num(drawn.Y) + "],\"props\":" + PropertiesJson(aWidget, SourceProps);
+        }
     }
     std::string text = TextOf(aWidget);
     if (!text.empty())
     {
-        if (text.size() > MaxText)
+        // To source copies a text whole.
+        if (text.size() > MaxText && !aReader.props)
             text = text.substr(0, MaxText) + "...";
         aOut += ",\"text\":" + JsonString(text);
     }
@@ -722,6 +746,8 @@ std::string ReadJson(const Value& aParams, std::string& aError)
     reader.max = size_t(std::clamp(IntField(aParams, "max", 5000), 1, int(MaxRead)));
     const Value* boxes = aParams.Get("boxes");
     reader.boxes = !(boxes && boxes->kind == Value::Kind::Bool && !boxes->boolean);
+    const Value* props = aParams.Get("props");
+    reader.props = props && props->kind == Value::Kind::Bool && props->boolean;
     if (reader.boxes)
     {
         std::string ignored;
@@ -956,16 +982,252 @@ std::string AtJson(const Value& aParams, bool aAll, std::string& aError)
     }
     return out + "],\"looked\":" + std::to_string(picker.looked) + ",\"ms\":" + Num(Elapsed(start)) + "}";
 }
+
+// ---------- trying a change on a game widget (UT3b) ----------
+
+// What ink.try may change: the getter that reads the value to keep, and the setter. The plain
+// names are the native overloads, which take the game's own types (HDRColor, Vector2,
+// inkMargin), so a value read is given back to the setter as it is.
+struct TryProp
+{
+    const char* prop;
+    const char* get;
+    const char* set;
+    const char* cls; // the class it needs, or null for every widget
+};
+constexpr TryProp TryProps[] = {
+    {"visible", "IsVisible", "SetVisible", nullptr},
+    {"opacity", "GetOpacity", "SetOpacity", nullptr},
+    {"tint", "GetTintColor", "SetTintColor", nullptr},
+    {"size", "GetSize", "SetSize", nullptr},
+    {"margin", "GetMargin", "SetMargin", nullptr},
+    {"padding", "GetPadding", "SetPadding", nullptr},
+    {"translation", "GetTranslation", "SetTranslation", nullptr},
+    {"text", "GetText", "SetText", "inkTextWidget"},
+    {"fontSize", "GetFontSize", "SetFontSize", "inkTextWidget"},
+};
+
+// A property tried, with the value it had before the first try.
+struct Tried
+{
+    WeakHandle<IScriptable> widget;
+    IScriptable* at = nullptr; // to find it again while it lives
+    std::string id;
+    std::string prop;
+    std::string package;
+    Value was;
+};
+// Never destroyed (weak handles must not be let go at DLL unload); ClearInkRead empties it.
+std::vector<Tried>& g_tried = *new std::vector<Tried>();
+
+void ValueJson(const Value& aValue, std::string& aOut)
+{
+    switch (aValue.kind)
+    {
+    case Value::Kind::Bool:
+        aOut += aValue.boolean ? "true" : "false";
+        return;
+    case Value::Kind::Number:
+        aOut += Num(aValue.number);
+        return;
+    case Value::Kind::String:
+        aOut += JsonString(aValue.text);
+        return;
+    case Value::Kind::Array:
+        aOut += "[";
+        for (size_t i = 0; i < aValue.items.size(); ++i)
+        {
+            aOut += i ? "," : "";
+            ValueJson(aValue.items[i], aOut);
+        }
+        aOut += "]";
+        return;
+    case Value::Kind::Object:
+        aOut += "{";
+        for (size_t i = 0; i < aValue.fields.size(); ++i)
+        {
+            aOut += (i ? "," : "") + JsonString(aValue.fields[i].first) + ":";
+            ValueJson(aValue.fields[i].second, aOut);
+        }
+        aOut += "}";
+        return;
+    default:
+        aOut += "null";
+    }
+}
+
+const TryProp* TryPropOf(const std::string& aProp)
+{
+    for (const auto& p : TryProps)
+    {
+        if (aProp == p.prop)
+            return &p;
+    }
+    return nullptr;
+}
+
+bool GetProp(const Obj& aWidget, const TryProp& aProp, Value& aOut, std::string& aError)
+{
+    Obj self = aWidget;
+    return CallNativeValue(self, nullptr, aProp.get, Args(), aOut, aError);
+}
+
+bool SetProp(const Obj& aWidget, const TryProp& aProp, const Value& aValue, std::string& aError)
+{
+    Obj self = aWidget;
+    Value out;
+    return CallNativeValue(self, nullptr, aProp.set, Args({aValue}), out, aError);
+}
+
+// Drops what was tried on widgets the game has removed (a save load rebuilds the HUD).
+void PruneTried()
+{
+    std::erase_if(g_tried, [](const Tried& t) { return !t.widget.Lock(); });
+}
+
+//   ink.try {"package":"...","id":"w12","prop":"opacity","value":0.5}
+//     -> {"id","prop","was":<the value before the first try>,"now":<read back>}
+std::string TryJson(const Value& aParams, std::string& aError)
+{
+    const std::string package = StringField(aParams, "package");
+    if (package.empty())
+    {
+        aError = "ink.try is for packages";
+        return {};
+    }
+    const std::string propName = StringField(aParams, "prop");
+    const TryProp* prop = TryPropOf(propName);
+    if (!prop)
+    {
+        std::string names;
+        for (const auto& p : TryProps)
+            names += (names.empty() ? "" : ", ") + std::string(p.prop);
+        aError = "ink.try cannot change \"" + propName + "\": it changes " + names;
+        return {};
+    }
+    const Value* value = aParams.Get("value");
+    if (!value || value->IsNull())
+    {
+        aError = "ink.try needs a value";
+        return {};
+    }
+    Obj widget = Target(aParams, aError);
+    if (!AsWidget(widget))
+    {
+        if (aError.empty())
+            aError = "not an ink widget";
+        return {};
+    }
+    if (prop->cls && !IsA(widget, prop->cls))
+    {
+        aError = std::string(prop->prop) + " is for " + prop->cls + ", not " + ClassName(widget);
+        return {};
+    }
+    PruneTried();
+    auto it = std::find_if(g_tried.begin(), g_tried.end(),
+                           [&](const Tried& t) { return t.at == widget.GetPtr() && t.prop == prop->prop; });
+    const bool first = it == g_tried.end();
+    if (first)
+    {
+        Tried t;
+        if (!GetProp(widget, *prop, t.was, aError))
+            return {};
+        t.widget = WeakHandle<IScriptable>(widget);
+        t.at = widget.GetPtr();
+        t.id = IdOf(widget);
+        t.prop = prop->prop;
+        t.package = package;
+        g_tried.push_back(std::move(t));
+        it = std::prev(g_tried.end());
+    }
+    if (!SetProp(widget, *prop, *value, aError))
+    {
+        if (first)
+            g_tried.erase(it);
+        return {};
+    }
+    Value now;
+    std::string ignored;
+    GetProp(widget, *prop, now, ignored);
+    std::string out = "{\"id\":" + JsonString(it->id) + ",\"prop\":" + JsonString(it->prop) + ",\"was\":";
+    ValueJson(it->was, out);
+    out += ",\"now\":";
+    ValueJson(now, out);
+    return out + "}";
+}
+
+//   ink.reset {"package":"...","id":"w12"?,"prop":"opacity"?} or {"all":true}
+//     -> {"reset":n,"gone":n,"errors":[...]}: puts back what the package tried, the newest first
+std::string ResetJson(const Value& aParams, std::string& aError)
+{
+    const std::string package = StringField(aParams, "package");
+    const Value* allField = aParams.Get("all");
+    const bool all = allField && allField->kind == Value::Kind::Bool && allField->boolean; // the host, at its start
+    if (package.empty() && !all)
+    {
+        aError = "ink.reset is for packages";
+        return {};
+    }
+    const std::string id = StringField(aParams, "id");
+    const std::string propName = StringField(aParams, "prop");
+    int reset = 0, gone = 0;
+    std::string errors = "[";
+    for (size_t i = g_tried.size(); i-- > 0;)
+    {
+        Tried& t = g_tried[i];
+        if ((!all && t.package != package) || (!id.empty() && t.id != id) || (!propName.empty() && t.prop != propName))
+            continue;
+        Obj widget(t.widget.Lock());
+        const TryProp* prop = TryPropOf(t.prop);
+        std::string e;
+        if (!widget || !prop)
+            gone += 1;
+        else if (SetProp(widget, *prop, t.was, e))
+            reset += 1;
+        else
+            errors += (errors.size() > 1 ? "," : "") + JsonString(t.id + "." + t.prop + ": " + e);
+        g_tried.erase(g_tried.begin() + i);
+    }
+    if (reset || gone)
+        Log("Ink reset: %s put back %d change(s)%s", all ? "every package" : package.c_str(), reset,
+            gone ? (", " + std::to_string(gone) + " on widgets the game removed").c_str() : "");
+    return "{\"reset\":" + std::to_string(reset) + ",\"gone\":" + std::to_string(gone) + ",\"errors\":" + errors + "]}";
+}
+
+//   ink.tried {"package":"..."} -> {"tried":[{"id","prop","was"}]}: what it changed and not reset
+std::string TriedJson(const Value& aParams)
+{
+    const std::string package = StringField(aParams, "package");
+    PruneTried();
+    std::string out = "{\"tried\":[";
+    bool first = true;
+    for (const auto& t : g_tried)
+    {
+        if (t.package != package)
+            continue;
+        out += (first ? "{\"id\":" : ",{\"id\":") + JsonString(t.id) + ",\"prop\":" + JsonString(t.prop) + ",\"was\":";
+        first = false;
+        ValueJson(t.was, out);
+        out += "}";
+    }
+    return out + "]}";
+}
 } // namespace
 
 bool IsInkReadMethod(const std::string& aMethod)
 {
     return aMethod == "ink.layers" || aMethod == "ink.read" || aMethod == "ink.inspect" || aMethod == "ink.at" ||
-           aMethod == "ink.boxes";
+           aMethod == "ink.boxes" || aMethod == "ink.try" || aMethod == "ink.reset" || aMethod == "ink.tried";
 }
 
 std::string InkRead(const std::string& aMethod, const json::Value& aParams, std::string& aError)
 {
+    if (aMethod == "ink.try")
+        return TryJson(aParams, aError);
+    if (aMethod == "ink.reset")
+        return ResetJson(aParams, aError);
+    if (aMethod == "ink.tried")
+        return TriedJson(aParams);
     if (aMethod == "ink.layers")
         return LayersJson(aError);
     if (aMethod == "ink.read")
@@ -980,5 +1242,6 @@ void ClearInkRead()
     g_widgets.clear();
     g_ids.clear();
     g_entryLines.clear();
+    g_tried.clear();
 }
 } // namespace rednode::overlay::detail

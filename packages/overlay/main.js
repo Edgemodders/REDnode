@@ -1272,6 +1272,8 @@ function connect() {
     writable = true;
     log('Connected to the game');
     sendJson({ cmd: 'host', pid: process.pid }); // lets the plugin open our texture handles
+    // What an earlier host's packages tried on game widgets, and never put back, goes back now.
+    if (!inkTriers.size) bridgeCall('ink.reset', { all: true }).catch(() => {});
     startHold = settings.openAtStart === false;
     if (startHold) log('Open at start is off: only HUD widgets show until the overlay is opened (F10)');
     for (const w of windows.values()) openInGame(w);
@@ -1786,6 +1788,19 @@ async function packageCallNow(id, method, params) {
     if (!id) throw new Error('ink is for packages');
     if (method === 'ink.apply') inkUsers.add(id);
     return bridgeCall(method, { ...params, package: id });
+  }
+  // ink.try (UT3b): changes a game widget's property, put back when the package stops. Only for
+  // a package the player allowed admin, as the UI Workbench is.
+  if (method === 'ink.try' || method === 'ink.reset' || method === 'ink.tried') {
+    const entry = id && apps.get(id);
+    if (!entry || !isGranted(id, 'admin')) {
+      throw new Error(entry?.manifest.permissions.includes('admin')
+        ? `${entry.manifest.name} needs the admin permission for ${method}: allow it in the Mod Manager`
+        : `${method} changes the game's own widgets: only a package the player allowed admin can call it`);
+    }
+    if (method === 'ink.try') inkTriers.add(id);
+    const { all, ...rest } = params ?? {};
+    return bridgeCall(method, { ...rest, package: id });
   }
   if (method === 'archives.soundState') return bridgeCall('opus.state', { sounds: Array.isArray(params?.sounds) ? params.sounds : [] });
   if (method === 'world.scene') return readSceneFile(id ? apps.get(id) : null, params?.file);
@@ -2948,14 +2963,20 @@ function stopSounds(id, fadeOut = 300) {
 // host removes them when the package stops (switched off, restarted, hot reloaded, crashed).
 
 const inkUsers = new Set(); // package ids that mounted ink
+const inkTriers = new Set(); // package ids that changed a game widget with ink.try (UT3b)
 
 function clearInk(id) {
+  if (inkTriers.delete(id) && connected) {
+    bridgeCall('ink.reset', { package: id })
+      .then((r) => r?.reset && log(`[${id}] Put back ${r.reset} change(s) it tried on the game's widgets`))
+      .catch(() => {});
+  }
   if (!inkUsers.delete(id) || !connected) return;
   bridgeCall('ink.clear', { package: id }).catch(() => {});
 }
 
 function checkInk() {
-  for (const id of [...inkUsers]) if (!packageRunning(id)) clearInk(id);
+  for (const id of new Set([...inkUsers, ...inkTriers])) if (!packageRunning(id)) clearInk(id);
 }
 
 function checkSounds() {

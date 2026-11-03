@@ -1535,9 +1535,51 @@ export const ink = {
    */
   async read(
     from: { id: string } | { layer: string } | { ref: { $ref: number } },
-    options: { depth?: number; max?: number; boxes?: boolean } = {},
+    options: {
+      depth?: number;
+      max?: number;
+      boxes?: boolean;
+      /** Each node's layout and look as well (`props` and `drawn`), with texts whole: what ink markup needs to copy it. Needs REDnode 0.56.0. */
+      props?: boolean;
+    } = {},
   ): Promise<InkReadResult> {
     return (await transport().call("ink.read", { ...from, ...options }).catch(rethrow)) as InkReadResult;
+  },
+
+  /**
+   * Tries a change on one of the game's own widgets, live, to find what controls a look: its
+   * `visible`, `opacity`, `tint`, `size`, `margin`, `padding`, `translation` (x and y), or a
+   * text's `text` and `fontSize`. The first try of a property keeps the value it had, and
+   * {@link ink.reset} puts it back; REDnode puts everything back when the package stops, so a
+   * try is never kept. Answers the value before the first try and the value now. Only for a
+   * package the player allowed `admin` (the UI Workbench's Try). Needs REDnode 0.56.0.
+   *
+   * @example
+   * ```ts
+   * const { hits } = await ink.at(200, 900);
+   * await ink.try(hits[0].id, "opacity", 0.3);
+   * await ink.try(hits[0].id, "tint", "#ff3040");
+   * await ink.reset(hits[0].id);
+   * ```
+   */
+  async try<P extends InkTryProp>(id: string, prop: P, value: InkTryValue<P>): Promise<{ id: string; prop: P; was: InkTryValue<P>; now: InkTryValue<P> }> {
+    const r = (await transport().call("ink.try", { id, prop, value: toGameValue(prop, value) }).catch(rethrow)) as { id: string; prop: P; was: unknown; now: unknown };
+    return { id: r.id, prop: r.prop, was: fromGameValue(prop, r.was) as InkTryValue<P>, now: fromGameValue(prop, r.now) as InkTryValue<P> };
+  },
+
+  /**
+   * Puts back what {@link ink.try} changed: every widget the package tried, one widget, or one
+   * of its properties. Answers how many were put back, and how many the game had removed
+   * meanwhile (a save load rebuilds the HUD). Needs REDnode 0.56.0.
+   */
+  async reset(id?: string, prop?: InkTryProp): Promise<{ reset: number; gone: number; errors: string[] }> {
+    return (await transport().call("ink.reset", { ...(id ? { id } : {}), ...(prop ? { prop } : {}) }).catch(rethrow)) as { reset: number; gone: number; errors: string[] };
+  },
+
+  /** What the package has tried and not put back yet, with each value before the first try. Needs REDnode 0.56.0. */
+  async tried(): Promise<{ id: string; prop: InkTryProp; was: unknown }[]> {
+    const r = (await transport().call("ink.tried", {}).catch(rethrow)) as { tried: { id: string; prop: InkTryProp; was: unknown }[] };
+    return r.tried.map((t) => ({ ...t, was: fromGameValue(t.prop, t.was) }));
   },
 
   /**
@@ -1594,6 +1636,72 @@ function rethrow(err: unknown): never {
   throw cleanError(err);
 }
 
+/** What {@link ink.try} can change on a game widget. */
+export type InkTryProp = "visible" | "opacity" | "tint" | "size" | "margin" | "padding" | "translation" | "text" | "fontSize";
+
+/**
+ * The value {@link ink.try} takes and answers for a property: a color as ink colors are
+ * written (it answers `"#rrggbbaa"`), sizes and places as `[x, y]`, margins as one number or
+ * `[left, top, right, bottom]` (it answers the four).
+ */
+export type InkTryValue<P extends InkTryProp> = P extends "visible"
+  ? boolean
+  : P extends "opacity" | "fontSize"
+    ? number
+    : P extends "text"
+      ? string
+      : P extends "tint"
+        ? InkColor
+        : P extends "size" | "translation"
+          ? [number, number]
+          : number | [number, number, number, number];
+
+// ink.try's values as the game's own types (the plugin calls the widget's native setters).
+function toGameValue(prop: InkTryProp, value: unknown): unknown {
+  switch (prop) {
+    case "tint": {
+      const [r, g, b, a] = inkColor(value as InkColor);
+      return { Red: r / 255, Green: g / 255, Blue: b / 255, Alpha: a / 255 };
+    }
+    case "size":
+    case "translation": {
+      if (!Array.isArray(value) || value.length !== 2) throw new Error(`ink.try: ${prop} takes [x, y]`);
+      return { X: Number(value[0]), Y: Number(value[1]) };
+    }
+    case "margin":
+    case "padding": {
+      const [left, top, right, bottom] = sides(value as number | number[]);
+      return { left, top, right, bottom };
+    }
+    case "visible":
+      return !!value;
+    case "opacity":
+    case "fontSize":
+      return Number(value);
+    default:
+      return String(value);
+  }
+}
+
+function fromGameValue(prop: InkTryProp, value: unknown): unknown {
+  const v = value as Record<string, number> | null;
+  if (!v || typeof v !== "object") return value;
+  switch (prop) {
+    case "tint": {
+      const byte = (n: number) => Math.max(0, Math.min(255, Math.round((n ?? 0) * 255))).toString(16).padStart(2, "0");
+      return `#${byte(v.Red)}${byte(v.Green)}${byte(v.Blue)}${byte(v.Alpha)}`;
+    }
+    case "size":
+    case "translation":
+      return [v.X, v.Y];
+    case "margin":
+    case "padding":
+      return [v.left, v.top, v.right, v.bottom];
+    default:
+      return value;
+  }
+}
+
 /** A widget's box on screen, `[x, y, width, height]` in ink pixels; null when it could not be read. */
 export type InkBox = [number, number, number, number] | null;
 
@@ -1647,6 +1755,15 @@ export interface InkTreeNode {
   count: number;
   /** Its children, unless the read stopped above them. */
   children?: InkTreeNode[];
+  /** With `props: true`: the size it is drawn at (its desired size when it fits its content). */
+  drawn?: [number, number];
+  /**
+   * With `props: true`: its layout and look, in the game's own types (`layout`,
+   * `renderTransform`, `size`, `tintColor`, `opacity`, `fitToContent`, `childMargin`, and a
+   * text's `fontSize`, `fontStyle`, `letterCase`, `textHorizontalAlignment`, an image's
+   * `textureAtlas` as a path hash and `texturePart`).
+   */
+  props?: Record<string, unknown>;
 }
 
 /** What {@link ink.read} answers. */
