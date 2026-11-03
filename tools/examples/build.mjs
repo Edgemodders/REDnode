@@ -120,6 +120,15 @@ ${FONTS}
   .list .line:nth-child(even) { background: color-mix(in srgb, var(--rn-panel-2) 45%, transparent); }
   rn-window:has(.list.fill) .content, .column:has(.list.fill) { flex: 1 0 auto; }
   .content > .list.fill, .column > .list.fill { flex: 1 1 0; min-height: 160px; }
+  .image { max-width: 100%; min-width: 0; }
+  .image img { display: block; box-sizing: border-box; width: 100%; height: auto; border: 1px solid var(--rn-line); }
+  .image:not([style*="width"]) img { width: auto; max-width: 100%; }
+  .image img[hidden] { display: none; }
+  .image.clickable { cursor: pointer; }
+  .image.clickable:hover img { border-color: var(--rn-accent); }
+  .image .why { padding: 8px; font-size: 13px; color: var(--rn-danger); border: 1px dashed var(--rn-line); overflow-wrap: anywhere; }
+  .row:has(> .image) { flex-wrap: nowrap; align-items: flex-start; }
+  .row > .image { flex: 0 1 auto; }
   .empty { width: 360px; padding: 18px; border: 1px dashed var(--rn-line); color: var(--rn-dim);
     font: 13px var(--rn-mono); background: color-mix(in srgb, var(--rn-bg) 70%, transparent); }
 </style>

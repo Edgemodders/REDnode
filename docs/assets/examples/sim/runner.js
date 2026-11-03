@@ -321,8 +321,36 @@ function apply(type, el, props) {
       }
       if ('push' in props) addLines(el, props.push ?? [], false);
       break;
+    case 'image':
+      applyImage(el, props);
+      break;
     default:
       break;
+  }
+}
+// ui.image, as builder.js draws it. The host checks the file and gives it an address; here a
+// relative path is a file of the app's own, and a full path is out of the preview's reach.
+function applyImage(el, props) {
+  const img = el.querySelector('img');
+  const why = el.querySelector('.why');
+  const fail = (text) => {
+    why.textContent = `${img.alt ? `${img.alt}: ` : ''}${text}`;
+    why.hidden = false;
+    img.hidden = true;
+    img.removeAttribute('src');
+  };
+  if ('width' in props) el.style.width = props.width ? `${Number(props.width)}px` : '';
+  if ('alt' in props) img.alt = props.alt ?? '';
+  if ('clickable' in props) el.classList.toggle('clickable', !!props.clickable);
+  if (!('src' in props)) return;
+  const src = String(props.src ?? '');
+  why.hidden = true;
+  img.hidden = false;
+  if (src.startsWith('data:')) img.src = src;
+  else if (/^([a-z]:|[\\/])/i.test(src)) fail(`${src}: a preview reads only the app's own files (in the game, a full path in pkg.dataDir works too)`);
+  else {
+    img.onerror = () => fail(`${src} was not found in the package's folder`);
+    img.src = new URL(src, location.href).href;
   }
 }
 // ui.list's lines, as builder.js adds them.
@@ -377,6 +405,18 @@ function render(spec) {
       el = document.createElement('div');
       el.className = 'list fill';
       break;
+    case 'image': {
+      el = document.createElement('div');
+      el.className = 'image';
+      const img = document.createElement('img');
+      img.draggable = false;
+      const why = document.createElement('div');
+      why.className = 'why';
+      why.hidden = true;
+      el.append(img, why);
+      el.addEventListener('click', () => el.classList.contains('clickable') && toMod(spec.id, 'click'));
+      break;
+    }
     case 'row':
     case 'column':
       el = document.createElement('div');

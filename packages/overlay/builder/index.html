@@ -27,6 +27,16 @@
     color: var(--rn-fg); background: color-mix(in srgb, var(--rn-panel-2) 55%, transparent); border: 1px solid var(--rn-line); }
   .list .line { white-space: pre-wrap; overflow-wrap: anywhere; }
   .list .line:nth-child(even) { background: color-mix(in srgb, var(--rn-panel-2) 45%, transparent); }
+  /* ui.image: its width, scaled down to fit; in a row, pictures shrink side by side rather than wrap. */
+  .image { max-width: 100%; min-width: 0; }
+  .image img { display: block; box-sizing: border-box; width: 100%; height: auto; border: 1px solid var(--rn-line); }
+  .image:not([style*="width"]) img { width: auto; max-width: 100%; }
+  .image img[hidden] { display: none; }
+  .image.clickable { cursor: pointer; }
+  .image.clickable:hover img { border-color: var(--rn-accent); }
+  .image .why { padding: 8px; font-size: 13px; color: var(--rn-danger); border: 1px dashed var(--rn-line); overflow-wrap: anywhere; }
+  .row:has(> .image) { flex-wrap: nowrap; align-items: flex-start; }
+  .row > .image { flex: 0 1 auto; }
   body.fill rn-window { height: 100vh; }
   body.fill .content, body.fill .column:has(.list.fill) { flex: 1 0 auto; }
   body.fill .content > .list.fill, body.fill .column > .list.fill { flex: 1 1 0; min-height: 160px; }

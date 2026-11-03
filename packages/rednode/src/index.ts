@@ -61,6 +61,9 @@ export type {
   InputProps,
   ProgressProps,
   ListProps,
+  ImageProps,
+  ImageSetProps,
+  UiImage,
   UiList,
 } from "./ui.js";
 export { defineInterceptor, interceptor } from "./interceptor.js";

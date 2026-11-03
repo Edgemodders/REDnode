@@ -153,6 +153,16 @@ function node(type, props, on = {}, children = []) {
     },
   };
 }
+function imageSource(src) {
+  if (typeof src === 'string') return src;
+  if (!(src instanceof Uint8Array)) throw new Error("rednode: ui.image takes a file path, a data: URL or the picture's bytes");
+  const b = src;
+  const type = b[0] === 0x89 && b[1] === 0x50 ? 'png' : b[0] === 0xff && b[1] === 0xd8 ? 'jpeg' : b[0] === 0x47 && b[1] === 0x49 ? 'gif' : b[8] === 0x57 && b[9] === 0x45 ? 'webp' : null;
+  if (!type) throw new Error("rednode: ui.image's bytes are not a PNG, JPEG, WebP or GIF picture");
+  let s = '';
+  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
+  return `data:image/${type};base64,${btoa(s)}`;
+}
 const split = (options = {}) => {
   const { onChange, onSubmit, ...props } = options;
   return { props, onChange, onSubmit };
@@ -201,6 +211,13 @@ export const ui = {
         self.set({ lines: [] });
       },
     });
+  },
+  // Like the package: bytes travel as a data: URL; the page finds a file in the app's folder.
+  image(src, o = {}) {
+    const { onClick, ...props } = o;
+    const self = node('image', { ...props, src: imageSource(src), clickable: !!onClick }, { click: onClick });
+    const set = self.set;
+    return Object.assign(self, { set: (p) => set(p.src === undefined ? p : { ...p, src: imageSource(p.src) }) });
   },
   row: (...children) => node('row', {}, {}, children),
   column: (...children) => node('column', {}, {}, children),

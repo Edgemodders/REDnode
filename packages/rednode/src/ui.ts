@@ -90,6 +90,31 @@ export interface ProgressProps {
   max?: number;
 }
 
+/** Properties of {@link ui.image}. */
+export interface ImageProps {
+  /**
+   * The picture: a PNG, JPEG, WebP or GIF file, or a `data:image/...;base64,` URL. A relative
+   * path is in the package's folder; a full path must be in the package's folder or its data
+   * folder (`pkg.dataDir`), where a mod writes the pictures it makes. Setting the same path
+   * again shows the file as it is now, so a mod can write a new picture over the old one.
+   */
+  src: string;
+  /** Width in pixels; the height follows the picture's shape. Scaled down to fit the window when wider. Without it, the picture's own width. */
+  width?: number;
+  /** Words for the picture, shown while it loads or when it cannot be shown. */
+  alt?: string;
+  /** Changes the picture's address without changing `src`, to show a file again by hand. Rarely needed: setting `src` does it. */
+  version?: number;
+}
+
+/** What {@link UiImage.set} takes: `src` may also be the picture's bytes. */
+export type ImageSetProps = Omit<ImageProps, "src"> & { src: string | Uint8Array };
+
+/** A picture, from {@link ui.image}. `set({ src })` shows another one, or the same file again. */
+export interface UiImage extends Omit<UiNode<ImageProps>, "set"> {
+  set(props: Partial<ImageSetProps>): void;
+}
+
 /** Properties of {@link ui.list}. */
 export interface ListProps {
   /** The lines shown, oldest first. Add to them with {@link UiList.push}. */
@@ -229,6 +254,25 @@ function node<P extends object>(type: string, props: P, on?: Record<string, Hand
   };
 }
 
+// ui.image's source as text: a path or a data: URL as given, bytes as a data: URL of their type.
+function imageSource(src: string | Uint8Array): string {
+  if (typeof src === "string") return src;
+  if (!(src instanceof Uint8Array)) throw new Error("rednode: ui.image takes a file path, a data: URL or the picture's bytes");
+  const b = src;
+  const type =
+    b[0] === 0x89 && b[1] === 0x50 ? "png" : b[0] === 0xff && b[1] === 0xd8 ? "jpeg" : b[0] === 0x47 && b[1] === 0x49 ? "gif" : b[8] === 0x57 && b[9] === 0x45 ? "webp" : null;
+  if (!type) throw new Error("rednode: ui.image's bytes are not a PNG, JPEG, WebP or GIF picture");
+  const B = (globalThis as { Buffer?: { from(b: Uint8Array): { toString(enc: string): string } } }).Buffer;
+  let base64: string;
+  if (B) base64 = B.from(b).toString("base64");
+  else {
+    let s = "";
+    for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
+    base64 = btoa(s);
+  }
+  return `data:image/${type};base64,${base64}`;
+}
+
 function collect(spec: Spec, out: string[]): void {
   out.push(spec.id);
   for (const c of spec.children ?? []) collect(c, out);
@@ -345,6 +389,38 @@ export const ui = {
       },
       clear() {
         self.set({ lines: [] });
+      },
+    });
+  },
+
+  /**
+   * A picture from a file or from bytes, for a mod that makes or fetches pictures: a
+   * render, a preview, a before and after. `src` is a PNG, JPEG, WebP or GIF file (a
+   * relative path in the package's folder, or a full path in `pkg.dataDir`), a
+   * `data:image/` URL, or the file's bytes (a `Buffer` or `Uint8Array`). Give a `width`
+   * in pixels; the height follows the picture. `set({ src })` shows another picture, or
+   * the same file again after the mod wrote over it. A picture that cannot be shown says
+   * why in the window and in the Mod log. Needs REDnode 0.55.0 or later.
+   *
+   * @example
+   * ```ts
+   * import path from "node:path";
+   * import { pkg, ui } from "rednode";
+   *
+   * const file = path.join(pkg.dataDir, "before.png"); // written by the mod
+   * const before = ui.image(file, { width: 220, alt: "The hat before" });
+   * const after = ui.image("waiting.png", { width: 220, onClick: () => console.log("larger") });
+   * ui.window({ title: "Reshape", width: 480, height: 320, children: [ui.row(before, after)] });
+   * after.set({ src: path.join(pkg.dataDir, "after.png") });
+   * ```
+   */
+  image(src: string | Uint8Array, options: Omit<ImageProps, "src"> & { onClick?: () => void } = {}): UiImage {
+    const { onClick, ...props } = options;
+    const self = node<ImageProps & { clickable: boolean }>("image", { ...props, src: imageSource(src), clickable: !!onClick }, { click: onClick && (() => onClick()) });
+    const set = self.set.bind(self);
+    return Object.assign(self, {
+      set(next: Partial<ImageSetProps>) {
+        set(next.src === undefined ? (next as Partial<ImageProps>) : { ...next, src: imageSource(next.src) });
       },
     });
   },

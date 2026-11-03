@@ -1,0 +1,10 @@
+{
+  "id": "image-mod",
+  "name": "Image mod",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "A Node mod with pictures (ui.image): one from the package's folder, one drawn into its data folder and drawn again over the same file, one from bytes, a larger view on click, and two that cannot be shown.",
+  "main": "mod.mjs",
+  "requires": { "rednode": ">=0.55.0" },
+  "open": false
+}

@@ -22,6 +22,9 @@ How to keep it:
 - For admin pages: `admin.setOpen(id, open)` switches a package on or off, as the launcher's switch does, and `admin.projectsFolder(name)` makes a folder under `Documents\REDnode` and watches it as a development folder. `ink.check(source)` checks ink markup without putting it on the game's UI, and answers the first mistake with its line and column. A package's own page may now connect to its own service. What the UI Tools pack's editor is built on.
 - `world.spawn({ ..., wait: false })` resolves as soon as the entity is created, without waiting for it to be in the world (far from V, or still streaming in), and keeps it as the package's spawn: move, remove, the respawn after a swap and the clean-up at stop all work. `world.spawned()` says whether each one is in the world (`attached`), and `world.load(scene, { wait: false })` loads a far scene in full (https://github.com/Edgemodders/REDnode/issues/35).
 
+- `ui.image(src, { width, alt, onClick })` in the UI builder: a picture in a Node mod's window, from a file in the package's folder or its data folder (`pkg.dataDir`), a `data:` URL or the picture's bytes. `set({ src })` shows another one, or the same file again after the mod wrote over it; a picture that cannot be shown says why. For a mod that makes or fetches pictures, such as a before and after (https://github.com/Edgemodders/REDnode/issues/37). See https://edgemodders.github.io/REDnode/overlay-apps.html
+- A sample, **Image mod**: pictures from the package, from bytes and drawn into the data folder, a larger view on click, and two that cannot be shown.
+
 **Changed**
 
 - Keys knows **Tripo** (`tripo`, the 3D service EDGEmat's Wardrobe Designer uses), so a player can set its key before any tool asks for it (https://github.com/Edgemodders/REDnode/issues/23).

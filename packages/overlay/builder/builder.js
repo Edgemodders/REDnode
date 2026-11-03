@@ -62,8 +62,29 @@ function apply(type, el, props) {
       }
       if ('push' in props) addLines(el, props.push ?? [], false);
       break;
+    case 'image':
+      applyImage(el, props);
+      break;
     default:
       break;
+  }
+}
+
+// ui.image: the host gives a file's picture an address (url) that changes when the file does,
+// shows a data: URL as it is, and says why a picture cannot be shown (error).
+function applyImage(el, props) {
+  const img = el.querySelector('img');
+  if ('width' in props) el.style.width = props.width ? `${Number(props.width)}px` : '';
+  if ('alt' in props) img.alt = props.alt ?? '';
+  if ('clickable' in props) el.classList.toggle('clickable', !!props.clickable);
+  if ('url' in props || 'src' in props || 'error' in props) {
+    const why = el.querySelector('.why');
+    why.textContent = props.error ? `${props.alt ? `${props.alt}: ` : ''}${props.error}` : '';
+    why.hidden = !props.error;
+    img.hidden = !!props.error;
+    const shown = props.error ? '' : props.url || (String(props.src ?? '').startsWith('data:') ? props.src : '');
+    if (shown) img.src = shown;
+    else img.removeAttribute('src');
   }
 }
 
@@ -128,6 +149,20 @@ function render(spec) {
       el = document.createElement('div');
       el.className = 'list fill';
       break;
+    case 'image': {
+      el = document.createElement('div');
+      el.className = 'image';
+      const img = document.createElement('img');
+      img.draggable = false;
+      const why = document.createElement('div');
+      why.className = 'why';
+      why.hidden = true;
+      el.append(img, why);
+      el.addEventListener('click', () => {
+        if (el.classList.contains('clickable')) send(spec.id, 'click');
+      });
+      break;
+    }
     case 'row':
     case 'column':
       el = document.createElement('div');

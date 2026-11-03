@@ -2619,8 +2619,8 @@ const PLAY_KEYS = ['category', 'volume', 'loop', 'delay', 'start', 'end', 'rate'
 const soundOwners = new Map(); // sound id -> package id, until the plugin says it ended
 
 // A file in the package's folder, or (#20) a full path in its data folder (pkg.dataDir),
-// for sounds a package makes while it runs. The engine reads the file at each play.
-function soundFile(entry, name) {
+// for what a package makes while it runs: sounds, and pictures for ui.image (#37).
+function packageFile(entry, name) {
   const inside = (dir, file) => {
     const rel = path.relative(dir, file);
     return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
@@ -2628,6 +2628,12 @@ function soundFile(entry, name) {
   const file = path.resolve(entry.dir, name);
   const where = inside(entry.dir, file) ? "the package's folder" : path.isAbsolute(name) && inside(dataDirOf(entry.manifest.id), file) ? "the package's data folder" : null;
   if (!where) throw new Error(`${name} is outside the package's folder and its data folder (pkg.dataDir)`);
+  return { file, where };
+}
+
+// The engine reads a sound's file at each play.
+function soundFile(entry, name) {
+  const { file, where } = packageFile(entry, name);
   if (!SOUND_TYPES.has(path.extname(file).toLowerCase())) throw new Error(`${name}: REDnode plays .wav, .ogg, .mp3 and .flac files`);
   if (!fs.existsSync(file)) throw new Error(`${name} was not found in ${where}`);
   return file;
@@ -4711,6 +4717,63 @@ function rememberClosed(key, closed) {
   writeJson('settings.json', settings);
 }
 
+// ui.image (#37): a picture in the package's folder or its data folder, served to the builder
+// page at rednode://image/<token>. A token stands for one checked file, so the page reaches no
+// other; the address changes with the file's time and size, so a picture written over shows.
+const IMAGE_TYPES = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif' };
+const DATA_IMAGE = /^data:image\/(png|jpeg|webp|gif);base64,/;
+const MAX_DATA_IMAGE = 16 * 1024 * 1024;
+const imageFiles = new Map(); // token -> { file, key }
+const imageTokens = new Map(); // "<window key>|<node>" -> token
+
+// Sets an image node's url (a rednode://image address, or null for a data: URL, which the page
+// shows as it is) and error (why it cannot be shown). The error goes to the Mod log too.
+function resolveImage(modId, key, spec) {
+  const src = String(spec.props.src ?? '');
+  spec.props.url = null;
+  spec.props.error = null;
+  try {
+    if (!src) throw new Error('ui.image needs a src: a file or a data: URL');
+    if (src.startsWith('data:')) {
+      if (!DATA_IMAGE.test(src)) throw new Error('a data: URL must be a base64 PNG, JPEG, WebP or GIF (data:image/png;base64,...)');
+      if (src.length > MAX_DATA_IMAGE) throw new Error('the data: URL is over 16 MB: write the picture to pkg.dataDir and give its path');
+      return;
+    }
+    const entry = apps.get(modId);
+    if (!entry) throw new Error('only a package can show pictures');
+    const { file, where } = packageFile(entry, src);
+    const type = IMAGE_TYPES[path.extname(file).toLowerCase()];
+    if (!type) throw new Error(`${src}: ui.image shows .png, .jpg, .webp and .gif files`);
+    let stat;
+    try {
+      stat = fs.statSync(file);
+    } catch {
+      throw new Error(`${src} was not found in ${where}`);
+    }
+    const at = `${key}|${spec.id}`;
+    let token = imageTokens.get(at);
+    if (!token) imageTokens.set(at, (token = crypto.randomBytes(12).toString('hex')));
+    imageFiles.set(token, { file, key });
+    spec.props.url = `rednode://image/${token}?v=${Math.floor(stat.mtimeMs)}-${stat.size}-${Number(spec.props.version) || 0}`;
+  } catch (err) {
+    spec.props.error = err.message;
+    mods.log(modId, 'warn', `ui.image: ${err.message}`);
+  }
+}
+
+function resolveImages(modId, key, spec) {
+  if (spec.type === 'image') resolveImage(modId, key, spec);
+  for (const c of spec.children ?? []) resolveImages(modId, key, c);
+}
+
+function forgetImages(key) {
+  for (const [at, token] of imageTokens) {
+    if (!at.startsWith(`${key}|`)) continue;
+    imageTokens.delete(at);
+    imageFiles.delete(token);
+  }
+}
+
 function findNode(spec, id) {
   if (spec.id === id) return spec;
   for (const c of spec.children ?? []) {
@@ -4734,6 +4797,8 @@ const ui = {
     }
     closeApp(key);
     if (playerClosed.delete(key)) notifyLauncher();
+    forgetImages(key);
+    resolveImages(modId, key, spec);
     built.set(key, { modId, win, spec });
     const p = spec?.props ?? {};
     const size = (v, d) => (Number.isInteger(v) && v >= 1 && v <= 4096 ? v : d);
@@ -4766,12 +4831,18 @@ const ui = {
       const keep = Math.min(5000, Math.max(1, Number(target.props.keep) || 500));
       target.props.lines = [...(target.props.lines ?? []), ...push.map(String)].slice(-keep);
     }
+    if (target.type === 'image' && ('src' in rest || 'version' in rest)) {
+      // A new picture, or the same file again: a new address, so the page loads it afresh.
+      resolveImage(modId, builtKey(modId, win), target);
+      props = { ...props, src: target.props.src, url: target.props.url, error: target.props.error };
+    }
     const w = windowOfApp(builtKey(modId, win));
     if (w) toPage(w, { event: 'builder', op: 'update', node, props });
   },
   close(modId, win) {
     const key = builtKey(modId, win);
     built.delete(key);
+    forgetImages(key);
     closeApp(key);
   },
   closeAll(modId) {
@@ -4927,8 +4998,19 @@ function closeApp(appId) {
 
 app.whenReady().then(() => {
   // rednode://ui/  the UI kit; rednode://sdk/  the rednode package, as ES modules.
-  protocol.handle('rednode', (request) => {
+  protocol.handle('rednode', async (request) => {
     const url = new URL(request.url);
+    // rednode://image/<token>  a picture a mod window shows (ui.image), read at each load.
+    if (url.host === 'image') {
+      const img = imageFiles.get(url.pathname.slice(1));
+      if (!img) return new Response('Not found', { status: 404 });
+      try {
+        const body = await fs.promises.readFile(img.file);
+        return new Response(body, { headers: { 'content-type': IMAGE_TYPES[path.extname(img.file).toLowerCase()], 'cache-control': 'no-store' } });
+      } catch {
+        return new Response('Not found', { status: 404 });
+      }
+    }
     const root = { ui: UI_DIR, sdk: SDK_DIR }[url.host];
     const file = root && path.join(root, decodeURIComponent(url.pathname));
     if (!root || !file.startsWith(root + path.sep) || !fs.existsSync(file)) {

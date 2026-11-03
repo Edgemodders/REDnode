@@ -451,6 +451,19 @@ export const NOTES = {
     ],
     tryThis: ['Watch a line arrive every two seconds.', 'Scroll the list up: it stays put while lines arrive; scroll back down and it follows again.', 'Press Clear.'],
   },
+  'image-mod': {
+    group: 'mods',
+    summary: 'Pictures in a Node mod\'s window with `ui.image`: one from the package, one the mod draws into its data folder and draws again, one from bytes.',
+    teaches: ['ui.image', 'image.set', 'pkg.dataDir', 'onClick'],
+    how: [
+      '`ui.image("picture.png", { width: 200 })` shows a file from the package\'s folder; the height follows the picture. A picture wider than the window is scaled down, and pictures in a `ui.row` shrink side by side.',
+      'Draw writes a PNG into `pkg.dataDir` and calls `set({ src })` with its full path. Drawing again writes over the same file and sets the same path: REDnode shows the file as it is now.',
+      'A `Uint8Array` or `Buffer` works as `src` too: the package sends it as a `data:` URL. The mod makes its pictures with a small PNG writer of its own, with no library.',
+      '`onClick` makes a picture clickable; here it opens a larger window. A picture that cannot be shown (missing, or outside the package\'s folder and its data folder) says why in the window and in the Mod log.',
+    ],
+    tryThis: ['Press From bytes, then click the right picture.', 'Press Missing file and Outside, then Back.', 'In the game, press Draw a few times: the same file shows each new picture.'],
+    preview: 'Draw fails here: a preview cannot write files. The other buttons work as in the game.',
+  },
   'sound-tracer': {
     group: 'game',
     summary: 'The game\'s sounds, live: every event it posts to its audio engine and every sound it loads, each with a button to play it again.',
