@@ -241,13 +241,37 @@ export const ui = {
     const ids = [];
     for (const c of root.children) collect(c, ids);
     for (const n of ids) nodes.get(n).window = id;
-    const state = { onClose: options.onClose, closed: false };
+    const state = { onClose: options.onClose, closed: false, nodes: ids, buttons: new Map() };
+    // Title-bar buttons (#38): the handlers stay here, the page gets id, label, icon and on.
+    const buttonsOf = (list) => {
+      state.buttons.clear();
+      return (list ?? []).map((b) => {
+        if (b.onClick) state.buttons.set(String(b.id), b.onClick);
+        return { id: String(b.id), label: String(b.label ?? b.id), icon: b.icon ?? null, on: !!b.on };
+      });
+    };
+    root.props.titleButtons = buttonsOf(options.titleButtons);
     windows.set(id, state);
     send({ t: 'ui-open', win: id, spec: root });
     return {
       id,
       get closed() {
         return state.closed;
+      },
+      // win.set({ title, titleButtons, children }): the same window, changed in place.
+      set(changes) {
+        const next = {};
+        if (changes.title !== undefined) next.title = root.props.title = String(changes.title);
+        if (changes.titleButtons !== undefined) next.titleButtons = root.props.titleButtons = buttonsOf(changes.titleButtons);
+        if (changes.children !== undefined) {
+          for (const n of state.nodes) if (nodes.get(n)?.window === id) nodes.get(n).window = null;
+          root.children = changes.children.map((c) => nodes.get(c.id).spec);
+          state.nodes = [];
+          for (const c of root.children) collect(c, state.nodes);
+          for (const n of state.nodes) nodes.get(n).window = id;
+          next.children = root.children;
+        }
+        if (!state.closed && Object.keys(next).length) send({ t: 'ui-update', node: root.id, win: id, props: next });
       },
       close() {
         if (state.closed) return;
@@ -289,6 +313,12 @@ self.addEventListener('message', (e) => {
       listeners.get(m.id)?.(m.payload);
       break;
     case 'ui-event': {
+      if (m.type === 'title') {
+        const fn = windows.get(m.win)?.buttons.get(String(m.value));
+        const r = fn?.();
+        if (r && typeof r.then === 'function') r.then(undefined, (err) => crash(err?.stack || String(err)));
+        break;
+      }
       if (m.type === 'close') {
         const w = windows.get(m.win);
         if (w && !w.closed) {

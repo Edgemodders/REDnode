@@ -1,0 +1,10 @@
+{
+  "id": "views-mod",
+  "name": "Views mod",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "A Node mod with one window and two views: buttons of its own in the title bar (Settings, a lit Pin switch, Help as text) and win.set, which swaps the window's title, buttons and content in place, with the same place and size. Needs REDnode 0.57.0 or later.",
+  "main": "mod.mjs",
+  "requires": { "rednode": ">=0.57.0" },
+  "open": false
+}

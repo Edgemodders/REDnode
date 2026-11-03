@@ -4819,8 +4819,24 @@ function findNode(spec, id) {
   return null;
 }
 
+// A ui-builder window's title-bar buttons (#38), as the page gets them: at most eight, each
+// with an id and a label.
+function titleButtonsOf(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((b) => b && b.id != null && String(b.id) !== '')
+    .slice(0, 8)
+    .map((b) => ({
+      id: String(b.id).slice(0, 64),
+      label: String(b.label ?? b.id).slice(0, 80),
+      icon: typeof b.icon === 'string' ? b.icon.slice(0, 32) : null,
+      on: !!b.on,
+    }));
+}
+
 const ui = {
   open(modId, win, spec) {
+    if (spec?.props) spec.props.titleButtons = titleButtonsOf(spec.props.titleButtons);
     const key = builtKey(modId, win);
     if (closedForGood(key)) {
       // Kept closed: the mod sees it closed, as if the player had just closed it.
@@ -4860,6 +4876,25 @@ const ui = {
     const b = built.get(builtKey(modId, win));
     const target = b && findNode(b.spec, node);
     if (!target) return;
+    if (target === b.spec) {
+      // The window itself (#38): win.set({ title, titleButtons, children }) changes it in
+      // place, with the same overlay window, place and size.
+      const key = builtKey(modId, win);
+      const next = {};
+      if ('title' in props) next.title = target.props.title = String(props.title ?? '');
+      if ('titleButtons' in props) next.titleButtons = target.props.titleButtons = titleButtonsOf(props.titleButtons);
+      if (Array.isArray(props.children)) {
+        target.children = props.children;
+        forgetImages(key);
+        resolveImages(modId, key, target);
+        next.children = target.children;
+      }
+      const w = windowOfApp(key);
+      if (w && 'title' in next) w.app.manifest.name = next.title || win;
+      if (w) toPage(w, { event: 'builder', op: 'update', node, props: next });
+      if ('title' in next) notifyLauncher();
+      return;
+    }
     const { push, ...rest } = props;
     Object.assign(target.props, rest);
     if (Array.isArray(push) && target.type === 'list') {

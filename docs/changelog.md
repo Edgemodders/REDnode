@@ -11,6 +11,12 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- Title-bar buttons for Node mod windows (https://github.com/Edgemodders/REDnode/issues/38): `ui.window({ titleButtons: [{ id, label, icon, onClick }] })` puts buttons of the mod's own beside close, with an icon from the UI kit (`key`, `settings`, `back`, `refresh`, `help`, `pin`...) or the label as text, and `on: true` for a lit switch. The window's own actions move into its ⋯ menu when there are more than three. Page apps get the same with the UI kit's `rn-window` `titleButtons` property.
+- `win.set({ title, titleButtons, children })` changes an open Node mod window in place, with the same place and size and no flicker, so one window can hold several views (https://github.com/Edgemodders/REDnode/issues/38). Nodes taken out keep their state.
+- A sample, **Views mod**: one window with two views, swapped with `win.set`, and three title-bar buttons.
+
 ## 0.56.1 (2026-11-03)
 
 For game version 2.5. With it, the first release of the [UI Tools](https://www.nexusmods.com/cyberpunk2077/mods/36958) pack: the UI Workbench inspects the game's own UI and builds native UI of your own.

@@ -451,6 +451,17 @@ export const NOTES = {
     ],
     tryThis: ['Watch a line arrive every two seconds.', 'Scroll the list up: it stays put while lines arrive; scroll back down and it follows again.', 'Press Clear.'],
   },
+  'views-mod': {
+    group: 'mods',
+    summary: 'A Node mod window with buttons in its title bar and two views, swapped in place with win.set.',
+    teaches: ['titleButtons', 'win.set'],
+    how: [
+      'titleButtons puts buttons of the mod\'s own in the title bar, the first next to close. An icon names one of the UI kit\'s (settings, back, pin, key...); the label is its tooltip, or its text when there is no icon. on: true lights it, for a switch.',
+      'win.set changes the open window in place: its title, its title-bar buttons, its content. The window keeps its place and size, so one window can hold several views.',
+      'Nodes taken out by win.set keep their state: the press count and the greeting are still there when their view comes back.',
+    ],
+    tryThis: ['Press the gear: the settings view swaps in, with a back arrow in the title bar.', 'Type a greeting, press Done: the title shows it.', 'Press Pin twice: it lights and goes out.', 'Press Help and read the Mod log.'],
+  },
   'image-mod': {
     group: 'mods',
     summary: 'Pictures in a Node mod\'s window with `ui.image`: one from the package, one the mod draws into its data folder and draws again, one from bytes.',

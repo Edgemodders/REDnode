@@ -148,7 +148,21 @@
     reset: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3"/></svg>',
     debug: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5" y="5" width="6" height="8" rx="3"/><path d="M6 5V3.5h4V5M5 8H2m12 0h-3M5 11H2.5m11 0H11M5.5 6 3 4m7.5 2L13 4M8 7v6"/></svg>',
     more: '<svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg>',
+    // For an app's own title-bar buttons (rn-window's titleButtons).
+    key: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="5" cy="8" r="3"/><path d="M8 8h6.5M12 8v2.5M14.5 8v2"/></svg>',
+    settings: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg>',
+    back: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 3L5 8l5 5"/></svg>',
+    refresh: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2v3h-3"/></svg>',
+    help: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M6.2 6.2a1.9 1.9 0 1 1 2.6 1.8c-.5.2-.8.6-.8 1.1V10"/><circle cx="8" cy="12" r=".4" fill="currentColor"/></svg>',
+    info: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 7v4.5"/><circle cx="8" cy="4.8" r=".4" fill="currentColor"/></svg>',
+    add: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2.5v11M2.5 8h11"/></svg>',
+    edit: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 13.5l.6-3L10.5 3l2.5 2.5-7.4 7.4zM9 4.5L11.5 7"/></svg>',
+    search: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="7" cy="7" r="4.5"/><path d="M10.3 10.3L14 14"/></svg>',
+    list: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5.5 4h8.5M5.5 8h8.5M5.5 12h8.5M2 4h1M2 8h1M2 12h1"/></svg>',
+    home: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 7.5L8 2.5l6 5M3.5 6.5v7h9v-7"/></svg>',
   };
+  // The icons an app may name for its own title-bar buttons.
+  const BUTTON_ICONS = ['key', 'settings', 'back', 'refresh', 'help', 'info', 'add', 'edit', 'search', 'list', 'home', 'pin', 'reset', 'space'];
 
   function installGlobals() {
     if (document.getElementById('rn-ui-globals')) return;
@@ -265,6 +279,9 @@ h1 { margin: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space:
 .close:hover, .act:hover, .act[aria-expanded="true"] { color: var(--rn-title-hover-fg); background: var(--rn-title-hover-bg); border-color: var(--rn-title-hover-bg); }
 .act.on { color: var(--rn-title-mark); }
 .act svg { width: 13px; height: 13px; }
+/* An app's title-bar button with no icon: its label, short. */
+.act.text { width: auto; max-width: 120px; padding: 0 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 600 12px var(--rn-display); letter-spacing: .08em; text-transform: uppercase; }
 /* Close and up to three actions, right to left; more than three: the overflow on the far left. */
 .actions { display: flex; align-items: center; gap: 6px; }
 .actions:empty { display: none; }
@@ -342,6 +359,19 @@ footer:empty { display: none; }
       return !this.hasAttribute('drawer') && document.querySelectorAll('rn-window:not([drawer])').length === 1;
     }
 
+    // The app's own title-bar buttons: [{ id, label, icon?, on?, onClick }], the first next to
+    // close. `icon` names one of the kit's icons (BUTTON_ICONS); without one the label shows.
+    // They count toward the three beside close, so the window's own actions move into ⋯.
+    get titleButtons() {
+      return this._titleButtons ?? [];
+    }
+    set titleButtons(list) {
+      this._titleButtons = (Array.isArray(list) ? list : [])
+        .filter((b) => b && b.id != null)
+        .map((b) => ({ id: String(b.id), label: String(b.label ?? b.id), icon: b.icon ?? null, on: !!b.on, onClick: b.onClick }));
+      this.renderActions();
+    }
+
     // The window's actions, most used first: the first three get icons next to close.
     // Overlay-window actions (spaces, the HUD pin, position) show only on a page's only
     // window, since they act on the whole page. A drawer has none: only its close button.
@@ -350,7 +380,14 @@ footer:empty { display: none; }
       const info = this._info;
       const whole = !!info && !!window.rednode && this.isMain();
       const run = (action, arg) => () => window.rednode.windowAction(action, arg).catch(() => {});
-      const list = [];
+      // The app's own buttons first, next to close, in the order given.
+      const list = this.titleButtons.map((b) => ({
+        id: `app:${b.id}`,
+        icon: BUTTON_ICONS.includes(b.icon) ? b.icon : null,
+        name: b.label,
+        on: !!b.on,
+        run: () => b.onClick?.(),
+      }));
       if (whole && !info.tool && info.spaces.names.length > 1 && !this.hasAttribute('no-space')) {
         list.push({
           id: 'space',
@@ -626,7 +663,13 @@ footer:empty { display: none; }
         b.setAttribute('aria-haspopup', 'menu');
         b.setAttribute('aria-expanded', 'false');
       }
-      b.innerHTML = ACTION_ICONS[a.id];
+      const icon = ACTION_ICONS[a.icon ?? a.id];
+      if (icon) b.innerHTML = icon;
+      else {
+        // An app's button with no icon shows its label; the tooltip says it whole.
+        b.classList.add('text');
+        b.textContent = a.name;
+      }
       return b;
     }
 
@@ -686,7 +729,7 @@ footer:empty { display: none; }
         const b = document.createElement('button');
         b.type = 'button';
         b.setAttribute('role', 'menuitem');
-        b.innerHTML = ACTION_ICONS[a.id] + '<span></span>' + (a.choices ? '<span class="rn-on">\u203a</span>' : a.on ? '<span class="rn-on">\u25cf</span>' : '');
+        b.innerHTML = (ACTION_ICONS[a.icon ?? a.id] ?? '<svg viewBox="0 0 16 16"></svg>') + '<span></span>' + (a.choices ? '<span class="rn-on">\u203a</span>' : a.on ? '<span class="rn-on">\u25cf</span>' : '');
         b.querySelector('span').textContent = a.name;
         b.addEventListener('click', () => {
           if (!a.choices) return this.runAction(a);

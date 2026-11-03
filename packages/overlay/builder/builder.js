@@ -207,18 +207,41 @@ function render(spec) {
   return el;
 }
 
-function show(spec) {
-  const win = document.getElementById('win');
+let rootId = null;
+
+// The window's title-bar buttons (#38): a press goes to the mod as the window node's "title"
+// event, with the button's id.
+function setTitleButtons(win, list) {
+  win.titleButtons = (Array.isArray(list) ? list : []).map((b) => ({ ...b, onClick: () => send(rootId, 'title', b.id) }));
+}
+
+// The window's content, in place: the old nodes go, the new ones behave as in a new window.
+function showChildren(win, children) {
   elements.clear();
-  win.setAttribute('title', spec.props.title ?? '');
-  attr(win, 'closable', spec.props.closable !== false);
   const content = document.createElement('div');
   content.className = 'content';
-  for (const child of spec.children ?? []) content.append(render(child));
+  for (const child of children ?? []) content.append(render(child));
   win.replaceChildren(content);
-  win.hidden = false;
   checkFill();
   for (const list of win.querySelectorAll('.list')) list.scrollTop = list.scrollHeight;
+}
+
+function show(spec) {
+  const win = document.getElementById('win');
+  rootId = spec.id;
+  win.setAttribute('title', spec.props.title ?? '');
+  attr(win, 'closable', spec.props.closable !== false);
+  setTitleButtons(win, spec.props.titleButtons);
+  showChildren(win, spec.children);
+  win.hidden = false;
+}
+
+// win.set({ title, titleButtons, children }) from the mod: the same window, changed in place.
+function updateWindow(props) {
+  const win = document.getElementById('win');
+  if ('title' in props) win.setAttribute('title', props.title ?? '');
+  if ('titleButtons' in props) setTitleButtons(win, props.titleButtons);
+  if ('children' in props) showChildren(win, props.children);
 }
 
 // The window's close button: the host closes the window and tells the mod.
@@ -230,6 +253,7 @@ document.getElementById('win').addEventListener('close', (e) => {
 window.rednode.on((m) => {
   if (m.event !== 'builder') return;
   if (m.op === 'update') {
+    if (m.node === rootId) return updateWindow(m.props ?? {});
     const found = elements.get(m.node);
     if (found) apply(found.type, found.el, m.props ?? {});
   }

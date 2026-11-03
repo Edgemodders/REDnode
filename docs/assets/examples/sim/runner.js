@@ -255,6 +255,10 @@ function onMessage(m) {
       placeholder();
       break;
     case 'ui-update': {
+      if (m.node?.startsWith?.('w:')) {
+        updateWindow(m.win ?? m.node.slice(2), m.props ?? {});
+        break;
+      }
       const found = elements.get(m.node);
       if (found) apply(found.type, found.el, m.props ?? {});
       break;
@@ -478,6 +482,7 @@ function openWindow(id, spec) {
     hostLog('info', `The player closed ${manifest.name}'s window`);
     placeholder();
   });
+  setTitleButtons(win, id, spec.props.titleButtons);
   const content = document.createElement('div');
   content.className = 'content';
   for (const child of spec.children ?? []) content.append(render(child));
@@ -486,6 +491,29 @@ function openWindow(id, spec) {
   for (const list of win.querySelectorAll('.list')) list.scrollTop = list.scrollHeight;
   windows.set(id, win);
   placeholder();
+}
+
+// A window's title-bar buttons (#38): a press goes to the mod with the button's id.
+function setTitleButtons(win, id, list) {
+  win.titleButtons = (list ?? []).map((b) => ({
+    ...b,
+    onClick: () => worker?.postMessage({ t: 'ui-event', type: 'title', win: id, value: b.id }),
+  }));
+}
+
+// win.set from the mod: the title, the buttons and the content, in place.
+function updateWindow(id, props) {
+  const win = windows.get(id);
+  if (!win) return;
+  if ('title' in props) win.setAttribute('title', props.title ?? '');
+  if ('titleButtons' in props) setTitleButtons(win, id, props.titleButtons);
+  if ('children' in props) {
+    const content = document.createElement('div');
+    content.className = 'content';
+    for (const child of props.children ?? []) content.append(render(child));
+    win.replaceChildren(content);
+    for (const list of win.querySelectorAll('.list')) list.scrollTop = list.scrollHeight;
+  }
 }
 
 // ---------- ink ----------

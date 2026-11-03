@@ -159,10 +159,46 @@ export interface WindowOptions {
   y?: number;
   /** Shows a close button. Defaults to true. */
   closable?: boolean;
+  /**
+   * Buttons of the mod's own in the title bar, beside close: the first next to close. They
+   * count toward the three icons there, so the window's own actions (roll up, reset
+   * position, debug) move into its ⋯ menu. Needs REDnode 0.57.0 or later.
+   */
+  titleButtons?: TitleButton[];
   /** The window's content, top to bottom. */
   children: UiNode[];
   /** Called when the player closes the window. The mod keeps running, and the launcher can show the window again. */
   onClose?: () => void;
+}
+
+/** A button in a window's title bar, given in {@link WindowOptions.titleButtons}. */
+export interface TitleButton {
+  /** Names the button within the window. */
+  id: string;
+  /** The tooltip, or the button's text when it has no icon. */
+  label: string;
+  /**
+   * One of the UI kit's icons: `key`, `settings`, `back`, `refresh`, `help`, `info`, `add`,
+   * `edit`, `search`, `list`, `home`, `pin`, `reset`, `space`. Without one, the label shows.
+   */
+  icon?: TitleIcon;
+  /** Shows the button lit, for a switch that is on. */
+  on?: boolean;
+  /** Runs in the mod when the player presses it. */
+  onClick?: () => void;
+}
+
+/** The icons a {@link TitleButton} can show. */
+export type TitleIcon = "key" | "settings" | "back" | "refresh" | "help" | "info" | "add" | "edit" | "search" | "list" | "home" | "pin" | "reset" | "space";
+
+/** What {@link UiWindow.set} changes. */
+export interface WindowChanges {
+  /** A new title bar text. */
+  title?: string;
+  /** New title-bar buttons, in place of the old ones; `[]` takes them away. */
+  titleButtons?: TitleButton[];
+  /** New content, in place of the old: the same window, place and size. */
+  children?: UiNode[];
 }
 
 /** A window opened with {@link ui.window}. */
@@ -171,6 +207,33 @@ export interface UiWindow {
   readonly id: string;
   /** True after {@link UiWindow.close}, or after the player closed it. */
   readonly closed: boolean;
+  /**
+   * Changes the open window in place: its title, its title-bar buttons, its content. The
+   * window keeps its place and size, with no flicker, so one window can show several
+   * views. The new content's nodes work as in a new window; nodes taken out keep their
+   * state and can be shown again later. A closed window takes the changes too, and shows
+   * them when the player opens it again. Needs REDnode 0.57.0 or later.
+   *
+   * @example
+   * ```ts
+   * import { ui } from "rednode";
+   *
+   * const main = [ui.text("The main view")];
+   * const keys = [ui.text("Your keys"), ui.button("Done", () => showMain())];
+   * const win = ui.window({
+   *   title: "Designer",
+   *   titleButtons: [{ id: "keys", label: "Keys", icon: "key", onClick: () => showKeys() }],
+   *   children: main,
+   * });
+   * function showKeys() {
+   *   win.set({ title: "Designer: your keys", titleButtons: [], children: keys });
+   * }
+   * function showMain() {
+   *   win.set({ title: "Designer", titleButtons: [{ id: "keys", label: "Keys", icon: "key", onClick: showKeys }], children: main });
+   * }
+   * ```
+   */
+  set(changes: WindowChanges): void;
   /** Closes the window. */
   close(): void;
 }
@@ -192,7 +255,23 @@ interface NodeState {
 let nextNode = 1;
 const nodes = new Map<string, NodeState>(); // node id -> state
 const handlers = new Map<string, Map<string, Handler>>(); // node id -> event type -> handler
-const windows = new Map<string, { onClose?: () => void; closed: boolean; nodes: string[]; root: Spec }>();
+interface WindowState {
+  onClose?: () => void;
+  closed: boolean;
+  nodes: string[];
+  root: Spec;
+  buttons: Map<string, () => void>;
+}
+const windows = new Map<string, WindowState>();
+
+// The title-bar buttons as the host and page get them, with their handlers kept here.
+function titleButtons(state: WindowState, list: TitleButton[] | undefined): Record<string, unknown>[] {
+  state.buttons.clear();
+  return (list ?? []).map((b) => {
+    if (b.onClick) state.buttons.set(String(b.id), b.onClick);
+    return { id: String(b.id), label: String(b.label ?? b.id), icon: b.icon ?? null, on: !!b.on };
+  });
+}
 let listening = false;
 
 function ensureListening(): void {
@@ -220,6 +299,11 @@ function ensureListening(): void {
         }
         transport().ui?.open(win, w.root);
       }
+      return;
+    }
+    if (m.type === "title") {
+      // A title-bar button: the window node's event, with the button's id.
+      windows.get(win)?.buttons.get(String(m.value))?.();
       return;
     }
     const handler = handlers.get(String(m.node))?.get(String(m.type));
@@ -477,7 +561,8 @@ export const ui = {
     const ids: string[] = [];
     for (const c of root.children!) collect(c, ids);
     for (const n of ids) nodes.get(n)!.window = id;
-    const state = { onClose: options.onClose, closed: false, nodes: ids, root };
+    const state: WindowState = { onClose: options.onClose, closed: false, nodes: ids, root, buttons: new Map() };
+    root.props.titleButtons = titleButtons(state, options.titleButtons);
     windows.set(id, state);
     t.ui.open(id, root);
 
@@ -485,6 +570,30 @@ export const ui = {
       id,
       get closed() {
         return state.closed;
+      },
+      set(changes: WindowChanges) {
+        const next: Record<string, unknown> = {};
+        if (changes.title !== undefined) next.title = root.props.title = String(changes.title);
+        if (changes.titleButtons !== undefined) next.titleButtons = root.props.titleButtons = titleButtons(state, changes.titleButtons);
+        if (changes.children !== undefined) {
+          // The old nodes leave the window (they keep their state and handlers, to come back
+          // later); the new ones join it.
+          for (const n of state.nodes) {
+            const s = nodes.get(n);
+            if (s && s.window === id) s.window = null;
+          }
+          root.children = changes.children.map((c) => {
+            const s = nodes.get(c.id);
+            if (!s) throw new Error("rednode: win.set's children must be nodes made with ui.*");
+            return s.spec;
+          });
+          const kept: string[] = [];
+          for (const c of root.children) collect(c, kept);
+          state.nodes = kept;
+          if (!state.closed) for (const n of kept) nodes.get(n)!.window = id;
+          next.children = root.children;
+        }
+        if (!state.closed && Object.keys(next).length) t.ui!.update(id, root.id, next);
       },
       close() {
         if (state.closed) return;
