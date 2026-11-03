@@ -53,26 +53,71 @@ function summary(dir) {
   };
 }
 
-const TEMPLATE_MARKUP = (name) => `<!-- ${name}: a panel of ink markup on the HUD. The script (${SCRIPT}) loads it and gives
-     it its data: {title} reads the data's title. Run shows it in the game; saving while it
-     runs shows the change. -->
+const TEMPLATE_MARKUP = (name) => `<!-- ${name}: a panel of ink markup on the HUD, drawn by the game. The script (${SCRIPT})
+     loads it and gives it its data: {level} reads the data's level. Each view.set() in the
+     script sends again only what reads the names it changed. Drag the slider in the script's
+     window and the panel follows. Run shows it in the game; saving while it runs shows the change. -->
 <mount layer="hud" anchor="left" x="80" y="-60">
   <column gap="10">
     <text style="label">{title}</text>
-    <text style="body">Made in the UI Workbench.</text>
+    <row gap="12" align="center">
+      <text style="small" tone="dim">Level</text>
+      <bar value="{fill}" tone="{tone}" track="dim" width="240" height="8" />
+      <text style="value" tone="{tone}">{level}%</text>
+    </row>
+    <text style="body" tone="{tone}">{mood}</text>
+    <text style="small" tone="dim">{changes} changes from the slider. Made in the UI Workbench.</text>
   </column>
 </mount>
 `;
 
 const TEMPLATE_SCRIPT = (name) => `// ${name}: the script of a UI Workbench project, a REDnode Node mod. It loads the markup
 // and gives it its data; view.set() changes the data, and only what reads it is sent again.
-import { ink } from 'rednode';
+// The window below is drawn by REDnode's overlay (F10 shows and hides it); its slider drives
+// the panel, which the game draws on its HUD.
+import { ink, ui } from 'rednode';
 
 // The functions the markup's on... attributes name (they fire from phase I3, Input).
 const handlers = {};
 
+let changes = 0;
+// The panel's data for a level from 0 to 100: the names its {slots} read.
+function data(level) {
+  return {
+    level,
+    fill: level / 100,
+    tone: level >= 90 ? 'danger' : level >= 70 ? 'warning' : 'accent',
+    mood: level >= 90 ? 'Overheating!' : level >= 70 ? 'Running hot' : level >= 30 ? 'In the zone' : 'Idling',
+    changes,
+  };
+}
+
 const view = await ink.load('${MARKUP}', handlers, {
-  title: '${name.replace(/'/g, "\\'")}',
+  title: ${JSON.stringify(name)},
+  ...data(50),
+});
+
+// live: the slider sends its value while it is dragged, not only when it is let go.
+const level = ui.slider('Level', (value) => {
+  changes++;
+  view.set(data(value));
+}, { min: 0, max: 100, value: 50, unit: '%', live: true });
+
+ui.window({
+  title: ${JSON.stringify(`${name}: controls`)},
+  anchor: 'right',
+  x: -40,
+  width: 380,
+  height: 230,
+  children: [
+    ui.text('Drag the slider: the panel on the HUD at the left follows.', { tone: 'dim' }),
+    level,
+    ui.button('Reset', () => {
+      changes = 0;
+      level.set({ value: 50 });
+      view.set(data(50));
+    }, { variant: 'ghost' }),
+  ],
 });
 `;
 
@@ -105,7 +150,7 @@ export function create(root, name) {
     name: title,
     version: '0.1.0',
     author: '',
-    description: 'Made in the REDnode UI Workbench: a panel of ink markup on the HUD.',
+    description: 'Made in the REDnode UI Workbench: a panel of ink markup on the HUD, driven by a slider.',
     main: SCRIPT,
     open: false,
     requires: { codeware: '>=1.16' },

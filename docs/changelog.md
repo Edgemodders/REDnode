@@ -26,10 +26,13 @@ How to keep it:
 - A sample, **Image mod**: pictures from the package, from bytes and drawn into the data folder, a larger view on click, and two that cannot be shown.
 
 - On a page that covers the game view (`"fill": "screen"`), an `rn-window` with `resizable` resizes inside the page by its corner grip, with `min-width` and `min-height`, its size kept for the page and **Reset position and size** in its title bar. See https://edgemodders.github.io/REDnode/overlay-apps.html
+- `ui.slider(label, onChange, { live: true })` in the UI builder: `onChange` also gets the value while the player drags, about 20 times a second, not only when they let go. For a slider that drives something the player watches move.
+- The UI kit's `rn-input` takes `clearable`: a ✕ inside the field while it holds text empties it, sending `input` and `change` as typing it away would.
 
 **Changed**
 
 - Keys knows **Tripo** (`tripo`, the 3D service EDGEmat's Wardrobe Designer uses), so a player can set its key before any tool asks for it (https://github.com/Edgemodders/REDnode/issues/23).
+- The **Mod Manager**'s search puts the strongest matches first: names that start with what you typed, then names with a word that starts with it, then names that hold it, then matches by id, author or description. The column's sort orders each group. Its search box has a ✕ that clears it.
 - Ctrl+Z, Ctrl+Y, Ctrl+A, Ctrl+C, Ctrl+V and Ctrl+X reach the page as keys (https://github.com/Edgemodders/REDnode/issues/33): a text field edits as before, and a page with its own undo or copy hears them and takes them with `preventDefault()`. Before, the overlay ran the editing command itself and the page never heard the key.
 
 **Fixed**

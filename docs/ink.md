@@ -909,3 +909,27 @@ Built 2026-11-02 from the player's notes. **Resize:** the UI kit's `rn-window` t
 6. In the script, double-click a word: it is selected (the double-click now reaches pages). Mark.
 7. Delete the project, switch the Workbench off and quit.
 
+**UT3a polish passed in game on 2026-11-03** (REDnode 0.55.1 with UI Workbench 0.2.1, dev PC): every step as expected. The player's notes from that run went into REDnode 0.55.2 with UI Workbench 0.2.2 (below).
+
+### Search, clear and a live template (REDnode 0.55.2, UI Workbench 0.2.2)
+
+Built 2026-11-03 from the player's notes, for the Mod Manager and the Workbench.
+
+| Change | What it does | Where |
+|---|---|---|
+| Clear | The UI kit's `rn-input` takes `clearable`: a ✕ inside the field while it holds text empties it and sends `input` and `change`. On the search and filter boxes of the Mod Manager, the Workbench (tree and properties), Sound Search, the Sound Tracer and the Tools Manager | `packages/ui/src/rednode-ui.js` |
+| Search order | The Mod Manager ranks what matches: a name that starts with the search, then a word of the name that does, a name that holds it, then the id, the author and the description. The column's sort orders each group, so a reversed Name sort keeps the strong group first | `strengthOf`, `filtered` in `packages/overlay/manager/app.js` |
+| Live slider | `ui.slider(..., { live: true })`: the builder page sends the value while the slider is dragged, at most one each 50 ms and the last one always, and the release only when it differs | `packages/rednode/src/ui.ts`, `packages/overlay/builder/builder.js`, the docs simulation's `runner.js` |
+| Template | A new project's script opens a controls window (`<name>: controls`, at the right) with a live slider and **Reset**; each move calls `view.set()`, and the HUD panel shows the level, a bar, a mood and a count of the changes, in the accent tone, warning from 70 and danger from 90 | `TEMPLATE_MARKUP`, `TEMPLATE_SCRIPT` in `packs/ui-tools/apps/ui-workbench/service.mjs` |
+
+Ink input (the markup's `on...` attributes) waits for phase I3, so the template's slider is in an overlay window, drawn by REDnode, rather than in the HUD panel itself. Checked in the mock game: 20 checks (scratchpad `t0552/check.mjs`: the order for "Test", the ✕ shown, hidden and clearing, a reversed sort, the template's live slider sending 3 or more batches for 30 moves and the last value, the warning tone, Reset, a move back after Reset), and UT3a's 21 again with the new template.
+
+0. Test timer: Start, Mark after each step.
+1. Load a save. Open the **Mod Manager** and type `Test` in its search: **Test timer** comes first, then the packages with the word *test* in their name, and the ones that match only by their description come last. Press the column head **Name** twice: the order flips inside each group, the strong matches still on top. Mark.
+2. Press the ✕ at the right of the search box: the search empties and every package comes back; the ✕ is gone. Mark.
+3. Switch on **UI Workbench**. In **Projects**, type `Slider Panel` and press **New**, then **Run** in **Edit**. Close the overlay (F10): the panel at the left of the HUD says *In the zone* at 50 %. Open it again (F10). Mark.
+4. In the window **Slider Panel: controls**, at the right, drag the slider slowly to the right while watching the HUD panel: the level, the bar and the count follow while you drag; from 70 it turns to the warning colour (*Running hot*) and from 90 to red (*Overheating!*). Mark.
+5. Press **Reset**: the slider and the panel go back to 50 %, the count to 0. Mark.
+6. In the Workbench's **Inspect** tab, type in the tree's filter, then press its ✕: the filter empties and the whole tree shows again. Mark.
+7. **Stop** the project in **Edit**, delete it in **Projects**, switch the Workbench off and quit.
+
