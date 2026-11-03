@@ -690,6 +690,48 @@ function showDetails(open) {
 $('details-tab').addEventListener('click', () => showDetails($('details-tab').getAttribute('aria-expanded') !== 'true'));
 showDetails(load('details', true) !== false);
 
+// The drawer's width: its left edge is dragged, kept for the next visit; a double-click puts
+// back the default. The table keeps room for its name column and a few others.
+const DRAWER_DEFAULT = 300;
+const DRAWER_MIN = 220;
+function setDrawer(width, keep = true) {
+  const main = $('drawer').closest('.main');
+  const most = Math.max(DRAWER_MIN, main.getBoundingClientRect().width - 420);
+  const w = Math.round(Math.max(DRAWER_MIN, Math.min(most, width)));
+  main.style.setProperty('--drawer-w', `${w}px`);
+  if (keep) save('drawerWidth', w);
+  return w;
+}
+let drawerDrag = null;
+$('drawer-split').addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  drawerDrag = { x: e.clientX, width: $('drawer').getBoundingClientRect().width };
+  $('drawer-split').classList.add('on');
+  $('drawer').closest('.main').classList.add('sizing');
+});
+window.addEventListener('pointermove', (e) => {
+  if (drawerDrag) setDrawer(drawerDrag.width + (drawerDrag.x - e.clientX), false);
+});
+window.addEventListener('pointerup', () => {
+  if (!drawerDrag) return;
+  drawerDrag = null;
+  $('drawer-split').classList.remove('on');
+  $('drawer').closest('.main').classList.remove('sizing');
+  save('drawerWidth', Math.round($('drawer').getBoundingClientRect().width));
+});
+$('drawer-split').addEventListener('dblclick', () => {
+  setDrawer(DRAWER_DEFAULT, false);
+  try {
+    localStorage.removeItem(`${STORE}drawerWidth`);
+  } catch {
+    // storage is a convenience
+  }
+});
+setDrawer(load('drawerWidth', DRAWER_DEFAULT), false);
+// A window made larger gives the kept width back; a smaller one narrows it for now.
+new ResizeObserver(() => !drawerDrag && setDrawer(load('drawerWidth', DRAWER_DEFAULT), false)).observe($('drawer').closest('.main'));
+
 window.rednode.on((m) => {
   if (m.event === 'apps') refresh();
 });

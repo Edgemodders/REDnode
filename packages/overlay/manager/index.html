@@ -64,11 +64,17 @@
   .drawer-tab { flex: none; width: 16px; margin: 0 6px; padding: 0; border: 1px solid var(--rn-line); background: var(--rn-panel-2);
     color: var(--rn-dim); font: 700 13px var(--rn-mono); cursor: pointer; }
   .drawer-tab:hover { color: var(--rn-accent); border-color: var(--rn-accent); }
-  .drawer { flex: none; width: 262px; display: flex; overflow: hidden; transition: width .18s ease-out; }
+  .drawer { flex: none; width: var(--drawer-w, 300px); display: flex; overflow: hidden; transition: width .18s ease-out; }
   .main.shut .drawer { width: 0; }
+  /* The drawer's left edge: dragged to make the details wider or narrower, a double-click for the default. */
+  .drawer-split { flex: none; width: 6px; margin-right: 2px; cursor: col-resize; background: transparent; border-left: 1px solid transparent; }
+  .drawer-split:hover, .drawer-split.on { background: color-mix(in srgb, var(--rn-accent) 25%, transparent); border-left-color: var(--rn-accent); }
+  .main.shut .drawer-split { display: none; }
+  .main.sizing .drawer { transition: none; }
+  .main.sizing { cursor: col-resize; user-select: none; }
   .main.shut .drawer-tab { margin-right: 0; }
   @media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
-  .details { width: 262px; flex: none; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+  .details { box-sizing: border-box; width: var(--drawer-w, 300px); flex: none; overflow-x: hidden; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
     padding: 10px 12px; border: 1px solid var(--rn-line); background: var(--rn-panel); }
   .details h2 { margin: 0; font: 700 16px var(--rn-display); letter-spacing: .06em; text-transform: uppercase; color: var(--rn-accent); overflow-wrap: anywhere; }
   .details .meta { font: 11px var(--rn-mono); color: var(--rn-dim); overflow-wrap: anywhere; }
@@ -126,6 +132,7 @@
         <div class="empty" id="empty" hidden>No package matches.</div>
       </div>
       <button class="drawer-tab" id="details-tab" type="button" aria-controls="drawer" aria-expanded="true">›</button>
+      <div class="drawer-split" id="drawer-split" title="Drag to make the details wider or narrower; double-click for the default"></div>
       <div class="drawer" id="drawer">
         <div class="details" id="details"><div class="dim">Select a package to see its details.</div></div>
       </div>
