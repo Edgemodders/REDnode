@@ -33,6 +33,7 @@ const { scanGame, checkRequires, validRange, key: gamefilesKey } = require('./ga
 const { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED } = require('./redbridge');
 const bridgeInstall = require('./bridge-install');
 const { createAttached } = require('./attached');
+const { createBridgeShare } = require('./bridge-share');
 const { hasRemoteFrames, createRouter } = require('./frames');
 const { createLookup } = require('./gameapi-lookup');
 const { soundPaksIn, hotToolsLookupMisses, archiveHashes } = require('./archive-index');
@@ -492,6 +493,9 @@ const redbridge = createRedbridge({
   configured: () => settings.redbridge,
   clean: () => settings.bridgeTest === 'clean',
 });
+// The same REDbridge for the MCP servers the host runs (#40, bridge-share.js), on a port and
+// token of its own, given to each in its environment.
+const bridgeShare = createBridgeShare({ call: (method, params) => redbridge.call(method, params), log });
 
 // EDGEmat's MCP server (E1, attached.js), shipped in resources/edgemat: its tools for
 // in-game assistants, such as REDagent, as edgemat__<tool>. "edgematTools": "all" in
@@ -508,9 +512,19 @@ const edgemat = createAttached({
   id: 'edgemat',
   name: 'EDGEmat',
   script: () => EDGEMAT_DIR && path.join(EDGEMAT_DIR, app.isPackaged ? 'server.cjs' : path.join('dist', 'server.cjs')),
-  env: () => {
+  env: async () => {
     const env = {};
     if (GAME_DIR) env.EDGEMAT_GAME_PATH = GAME_DIR;
+    // REDnode's REDbridge, shared (#40): EDGEmat's server sends its calls to the host and
+    // starts no REDbridge of its own. "edgematBridge": "own" in the settings gives it its own,
+    // as before (and an EDGEmat older than 0.3.2 ignores the variables and starts its own).
+    if (settings.edgematBridge !== 'own') {
+      try {
+        Object.assign(env, await bridgeShare.grant('EDGEmat'));
+      } catch (err) {
+        log(`EDGEmat tools: the shared REDbridge could not start (${err.message}); EDGEmat starts its own`);
+      }
+    }
     const b = redbridge.status();
     if (b.exe) env.REDBRIDGE_EXE = b.exe;
     // A per-user .NET 10 goes to EDGEmat's server and its REDbridge only, as to REDnode's own.
@@ -522,6 +536,7 @@ const edgemat = createAttached({
   reads: new Set(['mat_templates', 'mat_microblends', 'mat_colors', 'mat_describe', 'mat_find']),
   version: VERSION,
   log,
+  ended: () => bridgeShare.revoke('EDGEmat'),
 });
 const ATTACHED = [edgemat];
 // Whether an assistant sees the attached servers' tools: in-game ones always, desktop ones by setting.

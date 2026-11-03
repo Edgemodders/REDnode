@@ -37,7 +37,7 @@ if (build.status !== 0) throw new Error('Building the rednode package failed');
 // Apps and mods go to the game separately.
 rmSync(work, { recursive: true, force: true });
 mkdirSync(stage, { recursive: true });
-for (const f of ['main.js', 'preload.js', 'mods.js', 'mcp.js', 'gameapi-lookup.js', 'gamefiles.js', 'redbridge.js', 'bridge-install.js', 'archive-index.js', 'game-sounds.js', 'services.js', 'oauth.js', 'editor.js', 'attached.js', 'frames.js']) cpSync(join(overlay, f), join(stage, f));
+for (const f of ['main.js', 'preload.js', 'mods.js', 'mcp.js', 'gameapi-lookup.js', 'gamefiles.js', 'redbridge.js', 'bridge-install.js', 'archive-index.js', 'game-sounds.js', 'services.js', 'oauth.js', 'editor.js', 'attached.js', 'bridge-share.js', 'frames.js']) cpSync(join(overlay, f), join(stage, f));
 for (const d of ['launcher', 'modlog', 'manager', 'welcome', 'connect', 'keyask', 'builder']) cpSync(join(overlay, d), join(stage, d), { recursive: true });
 cpSync(join(repo, 'packages', 'ui', 'src'), join(stage, 'ui'), { recursive: true });
 
@@ -53,7 +53,10 @@ cpSync(join(overlay, 'runtime'), join(resources, 'runtime'), { recursive: true }
 // The Console (O12) is a built-in package with a Node mod, so it goes there too.
 cpSync(join(overlay, 'console'), join(resources, 'console'), { recursive: true });
 // EDGEmat's MCP server (E1, attached.js): one bundled file, run by the host's own Node.
-const edgematFrom = join(repo, 'node_modules', '@edgemodders', 'edgemat-mcp');
+// EDGEMAT_MCP_DIR names another copy for a test build only, such as EDGEmat's own
+// packages/edgemat-mcp built from its main branch before its release (#40's test).
+const edgematFrom = process.env.EDGEMAT_MCP_DIR || join(repo, 'node_modules', '@edgemodders', 'edgemat-mcp');
+if (process.env.EDGEMAT_MCP_DIR) console.log(`EDGEmat's MCP server from ${edgematFrom} (EDGEMAT_MCP_DIR, a test build)`);
 const edgemat = join(resources, 'edgemat');
 mkdirSync(edgemat, { recursive: true });
 for (const f of ['dist/server.cjs', 'package.json', 'LICENSE', 'THIRD-PARTY-NOTICES.txt']) cpSync(join(edgematFrom, f), join(edgemat, f.replace('dist/', '')));

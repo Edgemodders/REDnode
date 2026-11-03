@@ -17,6 +17,10 @@ How to keep it:
 - `win.set({ title, titleButtons, children })` changes an open Node mod window in place, with the same place and size and no flicker, so one window can hold several views (https://github.com/Edgemodders/REDnode/issues/38). Nodes taken out keep their state.
 - A sample, **Views mod**: one window with two views, swapped with `win.set`, and three title-bar buttons.
 
+**Changed**
+
+- EDGEmat's tools for in-game assistants use REDnode's own REDbridge instead of starting a second one beside it (https://github.com/Edgemodders/REDnode/issues/40), so one REDbridge runs while you play. It needs an EDGEmat newer than 0.3.1; with 0.3.1 nothing changes. `"edgematBridge": "own"` in the host's settings gives EDGEmat its own again.
+
 ## 0.56.1 (2026-11-03)
 
 For game version 2.5. With it, the first release of the [UI Tools](https://www.nexusmods.com/cyberpunk2077/mods/36958) pack: the UI Workbench inspects the game's own UI and builds native UI of your own.

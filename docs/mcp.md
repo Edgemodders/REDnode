@@ -78,7 +78,23 @@ REDnode 0.45.0 runs [EDGEmat](https://edgemodders.github.io/EDGEmat/)'s MCP serv
 | Who sees them | In-game assistants (packages with the `mcp` permission, such as REDagent). Not desktop ones: Claude Code gets EDGEmat directly through EDGEchat, and would see every tool twice. `"edgematTools": "all"` in the host's `settings.json` lists them to every assistant |
 | Switches | The Tools Manager lists them as the group EDGEmat, switched like a package's (`edgemat:<tool>`) |
 
-`mat_generate` needs a Gemini or OpenAI key, which EDGEmat's server does not get yet: until it reads the shared store (#23), it answers that it has no key, and the other tools work. EDGEmat's server starts its own REDbridge when a tool needs one (its library is built already for most), beside REDnode's shared one: more memory while the player plays (not measured, unverified).
+`mat_generate` needs a Gemini or OpenAI key, which EDGEmat's server does not get yet: until it reads the shared store (#23), it answers that it has no key, and the other tools work. EDGEmat's server starts its own REDbridge when a tool needs one (its library is built already for most), beside REDnode's shared one: more memory while the player plays (not measured, unverified). REDnode 0.57.0 offers it REDnode's own REDbridge instead (#40, below).
+
+### EDGEmat's tools on REDnode's REDbridge (#40)
+
+From REDnode 0.57.0 the host shares its REDbridge, the one packages reach through `kernel.bridge()`, with EDGEmat's server, so one REDbridge loads WolvenKit and the game's archive list while the player plays, not two. Asked for by EDGEmat ([#40](https://github.com/Edgemodders/REDnode/issues/40)) at the owner's request, 2026-11-03.
+
+| | |
+|---|---|
+| Where | `POST http://127.0.0.1:<port>/bridge`, a server of its own on a free port, 127.0.0.1 only, from the first start of EDGEmat's server until the host quits (`packages/overlay/bridge-share.js`). Not on the MCP server, which can be off or move |
+| Asked | `{ "method": "<REDbridge method>", "params": { ... } }` with `Authorization: Bearer <token>`. Answered `200 { "result": ... }`, or `200 { "error": "<message>" }` for REDbridge's own errors and for a missing REDbridge, with `kernel.bridge()`'s words ("REDbridge is not installed. Press Get REDbridge..."). The headers come at once and a space every 30 s keeps a long call open (leading spaces are valid JSON), since a library build or a mesh export runs for minutes and Node's `fetch` gives up after 5 minutes with nothing coming |
+| How the server learns it | `REDNODE_BRIDGE_URL` and `REDNODE_BRIDGE_TOKEN` in its environment, never on its command line. A new token at each start of the server; the old one stops working, and so does the token when the server ends |
+| Locked to | The token, held only by that server's process; a request must name `127.0.0.1:<port>` or `localhost:<port>` in its Host header (no DNS rebinding) and carry no `Origin` header (no web page). Only the host's attached servers get a token; packages keep `kernel.bridge()` and its `bridge` permission |
+| Which EDGEmat | One with `rednodeBridge()` (EDGEmat's main from 2026-11-03, the release after `@edgemodders/edgemat-mcp` 0.3.1). 0.3.1, pinned until then, ignores the variables and starts its own REDbridge as before |
+| Off | `"edgematBridge": "own"` in the host's `settings.json`: no variables, EDGEmat starts its own |
+| Log | `Shared REDbridge on http://127.0.0.1:<port>/bridge` once, `Shared REDbridge: first call from EDGEmat (<method>)` once per start; EDGEmat's own line `[EDGEmat] [edgemat-mcp] using REDnode's REDbridge (...)` |
+
+Checked outside the game on 2026-11-03: `bridge-share.js` alone (scratchpad `w40/share-check.cjs`, 21 checks: answers and errors, the spaces of a long call, wrong or missing token, another Host, any Origin, another path, GET, a body that is not JSON, a new grant ending the old token, revoke, stop), and end to end (`w40/e2e-check.cjs`, 12 checks: the host's `attached.js` and `redbridge.js` with EDGEmat's server built from its main, a real REDbridge on the dev PC's game: `mat_find` on `Items.Pants_01_basic_01` answered in 4.4 s with 6 calls through the shared REDbridge and one new REDbridge.exe, not two; with `"own"` EDGEmat started its own). A test build takes EDGEmat's server from its repo with `EDGEMAT_MCP_DIR` set for `npm run overlay:package` (`tools/overlay/package-host.mjs`); a release takes the pinned one from npm.
 
 Checked outside the game on 2026-10-29 (scratchpad `e1/check.cjs`, 21 checks: the real `attached.js` and `mcp.js` with EDGEmat 0.3.1: 10 tools listed to an in-game assistant and none to a desktop one, the read and ask flags, every input schema converted, `mat_library` and `mat_templates` answering through, `mod_services`, `mod_read` refusing `mat_edit` and running `mat_microblends`). The packaged host runs as Node (`ELECTRON_RUN_AS_NODE=1 REDnode-overlay.exe -e ...`: Node 24.21.0).
 

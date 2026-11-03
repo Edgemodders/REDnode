@@ -23,7 +23,8 @@ const CALL_MS = 10 * 60 * 1000; // a library build takes a minute or two; genera
  * @param {string} spec.id      the tools' prefix and the Tools Manager group, such as "edgemat"
  * @param {string} spec.name    the name players see, such as "EDGEmat"
  * @param {() => string | null} spec.script  the server's .cjs file, or null when not shipped
- * @param {() => object} spec.env  variables for the server, beside the MCP SDK's safe defaults
+ * @param {() => object | Promise<object>} spec.env  variables for the server, beside the MCP SDK's safe defaults
+ * @param {() => void} [spec.ended]  called when the server ends or is stopped
  * @param {Set<string>} spec.reads  the tools that only read; every other tool asks the player
  * @param {string} spec.version  the shipped version, for the log
  * @param {(line: string) => void} spec.log
@@ -47,7 +48,7 @@ function createAttached(spec) {
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: [script],
-      env: { ...spec.env(), ELECTRON_RUN_AS_NODE: '1' },
+      env: { ...(await spec.env()), ELECTRON_RUN_AS_NODE: '1' },
       stderr: 'pipe',
     });
     const c = new Client({ name: 'rednode', version: spec.version });
@@ -56,6 +57,7 @@ function createAttached(spec) {
         client = null;
         tools = [];
         spec.log(`${spec.name} tools: the server ended`);
+        spec.ended?.();
       }
     };
     const started = Date.now();
@@ -119,6 +121,7 @@ function createAttached(spec) {
     client = null;
     tools = [];
     if (c) await c.close().catch(() => {});
+    spec.ended?.();
   }
 
   return { id: spec.id, name: spec.name, ready, functions, call, stop, running: () => !!client };
