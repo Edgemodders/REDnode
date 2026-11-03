@@ -933,3 +933,5 @@ Ink input (the markup's `on...` attributes) waits for phase I3, so the template'
 6. In the Workbench's **Inspect** tab, type in the tree's filter, then press its ✕: the filter empties and the whole tree shows again. Mark.
 7. **Stop** the project in **Edit**, delete it in **Projects**, switch the Workbench off and quit.
 
+**Passed in game on 2026-11-03** (REDnode 0.55.2 with UI Workbench 0.2.2, dev PC): every step as expected, some of the Workbench's steps run out of order. Six Marks in the Mod log, the project switched on and off by the Workbench, no errors from the Workbench or its projects.
+
