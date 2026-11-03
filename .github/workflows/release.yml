@@ -10,7 +10,9 @@
 #                                               GitHub release with the zip; stops first if that
 #                                               tag exists (raise VERSION with tools/version.mjs)
 #                                               or docs/changelog.md has no section for VERSION
-#                                               (the release notes, tools/release/notes.mjs)
+#                                               (the release notes, tools/release/notes.mjs), or
+#                                               README.md's status line and badge do not say
+#                                               VERSION released (tools/release/readme-check.mjs)
 #   ... and "Update Nexus Mods" ticked          also, after the GitHub release, uploads the zip to
 #                                               the Nexus page as the main file's new version (the
 #                                               old one archived), adds its changelog and pushes
@@ -83,6 +85,10 @@ jobs:
             exit 1
           }
           $global:LASTEXITCODE = 0
+
+      - name: The README says this release
+        if: inputs.release
+        run: node tools/release/readme-check.mjs
 
       - name: Release notes from docs/changelog.md
         if: inputs.release
