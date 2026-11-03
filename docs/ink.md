@@ -1015,3 +1015,5 @@ Checked in the mock game: 14 checks (scratchpad `mm2/check.mjs`: the details ins
 3. Close and open the Mod Manager: the details are as wide as you left them. Double-click the edge: they go back to their first width. Mark.
 4. Switch on **UI Workbench**, make a project in **Projects** and **Export** it: point at the status line at the top; after a moment its tooltip shows the whole path. Delete the project, switch the Workbench off and quit.
 
+**Passed in game on 2026-11-03** (REDnode 0.56.1 with UI Workbench 0.4.1, dev PC): every step as expected. **UT3 is done**: what is left before UI Tools' first release is the screenshots, the owner's header on `brand/nexus.png` and the release run.
+
