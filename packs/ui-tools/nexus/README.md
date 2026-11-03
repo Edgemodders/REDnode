@@ -19,8 +19,7 @@ The source of the UI Tools pack's own Nexus Mods page, beside REDnode's (`nexus/
 
 | In `description.bbcode` | Replace with |
 |---|---|
-| `Screenshot 1` to `Screenshot 3` (cyan italics) | Upload each picture to the page's Images tab, then replace its line with `[img]<the image's Nexus URL>[/img]` |
-| The **UI Workbench: Edit** section's cyan line | What the editor does, once UT3 is built |
+| `Screenshot 1` to `Screenshot 4` (cyan italics) | Upload each picture to the page's Images tab, then replace its line with `[img]<the image's Nexus URL>[/img]`. The pictures are in `docs/assets/ui-tools/` |
 
 ## The Nexus form
 

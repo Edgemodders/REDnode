@@ -57,6 +57,8 @@ These two tabs need the `admin` permission (the Mod Manager, the Workbench's **P
 
 A project is a REDnode package of its own in `Documents\REDnode\UI projects`, which REDnode watches as a development folder: `rednode-app.json`, `panel.ink.html` (the markup) and `mod.mjs` (its script: `ink.load` with the handlers and the data). **New** makes one from a small working example (a slider in its own window drives the HUD panel while it is dragged, to show how `view.set()` updates it), **Rename** changes its name, **Delete** moves it to the folder's `.trash`.
 
+**Export** (on a project's row, or in **Edit**) writes the project as a zip in `Documents\REDnode\UI exports`, named by its id and version, with its files laid out as in the game folder (`red4ext\plugins\REDnode\apps\<id>\`) and a README. Extract it into the game folder, or add it to a mod manager, and it runs as a mod of its own, switched on in the launcher or the Mod Manager; it needs REDnode and Codeware, which its manifest names. Unsaved changes are saved first, and the zip's path is copied. Before you install an export on the same PC, delete or rename the project: a development copy wins over the installed one (the Mod Manager's DEV tag).
+
 In **Edit**, the markup and the script are side by side, with highlighting, completion of the markup's tags and attributes, and each mistake shown at its line as you type. Drag the splitter between them to give one more width; a double-click centres it. **Run** saves and runs the project as a mod of its own, so its panel shows in the game; **Save** (Ctrl+S) while it runs shows the change; **Stop** takes it away. Its output and any crash are in the Mod log.
 
 ### Details
@@ -65,7 +67,7 @@ The selected widget's class and its parents' classes, path, box on screen, visib
 
 ### To source
 
-**To source** copies the selected widget and everything under it into a new project, as ink markup: panels as `column` and `row`, canvases, texts with their size, weight, case and colour, images with their atlas and part, any other class as `<widget class="...">`. The project opens in **Edit**, and **Run** shows the copy on the HUD beside the original, a start for a panel of your own that looks like the game's. The copy is still: the game's own controller is what fills and moves the original. Hidden widgets are left out, and what markup cannot say (an anchor that fills one way only, a colour brighter than white) is listed in the markup's first comment. Needs the `admin` permission, as Projects does.
+**To source** copies the selected widget and everything under it into a new project, as ink markup (a HUD piece's own window is skipped: it starts from what the window holds): panels as `column` and `row`, canvases, texts with their size, weight, case and colour, images with their atlas and part, any other class as `<widget class="...">`. The project opens in **Edit**, and **Run** shows the copy on the HUD beside the original, a start for a panel of your own that looks like the game's. The copy is still: the game's own controller is what fills and moves the original. Hidden widgets are left out, and what markup cannot say (an anchor that fills one way only, a colour brighter than white) is listed in the markup's first comment. Needs the `admin` permission, as Projects does.
 
 ### Try
 

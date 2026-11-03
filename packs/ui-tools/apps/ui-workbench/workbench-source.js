@@ -9,6 +9,8 @@
 
 const TAGS = {
   inkCanvasWidget: 'canvas',
+  // A HUD piece's own window holds its tree as a canvas does (UT3b's run).
+  inkVirtualWindow: 'canvas',
   inkVerticalPanelWidget: 'column',
   inkHorizontalPanelWidget: 'row',
   inkTextWidget: 'text',
@@ -37,6 +39,11 @@ const CASES = { UpperCase: 'upper', LowerCase: 'lower' };
 const TEXT_ALIGN = { Center: 'center', Right: 'right' };
 
 export const MAX_WIDGETS = 600;
+
+// The name the game gives a widget nobody named: never written as an id or a project's name.
+export const NO_NAME = new Set(['', 'None', 'UNINITIALIZED_WIDGET']);
+/** A widget's name to show or to name a copy by: its own, else its class without ink and Widget. */
+export const nameOf = (node) => (NO_NAME.has(node.name ?? '') ? String(node.class ?? 'widget').replace(/^ink/, '').replace(/Widget$/, '') : node.name);
 
 const round = (n) => Math.round(Number(n) * 100) / 100;
 const escapeText = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\{/g, '{{').replace(/\}/g, '}}');
@@ -107,7 +114,7 @@ export function toSource(root, { box = null, layerSize = null, path = '', name =
       if (v !== null && v !== undefined && v !== '') attrs.push(`${k}="${escapeAttr(v)}"`);
     };
     if (tag === 'widget') attr('class', scriptClass(node.class));
-    if (node.name && node.name !== 'None') attr('id', node.name);
+    if (!NO_NAME.has(node.name ?? '')) attr('id', node.name);
 
     const inPanel = parentTag === 'column' || parentTag === 'row';
     if (inPanel) {
@@ -200,7 +207,7 @@ export function toSource(root, { box = null, layerSize = null, path = '', name =
   ].join('\n');
   const markup = `${header}\n<mount layer="hud" anchor="top-left" x="${round(x)}" y="${round(y)}">\n${tree}</mount>\n`;
 
-  const title = name || root.name || root.class;
+  const title = name || nameOf(root);
   const script = `// ${title.replace(/\n/g, ' ')}: a copy of the game's ${what.replace(/\n/g, ' ')}, made with To source in the
 // UI Workbench. It loads the markup with no data; give it data names ({name} in the markup)
 // and pass them here to fill it from your own code.

@@ -2,9 +2,11 @@
 // the projects folder (Documents\REDnode\UI projects, made and watched by the host as a
 // development folder), with rednode-app.json, panel.ink.html and mod.mjs. The Workbench's page
 // calls these functions through REDnode's mod services; they read and write only inside that
-// folder. A project deleted goes to its .trash folder, which REDnode does not scan.
+// folder, and Export writes beside it, in Documents\REDnode\UI exports. A project deleted goes
+// to its .trash folder, which REDnode does not scan.
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
 const MARKUP = 'panel.ink.html';
 const SCRIPT = 'mod.mjs';
@@ -207,4 +209,124 @@ export function remove(root, id) {
   const to = path.join(trash, `${id}-${new Date().toISOString().replace(/[:.]/g, '-')}`);
   fs.renameSync(dir, to);
   return { id, movedTo: to };
+}
+
+// ---------- Export (UT3c) ----------
+
+// The REDnode a project needs when its manifest does not say: the template's live slider.
+const NEEDS_REDNODE = '>=0.55.2';
+
+const CRC = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  if (typeof zlib.crc32 === 'function') return zlib.crc32(bytes) >>> 0;
+  let c = 0xffffffff;
+  for (const b of bytes) c = CRC[(c ^ b) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+// A zip of the entries ({ name, data, time }), deflated: what Windows, Vortex and EDGEdeck open.
+function zipOf(entries) {
+  const locals = [];
+  const centrals = [];
+  let offset = 0;
+  for (const e of entries) {
+    const name = Buffer.from(e.name, 'utf8');
+    const packed = zlib.deflateRawSync(e.data);
+    const crc = crc32(e.data);
+    const t = e.time;
+    const dosTime = (t.getHours() << 11) | (t.getMinutes() << 5) | Math.floor(t.getSeconds() / 2);
+    const dosDate = ((t.getFullYear() - 1980) << 9) | ((t.getMonth() + 1) << 5) | t.getDate();
+    const head = Buffer.alloc(30);
+    head.writeUInt32LE(0x04034b50, 0);
+    head.writeUInt16LE(20, 4);
+    head.writeUInt16LE(0x0800, 6); // names in UTF-8
+    head.writeUInt16LE(8, 8); // deflate
+    head.writeUInt16LE(dosTime, 10);
+    head.writeUInt16LE(dosDate, 12);
+    head.writeUInt32LE(crc, 14);
+    head.writeUInt32LE(packed.length, 18);
+    head.writeUInt32LE(e.data.length, 22);
+    head.writeUInt16LE(name.length, 26);
+    locals.push(head, name, packed);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(0x0800, 8);
+    central.writeUInt16LE(8, 10);
+    central.writeUInt16LE(dosTime, 12);
+    central.writeUInt16LE(dosDate, 14);
+    central.writeUInt32LE(crc, 16);
+    central.writeUInt32LE(packed.length, 20);
+    central.writeUInt32LE(e.data.length, 24);
+    central.writeUInt16LE(name.length, 28);
+    central.writeUInt32LE(offset, 42);
+    centrals.push(central, name);
+    offset += head.length + name.length + packed.length;
+  }
+  const dir = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(dir.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, dir, end]);
+}
+
+/**
+ * A project as a zip that installs as a mod of its own, in Documents\REDnode\UI exports: its
+ * files laid out as in the game folder (red4ext\plugins\REDnode\apps\<id>\...), with a
+ * README.txt. Answers the zip's path, its file count and size.
+ */
+export function exportZip(root, id) {
+  const dir = projectDir(root, id);
+  if (!fs.existsSync(dir)) throw new Error(`No project "${id}"`);
+  const manifest = readJson(path.join(dir, MANIFEST));
+  manifest.requires = { rednode: NEEDS_REDNODE, ...(manifest.requires ?? {}) };
+  const base = `red4ext/plugins/REDnode/apps/${id}`;
+  const entries = [];
+  const walk = (at, rel) => {
+    for (const entry of fs.readdirSync(at, { withFileTypes: true })) {
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+      const full = path.join(at, entry.name);
+      const name = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) walk(full, name);
+      else if (entry.isFile()) {
+        const data = name === MANIFEST ? Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`) : fs.readFileSync(full);
+        entries.push({ name: `${base}/${name}`, data, time: fs.statSync(full).mtime });
+      }
+    }
+  };
+  walk(dir, '');
+  const title = manifest.name ?? id;
+  const needs = Object.entries(manifest.requires).map(([k, v]) => `${k === 'rednode' ? 'REDnode' : k === 'codeware' ? 'Codeware' : k} ${v}`).join(', ');
+  const readme = [
+    `${title} ${manifest.version ?? ''}`.trim(),
+    '',
+    manifest.description ?? '',
+    '',
+    'A REDnode mod, made with the REDnode UI Workbench (REDnode UI Tools).',
+    `Needs: ${needs}.`,
+    '',
+    'Install: extract this zip into the Cyberpunk 2077 folder (the one that holds bin and red4ext),',
+    `or add it to your mod manager. It goes to red4ext\\plugins\\REDnode\\apps\\${id}.`,
+    'Then switch it on in REDnode\'s launcher or Mod Manager (F10 opens the overlay).',
+    '',
+  ].join('\r\n');
+  entries.push({ name: `${base}/README.txt`, data: Buffer.from(readme), time: new Date() });
+  const out = path.join(path.dirname(rootOf(root)), 'UI exports');
+  fs.mkdirSync(out, { recursive: true });
+  const file = path.join(out, `${id}-${manifest.version ?? '0.1.0'}.zip`);
+  const zip = zipOf(entries);
+  fs.writeFileSync(file, zip);
+  return { file, files: entries.length, bytes: zip.length };
 }

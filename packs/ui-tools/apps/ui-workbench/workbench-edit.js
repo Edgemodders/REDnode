@@ -6,7 +6,7 @@
 // (admin.setOpen), so it runs as the modder's mod will, in a Node mod of its own; saving while
 // it runs restarts it (admin.restartTask). The markup is checked as it is typed with ink.check,
 // the script with acorn, and each error is shown at its line.
-import { admin, ink, service } from 'rednode';
+import { admin, ink, service, ui } from 'rednode';
 import * as E from './vendor/editor.js';
 
 const $ = (id) => document.getElementById(id);
@@ -103,6 +103,7 @@ function projectRow(p) {
     return b;
   };
   button('Open', () => openProject(p.id), null);
+  button('Export', () => exportProject(p), null);
   button('Rename', () => {
     const input = el('rn-input');
     input.setAttribute('value', p.name);
@@ -341,7 +342,7 @@ function setDirty(on) {
 
 function setCurrent(p) {
   current = p;
-  for (const id of ['save', 'run', 'stop']) $(id).toggleAttribute('disabled', !p);
+  for (const id of ['save', 'run', 'stop', 'export']) $(id).toggleAttribute('disabled', !p);
   setDirty(dirty);
 }
 
@@ -391,8 +392,19 @@ async function save() {
 // Run: save, then switch the project's package on; a project made a moment ago is found by
 // REDnode within a second or two, so "No package" is asked again for a while.
 async function run() {
-  if (!current || !(await save())) return;
-  if (running.has(current.id)) return; // save restarted it
+  if (!current) return;
+  // Saved only with unsaved changes: a save is a change REDnode's hot reload restarts the
+  // package for, which started a project twice (UT3b's run).
+  const changed = dirty;
+  if (changed) {
+    if (!(await save())) return;
+  } else {
+    await readRunning();
+  }
+  if (running.has(current.id)) {
+    if (!changed) editStatus(`${current.name} already runs in the game`);
+    return; // a save restarted it
+  }
   editStatus(`Starting ${current.name}...`);
   for (let i = 0; i < 20; i++) {
     try {
@@ -444,4 +456,21 @@ window.uiWorkbenchEdit = { markup: () => markupView, script: () => scriptView, c
 
 $('save').addEventListener('click', save);
 $('run').addEventListener('click', run);
+$('export').addEventListener('click', () => current && exportProject(current));
+
+// Export (UT3c): the project as a zip in Documents\REDnode\UI exports, laid out as the game
+// folder, so a player extracts it there or adds it to a mod manager. Unsaved changes are saved
+// first; the zip's path is copied.
+async function exportProject(p) {
+  const say = (text) => (panes.Edit.hidden ? projStatus(text) : editStatus(text));
+  try {
+    if (current?.id === p.id && dirty && !(await save())) return;
+    const { root: r, files: f } = await ready();
+    const out = await f.exportZip(r, p.id);
+    await ui.copy(out.file).catch(() => {});
+    say(`Exported ${p.name}: ${out.file} (${out.files} files, ${Math.max(1, Math.round(out.bytes / 1024))} KB). The path is copied.`);
+  } catch (err) {
+    say(needsAdmin(err));
+  }
+}
 $('stop').addEventListener('click', stop);

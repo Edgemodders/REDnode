@@ -132,6 +132,7 @@
         <rn-button id="save" variant="ghost" disabled title="Save the markup and the script (Ctrl+S)">Save</rn-button>
         <rn-button id="run" disabled title="Save, and show the project in the game as a mod of its own">Run</rn-button>
         <rn-button id="stop" variant="ghost" disabled title="Take the project out of the game">Stop</rn-button>
+        <rn-button id="export" variant="ghost" disabled title="Save, and write the project as a zip that installs as a mod of its own">Export</rn-button>
         <span class="grow"></span>
         <span id="editStatus" class="status"></span>
       </div>
@@ -165,7 +166,7 @@
 
 <script type="module">
   import { game, ink, ui } from 'rednode';
-  import { toSource } from './workbench-source.js';
+  import { nameOf, toSource } from './workbench-source.js';
 
   const $ = (id) => document.getElementById(id);
   const tree = $('tree');
@@ -539,8 +540,10 @@
   async function toSourceOf(w) {
     status('To source: reading it with its layout and look...');
     try {
+      // A HUD piece's own window covers the whole screen: start from what it holds (UT3b's run).
+      while (w.class === 'inkVirtualWindow' && w.children.length === 1) w = await ink.inspect(w.children[0]);
       const r = await ink.read({ id: w.id }, { props: true, boxes: false, max: 5000 });
-      const base = w.name && w.name !== 'None' ? w.name : w.class.replace(/^ink/, '').replace(/Widget$/, '');
+      const base = nameOf(w);
       const s = toSource(r.root, { box: w.box, layerSize: inkSize, path: w.path, name: `${base} copy`, cut: r.cut });
       const p = await window.uiWorkbenchEdit.fromSource(`${base} copy`, {
         markup: s.markup,

@@ -972,3 +972,28 @@ Found, for UT3c:
 | **Parent** led up to the tracker's own window (`inkVirtualWindow`, named `UNINITIALIZED_WIDGET`, the game's default name), so the copy was named `uninitialized-widget-copy` and wrapped in a 3840 x 2160 `<widget class="inkVirtualWindow">` | To source starts inside a window (its content); `UNINITIALIZED_WIDGET` is left out as an id and never names a project |
 | **Run** saves the files even when nothing changed, so the copy started, then restarted at once (`Changed: ... (mod.mjs). Reloading.` right after `Switched on`). Seen since UT3a | Run saves only unsaved changes |
 
+## UT3c: build (UI Workbench 0.4.0, on REDnode 0.56.0)
+
+Built 2026-11-03. Only the Workbench changed, so REDnode stays 0.56.0.
+
+| Part | What it does | Where |
+|---|---|---|
+| Export | `exportZip(root, id)` in the Workbench's service: the project's files (dot folders and `node_modules` left out) as a deflated zip in `Documents\REDnode\UI exports\<id>-<version>.zip`, under `red4ext/plugins/REDnode/apps/<id>/`, with a README.txt (what it needs and how to install it); the manifest in the zip gets `requires.rednode` (`>=0.55.2`, the template's live slider) when it has none, the project's own is left as it is. Its own zip writer (`node:zlib`'s deflate and CRC), no library | `ui-workbench/service.mjs` |
+| The buttons | **Export** on each project's row and in Edit's bar: unsaved changes saved first, the path shown and copied | `ui-workbench/workbench-edit.js` |
+| UT3b's findings | To source starts inside an `inkVirtualWindow` that holds one widget, and a window anywhere is written as a `canvas`; `UNINITIALIZED_WIDGET` (and `None`) is never an id or a copy's name (`NO_NAME`, `nameOf`); Run saves only unsaved changes, and says when the project already runs | `workbench-source.js`, `index.html`, `workbench-edit.js` |
+| Release scaffolding | The Nexus description's editor part (Try and To source, Edit and Projects, Export), the `admin` permission in the install steps, REDnode 0.56.0 in the requirements, four screenshot places; the docs page's Export; `pack.json` on REDnode 0.56.0 | `packs/ui-tools/nexus/`, `docs/ui-tools.md`, `pack.json` |
+
+Checked outside the game: Export in plain Node (10 checks, scratchpad `ut3c/export-check.mjs`: the zip read back by Python's zipfile with every CRC right and by Windows' Expand-Archive, the layout, the bytes, the README, the projects folder check), the converter's 18 (two new: a window as a canvas, the default name), and the mock game (12 checks, scratchpad `ut3c/check.mjs`: To source on the minimap's window reads the minimap, Run with nothing unsaved writes no file and starts once, Run again says so, Export in Edit saves first and writes the zip, Export in Projects), with UT3b's 23 and UT3a's 21 again.
+
+Still to do for the release, after this test: the screenshots (taken in the game with the owner, then uploaded to the page's Images tab), the EDGEmodders header on `brand/nexus.png` (the owner), and the release itself (`"unreleased"` removed, the changelog dated, with a REDnode release; started only when the owner asks).
+
+### UT3c test
+
+0. Test timer: Start, Mark after each step.
+1. Load a save with a quest tracked. Switch on **UI Workbench** (its `admin` permission is still allowed). Pick the quest tracker and press **Parent** until the details show its window (`inkVirtualWindow`), then press **To source**: the new project is named after the tracker's content (not `uninitialized-widget copy`). Mark.
+2. In **Edit**, press **Run** without changing anything: the copy shows once. Claude checks that the host logs no `Changed: ... Reloading.` after `Switched on`. Press **Stop**. Mark.
+3. In **Projects**, make a project with **New** (name it `Export Test`), then press **Export** on its row: the line at the top says where the zip went and that the path is copied. Open that folder in Explorer (paste the path) and see the zip. Mark.
+4. Delete `Export Test` and the tracker's copy in **Projects**. Quit the game. Extract the zip into the game folder (the folder that holds `bin` and `red4ext`), so it lands in `red4ext\plugins\REDnode\apps\export-test`. Mark.
+5. Start the game and load a save. In the **Mod Manager**, find **Export Test** (installed, no DEV tag) and switch it on: its controls window and the HUD panel show, and the slider drives the panel. Mark.
+6. Switch it off, quit and tell Claude. Afterwards, delete `red4ext\plugins\REDnode\apps\export-test` (or Claude can).
+

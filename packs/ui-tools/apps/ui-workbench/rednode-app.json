@@ -1,7 +1,7 @@
 {
   "id": "ui-workbench",
   "name": "UI Workbench",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": "Edgemodders",
   "description": "Inspect the game's own UI (its ink layers and HUD pieces as a tree, any widget's class, path, box, controllers, source file and properties, and Pick under the cursor), and write native UI of your own: projects of ink markup and a script, run live in the game, or copied from a game widget with To source. Try changes a game widget live, never kept. Inspect reads only; To source, Try, Edit and Projects need the admin permission. Part of REDnode UI Tools.",
   "entry": "index.html",
