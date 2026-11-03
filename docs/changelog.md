@@ -34,11 +34,13 @@ How to keep it:
 **Changed**
 
 - Keys knows **Tripo** (`tripo`, the 3D service EDGEmat's Wardrobe Designer uses), so a player can set its key before any tool asks for it (https://github.com/Edgemodders/REDnode/issues/23).
+- The **Mod Manager**'s details are 300 wide (were 262), and the edge between them and the table drags to make them wider or narrower; the width is kept, and a double-click puts back 300.
 - The **Mod Manager**'s search puts the strongest matches first: names that start with what you typed, then names with a word that starts with it, then names that hold it, then matches by id, author or description. The column's sort orders each group. Its search box has a ✕ that clears it.
 - Ctrl+Z, Ctrl+Y, Ctrl+A, Ctrl+C, Ctrl+V and Ctrl+X reach the page as keys (https://github.com/Edgemodders/REDnode/issues/33): a text field edits as before, and a page with its own undo or copy hears them and takes them with `preventDefault()`. Before, the overlay ran the editing command itself and the page never heard the key.
 
 **Fixed**
 
+- The **Mod Manager**'s details cut 26 pixels off on the right: their padding and border were added to a width the drawer around them did not have.
 - A double-click reaches pages in the game: every press went to the page as a single click, so a page never heard `dblclick` (a text field's double-click on a word, a page's own double-click actions). Presses of the same button within 450 ms and 6 px now count up, as the title bar's double-click does.
 - A name passed to the game as a CName (through `api`, or the ink driver's own) now reads back as text: it was only hashed, so the game knew it by number alone, and the ink driver's mounts had no readable name.
 - A `world.spawn` that times out before the entity is in the world now removes the entity before it throws, so a failed spawn leaves nothing behind. Before, the entity stayed in the game with no id given back, and showed up when V got near (https://github.com/Edgemodders/REDnode/issues/35).

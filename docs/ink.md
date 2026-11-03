@@ -997,3 +997,21 @@ Still to do for the release, after this test: the screenshots (taken in the game
 5. Start the game and load a save. In the **Mod Manager**, find **Export Test** (installed, no DEV tag) and switch it on: its controls window and the HUD panel show, and the slider drives the panel. Mark.
 6. Switch it off, quit and tell Claude. Afterwards, delete `red4ext\plugins\REDnode\apps\export-test` (or Claude can).
 
+**UT3c passed in game on 2026-11-03** (UI Workbench 0.4.0 on REDnode 0.56.0, dev PC): every step as expected. To source on the quest tracker's window named the copy `root-copy`, after the window's content (`Root`); Run switched it on once with no reload after it; the export installed into the game folder started as a mod of its own (`[export-test] Starting mod.mjs`). The player's notes went into REDnode 0.56.1 and UI Workbench 0.4.1: the Mod Manager's details were cut on the right, and want an edge that resizes them, and the Workbench's status line after Export cut off the path with no way to read it.
+
+### Mod Manager details and status tooltips (REDnode 0.56.1, UI Workbench 0.4.1)
+
+| Change | What it does | Where |
+|---|---|---|
+| Cut on the right | The details' padding and border (26 px) were added to a width the drawer did not have, so their right edge was hidden; their width now holds them (`box-sizing: border-box`) | `packages/overlay/manager/index.html` |
+| Resizable | The edge between the table and the details drags (220 px at the narrowest, the table keeping 420), kept in the page's storage (`rn-modmanager:drawerWidth`), a double-click back to 300 (was 262); gone while the details are shut; a larger window gives the kept width back | `packages/overlay/manager/app.js` (`setDrawer`) |
+| Tooltips | The Workbench's status lines (Inspect, Edit, Projects) and the projects folder line carry their whole text as a tooltip, for when the window cuts them | `ui-workbench/index.html`, `workbench-edit.js` |
+
+Checked in the mock game: 14 checks (scratchpad `mm2/check.mjs`: the details inside the drawer, a real drag through the mock's input, the limits, kept across a reload, the double-click, gone when shut, the three tooltips).
+
+0. Test timer: Start, Mark after each step.
+1. Load a save and open the **Mod Manager**. Select a package with a long description (UI Workbench): nothing in the details is cut on the right. Mark.
+2. Drag the edge between the table and the details to the left: the details widen. Drag it right: they narrow, down to a limit. Mark.
+3. Close and open the Mod Manager: the details are as wide as you left them. Double-click the edge: they go back to their first width. Mark.
+4. Switch on **UI Workbench**, make a project in **Projects** and **Export** it: point at the status line at the top; after a moment its tooltip shows the whole path. Delete the project, switch the Workbench off and quit.
+

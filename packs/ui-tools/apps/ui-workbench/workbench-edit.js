@@ -16,12 +16,15 @@ const el = (tag, cls, text) => {
   if (text !== undefined) e.textContent = text;
   return e;
 };
+// Status lines are cut at their end when the window is narrow: the whole text is the tooltip.
 const editStatus = (text) => {
   $('editStatus').textContent = text;
+  $('editStatus').title = text;
   console.log(`[ui-workbench] ${text}`);
 };
 const projStatus = (text) => {
   $('projStatus').textContent = text;
+  $('projStatus').title = text;
   console.log(`[ui-workbench] ${text}`);
 };
 
@@ -48,6 +51,7 @@ async function ready() {
   if (!root) root = await admin.projectsFolder('UI projects');
   if (!files) files = await service.connect('ui-workbench');
   $('projFolder').textContent = `Projects are in ${root}: REDnode watches it, as the apps folder.`;
+  $('projFolder').title = $('projFolder').textContent;
   return { root, files };
 }
 const needsAdmin = (err) =>

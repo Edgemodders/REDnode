@@ -13,3 +13,4 @@ An optional app pack for REDnode. Its first release comes with the UI Workbench'
 - **To source**: the selected game widget and everything under it, copied into a new project as ink markup, opened in Edit; **Run** shows the copy beside the original. **Try**: change a game widget's visibility, opacity, tint, size, margin, padding, place, text or font size live, with **Reset** and **Reset all**; switching the Workbench off puts everything back. Needs REDnode 0.56.0.
 - **Export**, on a project's row and in Edit: the project as a zip in `Documents\REDnode\UI exports`, laid out as the game folder with a README, that installs as a mod of its own.
 - To source starts inside a HUD piece's own window, and never names a copy or a widget by the game's default name (`UNINITIALIZED_WIDGET`). **Run** saves only unsaved changes, so a project no longer starts twice.
+- A status line cut at its end (a long project's path after Export) shows its whole text as a tooltip.

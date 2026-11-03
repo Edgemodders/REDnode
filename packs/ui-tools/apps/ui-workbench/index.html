@@ -172,8 +172,10 @@
   const tree = $('tree');
   const detail = $('detail');
   const marks = $('marks');
+  // A status line is cut at its end when the window is narrow: the whole text is its tooltip.
   const status = (text) => {
     $('status').textContent = text;
+    $('status').title = text;
     console.log(`[ui-workbench] ${text}`);
   };
   const el = (tag, cls, text) => {
