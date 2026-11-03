@@ -25,7 +25,7 @@ To uninstall, remove it in your mod manager or delete that folder. REDnode stays
 
 ## UI Workbench
 
-The Workbench covers the game view (a page with `"fill": "screen"`) and is see-through, so the game takes the mouse wherever it draws nothing. Its window moves inside the page.
+The Workbench covers the game view (a page with `"fill": "screen"`) and is see-through, so the game takes the mouse wherever it draws nothing. Its window moves inside the page by its title bar and resizes by the grip in its bottom-right corner; it keeps its place and size, and **Reset position and size** in the title bar puts them back.
 
 ### The tree
 
@@ -57,7 +57,7 @@ These two tabs need the `admin` permission (the Mod Manager, the Workbench's **P
 
 A project is a REDnode package of its own in `Documents\REDnode\UI projects`, which REDnode watches as a development folder: `rednode-app.json`, `panel.ink.html` (the markup) and `mod.mjs` (its script: `ink.load` with the handlers and the data). **New** makes one from a small panel, **Rename** changes its name, **Delete** moves it to the folder's `.trash`.
 
-In **Edit**, the markup and the script are side by side, with highlighting, completion of the markup's tags and attributes, and each mistake shown at its line as you type. **Run** saves and runs the project as a mod of its own, so its panel shows in the game; **Save** (Ctrl+S) while it runs shows the change; **Stop** takes it away. Its output and any crash are in the Mod log.
+In **Edit**, the markup and the script are side by side, with highlighting, completion of the markup's tags and attributes, and each mistake shown at its line as you type. Drag the splitter between them to give one more width; a double-click centres it. **Run** saves and runs the project as a mod of its own, so its panel shows in the game; **Save** (Ctrl+S) while it runs shows the change; **Stop** takes it away. Its output and any crash are in the Mod log.
 
 ### Details
 

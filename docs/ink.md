@@ -894,3 +894,18 @@ Found on the way, in the mock game: CodeMirror finds an editor's root by walking
 6. Press **Stop**: the panel goes. Mark.
 7. In **Projects**, **Rename** the project (type a new name, Enter), then **Delete** it (press twice): it goes from the list. Switch the Workbench off and quit. Claude reads the host's `Switched on: my-panel` and `Switched off` lines.
 
+**UT3a passed in game on 2026-11-02** (REDnode 0.55.0 with UI Workbench 0.2.0, dev PC, one session with #37's test). Every step as expected. The host logged `Projects folder ...\Documents\REDnode\UI projects watched, for UI Workbench`, `New package: my-panel (development copy)`, `Switched on: my-panel, by UI Workbench`, a reload at each save, `Switched off: my-panel, by UI Workbench` and `Package removed: my-panel`. In step 5 the panel's mod crashed twice with `SyntaxError: Unexpected token ';'` and restarted: the script was saved with the error while the panel ran (the editor showed it). The player's notes went into UI Workbench 0.2.1: the window resizes, and the editors have a splitter.
+
+### UT3a polish (REDnode 0.55.1, UI Workbench 0.2.1)
+
+Built 2026-11-02 from the player's notes. **Resize:** the UI kit's `rn-window` takes `resizable` (with `min-width` and `min-height`) on a page that fills the screen, where the host's resize cannot apply (the page is the whole screen): the corner grip resizes the window inside the page, kept in the page's localStorage (`rn-size:*`) beside its place, and **Reset position and size** clears both. The Workbench is 980 x 720 at first, 760 x 420 at the smallest, and each tab's panes fill the height its bars leave. **Splitter:** a 10 px bar between the markup and the script sets their shares (15 to 85 %), kept in localStorage; a double-click centres it. **Double-clicks:** the mock check found that no page ever got a `dblclick` in the game: the host sent every press with `clickCount: 1`. It now counts presses of the same button within 450 ms and 6 px, as the plugin counts a title bar's. Checked in the mock game: 19 checks (scratchpad `wb/check.mjs`, input through the mock's control file as the plugin sends it), and the keys and modifiers check's 19 again.
+
+0. Test timer: Start, Mark after each step.
+1. Load a save. Switch on **UI Workbench** (its `admin` permission is still allowed from the last test). Drag the grip in its bottom-right corner down and to the right: the window grows, and the tree and the details grow with it. Drag it far up and left: it stops at its smallest size. Mark.
+2. Make it a size you like, switch the Workbench off and on again: it comes back at that size and place. Mark.
+3. In **Projects**, make a project (**New**), so **Edit** opens. Drag the bar between the markup and the script to the left and right: the editors' widths follow, and the text in each still fits its pane. Double-click the bar: the two are equal again. Mark.
+4. Drag the bar off-centre, switch the Workbench off and on, open the project's **Edit**: the bar is where you left it. Mark.
+5. In the title bar, press **Reset position and size** (in the ⋯ menu if it is not shown as an icon): the window goes back to its first place and size. Mark.
+6. In the script, double-click a word: it is selected (the double-click now reaches pages). Mark.
+7. Delete the project, switch the Workbench off and quit.
+

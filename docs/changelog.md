@@ -25,6 +25,8 @@ How to keep it:
 - `ui.image(src, { width, alt, onClick })` in the UI builder: a picture in a Node mod's window, from a file in the package's folder or its data folder (`pkg.dataDir`), a `data:` URL or the picture's bytes. `set({ src })` shows another one, or the same file again after the mod wrote over it; a picture that cannot be shown says why. For a mod that makes or fetches pictures, such as a before and after (https://github.com/Edgemodders/REDnode/issues/37). See https://edgemodders.github.io/REDnode/overlay-apps.html
 - A sample, **Image mod**: pictures from the package, from bytes and drawn into the data folder, a larger view on click, and two that cannot be shown.
 
+- On a page that covers the game view (`"fill": "screen"`), an `rn-window` with `resizable` resizes inside the page by its corner grip, with `min-width` and `min-height`, its size kept for the page and **Reset position and size** in its title bar. See https://edgemodders.github.io/REDnode/overlay-apps.html
+
 **Changed**
 
 - Keys knows **Tripo** (`tripo`, the 3D service EDGEmat's Wardrobe Designer uses), so a player can set its key before any tool asks for it (https://github.com/Edgemodders/REDnode/issues/23).
@@ -32,6 +34,7 @@ How to keep it:
 
 **Fixed**
 
+- A double-click reaches pages in the game: every press went to the page as a single click, so a page never heard `dblclick` (a text field's double-click on a word, a page's own double-click actions). Presses of the same button within 450 ms and 6 px now count up, as the title bar's double-click does.
 - A name passed to the game as a CName (through `api`, or the ink driver's own) now reads back as text: it was only hashed, so the game knew it by number alone, and the ink driver's mounts had no readable name.
 - A `world.spawn` that times out before the entity is in the world now removes the entity before it throws, so a failed spawn leaves nothing behind. Before, the entity stayed in the game with no id given back, and showed up when V got near (https://github.com/Edgemodders/REDnode/issues/35).
 - Clicks, moves and the wheel in overlay windows now carry Ctrl, Shift and Alt (`ctrlKey`, `shiftKey`, `altKey`), read from Windows at each event, so Ctrl+click, Shift+drag and Alt+click work (https://github.com/Edgemodders/REDnode/issues/33).

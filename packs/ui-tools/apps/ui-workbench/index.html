@@ -25,12 +25,16 @@
     font: 14px var(--rn-body); background: var(--rn-panel); border: 1px solid var(--rn-accent); color: var(--rn-fg); }
   body.picking #hint { display: block; }
 
-  rn-window#bench { position: absolute; left: 40px; top: 80px; width: 980px; }
+  /* Resizable inside the page by the corner grip (the kit's resizable on a fill page); each
+     tab fills the window, its panes taking the height the bars leave. */
+  rn-window#bench { position: absolute; left: 40px; top: 80px; width: 980px; height: 720px; }
+  #tabInspect, #tabEdit, #tabProjects { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+  #tabInspect[hidden], #tabEdit[hidden], #tabProjects[hidden] { display: none; }
   .bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
   .bar .grow { flex: 1; }
   .bar rn-input { width: 220px; }
   #status { font: 12px var(--rn-mono); color: var(--rn-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; height: 560px; }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; flex: 1 1 0; min-height: 160px; }
   .pane { border: 1px solid var(--rn-line); overflow: auto; min-height: 0; }
   .treepane { display: flex; flex-direction: column; overflow: hidden; }
   .treebar { padding: 6px; border-bottom: 1px solid var(--rn-line); }
@@ -55,13 +59,17 @@
   /* Edit and Projects (UT3a). */
   .status { font: 12px var(--rn-mono); color: var(--rn-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 520px; }
   .projname { font: 600 15px var(--rn-display); }
-  .editsplit { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  /* The editors' widths follow the splitter between them (dragged; a double-click centres it). */
+  .editsplit { grid-template-columns: minmax(0, var(--left, 1fr)) 10px minmax(0, var(--right, 1fr)); gap: 0; }
+  .splitter { cursor: col-resize; touch-action: none; position: relative; }
+  .splitter::after { content: ''; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; background: var(--rn-line); }
+  .splitter:hover::after, .splitter.on::after { background: var(--rn-accent); }
   .editpane { display: flex; flex-direction: column; overflow: hidden; }
   .panehead { padding: 6px 8px; border-bottom: 1px solid var(--rn-line); font: 12px var(--rn-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .err { color: var(--rn-danger); margin-left: 8px; }
   .editor { flex: 1; min-height: 0; overflow: hidden; }
   .editor .cm-editor { height: 100%; }
-  .projpane { height: 520px; }
+  .projpane { flex: 1 1 0; min-height: 120px; overflow: auto; }
   .projrow { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--rn-line); font: 13px var(--rn-body); }
   .projrow.open { background: var(--rn-panel-2); }
   .projrow .pname { font: 600 14px var(--rn-display); min-width: 220px; }
@@ -94,7 +102,7 @@
   <div id="tip"></div>
   <div id="hint">Pick: point at a piece of the game's UI and click it. Right-click sets the one under the cursor aside. Esc leaves.</div>
 
-  <rn-window id="bench" title="UI Workbench" draggable closable>
+  <rn-window id="bench" title="UI Workbench" draggable closable resizable min-width="760" min-height="420">
     <rn-tabs id="tabs"><rn-tab label="Inspect" active></rn-tab><rn-tab label="Edit"></rn-tab><rn-tab label="Projects"></rn-tab></rn-tabs>
     <div id="tabInspect">
     <div class="bar">
@@ -128,6 +136,7 @@
           <div class="panehead">panel.ink.html <span class="dim">ink markup</span> <span id="markupError" class="err"></span></div>
           <div id="markupEditor" class="editor"></div>
         </div>
+        <div class="splitter" id="editSplitter" title="Drag to change the editors' widths; double-click to centre"></div>
         <div class="pane editpane">
           <div class="panehead">mod.mjs <span class="dim">script</span> <span id="scriptError" class="err"></span></div>
           <div id="scriptEditor" class="editor"></div>

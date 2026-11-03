@@ -1382,6 +1382,20 @@ function onInput(m) {
 
 // One input message for a window: to the page by sendInputEvent, or through the router to a
 // frame in another process under the cursor (or the frame clicked last, for keys).
+// Presses of the same button close together in time and place count up, as the plugin counts
+// a title bar's double-click (450 ms, 6 px), so a page hears dblclick; a release carries its
+// press's count. Every press went as one click before 0.55.1, and no page heard a dblclick.
+const DOUBLE_CLICK_MS = 450;
+const DOUBLE_CLICK_SLOP = 6;
+function clickCountOf(w, m) {
+  const last = w.lastPress;
+  if (m.type === 'mouseUp') return last?.button === m.button ? last.count : 1;
+  const now = Date.now();
+  const again = last && last.button === m.button && now - last.at <= DOUBLE_CLICK_MS && Math.abs(last.x - m.x) <= DOUBLE_CLICK_SLOP && Math.abs(last.y - m.y) <= DOUBLE_CLICK_SLOP;
+  w.lastPress = { button: m.button, x: m.x, y: m.y, at: now, count: again ? last.count + 1 : 1 };
+  return w.lastPress.count;
+}
+
 async function inputTo(w, m, router) {
   const wc = w.win.webContents;
   switch (m.type) {
@@ -1403,8 +1417,9 @@ async function inputTo(w, m, router) {
       w.held ??= new Set();
       if (m.type === 'mouseDown') w.held.add(m.button);
       else w.held.delete(m.button);
+      const clickCount = clickCountOf(w, m);
       if (router && (await router.mouse(m, w.held))) break;
-      wc.sendInputEvent({ type: m.type, x: m.x, y: m.y, button: m.button, clickCount: 1, modifiers: [...heldButtons(w), ...keyMods(m)] });
+      wc.sendInputEvent({ type: m.type, x: m.x, y: m.y, button: m.button, clickCount, modifiers: [...heldButtons(w), ...keyMods(m)] });
       break;
     case 'mouseWheel':
       if (router && (await router.mouse(m, w.held ?? new Set()))) break;

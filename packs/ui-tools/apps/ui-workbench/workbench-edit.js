@@ -153,6 +153,61 @@ async function newProject() {
   }
 }
 
+// ---------- the splitter between the editors ----------
+
+// The markup's share of the width, 0.15 to 0.85, kept in the page's localStorage.
+const SPLIT_KEY = 'ui-workbench:editSplit';
+function setSplit(share) {
+  const left = Math.min(0.85, Math.max(0.15, share));
+  const grid = document.querySelector('.editsplit');
+  grid.style.setProperty('--left', `${left}fr`);
+  grid.style.setProperty('--right', `${1 - left}fr`);
+  return left;
+}
+{
+  const bar = $('editSplitter');
+  let drag = null;
+  try {
+    const saved = Number(localStorage.getItem(SPLIT_KEY));
+    if (saved) setSplit(saved);
+  } catch {
+    // storage is a convenience
+  }
+  bar.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    bar.setPointerCapture?.(e.pointerId);
+    const r = bar.parentElement.getBoundingClientRect();
+    drag = { left: r.left, width: r.width - bar.offsetWidth, share: null };
+    bar.classList.add('on');
+  });
+  bar.addEventListener('pointermove', (e) => {
+    if (drag) drag.share = setSplit((e.clientX - drag.left - bar.offsetWidth / 2) / drag.width);
+  });
+  const end = () => {
+    if (!drag) return;
+    const { share } = drag;
+    drag = null;
+    bar.classList.remove('on');
+    if (share === null) return;
+    try {
+      localStorage.setItem(SPLIT_KEY, String(share));
+    } catch {
+      // storage is a convenience
+    }
+  };
+  bar.addEventListener('pointerup', end);
+  bar.addEventListener('lostpointercapture', end);
+  bar.addEventListener('dblclick', () => {
+    setSplit(0.5);
+    try {
+      localStorage.removeItem(SPLIT_KEY);
+    } catch {
+      // storage is a convenience
+    }
+  });
+}
+
 // ---------- Edit ----------
 let markupView = null;
 let scriptView = null;

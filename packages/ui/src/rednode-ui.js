@@ -369,7 +369,9 @@ footer:empty { display: none; }
         list.push({ id: 'pin', name: info.onHud ? 'Unpin from HUD' : 'Pin to HUD', on: info.onHud, run: run('pin-hud', !info.onHud) });
       }
       if (whole && info.canReset) list.push({ id: 'reset', name: info.resizable ? 'Reset position and size' : 'Reset position', run: run('reset') });
-      if (this.movesInPage() && this.savedPlace()) list.push({ id: 'reset', name: 'Reset position', run: () => this.resetPlace() });
+      if ((this.movesInPage() || this.resizesInPage()) && (this.savedPlace() || this.savedSize())) {
+        list.push({ id: 'reset', name: this.savedSize() ? 'Reset position and size' : 'Reset position', run: () => this.resetPlace() });
+      }
       if (document.documentElement.hasAttribute('rn-developer') && window.rednode?.debug && !this.hasAttribute('no-debug')) {
         list.push({ id: 'debug', name: 'Debug', run: () => window.rednode.debug().catch(() => {}) });
       }
@@ -400,7 +402,9 @@ footer:empty { display: none; }
           });
       };
       grip.addEventListener('pointerdown', (e) => {
-        if (e.button !== 0 || !this._info?.resizable) return;
+        if (e.button !== 0) return;
+        if (this.resizesInPage()) return this.resizeInPage(e, grip);
+        if (!this._info?.resizable) return;
         e.preventDefault();
         grip.setPointerCapture?.(e.pointerId);
         const size = this._info.size ?? { width: innerWidth, height: innerHeight };
@@ -436,15 +440,82 @@ footer:empty { display: none; }
     movesInPage() {
       return this.bool('draggable') && !!this._info?.fill;
     }
+    // A window with the `resizable` attribute on such a page resizes inside the page by the
+    // same grip, as a resizable overlay window does; `min-width` and `min-height` (pixels) set
+    // the smallest size, the page's edge the largest, and the size is kept per page.
+    resizesInPage() {
+      return this.hasAttribute('resizable') && !!this._info?.fill;
+    }
+    sizeKey() {
+      return `rn-size:${location.pathname}:${this.getAttribute('title') || ''}`;
+    }
+    savedSize() {
+      try {
+        const s = JSON.parse(localStorage.getItem(this.sizeKey()) || 'null');
+        return s && Number.isFinite(s.width) && Number.isFinite(s.height) ? s : null;
+      } catch {
+        return null;
+      }
+    }
+    // Sets the window's size inside the page, kept from the page's right and bottom edges.
+    sizeTo(width, height) {
+      const r = this.getBoundingClientRect();
+      const page = document.documentElement;
+      const minW = Number(this.getAttribute('min-width')) || 320;
+      const minH = Number(this.getAttribute('min-height')) || 200;
+      const size = {
+        width: Math.round(Math.max(minW, Math.min(width, page.clientWidth - Math.max(0, r.left)))),
+        height: Math.round(Math.max(minH, Math.min(height, page.clientHeight - Math.max(0, r.top)))),
+      };
+      Object.assign(this.style, { width: `${size.width}px`, height: `${size.height}px` });
+      return size;
+    }
+    resizeInPage(e, grip) {
+      e.preventDefault();
+      grip.setPointerCapture?.(e.pointerId);
+      const r = this.getBoundingClientRect();
+      this.placeAt(r.left, r.top); // placed by its left and top from now on
+      const start = { x: e.clientX, y: e.clientY, width: r.width, height: r.height };
+      let size = null;
+      grip.classList.add('on');
+      const move = (m) => {
+        size = this.sizeTo(start.width + m.clientX - start.x, start.height + m.clientY - start.y);
+      };
+      const end = () => {
+        grip.removeEventListener('pointermove', move);
+        grip.removeEventListener('pointerup', end);
+        grip.removeEventListener('lostpointercapture', end);
+        grip.classList.remove('on');
+        if (!size) return;
+        try {
+          localStorage.setItem(this.sizeKey(), JSON.stringify(size));
+        } catch {
+          // storage is a convenience
+        }
+        this.emit('resize-end', size);
+        this.renderActions();
+      };
+      grip.addEventListener('pointermove', move);
+      grip.addEventListener('pointerup', end);
+      grip.addEventListener('lostpointercapture', end);
+    }
     updateGrip() {
       const grip = this.$('.grip');
       const inPage = this.movesInPage();
       grip.toggleAttribute('data-rednode-drag', this.bool('draggable') && !inPage);
       grip.classList.toggle('moves', inPage);
-      if (inPage && !this._placeRestored) {
+      if ((inPage || this.resizesInPage()) && !this._placeRestored) {
         this._placeRestored = true;
         const saved = this.savedPlace();
-        if (saved) requestAnimationFrame(() => this.placeAt(saved.x, saved.y));
+        const size = this.resizesInPage() && this.savedSize();
+        requestAnimationFrame(() => {
+          if (saved) this.placeAt(saved.x, saved.y);
+          if (size) {
+            const r = this.getBoundingClientRect();
+            this.placeAt(r.left, r.top);
+            this.sizeTo(size.width, size.height);
+          }
+        });
       }
     }
     placeKey() {
@@ -480,6 +551,7 @@ footer:empty { display: none; }
     resetPlace() {
       try {
         localStorage.removeItem(this.placeKey());
+        localStorage.removeItem(this.sizeKey());
       } catch {
         // storage is a convenience
       }
@@ -525,7 +597,7 @@ footer:empty { display: none; }
       const box = this.$('.actions');
       if (!box) return;
       const info = this._info;
-      this.$('.resize').hidden = !(info?.resizable && window.rednode?.windowAction && this.isMain());
+      this.$('.resize').hidden = !((info?.resizable && window.rednode?.windowAction && this.isMain()) || this.resizesInPage());
       const list = this.actions();
       const shown = list.slice(0, 3);
       const overflow = list.slice(3);
