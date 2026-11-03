@@ -89,6 +89,8 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [Solo mask and Ask answers (0.50.1)](#solo-mask-and-ask-answers-0501) | In the game | Overlay, REDagent | Passed | 0.50.1 + Layers test 0.2.0, REDagent 0.4.1, game 2.5 | Passed on the dev PC on 2026-11-01. Mock game: 10 checks for the in-page drag (scratchpad `mask/check.mjs`, 21:9) |
 | [Keys and modifiers (#33, #34)](#keys-and-modifiers-33-34) | In the game | Overlay | Passed | 0.52.1 + Input test 0.1.0, EDGEbuilder 0.5.3, game 2.5 | Retest passed 2026-11-02 (0.52.1). 0.52.0: all but steps 3 (End came as Shift+End: no `"mods"` with none held; fixed in 0.52.1) and 8's Esc (EDGEbuilder 0.5.2 installed, which never asks). Mock game: 19 checks (scratchpad `keys/check.mjs`) |
 | [A picture in a mod window (#37)](#a-picture-in-a-mod-window-37) | In the game | Overlay | Passed | 0.55.0 + Image mod 0.1.0, game 2.5 | Passed on the dev PC on 2026-11-02; both `ui.image:` lines in the Mod log. #37 closed. Mock game: 15 checks (scratchpad `img/check.mjs`), dev and packaged host |
+| [Title-bar buttons and views (#38)](#title-bar-buttons-and-views-38) | In the game | Overlay | Not run | 0.57.0 + Views mod 0.1.0, game 2.5 | Built 2026-11-03. Mock game: 19 checks (scratchpad `views/check.mjs`), dev and packaged host |
+| [EDGEmat on REDnode's REDbridge (#40)](#edgemat-on-rednodes-redbridge-40) | In the game | MCP | Not run | 0.57.0 + EDGEmat's server from its main, REDagent, game 2.5 | Built 2026-11-03. Outside the game: 21 checks on the share, 12 end to end with a real REDbridge (scratchpad `w40/`) |
 | [Edit and Run (UT3a)](ink.md#ut3a-test) | In the game | UI Tools | Passed | 0.55.0 + UI Workbench 0.2.0, Codeware, game 2.5 | Passed on the dev PC on 2026-11-02, with #37's test. The player's notes (resize, a splitter) went into 0.55.1. Mock game: 21 checks (scratchpad `ut3/check.mjs`) and Inspect's 40 |
 | [UT3a polish (0.55.1)](ink.md#ut3a-polish-rednode-0551-ui-workbench-021) | In the game | UI Tools, Overlay | Passed 2026-11-03 | 0.55.1 + UI Workbench 0.2.1, Codeware, game 2.5 | Every step as expected (dev PC). Mock game: 19 checks (scratchpad `wb/check.mjs`) and the keys check's 19 |
 | [Mod Manager details and status tooltips (0.56.1)](ink.md#mod-manager-details-and-status-tooltips-rednode-0561-ui-workbench-041) | In the game | Overlay, UI Tools | Passed 2026-11-03 | 0.56.1 + UI Workbench 0.4.1 | Every step as expected (dev PC). Mock game: 14 checks (scratchpad `mm2/check.mjs`) |
@@ -1112,6 +1114,30 @@ Result, 2026-10-30 (laptop, 0.47.1, run with the Keys retest): **passed.** The C
 | Quit (11:05:27) | Both, world already off |
 
 So the game lets go of its player before `PlayerPuppet.OnDetach` runs (value 2 every time, never 1), and it runs on one of the game's worker threads, not the game thread. While the load holds the game thread, no call runs; but a call queued then would have run in the first frame after it, before the poll saw no player: 0.47.0 would have let it reach the game, 0.47.1 refused it. 0.47.2 keeps the event's side to atomics (the plugin read the player on that worker thread in 0.47.1) and lets the poll, on the game thread, do the rest; a short check of it (a load from the pause menu, the same log lines) rides with the next in-game test. **Passed on 2026-10-31 (0.49.5, dev PC):** a load from the pause menu logged `V left the world (OnDetach, no player left)` on a worker thread, `PlayerPuppet.OnDetach = 2`, `REDnode.SessionEnd`, world off, then `OnGameAttached` and world on 3 s later; no crash.
+
+### Title-bar buttons and views (#38)
+
+Built 2026-11-03 in REDnode 0.57.0 for EDGEmat's [#38](https://github.com/Edgemodders/REDnode/issues/38) (Wardrobe Designer's keys view). `ui.window({ titleButtons })` puts the mod's own buttons in the title bar, drawn by the UI kit's `rn-window` `titleButtons` property, the first next to close; `win.set({ title, titleButtons, children })` changes the open window in place through the host's update for the window node. Checked in the mock game with the new **Views mod** sample: 19 checks (scratchpad `views/check.mjs`; the three buttons in order with icons and a text one, the window's own actions in ⋯, a press reaching the mod, the title, buttons and content swapped with no reload of the page and the same overlay window, nodes keeping their state across views, a lit switch, a reloaded page showing the current view), dev and packaged host.
+
+0. Test timer: **Start**, and **Mark** after each step.
+1. Load a save. In the launcher, switch on **Views mod** (no permission switch). Its window's title bar, right to left: close, a gear, a pin, **HELP** as text, then ⋯. Hover each: tooltips **Settings**, **Pin**, **Help**. Mark.
+2. Press **Press** twice: "2 presses.". Press the gear: the title becomes **Views: settings**, a back arrow takes the gear's place, and the window stays where it was, same size, with no flicker. Mark.
+3. Type a greeting in the field, click outside it, press **Done**: the title shows **Views: <your greeting>** and the main view still says "2 presses.". Mark.
+4. Press the pin: it lights, and its tooltip says **Unpin**. Press it again: it goes out. Press **HELP**, open the **Mod log**: a `Help:` line from views-mod. Open ⋯: Roll up and the window's other actions are there. Mark.
+5. Drag the window somewhere else and press the gear: the settings view opens where you left it. Close the window with ✕, then press **Show** for it in the launcher: it comes back in the settings view. Mark.
+6. Switch the Views mod off. Mark.
+
+### EDGEmat on REDnode's REDbridge (#40)
+
+Built 2026-11-03 in REDnode 0.57.0 for EDGEmat's [#40](https://github.com/Edgemodders/REDnode/issues/40): the host shares its REDbridge with EDGEmat's in-game server over `POST http://127.0.0.1:<port>/bridge` with a token per start (`packages/overlay/bridge-share.js`; docs/mcp.md, "EDGEmat's tools on REDnode's REDbridge (#40)"). This test build carries EDGEmat's server from its main branch (`EDGEMAT_MCP_DIR`), since 0.3.1 on npm ignores the shared REDbridge. Checked outside the game: 21 checks on `bridge-share.js` alone and 12 end to end with a real REDbridge (scratchpad `w40/share-check.cjs`, `w40/e2e-check.cjs`): `mat_find` answered in 4.4 s through the shared REDbridge, with one new REDbridge.exe, not two.
+
+REDagent needs its Anthropic key, as before.
+
+0. Test timer: **Start**, and **Mark** after each step.
+1. Load a save. In the launcher, switch on **REDagent** and its **Allowed** switch for REDnode's tools (`mcp`). Mark.
+2. Ask REDagent: "Find the materials of Items.Pants_01_basic_01." It runs `mat_find` without asking you and names the trousers' meshes and materials. Mark.
+3. Ask: "Describe the layers of its first material setup." It runs `mat_describe` without asking. Mark.
+4. Quit the game. Claude reads the host log: `Shared REDbridge on http://127.0.0.1:<port>/bridge`, `Shared REDbridge: first call from EDGEmat (...)`, EDGEmat's `using REDnode's REDbridge`, one `REDbridge ... starting` line (the host's), and none of EDGEmat's own `starting ... REDbridge.exe` lines.
 
 ## Game 2.5
 
