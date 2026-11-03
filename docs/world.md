@@ -311,7 +311,7 @@ Found on 2026-10-19 on the laptop (REDnode 0.26.1, RED Hot Tools 1.3.0), with `E
 
 | Run | Route | Thread | RED Hot Tools' last line | Result |
 |---|---|---|---|---|
-| 10:31:29 | REDcode's **Pack and Try**, which copies into `archive/pc/hot`; RED Hot Tools' folder watcher reloads | 27088, the watcher's | "Loading updated archives..." | Crash |
+| 10:31:29 | REDcode's **Pack and Try** (now **Pack and Play**), which copies into `archive/pc/hot`; RED Hot Tools' folder watcher reloads | 27088, the watcher's | "Loading updated archives..." | Crash |
 | 10:3x | The same archive in `archive/pc/mod`, game started normally | | | Runs |
 | 10:43:19 | REDnode's Hot swap test, `archives.reload` | 23000, the game thread (REDnode's pump) | "Loading updated archives..." | Crash a second later |
 
