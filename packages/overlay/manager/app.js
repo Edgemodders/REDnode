@@ -178,9 +178,22 @@ function chips(container, options, key) {
   );
 }
 
+// How strongly a package matches the search, strongest first: its name starts with it, a word
+// of its name does, its name holds it, then its id, author and description. Null: no match.
+function strengthOf(i, q) {
+  const name = (i.name ?? '').toLowerCase();
+  if (name.startsWith(q)) return 0;
+  if (name.split(/[^a-z0-9]+/).some((w) => w.startsWith(q))) return 1;
+  if (name.includes(q)) return 2;
+  if ((i.id ?? '').toLowerCase().includes(q)) return 3;
+  if ((i.author ?? '').toLowerCase().includes(q)) return 4;
+  if ((i.description ?? '').toLowerCase().includes(q)) return 5;
+  return null;
+}
+
 function matches(i) {
   const q = view.search.trim().toLowerCase();
-  if (q && ![i.name, i.id, i.author, i.description].some((s) => s && s.toLowerCase().includes(q))) return false;
+  if (q && strengthOf(i, q) === null) return false;
   if (view.kind !== 'all' && kindOf(i) !== view.kind) return false;
   if (view.state === 'on' && !i.open) return false;
   if (view.state === 'off' && i.open) return false;
@@ -318,10 +331,14 @@ function renderHead() {
   );
 }
 
+// While a search is typed, the stronger matches come first; the column's sort orders each group.
 function filtered() {
   const list = items.filter(matches);
   const key = SORT[view.sort] ?? SORT.name;
+  const q = view.search.trim().toLowerCase();
+  const strength = new Map(q ? list.map((i) => [i.id, strengthOf(i, q)]) : []);
   list.sort((a, b) => {
+    if (q && strength.get(a.id) !== strength.get(b.id)) return strength.get(a.id) - strength.get(b.id);
     const x = key(a);
     const y = key(b);
     const r = x < y ? -1 : x > y ? 1 : a.name.localeCompare(b.name);
