@@ -74,6 +74,11 @@ export interface SliderProps {
   value?: number;
   /** Shown after the value, for example `"%"`. */
   unit?: string;
+  /**
+   * `onChange` also gets the value while the player drags, about 20 times a second, not only
+   * when they let go. Needs REDnode 0.55.2 or later.
+   */
+  live?: boolean;
 }
 /** Properties of {@link ui.input}. */
 export interface InputProps {
@@ -326,7 +331,15 @@ export const ui = {
     return self;
   },
 
-  /** A slider. `onChange` gets the value when the player lets go. */
+  /**
+   * A slider. `onChange` gets the value when the player lets go, or while they drag with
+   * `live: true`.
+   *
+   * @example
+   * ```ts
+   * ui.slider("Level", (v) => panel.set({ level: v }), { min: 0, max: 100, value: 50, unit: "%", live: true });
+   * ```
+   */
   slider(label: string, onChange?: (value: number) => void, options: Omit<SliderProps, "label"> = {}): UiNode<SliderProps> {
     let self: UiNode<SliderProps>;
     self = node("slider", { label, ...options }, {

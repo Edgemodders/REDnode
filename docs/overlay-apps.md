@@ -398,7 +398,7 @@ game.on('PlayerPuppet.OnGameAttached', () => console.log('A save was loaded'));
 | `ui.text(text, { tone })`, `ui.heading(text)` | Text. `tone` is `dim`, `accent` or `danger` |
 | `ui.button(label, onClick, { variant, sound })` | A button. `variant` is `ghost` or `danger` |
 | `ui.toggle(label, onChange, { checked })` | An on and off switch |
-| `ui.slider(label, onChange, { min, max, step, value, unit })` | A slider |
+| `ui.slider(label, onChange, { min, max, step, value, unit, live })` | A slider. `onChange` gets the value when the player lets go; with `live: true` also while they drag, about 20 times a second (REDnode 0.55.2) |
 | `ui.input({ label, placeholder, value, password, onChange, onSubmit })` | A text field; `password: true` shows dots (0.44.0), for a key you keep with `secrets` |
 | `ui.progress(value, { label, max })` | A progress bar |
 | `ui.list({ lines, keep, height, follow })` | A list of lines that scrolls on its own, for a log or a live feed. `push(...lines)` adds at the bottom (only the new lines travel to the window) and `clear()` empties it. It keeps the newest `keep` lines (500 by default, up to 5,000) and follows the newest one unless the player has scrolled up. Without `height` it fills the space the other nodes leave, at least 160 px; when they leave less, the window scrolls |

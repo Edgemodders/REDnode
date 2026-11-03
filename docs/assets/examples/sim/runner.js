@@ -299,6 +299,7 @@ function apply(type, el, props) {
       break;
     case 'slider':
       for (const k of ['label', 'min', 'max', 'step', 'unit', 'value']) if (k in props) attr(el, k, props[k]);
+      if ('live' in props) el.dataset.live = props.live ? '1' : '';
       break;
     case 'input':
       for (const k of ['label', 'placeholder']) if (k in props) attr(el, k, props[k]);
@@ -391,7 +392,33 @@ function render(spec) {
       break;
     case 'slider':
       el = document.createElement('rn-slider');
-      el.addEventListener('change', (e) => toMod(spec.id, 'change', e.detail.value));
+      {
+        // live: values while dragging too, at most one each 50 ms, the last one always sent.
+        let sent;
+        let timer = null;
+        let at = 0;
+        const out = (v) => {
+          clearTimeout(timer);
+          timer = null;
+          at = Date.now();
+          if (v === sent) return;
+          sent = v;
+          toMod(spec.id, 'change', v);
+        };
+        el.addEventListener('input', (e) => {
+          if (!el.dataset.live) return;
+          const v = e.detail.value;
+          const wait = 50 - (Date.now() - at);
+          clearTimeout(timer);
+          if (wait <= 0) out(v);
+          else timer = setTimeout(() => out(v), wait);
+        });
+        // The release sends its value unless the drag just sent it; the mod may set it later.
+        el.addEventListener('change', (e) => {
+          out(e.detail.value);
+          sent = undefined;
+        });
+      }
       break;
     case 'input':
       el = document.createElement('rn-input');
