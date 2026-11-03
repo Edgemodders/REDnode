@@ -11,8 +11,8 @@
     "description": "REDnode {version} for game 2.5: the plugin, the overlay host and ten samples. Install with Vortex or EDGEdeck, or extract into the game folder. Needs RED4ext and redscript."
   },
   "pulled": {
-    "sha256": "3ead6a3eaeb2101b71d61eadea74da329554b6ee5b7d3b621d5bf0c80a28aec5",
-    "at": "2026-10-27T17:28:46.950Z",
-    "version": "0.40.1"
+    "sha256": "c3f700cadacb45173f5101855cac49b075fe10ea63e5d5f721f7e716cb412fdb",
+    "at": "2026-11-03T10:54:06.764Z",
+    "version": "0.56.1"
   }
 }
