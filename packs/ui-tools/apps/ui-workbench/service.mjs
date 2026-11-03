@@ -136,8 +136,11 @@ export function list(root) {
   return out.sort((a, b) => b.modified - a.modified);
 }
 
-/** A new project from the template: its id comes from its name. */
-export function create(root, name) {
+/**
+ * A new project from the template, or from the markup and script given (To source): its id
+ * comes from its name.
+ */
+export function create(root, name, files = null) {
   const title = String(name ?? '').trim();
   if (!title) throw new Error('Give the project a name');
   const id = slug(title);
@@ -150,14 +153,14 @@ export function create(root, name) {
     name: title,
     version: '0.1.0',
     author: '',
-    description: 'Made in the REDnode UI Workbench: a panel of ink markup on the HUD, driven by a slider.',
+    description: files?.description ?? 'Made in the REDnode UI Workbench: a panel of ink markup on the HUD, driven by a slider.',
     main: SCRIPT,
     open: false,
     requires: { codeware: '>=1.16' },
   };
   fs.writeFileSync(path.join(dir, MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
-  fs.writeFileSync(path.join(dir, MARKUP), TEMPLATE_MARKUP(title));
-  fs.writeFileSync(path.join(dir, SCRIPT), TEMPLATE_SCRIPT(title));
+  fs.writeFileSync(path.join(dir, MARKUP), typeof files?.markup === 'string' ? files.markup : TEMPLATE_MARKUP(title));
+  fs.writeFileSync(path.join(dir, SCRIPT), typeof files?.script === 'string' ? files.script : TEMPLATE_SCRIPT(title));
   return summary(dir);
 }
 

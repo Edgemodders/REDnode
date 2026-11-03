@@ -935,3 +935,31 @@ Ink input (the markup's `on...` attributes) waits for phase I3, so the template'
 
 **Passed in game on 2026-11-03** (REDnode 0.55.2 with UI Workbench 0.2.2, dev PC): every step as expected, some of the Workbench's steps run out of order. Six Marks in the Mod log, the project switched on and off by the Workbench, no errors from the Workbench or its projects.
 
+## UT3b: build (REDnode 0.56.0, UI Workbench 0.3.0)
+
+Built 2026-11-03, the plan's next phase after the owner chose on the same day to keep it as agreed (UT3b, then UT3c and the release).
+
+| Part | What it does | Where |
+|---|---|---|
+| `props` in `ink.read` | Each node also gets `drawn` (its drawn size) and `props`: `fitToContent`, `layout` (margin, padding, alignment, anchor, size rule), `renderTransform`, `size`, `tintColor`, `opacity`, `childMargin`, a text's `fontSize`, `fontStyle`, `letterCase` and `textHorizontalAlignment`, an image's `textureAtlas` (a hash) and `texturePart`, in the game's own types. Texts come whole | `inkread.cpp` (`SourceProps`), `PropertiesJson` with names in `reflect.cpp` |
+| `ink.try`, `ink.reset`, `ink.tried` | A property's native getter keeps the value before the first try, its native setter sets the new one (the plain names are the native overloads, taking HDRColor, Vector2 and inkMargin, so a value read goes back as it is). Reset goes newest first; tries on widgets the game removed are dropped | `inkread.cpp` (`TryProps`, `g_tried`) |
+| Who may try | Only a package granted `admin`; the host adds its id and resets its tries when it stops (`inkTriers`, `clearInk`), and resets every try at its start (`{"all": true}`), for a host that left without putting back | `packages/overlay/main.js` |
+| The package | `ink.try(id, prop, value)` with the ink API's own forms (a tint as `"#rrggbb"`, `[x, y]`, margins as one number or four), answering `{ was, now }` in those forms; `ink.reset(id?, prop?)`, `ink.tried()` | `packages/rednode/src/ink.ts` |
+| To source | The tree read with props becomes markup: canvases, `column`, `row`, `text`, `rect`, `circle`, `image`, other classes as `<widget class>` by the script's name; in a panel, `align` and `grow`, else `anchor`, `x` and `y`; margins (a panel's child margin added to each child's), padding, size (or the drawn size when it has none), colour as `#rrggbbaa`, opacity; a text's size, weight, case and alignment; an image's atlas in hex and part. `{` and `}` in texts are doubled, so they are not slots. Hidden widgets are left out, at most 600 widgets, and what is approximated is listed in the first comment. The mount is placed beside the original: right, else left, else below | `ui-workbench/workbench-source.js` |
+| The Workbench | **To source** among the widget's actions: a project named "<widget> copy" (then " 2", ...), opened in Edit. A **Try** part in the details (folded at first): a switch, an opacity slider (a try each 80 ms at most while dragged) and fields filled from the widget, Enter to try, **Reset**, **Reset all** and a count | `ui-workbench/index.html`, `workbench-edit.js` (`fromSource`), `service.mjs` (`create` with files) |
+
+Unverified until the in-game test: that the copy's mount lands beside the original (the boxes and REDnode's HUD mounts should share the layer's ink pixels), which game widgets come out close to the original, and that each setter takes the getter's value back (SetText with its text parameters left out).
+
+Checked outside the game: the converter against a stand-in HUD piece (16 checks, scratchpad `ut3b/source-check.mjs`, its markup passing `ink.check`), and the mock game (23 checks, scratchpad `ut3b/check.mjs`: the Try part and its fields, a try of each kind and its answer, a wrong value refused in the page, the opacity slider, the count, Reset and its re-read, To source's read and markup, Edit with no error, a second copy's name, Run, the reset when the Workbench is switched off, and the host's reset at its start), with UT2's 44 (updated for the Try part) and UT3a's 21 again.
+
+### UT3b test
+
+0. Test timer: Start, Mark after each step.
+1. Load a save. Switch on **UI Workbench** (its `admin` permission is still allowed). In **Inspect**, press **Pick** and click the health bar at the top left; in the details, press **Parent** until the selected widget is the whole health bar piece (its box covers the bar and the numbers). Mark.
+2. Press **To source**: **Edit** opens on a project named after the widget, with its markup and script and no error. Press **Run**, then close the overlay (F10): a copy of the health bar shows beside the original, still. Note how close it looks and where it sits. Open the overlay again (F10). Mark.
+3. In **Edit**, change a text in the copy's markup and press **Save**: the copy shows the change. Press **Stop**: the copy goes. Mark.
+4. Back in **Inspect**, pick a text on the HUD (the health numbers or the clock). Open **Try**. Type a new text and press Enter, then a tint such as `#ff3040` and Enter: the game's own text changes, and the line under the fields says the value before. Mark.
+5. Drag the **opacity** slider down and up: the widget fades while you drag. Set **x y** to `40 0` and press Enter: it moves. Mark.
+6. Press **Reset**: the widget is back as it was. Try two changes again, on another widget, then press **Reset all**: both are back. Mark.
+7. Try one more change, then switch the Workbench off: the change goes back as it closes. Switch it on again and delete the copied project in **Projects**. Switch it off, quit and tell Claude, who reads the plugin's `Ink reset:` lines and the host's `Put back` line.
+

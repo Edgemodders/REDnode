@@ -89,7 +89,11 @@
   #detail summary::before { content: '▸ '; }
   #detail details[open] > summary::before { content: '▾ '; }
   #detail summary:hover { color: var(--rn-fg); }
-  #detail .actions { display: flex; gap: 6px; margin: 6px 0; flex-wrap: wrap; }
+  #detail .actions { display: flex; gap: 6px; margin: 6px 0; flex-wrap: wrap; align-items: center; }
+  #detail .trynote { color: var(--rn-dim); margin: 2px 0 6px; }
+  #detail table.try td { vertical-align: middle; }
+  #detail table.try rn-input, #detail table.try rn-slider { display: block; }
+  #detail .trystatus { font: 12px var(--rn-mono); color: var(--rn-accent); margin: 4px 0; min-height: 16px; overflow-wrap: anywhere; }
   .hit { padding: 2px 4px; font: 12px var(--rn-mono); cursor: default; }
   .hit:hover { background: var(--rn-panel-2); }
   .empty { color: var(--rn-dim); padding: 10px; }
@@ -161,6 +165,7 @@
 
 <script type="module">
   import { game, ink, ui } from 'rednode';
+  import { toSource } from './workbench-source.js';
 
   const $ = (id) => document.getElementById(id);
   const tree = $('tree');
@@ -429,7 +434,7 @@
   }
 
   // The details' three parts fold, each remembered as the player left it.
-  const opened = { hits: true, widget: true, props: true };
+  const opened = { hits: true, widget: true, try: false, props: true };
   function section(key, title) {
     const d = el('details');
     d.open = opened[key];
@@ -467,6 +472,10 @@
       });
       actions.append(all);
     }
+    const src = el('rn-button', '', 'To source');
+    src.title = 'Copy this widget and everything under it into a new project, as ink markup';
+    src.addEventListener('click', () => toSourceOf(w));
+    actions.append(src);
     if (w.parent) {
       const up = el('rn-button', '', 'Parent');
       up.setAttribute('variant', 'ghost');
@@ -502,6 +511,8 @@
     line('api ref', `{"$ref": ${w.ref.$ref}}`);
     part.append(table);
 
+    showTry(w);
+
     const propsPart = section('props', `Properties (${Object.keys(w.properties).length})`);
     const filter = el('rn-input');
     filter.setAttribute('placeholder', 'Filter properties');
@@ -520,6 +531,158 @@
     filter.addEventListener('input', (e) => fill(String(e.detail?.value ?? filter.value).toLowerCase()));
     fill('');
     propsPart.append(filter, props);
+  }
+
+  // ---------- To source (UT3b) ----------
+  // The widget and everything under it, read with its layout and look, written as ink markup
+  // into a new project, opened in Edit (workbench-source.js does the writing).
+  async function toSourceOf(w) {
+    status('To source: reading it with its layout and look...');
+    try {
+      const r = await ink.read({ id: w.id }, { props: true, boxes: false, max: 5000 });
+      const base = w.name && w.name !== 'None' ? w.name : w.class.replace(/^ink/, '').replace(/Widget$/, '');
+      const s = toSource(r.root, { box: w.box, layerSize: inkSize, path: w.path, name: `${base} copy`, cut: r.cut });
+      const p = await window.uiWorkbenchEdit.fromSource(`${base} copy`, {
+        markup: s.markup,
+        script: s.script,
+        description: `A copy of the game's ${w.path}, made with To source in the REDnode UI Workbench.`,
+      });
+      status(`To source: ${s.widgets} widgets into ${p.name}${s.hidden ? `, ${s.hidden} hidden left out` : ''}${s.notes.length ? `; approximated: ${s.notes.join('; ')}` : ''}`);
+    } catch (err) {
+      status(`To source: ${err.message}`);
+    }
+  }
+
+  // ---------- Try (UT3b) ----------
+  // Changes the game's own widget live (ink.try), to see what controls a look; Reset puts it
+  // back, and REDnode puts everything back when the Workbench stops.
+  const show = (v) => (typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v));
+  const numbers = (text, n) => {
+    const list = String(text).trim().split(/[\s,]+/).map(Number);
+    if (list.some((x) => !Number.isFinite(x)) || !(list.length === n || (n === 4 && list.length === 1))) {
+      throw new Error(n === 1 ? 'give a number' : n === 2 ? 'give two numbers: x y' : 'give one number or four: left top right bottom');
+    }
+    return n === 1 || (n === 4 && list.length === 1) ? list[0] : list;
+  };
+  const byte = (n) => Math.max(0, Math.min(255, Math.round((Number(n) || 0) * 255))).toString(16).padStart(2, '0');
+  const hexOf = (c) => (c ? `#${byte(c.Red)}${byte(c.Green)}${byte(c.Blue)}${byte(c.Alpha ?? 1)}` : '');
+  const sidesOf = (m) => (m ? [m.left, m.top, m.right, m.bottom].map((n) => Math.round(n * 100) / 100).join(' ') : '');
+  const pairOf = (v) => (v ? [v.X, v.Y].map((n) => Math.round(n * 100) / 100).join(' ') : '');
+
+  function showTry(w) {
+    const part = section('try', 'Try');
+    part.append(el('div', 'trynote', 'Changes this widget in the game, live, to see what controls its look. Never kept: Reset puts it back, and so does switching the Workbench off.'));
+    const msg = el('div', 'trystatus');
+    const table = el('table', 'try');
+    const tryIt = async (prop, value) => {
+      try {
+        const r = await ink.try(w.id, prop, value);
+        msg.textContent = `${prop}: ${show(r.now)} (before: ${show(r.was)})`;
+        countTried();
+      } catch (err) {
+        msg.textContent = err.message;
+      }
+    };
+    const row = (label, control) => {
+      const tr = el('tr');
+      const td = el('td');
+      td.append(control);
+      tr.append(el('td', '', label), td);
+      table.append(tr);
+    };
+    const field = (label, prop, value, parse, hint) => {
+      const input = el('rn-input');
+      input.setAttribute('value', value);
+      input.setAttribute('placeholder', hint);
+      input.title = `${hint}, then Enter`;
+      input.dataset.prop = prop;
+      input.addEventListener('submit', (e) => {
+        try {
+          tryIt(prop, parse(e.detail.value));
+        } catch (err) {
+          msg.textContent = `${prop}: ${err.message}`;
+        }
+      });
+      row(label, input);
+    };
+    const p = w.properties ?? {};
+    const visible = el('rn-toggle');
+    if (w.visible) visible.setAttribute('checked', '');
+    visible.dataset.prop = 'visible';
+    visible.addEventListener('change', (e) => tryIt('visible', !!e.detail.checked));
+    row('visible', visible);
+    const opacity = el('rn-slider');
+    opacity.setAttribute('min', '0');
+    opacity.setAttribute('max', '100');
+    opacity.setAttribute('unit', '%');
+    opacity.setAttribute('value', String(Math.round((p.opacity ?? 1) * 100)));
+    opacity.dataset.prop = 'opacity';
+    // While it is dragged: at most one try each 80 ms, the last one always.
+    let opacityAt = 0;
+    let opacityTimer = null;
+    const sendOpacity = (v) => {
+      clearTimeout(opacityTimer);
+      opacityAt = Date.now();
+      tryIt('opacity', v / 100);
+    };
+    opacity.addEventListener('input', (e) => {
+      const wait = 80 - (Date.now() - opacityAt);
+      clearTimeout(opacityTimer);
+      if (wait <= 0) sendOpacity(e.detail.value);
+      else opacityTimer = setTimeout(() => sendOpacity(e.detail.value), wait);
+    });
+    opacity.addEventListener('change', (e) => sendOpacity(e.detail.value));
+    row('opacity', opacity);
+    field('tint', 'tint', hexOf(p.tintColor), (v) => v.trim(), '#rrggbb or #rrggbbaa');
+    if (w.classes.includes('inkTextWidget')) {
+      field('text', 'text', w.text ?? '', (v) => v, 'the text');
+      field('font size', 'fontSize', String(p.fontSize ?? ''), (v) => numbers(v, 1), 'a size');
+    }
+    field('size', 'size', pairOf(p.size), (v) => numbers(v, 2), 'width height');
+    field('margin', 'margin', sidesOf(p.layout?.margin), (v) => numbers(v, 4), 'left top right bottom');
+    if (w.classes.includes('inkCompoundWidget')) field('padding', 'padding', sidesOf(p.layout?.padding), (v) => numbers(v, 4), 'left top right bottom');
+    field('x y', 'translation', pairOf(p.renderTransform?.translation), (v) => numbers(v, 2), 'x y');
+    part.append(table, msg);
+    const actions = el('div', 'actions');
+    const reset = el('rn-button', '', 'Reset');
+    reset.id = 'resetWidget';
+    reset.title = 'Put back what was tried on this widget';
+    reset.addEventListener('click', async () => {
+      try {
+        const r = await ink.reset(w.id);
+        status(`Reset: ${r.reset} change(s) put back on ${w.name || w.class}`);
+        await select(w.id);
+      } catch (err) {
+        msg.textContent = err.message;
+      }
+    });
+    const all = el('rn-button', '', 'Reset all');
+    all.setAttribute('variant', 'ghost');
+    all.id = 'resetAll';
+    all.title = 'Put back what was tried on every widget';
+    all.addEventListener('click', async () => {
+      try {
+        const r = await ink.reset();
+        status(`Reset all: ${r.reset} change(s) put back${r.gone ? `, ${r.gone} on widgets the game had removed` : ''}`);
+        if (current) await select(current.id);
+      } catch (err) {
+        msg.textContent = err.message;
+      }
+    });
+    actions.append(reset, all, el('span', 'dim tried', ''));
+    part.append(actions);
+    countTried();
+  }
+
+  // How many changes are tried and not put back, beside Reset all.
+  async function countTried() {
+    try {
+      const list = await ink.tried();
+      const label = detail.querySelector('.tried');
+      if (label) label.textContent = list.length ? `${list.length} change(s) tried` : 'nothing tried';
+    } catch {
+      // without the admin permission: a try says so itself
+    }
   }
 
   function showHits(hits) {

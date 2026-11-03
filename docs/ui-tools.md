@@ -63,6 +63,14 @@ In **Edit**, the markup and the script are side by side, with highlighting, comp
 
 The selected widget's class and its parents' classes, path, box on screen, visibility, text, controllers, its layer and HUD entry, the `.inkwidget` file it was spawned from (as a path hash), and every property, with a filter. Each part folds, and stays as you left it. **Path** and **JSON** copy it; **Read all** reads every widget under it in one call and says how long it took; **Parent** selects its parent.
 
+### To source
+
+**To source** copies the selected widget and everything under it into a new project, as ink markup: panels as `column` and `row`, canvases, texts with their size, weight, case and colour, images with their atlas and part, any other class as `<widget class="...">`. The project opens in **Edit**, and **Run** shows the copy on the HUD beside the original, a start for a panel of your own that looks like the game's. The copy is still: the game's own controller is what fills and moves the original. Hidden widgets are left out, and what markup cannot say (an anchor that fills one way only, a colour brighter than white) is listed in the markup's first comment. Needs the `admin` permission, as Projects does.
+
+### Try
+
+**Try**, in the details, changes the selected game widget live, to find what controls a look: visible, opacity (a slider), tint, size, margin, padding, place (x y), and a text's text and font size. Type a value and press Enter; the line under the fields says the value now and the one before. Nothing is kept: **Reset** puts the widget back, **Reset all** puts back every widget tried, and switching the Workbench off puts back whatever is left. Needs the `admin` permission.
+
 ## For mod makers
 
 Everything the Workbench reads is in the `rednode` package, for your own mods and apps ([Native game UI](ink.md), and the [API reference](api/)):
@@ -74,6 +82,8 @@ Everything the Workbench reads is in the `rednode` package, for your own mods an
 | `ink.inspect(id)` | One widget in full, with its parents and every property, and an `api` reference to it |
 | `ink.at(x, y)` | The drawn widgets under a point, smallest first |
 | `ink.boxes()` | Every drawn widget's box in one call, to find what is under the cursor on each move |
+| `ink.read(from, { props: true })` | Each widget's layout and look as well, with texts whole: what To source turns into markup |
+| `ink.try(id, prop, value)`, `ink.reset()` | Change one property of a game widget, and put it back (packages allowed `admin` only) |
 
 ```ts
 import { ink } from "rednode";

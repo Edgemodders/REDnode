@@ -27,6 +27,8 @@ How to keep it:
 
 - On a page that covers the game view (`"fill": "screen"`), an `rn-window` with `resizable` resizes inside the page by its corner grip, with `min-width` and `min-height`, its size kept for the page and **Reset position and size** in its title bar. See https://edgemodders.github.io/REDnode/overlay-apps.html
 - `ui.slider(label, onChange, { live: true })` in the UI builder: `onChange` also gets the value while the player drags, about 20 times a second, not only when they let go. For a slider that drives something the player watches move.
+- `ink.read(from, { props: true })` gives each widget's layout and look as well (anchor, margins, size, tint, opacity, a text's font size, weight, case and alignment, an image's atlas and part), with texts whole: what ink markup needs to copy a piece of the game's UI.
+- `ink.try(id, prop, value)` changes one property of one of the game's own widgets, live (`visible`, `opacity`, `tint`, `size`, `margin`, `padding`, `translation`, a text's `text` and `fontSize`), and keeps the value it had; `ink.reset()` puts it back, and REDnode puts everything back when the package stops. For packages the player allowed `admin`, such as the UI Workbench.
 - The UI kit's `rn-input` takes `clearable`: a ✕ inside the field while it holds text empties it, sending `input` and `change` as typing it away would.
 
 **Changed**

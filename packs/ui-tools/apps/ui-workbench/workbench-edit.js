@@ -422,7 +422,25 @@ async function stop() {
 }
 
 // For checks (the mock game's) and the window debugger: the two editors.
-window.uiWorkbenchEdit = { markup: () => markupView, script: () => scriptView, current: () => current };
+// To source (UT3b): a project from the markup and script the Inspect tab wrote, under the first
+// free name (Name, Name 2, ...), opened in Edit.
+async function fromSource(name, files) {
+  const { root: r, files: f } = await ready();
+  for (let n = 1; n <= 50; n++) {
+    const tryName = n === 1 ? name : `${name} ${n}`;
+    try {
+      const p = await f.create(r, tryName, files);
+      await openProject(p.id);
+      editStatus(`Made ${p.name} from the game's widgets: Run shows the copy beside the original`);
+      return p;
+    } catch (err) {
+      if (!/already/.test(String(err?.message))) throw new Error(needsAdmin(err));
+    }
+  }
+  throw new Error(`There are 50 projects named ${name} already`);
+}
+
+window.uiWorkbenchEdit = { markup: () => markupView, script: () => scriptView, current: () => current, fromSource };
 
 $('save').addEventListener('click', save);
 $('run').addEventListener('click', run);
