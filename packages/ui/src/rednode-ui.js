@@ -912,29 +912,50 @@ input:focus-visible { outline: 2px solid var(--rn-accent-2); outline-offset: 2px
 
   // ---------- rn-input ----------
 
+  // `clearable` adds a ✕ inside the field while it holds text: it empties the field and sends
+  // `input` and `change` with an empty value, as typing it away would.
   class RnInput extends Base {
-    static observedAttributes = ['label', 'placeholder', 'value', 'type'];
+    static observedAttributes = ['label', 'placeholder', 'value', 'type', 'clearable'];
     constructor() {
       super(
         `
 :host { display: block; }
 .label { display: block; margin-bottom: 6px; }
 .label:empty { display: none; }
+.field { position: relative; display: block; }
 input { width: 100%; padding: 8px 10px; font: 14px var(--rn-mono); color: var(--rn-fg);
   background: color-mix(in srgb, var(--rn-panel-2) 70%, black); border: 1px solid var(--rn-line); border-left: 3px solid var(--rn-accent); }
+:host([clearable]) input { padding-right: 30px; }
 input:focus { border-color: var(--rn-accent-2); outline: none; }
-input::placeholder { color: var(--rn-dim); }`,
-        `<label><span class="label"></span><input part="input" spellcheck="false" autocomplete="off"></label>`,
+input::placeholder { color: var(--rn-dim); }
+.clear { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; padding: 0;
+  border: 0; background: transparent; color: var(--rn-dim); font: 13px var(--rn-mono); line-height: 22px; cursor: pointer; }
+.clear:hover { color: var(--rn-accent-2); }
+.clear[hidden] { display: none; }`,
+        `<label><span class="label"></span><span class="field"><input part="input" spellcheck="false" autocomplete="off"><button class="clear" part="clear" type="button" title="Clear" aria-label="Clear" hidden>✕</button></span></label>`,
       );
       const input = this.$('input');
       // The browser's own input event crosses the shadow root with no detail; pages get the kit's.
       input.addEventListener('input', (e) => {
         e.stopPropagation();
+        this.showClear();
         this.emit('input', { value: input.value });
       });
       input.addEventListener('change', () => this.emit('change', { value: input.value }));
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') this.emit('submit', { value: input.value });
+      });
+      const clear = this.$('.clear');
+      // A press on the ✕ must not take the focus away first (that would send a change of its own).
+      clear.addEventListener('pointerdown', (e) => e.preventDefault());
+      clear.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!input.value) return;
+        input.value = '';
+        this.showClear();
+        input.focus();
+        this.emit('input', { value: '' });
+        this.emit('change', { value: '' });
       });
     }
     get value() {
@@ -942,9 +963,13 @@ input::placeholder { color: var(--rn-dim); }`,
     }
     set value(v) {
       this.$('input').value = v;
+      this.showClear();
     }
     focus() {
       this.$('input').focus();
+    }
+    showClear() {
+      this.$('.clear').hidden = !this.hasAttribute('clearable') || !this.$('input').value;
     }
     attributeChangedCallback(name) {
       const input = this.$('input');
@@ -952,6 +977,7 @@ input::placeholder { color: var(--rn-dim); }`,
       input.placeholder = this.getAttribute('placeholder') || '';
       input.type = this.getAttribute('type') || 'text';
       if (name === 'value') input.value = this.getAttribute('value') || '';
+      this.showClear();
     }
   }
 

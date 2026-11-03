@@ -4,6 +4,10 @@ What changed in each release of the Admin Tools pack, for its Nexus page and its
 
 ## Unreleased
 
+**Changed**
+
+- The **Tools Manager**'s search box has a ✕ that clears it (with REDnode 0.55.2 or later).
+
 ## 0.1.0 (2026-10-24)
 
 The first release, for REDnode 0.37.0 on game version 2.31.

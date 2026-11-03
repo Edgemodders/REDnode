@@ -114,7 +114,7 @@
     </div>
     <div class="split">
       <div class="pane treepane">
-        <div class="treebar"><rn-input id="filter" placeholder="Filter the tree: name, class, controller or text"></rn-input></div>
+        <div class="treebar"><rn-input id="filter" placeholder="Filter the tree: name, class, controller or text" clearable></rn-input></div>
         <div id="tree"><div class="empty">Reading the game's layers...</div></div>
       </div>
       <div class="pane" id="detail"><div class="empty">Select a widget in the tree, or press Pick and click the game's UI.</div></div>
@@ -505,6 +505,7 @@
     const propsPart = section('props', `Properties (${Object.keys(w.properties).length})`);
     const filter = el('rn-input');
     filter.setAttribute('placeholder', 'Filter properties');
+    filter.setAttribute('clearable', '');
     const props = el('table');
     const fill = (q) => {
       props.replaceChildren();

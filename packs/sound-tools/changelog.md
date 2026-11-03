@@ -4,6 +4,10 @@ What changed in each release of the Sound Tools pack, for its Nexus page and its
 
 ## Unreleased
 
+**Changed**
+
+- The search boxes of **Sound Search** and the **Sound Tracer**'s filter have a ✕ that clears them (with REDnode 0.55.2 or later).
+
 ## 0.1.1 (2026-10-27)
 
 For REDnode 0.41.0 on game version 2.5. On game 2.31, keep 0.1.0 with REDnode 0.37.0.

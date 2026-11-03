@@ -43,7 +43,7 @@ Themes are CSS custom properties, so an app can adjust one: `--rn-bg`, `--rn-pan
 | `rn-button` | `variant`: `ghost` or `danger`; `disabled`; `sound`, `hover-sound` | normal `click` |
 | `rn-toggle` | `label`, `checked`, `disabled`, `sound` | `change` (`{ checked }`) |
 | `rn-slider` | `label`, `min`, `max`, `step`, `value`, `unit`, `sound` | `input`, `change` (`{ value }`) |
-| `rn-input` | `label`, `placeholder`, `value`, `type` | `input`, `change`, `submit` on Enter (`{ value }`) |
+| `rn-input` | `label`, `placeholder`, `value`, `type`, `clearable` (a ✕ inside the field while it holds text; it empties it and sends `input` and `change`) | `input`, `change`, `submit` on Enter (`{ value }`) |
 | `rn-list` with `rn-item` | items: `value`, `selected`, `disabled`, slot `end`. List: `sound`. Height: `--rn-list-height` | `select` (`{ value, item }`) |
 | `rn-menu` with `rn-menu-item` | menu: `title`, `sound`. Items: `value`, `disabled`, slot `end` | `select` (`{ value, item }`) |
 | `rn-tabs` with `rn-tab` | tabs: `label`, `active`. Tabs: `sound` | `change` (`{ index, label }`) |
