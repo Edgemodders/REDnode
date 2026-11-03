@@ -2,11 +2,11 @@
 
 **REDnode UI Tools** is an optional app pack for UI modders: read the game's own interface, the ink widgets the engine draws, and build native UI of your own. It is its own download on [Nexus Mods](https://www.nexusmods.com/cyberpunk2077/mods/36958) and the GitHub release, beside REDnode, and its source lives in this repo at [`packs/ui-tools/`](https://github.com/Edgemodders/REDnode/tree/main/packs/ui-tools).
 
-> **Not released yet.** The pack's first release comes with the UI Workbench's editor (phase UT3, in [Native game UI](ink.md#ui-tools-plan)). The Inspect tab below passed in game on 2026-11-02 (REDnode 0.53.7).
+> **Released:** UI Tools 0.1.0, on 2026-11-03, with REDnode 0.56.1. Every part below passed in game (phases UT1 to UT3, in [Native game UI](ink.md#ui-tools-plan)). The EDGEmodders wiki has a user's manual with walkthroughs: [edgemodders.ai/wiki](https://edgemodders.ai/wiki/).
 
 | App | What it does |
 |---|---|
-| [UI Workbench](#ui-workbench) | **Inspect:** the game's ink layers and HUD pieces as a tree, Pick under the cursor, a widget's details and properties. **Edit** (coming with UT3): ink markup and a script, run live in the game, saved as projects and exported |
+| [UI Workbench](#ui-workbench) | **Inspect:** the game's ink layers and HUD pieces as a tree, Pick under the cursor, a widget's details and properties. **Try:** change a game widget live, put back with Reset. **To source:** copy a game widget into a project as ink markup. **Edit** and **Projects:** ink markup and a script, run live in the game, saved as projects and exported as mods |
 
 More UI apps can join the pack later.
 
@@ -14,12 +14,51 @@ More UI apps can join the pack later.
 
 | Needs | Why |
 |---|---|
-| REDnode 0.53.7 or later ([Nexus](https://www.nexusmods.com/cyberpunk2077/mods/35419), [GitHub](https://github.com/Edgemodders/REDnode/releases/latest)) | The reads the Workbench uses (`ink.layers`, `ink.read`, `ink.inspect`, `ink.at`, `ink.boxes`) and their fixes from the Inspect tab's tests |
+| REDnode 0.56.0 or later ([Nexus](https://www.nexusmods.com/cyberpunk2077/mods/35419), [GitHub](https://github.com/Edgemodders/REDnode/releases/latest)) | The reads the Workbench uses (`ink.layers`, `ink.read` with props, `ink.inspect`, `ink.at`, `ink.boxes`), `ink.try` and `ink.reset`, and the host's projects folder |
 | [Codeware](https://www.nexusmods.com/cyberpunk2077/mods/7780) 1.16 or later | The game's ink layers reach REDnode through it |
 | Game version 2.5 | As REDnode |
 
 1. Install the zip with Vortex, or extract it into the game folder: the app lands in `red4ext/plugins/REDnode/apps/ui-workbench`.
-2. In the game, press **F10** and open the **Mod Manager** from the launcher. Switch **UI Workbench** on. It asks for no permission: everything it does reads the game's UI.
+2. In the game, press **F10** and open the **Mod Manager** from the launcher. Switch **UI Workbench** on.
+3. Inspect works at once. **Try**, **To source**, **Edit** and **Projects** need the Workbench's `admin` permission, because they start and stop your projects and change the game's widgets: allow it in the Mod Manager's details for UI Workbench, under Permissions. Without it, those parts say so.
+
+## Quick start
+
+A first native panel in five minutes, from a save in the game with the overlay open (F10):
+
+1. **Look at the game's own UI.** In **Inspect**, press **Pick** and point at the quest tracker at the right of the HUD: the widget under the cursor is outlined and named. Click it, and the tree opens down to it with its details beside. Esc leaves Pick.
+2. **Try a change.** In the details, open **Try**, type a new text in **text** and press Enter: the game's own tracker shows it. Drag **opacity** down and up. Press **Reset**: it is back as it was.
+3. **Copy it.** Press **Parent** until the box covers the whole tracker, then **To source**: a new project opens in **Edit**, the tracker written as ink markup. Press **Run** and close the overlay (F10): a still copy shows beside the original.
+4. **Make your own.** In **Projects**, type a name and press **New**. Its template is a small working example: **Run** it, then drag the slider in its controls window and watch the panel on the HUD follow. Change a `<text>` in the markup and press **Save** (Ctrl+S): the panel shows the change at once.
+5. **Share it.** Press **Export**: the project becomes a zip in `Documents\REDnode\UI exports`, ready to install as a mod of its own.
+
+The panel's markup reads its data by name, and the script changes the data:
+
+```html
+<mount layer="hud" anchor="left" x="80" y="-60">
+  <column gap="10">
+    <text style="label">{title}</text>
+    <row gap="12" align="center">
+      <bar value="{fill}" tone="{tone}" track="dim" width="240" height="8" />
+      <text style="value" tone="{tone}">{level}%</text>
+    </row>
+  </column>
+</mount>
+```
+
+```js
+import { ink, ui } from 'rednode';
+
+const data = (level) => ({ level, fill: level / 100, tone: level >= 70 ? 'warning' : 'accent' });
+const view = await ink.load('panel.ink.html', {}, { title: 'My panel', ...data(50) });
+
+ui.window({
+  title: 'My panel: controls',
+  children: [ui.slider('Level', (v) => view.set(data(v)), { min: 0, max: 100, value: 50, live: true })],
+});
+```
+
+`view.set()` sends the game only what reads the names it changed. Every tag and attribute of the markup is in [Native game UI](ink.md#ut1-build-rednode-0510).
 
 To uninstall, remove it in your mod manager or delete that folder. REDnode stays.
 
