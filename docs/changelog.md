@@ -11,6 +11,10 @@ How to keep it:
 
 ## Unreleased
 
+## 0.56.1 (2026-11-03)
+
+For game version 2.5. With it, the first release of the [UI Tools](https://www.nexusmods.com/cyberpunk2077/mods/36958) pack: the UI Workbench inspects the game's own UI and builds native UI of your own.
+
 **New**
 
 - Ink markup: a native HUD panel can be written as an `.ink.html` file, with REDnode's ink tags as HTML (`<column gap="10">`, `<text style="label">{title}</text>`, `<list items="contracts" key="id">`), and put on the game's UI with `ink.load("board.ink.html", handlers, data)` or `ink.parse(source)`. `{name}` reads named data and a list item's fields; `view.set(data)` sends only what reads the changed data. A mistake is refused with its file, line and column. The first step of UI Tools. See https://edgemodders.github.io/REDnode/ink.html#ut1-build-rednode-0510

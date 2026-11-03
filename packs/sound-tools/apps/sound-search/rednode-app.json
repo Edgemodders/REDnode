@@ -1,7 +1,7 @@
 {
   "id": "sound-search",
   "name": "Sound Search",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Edgemodders",
   "description": "Search the game's sound events by name, tag, event id or sound id, play an event or any of its recordings, and keep what you find in a Scratch tab between sessions. Part of REDnode Sound Tools.",
   "entry": "index.html",

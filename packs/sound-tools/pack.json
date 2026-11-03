@@ -1,7 +1,7 @@
 {
   "id": "sound-tools",
   "name": "REDnode Sound Tools",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "rednode": ">=0.41.0",
   "summary": "An optional app pack for sound modders: Sound Tracer, Sound Search and Hot swap. Hot swap swaps through REDswap, which REDnode 0.41.0 installs.",
   "guide": "https://edgemodders.github.io/REDnode/sound-tools.html",
