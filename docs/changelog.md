@@ -21,6 +21,14 @@ How to keep it:
 
 - EDGEmat's tools for in-game assistants use REDnode's own REDbridge instead of starting a second one beside it (https://github.com/Edgemodders/REDnode/issues/40), so one REDbridge runs while you play. It needs an EDGEmat newer than 0.3.1; with 0.3.1 nothing changes. `"edgematBridge": "own"` in the host's settings gives EDGEmat its own again.
 
+**Fixed**
+
+- When another program holds REDnode's MCP port (41820) as the game starts, REDnode now tries again every 10 seconds instead of giving up for the session, and the launcher's Settings say which program holds it. Before, an assistant signing in reached that other program, and no Connect window showed in the game.
+
+**Other**
+
+- Port 41820 is kept for the game's REDnode: a host run from the repo or started by a test uses 41821 (`--mcp-port=<n>` for another).
+
 ## 0.56.1 (2026-11-03)
 
 For game version 2.5. With it, the first release of the [UI Tools](https://www.nexusmods.com/cyberpunk2077/mods/36958) pack: the UI Workbench inspects the game's own UI and builds native UI of your own.

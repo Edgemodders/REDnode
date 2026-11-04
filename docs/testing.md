@@ -1139,6 +1139,20 @@ REDagent needs its Anthropic key, as before.
 3. Ask: "Describe the layers of its first material setup." It runs `mat_describe` without asking. Mark.
 4. Quit the game. Claude reads the host log: `Shared REDbridge on http://127.0.0.1:<port>/bridge`, `Shared REDbridge: first call from EDGEmat (...)`, EDGEmat's `using REDnode's REDbridge`, one `REDbridge ... starting` line (the host's), and none of EDGEmat's own `starting ... REDbridge.exe` lines.
 
+## The game's MCP port (0.57.1)
+
+Found on 2026-11-04: another Claude session's sign-in opened the browser with a pairing code, but no Connect window showed in the game. The game's host log said `MCP server could not start on port 41820: listen EADDRINUSE`: a REDnode test host, started by an EDGEbuilder session the evening before and still running, held the port, so the sign-in reached it. Claude stopped that test host (pid 68180) with the owner's OK. REDnode 0.57.1 keeps 41820 for the game's host (any other host uses 41821), and the game's host tries again every 10 s while the port is taken, naming its holder in the log and the launcher.
+
+Checked outside the game on 2026-11-04 (scratchpad `mcpport-check.cjs`, 9 checks): a port held by another program is named (`node.exe (pid N)`), the server waits without a second try at once, starts within 10 s once the port is free, answers there, and stops.
+
+Test, with the next deploy:
+
+0. Test timer: **Start**, and **Mark** after each step.
+1. Before starting the game, hold port 41820 with something else: in a terminal, `node -e "require('http').createServer().listen(41820,'127.0.0.1')"` (leave it running).
+2. Start the game. In the launcher's Settings, under **MCP server**, a line says REDnode is waiting for port 41820 and names `node.exe` with its pid.
+3. Close the terminal's node (Ctrl+C). Within about 10 seconds the line goes, and the host log says `MCP server on http://127.0.0.1:41820/mcp, after waiting N s for the port`.
+4. Reconnect Claude Code to REDnode (`/mcp`): the Connect window shows in the game with the code your browser shows. Allow it.
+
 ## Game 2.5
 
 ### G1 REDnode on game 2.5

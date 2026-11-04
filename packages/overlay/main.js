@@ -206,7 +206,12 @@ const hotReloadArg = arg('hot-reload');
 // The kernel MCP server (mcp.js): on for developers; for players a launcher switch,
 // off by default. --mcp=on|off overrides both.
 const mcpArg = arg('mcp');
-const MCP_PORT = 41820;
+// Port 41820 belongs to the game's REDnode, the packaged host the game starts (never with
+// --data-dir): Claude Code and the EDGE plugin reach it there. Any other host (run from the repo,
+// or packaged but started by a test with --data-dir) uses 41821, so one left running cannot take
+// the game's port (a test host left running since the evening before did, on 2026-11-04);
+// --mcp-port=<n> picks another.
+const MCP_PORT = Number(arg('mcp-port')) || (app.isPackaged && !arg('data-dir') ? 41820 : 41821);
 // Game API types and notes for gameapi_lookup. Packaged, they sit in resources/gameapi.
 const GAMEAPI_DIR = app.isPackaged ? path.join(process.resourcesPath, 'gameapi') : null;
 const TYPES_FILE = GAMEAPI_DIR
@@ -3579,7 +3584,7 @@ function mcpConfig() {
   return {
     enabled: external || internal.size > 0,
     external,
-    port: Number(settings.mcp?.port) || MCP_PORT,
+    port: Number(arg('mcp-port')) || Number(settings.mcp?.port) || MCP_PORT,
     token: settings.mcp?.token,
     internal,
   };
@@ -4514,6 +4519,12 @@ ipcMain.handle('rednode:host:mcp', (event, on) => {
     mcp.configure(mcpConfig());
   }
   return mcpConfig().external;
+});
+
+// The MCP server's state for the launcher's Settings: running, or waiting for its port (and who holds it).
+ipcMain.handle('rednode:host:mcp-status', (event) => {
+  fromLauncher(event);
+  return mcp.status();
 });
 
 ipcMain.handle('rednode:host:mcp-command', (event) => {

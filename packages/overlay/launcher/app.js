@@ -177,6 +177,18 @@ $('mcp-copy').addEventListener('click', async () => {
   RednodeUI.notify('Run the copied command once in a terminal to add REDnode to Claude Code', { title: 'MCP server' });
 });
 
+// While another program holds the MCP server's port: says who, so a sign-in that does not reach
+// the game is explained (the host tries again every 10 s).
+async function showMcpStatus() {
+  const s = await window.rednode.apps.mcpStatus().catch(() => null);
+  const w = $('mcp-waiting');
+  w.hidden = !s?.waiting;
+  if (s?.waiting) w.textContent = `Waiting for port ${s.port}: ${s.waiting.holder ?? 'another program'} is using it. REDnode tries again every 10 seconds; close that program, and assistants reach the game here.`;
+}
+setInterval(() => {
+  if (!drawer.hidden) void showMcpStatus();
+}, 5000);
+
 // Assistants that signed in and were allowed in the game (#19), each with Revoke.
 function showMcpClients(list) {
   $('mcp-clients').hidden = !list.length;
@@ -283,6 +295,7 @@ async function refresh() {
     showTheme(await window.rednode.apps.theme());
     $('mcp').checked = await window.rednode.apps.mcp();
     showMcpClients(await window.rednode.apps.mcpClients().catch(() => []));
+    await showMcpStatus();
     $('dev').checked = await window.rednode.apps.developer();
     $('devdirs').hidden = !$('dev').checked;
     if ($('dev').checked && !drawer.hidden) showDevFolders(await window.rednode.apps.devFolders());

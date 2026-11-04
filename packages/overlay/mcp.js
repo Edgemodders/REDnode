@@ -17,6 +17,7 @@
 'use strict';
 
 const http = require('node:http');
+const { execFile } = require('node:child_process');
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
 const { z } = require('zod');
@@ -130,9 +131,26 @@ const modToolName = (pkg, fn) => `${pkg}__${fn}`.replace(/[^A-Za-z0-9_]/g, '_').
  *                       state, perf, lookup, webContentsOf, consoleOf, captureGame, call,
  *                       reloadArchives; for SV3: modTools, callModTool, toolOff, seen
  */
+/** Which program listens on a port of 127.0.0.1, as "electron.exe (pid 68180)", through netstat and tasklist. */
+function portHolder(port) {
+  const run = (cmd, args) => new Promise((resolve) => execFile(cmd, args, { windowsHide: true, timeout: 5000 }, (err, out) => resolve(err ? '' : String(out))));
+  return run('netstat.exe', ['-ano', '-p', 'TCP']).then(async (out) => {
+    const line = out.split(/\r?\n/).find((l) => new RegExp(`\\s(127\\.0\\.0\\.1|0\\.0\\.0\\.0):${port}\\s.*LISTENING`, 'i').test(l));
+    const pid = line?.trim().split(/\s+/).pop();
+    if (!pid || !/^\d+$/.test(pid)) return 'another program';
+    const name = (await run('tasklist.exe', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'])).split('","')[0]?.replace(/^"/, '').trim();
+    return `${name || 'a program'} (pid ${pid})`;
+  });
+}
+
+const RETRY_MS = 10 * 1000;
+
 function createMcp(host) {
   let server = null;
   let current = { enabled: false, port: 0, token: '' };
+  // While another program holds the port: since when, who (found once), and the next try.
+  let waiting = null;
+  let retry = null;
   // The $type of each object reference the tools handed out, so api_read knows a TweakDB record.
   const refTypes = new Map();
 
@@ -1012,10 +1030,56 @@ function createMcp(host) {
   }
 
   function stop() {
+    clearTimeout(retry);
+    retry = null;
+    waiting = null;
     if (!server) return;
     server.close();
     server.closeAllConnections?.();
     server = null;
+  }
+
+  /**
+   * Listens on current.port. When another program holds it, says so once (naming that program)
+   * and tries again every 10 s while the server should run, instead of giving up for the session:
+   * 41820 belongs to the game's REDnode, and on 2026-11-04 a test host left running since the
+   * evening before held it when the game started.
+   */
+  function listen() {
+    const port = current.port;
+    const s = http.createServer((req, res) => {
+      handle(req, res);
+    });
+    server = s;
+    s.on('error', (err) => {
+      if (server === s) server = null;
+      if (err.code !== 'EADDRINUSE' || !current.enabled || current.port !== port) {
+        host.log(`MCP server could not start on port ${port}: ${err.message}`);
+        return;
+      }
+      if (!waiting) {
+        waiting = { since: Date.now(), holder: null };
+        host.log(`MCP server: port ${port} is in use by another program; trying again every ${RETRY_MS / 1000} s`);
+        portHolder(port).then((holder) => {
+          if (!waiting) return;
+          waiting.holder = holder;
+          host.log(`MCP server: port ${port} is held by ${holder}`);
+          host.changed?.();
+        });
+        host.changed?.();
+      }
+      clearTimeout(retry);
+      retry = setTimeout(() => {
+        retry = null;
+        if (current.enabled && current.port === port && !server) listen();
+      }, RETRY_MS);
+    });
+    s.listen(port, '127.0.0.1', () => {
+      const waited = waiting ? `, after waiting ${Math.round((Date.now() - waiting.since) / 1000)} s for the port` : '';
+      waiting = null;
+      host.log(`MCP server on http://127.0.0.1:${port}/mcp${waited}`);
+      host.changed?.();
+    });
   }
 
   return {
@@ -1029,21 +1093,22 @@ function createMcp(host) {
         return;
       }
       if (same) return;
+      // still waiting for this port: the retry goes on
+      if (!server && waiting && retry && current.port === aConfig.port) return;
       stop();
-      server = http.createServer((req, res) => {
-        handle(req, res);
-      });
-      server.on('error', (err) => {
-        host.log(`MCP server could not start on port ${current.port}: ${err.message}`);
-        server = null;
-      });
-      server.listen(current.port, '127.0.0.1', () => host.log(`MCP server on http://127.0.0.1:${current.port}/mcp`));
+      listen();
     },
     stop,
     /** REDnode's own tools, for the Tools Manager. */
     ownTools,
     /** Whether the server runs, and on which port. */
-    status: () => ({ enabled: !!server && current.enabled, port: current.port, external: !!current.external }),
+    status: () => ({
+      enabled: !!server && server.listening && current.enabled,
+      port: current.port,
+      external: !!current.external,
+      // set while another program holds the port: { since, holder }
+      waiting: waiting ? { since: waiting.since, holder: waiting.holder } : null,
+    }),
   };
 }
 
@@ -1068,4 +1133,4 @@ const WINDOW_TEXT = `(() => {
   return out.join('\\n');
 })()`;
 
-module.exports = { createMcp, isRead, modToolName };
+module.exports = { createMcp, isRead, modToolName, portHolder };

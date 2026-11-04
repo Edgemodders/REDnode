@@ -53,6 +53,7 @@
   .setting { display: flex; flex-direction: column; gap: 2px; padding: 0 0 8px; border-bottom: 1px solid var(--rn-line); }
   .setting:last-child { border-bottom: 0; padding-bottom: 0; }
   .setting .what { font-size: 13px; line-height: 1.3; color: var(--rn-dim); }
+  .setting .what.warn { color: var(--rn-danger); margin-top: 4px; }
   .setting rn-button::part(button) { min-height: 24px; padding: 2px 8px; font-size: 11px; }
   .setting .line { display: flex; margin-top: 4px; }
   /* Development folders, under Developer mode: one a line, with Remove. */
@@ -161,6 +162,7 @@
       <div class="setting">
         <rn-toggle id="mcp" label="MCP server"></rn-toggle>
         <div class="what">For AI agents on this PC, such as Claude Code. An agent asks to connect, and you allow it in the game.</div>
+        <div class="what warn" id="mcp-waiting" hidden></div>
         <div class="line"><rn-button id="mcp-copy" variant="ghost">Copy setup</rn-button></div>
         <div class="devdirs" id="mcp-clients" hidden>
           <div class="sub">Connected assistants</div>

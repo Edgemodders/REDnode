@@ -115,6 +115,7 @@ contextBridge.exposeInMainWorld('rednode', {
     role: (role, id) => ipcRenderer.invoke('rednode:apps:role', role, id),
     /** Gets the kernel MCP server's switch, or turns it on or off. */
     mcp: (on) => ipcRenderer.invoke('rednode:host:mcp', on),
+    mcpStatus: () => ipcRenderer.invoke('rednode:host:mcp-status'),
     /** Copies the command that adds the MCP server to Claude Code. */
     copyMcpCommand: () => ipcRenderer.invoke('rednode:host:mcp-command'),
     /** MCP clients signed in through OAuth (#19), for the launcher: [{ id, name, lastUsed }]. */
