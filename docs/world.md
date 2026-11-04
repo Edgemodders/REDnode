@@ -1623,3 +1623,30 @@ The MCP server's `world_spawn` already returned the id with `inWorld: false` and
 4. Switch the World objects test off and quit. Claude reads the host's `Removed 2 entities world-objects-test spawned (the package stopped)`: the near box and the far one kept with `wait: false`, and not the one that timed out (0.52 and before would have left it in the game, untracked by the package).
 
 **Passed in game on 2026-11-02** (REDnode 0.53.0, dev PC, game 2.5): Spawn a prop in 197 ms; **Far, waiting** refused after 3129 ms with "so it was removed"; **Far, wait: false** answered in 109 ms, `entity null, listed and not in the world yet`; **Spawned** listed the near box in the world and the far one not yet; the switch-off logged `Removed 2 entities world-objects-test spawned (the mod stopped)`. #35 closed.
+
+## Animations on a spawned character (#39): plan
+
+Proposed on 2026-11-04, to agree with the owner. EDGEquest's request (not urgent: its Q8 H4 needs it) asks to play a game animation or a workspot on a character REDnode spawned beside V, such as the prologue's Trauma Team medics, and to tell started, finished or failed.
+
+**What the game offers** (read on 2026-11-04 from `gameapi/2.5/rtti.json` and, through REDbridge, the game's files):
+
+| Fact | Consequence |
+|---|---|
+| `gameWorkspotGameSystem` has `PlayInDeviceSimple(device, actor, allowCameraMov, actorDataCompName, deviceDataCompName, syncSlotName, slideTime, slideBehaviour, callbackEventRecipient)`, `PlayNpcInWorkspot(npc, master, referenceEntity, actorDataCompName, syncSlotName, slideTime, syncOffsetSourceCompName)`, `SendJumpToAnimEnt(actor, animName, instant)`, `IsActorInWorkspot(actor)`, `SendFastExitSignal(...)`, `StopNpcInWorkspot(actor)` | A workspot plays "in a device", an entity with a workspot component; then an animation in it can be jumped to by name |
+| `workWorkspotResourceComponent` (an `entIPlacedComponent`) has `workspotResource` (`raRef<workWorkspotResource>`), `npcWorkspotResourceSync`, `deviceWorkspotResourceSync`, `syncSlotName`, `shouldCrouch` | The device can be any entity carrying this component: `world.spawn` already attaches components made with `api.$new` at `Entity/Initialize` (W1), and a path string fills an `raRef` (#3) |
+| `entAnimationControllerComponent` has `PushEvent`, `ApplyFeature`, `SetInput*`, `GetAnimationDuration(animationName)`, `PreloadAnimations(...)`, but no "play this animation" | Outside a workspot there is no base-game call to play an animation by name (unverified for Codeware): a workspot is the way |
+| The medics' workspots are `base\workspots\quest\main_quests\prologue\q001\q001_00c_rescuing_girl\q001_00c_trauma_arrives___med_01_idle__01.workspot` and `..._med_02_idle__01`, `..._soldier_01_idle__01`, `..._soldier_02_idle__01` (the request's `med_1` is `med_01` in the file names). `med_01`'s tree loops one animation, `q001_00c_trauma_arrives___med_1_idle__01`, on the male rig `base\characters\base_entities\man_base\man_base.rig`, from `base\animations\quest_custom\q001\q001_00c_rescuing_girl\q001_00c_trauma_arrives\q001_00c_trauma_arrives_male_average.anims` | The spawned character must be male (the rig) |
+| Trauma Team characters: `Character.trauma_team_paramedic`, `Character.mws_hey_07_trauma_medic_01` and `_02`, `Character.mws_pac_06_trauma_medic_01`; the AV `Vehicle.av_trauma`, with `q001_00c_trauma_arrives_av.anims` and `synced__q001_00c__trauma_av.anims` | Real ids for the spike |
+
+**A1, the spike** (an app, Animation test, through `api` and `world` only, like H2a's Refresh test: no REDnode change, so it runs on the REDnode in the game):
+
+1. **Spawn the medic** beside V: `world.spawn({ record: "Character.trauma_team_paramedic", npc: true })` (a male one; the spike tries the others if it is not).
+2. **Make a device**: spawn REDnode's bare entity at the medic's place with a `workWorkspotResourceComponent` (`name: "workspot"`, `workspotResource` the `med_01` path).
+3. **Play**: `PlayInDeviceSimple(device, medic, false, "", "workspot", "", 0.3, Teleport...)`, then `IsActorInWorkspot(medic)` and a picture (`game_image`). If the device way fails, `PlayNpcInWorkspot(medic, V, device, ...)`.
+4. **Pick an animation**: `SendJumpToAnimEnt(medic, "q001_00c_trauma_arrives___med_1_idle__01", false)`; `GetAnimationDuration` on the medic's animation controller for the same name (whether the set is loaded on that rig).
+5. **Stop**: `SendFastExitSignal` or `StopNpcInWorkspot`, then remove the device and the medic. Each step's result goes to the Mod log.
+6. **Optional, the AV**: spawn `Vehicle.av_trauma` and try its synced set the same way (EDGEquest's second question).
+
+**What A1 decides:** whether a quest's workspot plays outside its scene on an ordinary spawned NPC (EDGEquest's first question), whether the device needs more than the component (a sync slot, a navmesh), and what a failure looks like (wrong rig, missing set), for the answer `started` / `finished` / `failed` with a reason.
+
+**A2, the call** (after A1, shaped by it): `world.useWorkspot(id, { workspot, entry? })` and `world.stopWorkspot(id)` in the package, the device made and removed by REDnode, its state on `world.spawned()`; `world.playAnimation(id, { anim, set?, loop? })` only if A1 finds a way to play an animation that no workspot holds (else it is a workspot's `SendJumpToAnimEnt`, or a workspot REDnode makes for it: later, unverified); the MCP tool `world_animate` (asks first, as `world_spawn` does).
