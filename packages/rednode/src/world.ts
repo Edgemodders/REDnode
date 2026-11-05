@@ -81,7 +81,8 @@ export interface SpawnOptions {
   /**
    * Ask the game to keep it spawned for the whole session, wherever V is, instead of only while
    * V is around (Codeware's `DynamicEntitySpec.alwaysSpawned`). For objects far from V, such as
-   * around an editor camera; use it with `wait: false`. Default `false`.
+   * around an editor camera; use it with `wait: false`. It then stays for the session until
+   * removed, wherever V goes, so remove what you no longer show. Default `false`.
    */
   alwaysSpawned?: boolean;
 }

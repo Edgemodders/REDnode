@@ -1628,7 +1628,7 @@ The MCP server's `world_spawn` already returned the id with `inWorld: false` and
 
 Asked for by EDGEbuilder ([#41](https://github.com/Edgemodders/REDnode/issues/41), 2026-11-05): its camera flies free while V stays put, and an object about 320 m from V never came in, so it has no preview, outline or gizmo. `wait: false` (#35) only keeps an entity until V gets near.
 
-Built in REDnode 0.58.0. **Whether it does the job is unverified until the test below.** Codeware's wiki says an `alwaysSpawned` entity is kept spawned for the session rather than only when the player is around, and its code passes the field to the game's population system (`PopulationEntityRegisterRequest`), so what it does is the engine's.
+Built in REDnode 0.58.0; **passed in game on 2026-11-04** ([results](#41-test-results)). Codeware's wiki says an `alwaysSpawned` entity is kept spawned for the session rather than only when the player is around, and its code passes the field to the game's population system (`PopulationEntityRegisterRequest`), so what it does is the engine's.
 
 | Part | Now |
 |---|---|
@@ -1646,7 +1646,7 @@ What it must answer, from the request: does a box 300 m, 1 km and 4 km from V co
 0. Test timer: Start, Mark after each step. Stand in the open, facing down a long street if you can.
 1. Load a save. In the launcher, switch on **World objects test** (these steps need no permission switch; its **archives** switch is only for Swap). Press **Always, 8 m** and **Not always, 8 m**: two boxes ahead of V, and a log line for each saying it is in the world. Mark.
 2. Press **Not always, 300 m**, and wait 15 s: the control. It should say it was asked for, and no `in the world` line after. Mark.
-3. Press **Always, 300 m**, and wait 15 s: does an `in the world after ... s, V 300 m away` line come? Press **Camera to the newest box**: the view jumps to 6 m from it. Say if the box shows, and the ground and buildings around it. Mark.
+3. Press **Always, 300 m**, and read the log: does an `in the world after ... s, V 300 m away` line come? It may come at once, right under the `asked for` line. Press **Camera to the newest box**: the view jumps to 6 m from it. Say if the box shows, and the ground and buildings around it. Mark.
 4. Press **Always, 1 km**, wait 15 s, then **Camera to the newest box**. The same questions. Mark.
 5. Press **Always, 4 km**, wait 30 s, then **Camera to the newest box**. The same questions. A box at V's height may be inside a building or below the ground out there, so look around the log's answer too. Press **Camera back**: V's view returns. Mark.
 6. Press **Always, 200 boxes**, and watch the frame rate. Press **Batch count** after about 10 s and again after about 30 s. Say if the game hitched or stayed slower. Mark.
@@ -1656,6 +1656,20 @@ What it must answer, from the request: does a box 300 m, 1 km and 4 km from V co
 10. Switch the World objects test off and quit. Claude reads the logs. If the camera was still on at any point, say so.
 
 If the boxes do not come in, the next thing to ask is whatever makes entities stream around a point, the last part of #24.
+
+### #41 test: results
+
+Passed on 2026-11-04 on the dev PC, game 2.5, REDnode 0.58.0, World objects test 0.2.5. The owner: everything did what was written. From the mod log:
+
+| Question | Found |
+|---|---|
+| Does it come in far from V? | Yes: Always boxes at 300 m, 1 km and 4 km were each in the world **0.1 s** after asking. The control, Not always at 300 m, never came in, in the 13 minutes it was listed |
+| Does the game draw it there? | At 300 m the owner saw the box from the camera (inside a structure, since a box goes at V's height). At 1 km and 4 km the log shows them attached, and the owner reported nothing wrong; the 4 km look was cut short when EDGEbuilder's Edit was switched on by accident. Whether the ground streams around a far camera was not read separately. EDGEbuilder's own flight is the real check |
+| Does it leave when V goes far? | No: with V about 5 km away, all 204 Always boxes were still in, and they left only at **Remove spawned**. Not always at 8 m left with V 166 m away |
+| Does `world.remove` remove it? | Yes: 207 removed in 3.5 s, nothing listed after, no errors |
+| What do a few hundred cost? | 200 boxes: 9.3 s of calls (about 46 ms a spawn, the calls of one spawn taking a frame each), all 200 in by then, no hitching for the owner. Frame rate was not measured, and these are the smallest of objects: heavier entities and people are untried |
+
+Also seen: the test's camera entity, spawned without the option, left the world when V travelled, while it went on working with V still. So an editor camera should use `alwaysSpawned` too if V can move far. **Camera back** was not exercised (EDGEbuilder's Edit took the camera, and gave V's back). The MCP `world_spawn` option was not run. An `alwaysSpawned` object stays for the session until removed, wherever V goes, so a tool should remove what it no longer shows.
 
 ## Animations on a spawned character (#39): plan
 
