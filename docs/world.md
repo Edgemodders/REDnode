@@ -1624,6 +1624,39 @@ The MCP server's `world_spawn` already returned the id with `inWorld: false` and
 
 **Passed in game on 2026-11-02** (REDnode 0.53.0, dev PC, game 2.5): Spawn a prop in 197 ms; **Far, waiting** refused after 3129 ms with "so it was removed"; **Far, wait: false** answered in 109 ms, `entity null, listed and not in the world yet`; **Spawned** listed the near box in the world and the far one not yet; the switch-off logged `Removed 2 entities world-objects-test spawned (the mod stopped)`. #35 closed.
 
+## Objects far from V (#41)
+
+Asked for by EDGEbuilder ([#41](https://github.com/Edgemodders/REDnode/issues/41), 2026-11-05): its camera flies free while V stays put, and an object about 320 m from V never came in, so it has no preview, outline or gizmo. `wait: false` (#35) only keeps an entity until V gets near.
+
+Built in REDnode 0.58.0. **Whether it does the job is unverified until the test below.** Codeware's wiki says an `alwaysSpawned` entity is kept spawned for the session rather than only when the player is around, and its code passes the field to the game's population system (`PopulationEntityRegisterRequest`), so what it does is the engine's.
+
+| Part | Now |
+|---|---|
+| `world.spawn({ ..., alwaysSpawned: true, wait: false })` | Passed to `DynamicEntitySpec`, and left out unless asked for, so nothing changes for anyone else |
+| `world.load(scene, { wait: false, alwaysSpawned: true })` | The same for every object in the scene |
+| The respawn after an archive swap | Keeps it, as it keeps the other spawn options |
+| MCP `world_spawn` | `alwaysSpawned` as an option |
+
+Checked against a stand-in host (scratchpad `w41/check.mjs`, 8 checks, and #35's check again); the MCP line is not run outside the game. The probe is in World objects test 0.2.5: it logs each box when it comes in and leaves, with the time taken and V's distance, and has a camera that goes to the newest box as EDGEbuilder's does.
+
+### #41 test
+
+What it must answer, from the request: does a box 300 m, 1 km and 4 km from V come in and show when a camera goes there; does the game draw the ground around it with V far away; does it leave when V goes far, or stay; does `world.remove` still remove it; what do a few hundred cost.
+
+0. Test timer: Start, Mark after each step. Stand in the open, facing down a long street if you can.
+1. Load a save. In the launcher, switch on **World objects test** (these steps need no permission switch; its **archives** switch is only for Swap). Press **Always, 8 m** and **Not always, 8 m**: two boxes ahead of V, and a log line for each saying it is in the world. Mark.
+2. Press **Not always, 300 m**, and wait 15 s: the control. It should say it was asked for, and no `in the world` line after. Mark.
+3. Press **Always, 300 m**, and wait 15 s: does an `in the world after ... s, V 300 m away` line come? Press **Camera to the newest box**: the view jumps to 6 m from it. Say if the box shows, and the ground and buildings around it. Mark.
+4. Press **Always, 1 km**, wait 15 s, then **Camera to the newest box**. The same questions. Mark.
+5. Press **Always, 4 km**, wait 30 s, then **Camera to the newest box**. The same questions. A box at V's height may be inside a building or below the ground out there, so look around the log's answer too. Press **Camera back**: V's view returns. Mark.
+6. Press **Always, 200 boxes**, and watch the frame rate. Press **Batch count** after about 10 s and again after about 30 s. Say if the game hitched or stayed slower. Mark.
+7. Press **Spawned**: each box says `in the world` or `not in the world yet`. Mark.
+8. Walk or fast travel far across the city, more than 1 km. Press **Spawned** again. The log says which boxes left; `Not always, 8 m` should have, and the question is whether the Always ones stayed. Mark.
+9. Press **Remove spawned**, then **Spawned**: nothing listed, and no errors. Mark.
+10. Switch the World objects test off and quit. Claude reads the logs. If the camera was still on at any point, say so.
+
+If the boxes do not come in, the next thing to ask is whatever makes entities stream around a point, the last part of #24.
+
 ## Animations on a spawned character (#39): plan
 
 Proposed on 2026-11-04, to agree with the owner. EDGEquest's request (not urgent: its Q8 H4 needs it) asks to play a game animation or a workspot on a character REDnode spawned beside V, such as the prologue's Trauma Team medics, and to tell started, finished or failed.

@@ -580,6 +580,7 @@ function createMcp(host) {
           record: z.string().optional().describe('A TweakDB record, such as Character.CitizenRichFemale'),
           appearance: z.string().optional().describe('The entity appearance'),
           position: POINT.optional(),
+          alwaysSpawned: z.boolean().optional().describe('Ask the game to keep it spawned wherever V is, for objects far from V'),
         },
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
         _meta: ASK_FIRST,

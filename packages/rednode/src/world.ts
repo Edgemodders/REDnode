@@ -78,6 +78,12 @@ export interface SpawnOptions {
    * their place and stay friendly once they attach. Default `true`.
    */
   wait?: boolean;
+  /**
+   * Ask the game to keep it spawned for the whole session, wherever V is, instead of only while
+   * V is around (Codeware's `DynamicEntitySpec.alwaysSpawned`). For objects far from V, such as
+   * around an editor camera; use it with `wait: false`. Default `false`.
+   */
+  alwaysSpawned?: boolean;
 }
 
 /** A spawned entity. */
@@ -347,6 +353,7 @@ export const world = {
       active: true,
       tags: options.tags ?? [],
       ...(options.keep ? { persistState: true, persistSpawn: true } : {}),
+      ...(options.alwaysSpawned ? { alwaysSpawned: true } : {}),
     });
     // Listen before spawning: the events can come before the ID does.
     const attached = new Set<string>();
@@ -439,7 +446,8 @@ export const world = {
    * your package's folder). People stand where placed and stay friendly to V. Loading a
    * scene of the same name again replaces it. With `wait: false`, objects are spawned without
    * waiting for each to be in the world, as {@link world.spawn} does with it, so a scene far
-   * from V loads in full and shows once V gets near.
+   * from V loads in full and shows once V gets near. `alwaysSpawned` asks for every object what
+   * {@link world.spawn}'s option of that name asks for one.
    *
    * @example
    * ```ts
@@ -448,7 +456,7 @@ export const world = {
    * await world.unload(r.name);
    * ```
    */
-  async load(scene: Scene | string, options: { name?: string; wait?: boolean } = {}): Promise<LoadResult> {
+  async load(scene: Scene | string, options: { name?: string; wait?: boolean; alwaysSpawned?: boolean } = {}): Promise<LoadResult> {
     const started = Date.now();
     let read: SceneRead;
     try {
@@ -465,7 +473,7 @@ export const world = {
     const skipped = [...read.skipped];
     for (const plan of read.plans) {
       try {
-        const { id } = await world.spawn({ ...planOptions(plan), ...(options.wait === false ? { wait: false } : {}) });
+        const { id } = await world.spawn({ ...planOptions(plan), ...(options.wait === false ? { wait: false } : {}), ...(options.alwaysSpawned ? { alwaysSpawned: true } : {}) });
         ids.push(id.hash);
         const entry = mine.get(id.hash);
         if (entry) entry.scene = name;

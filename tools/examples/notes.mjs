@@ -416,7 +416,7 @@ export const NOTES = {
     summary: 'Spawn a person and a prop, list what is near V with the files each uses, load an EDGEbuilder scene around V, and swap an archive to see what its refresh does to the world.',
     teaches: ['world.spawn', 'world.move', 'world.near', 'world.files', 'world.load', 'world.unload', 'world.spawned', 'world.onRespawn', 'archives.reload', 'ui.list'],
     how: [
-      'H2c-b\'s test app: each button calls one part of the world API and logs what came back and how long it took.',
+      'H2c-b\'s test app: each button calls one part of the world API and logs what came back and how long it took. The **Always** buttons are #41\'s probe of `alwaysSpawned`, for objects far from V.',
       '**Spawn a person** uses `world.spawn({ record })`: a `Character.*` record stands where it was placed and stays friendly to V, with no other call. **Spawn a prop** uses `world.spawn({ mesh })`: a mesh on its own. **Keep in saves** passes `keep`. **Move** shifts the newest spawn 2 m east and turns it a quarter with `world.move`, which also keeps the new place, so the respawn after a swap brings it back there.',
       '**Far, waiting** spawns a box 4 km ahead of V, where the game does not stream it in: after its `timeoutMs` the call throws and the box is removed, so nothing is left behind. **Far, wait: false** passes `wait: false`: the call resolves at once and the box is listed in **Spawned** as not in the world yet, until V gets near.',
       '**Near V** is `world.near`: every entity within the radius, nearest first, read in the game in one call; **With files** adds the files each one uses, and **Using this file** keeps only those that use a given depot path.',

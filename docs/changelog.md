@@ -15,6 +15,7 @@ How to keep it:
 
 - Title-bar buttons for Node mod windows (https://github.com/Edgemodders/REDnode/issues/38): `ui.window({ titleButtons: [{ id, label, icon, onClick }] })` puts buttons of the mod's own beside close, with an icon from the UI kit (`key`, `settings`, `back`, `refresh`, `help`, `pin`...) or the label as text, and `on: true` for a lit switch. The window's own actions move into its ⋯ menu when there are more than three. Page apps get the same with the UI kit's `rn-window` `titleButtons` property.
 - `win.set({ title, titleButtons, children })` changes an open Node mod window in place, with the same place and size and no flicker, so one window can hold several views (https://github.com/Edgemodders/REDnode/issues/38). Nodes taken out keep their state.
+- `world.spawn` and `world.load` take `alwaysSpawned: true`, and the MCP tool `world_spawn` takes it too: it asks the game to keep an object spawned wherever V is, for objects far from V such as around an editor camera (https://github.com/Edgemodders/REDnode/issues/41).
 - A sample, **Views mod**: one window with two views, swapped with `win.set`, and three title-bar buttons.
 
 **Changed**

@@ -1956,6 +1956,7 @@ async function spawnForAgent(o) {
         spawnInView: true,
         active: true,
         tags: [],
+        ...(o.alwaysSpawned ? { alwaysSpawned: true } : {}),
       },
     });
     const id = await bridgeCall('rtti.call', { class: 'REDnodeWorld', fn: 'Spawn', args: [{ $ref: spec.$ref }, components.map((c) => ({ $ref: c.$ref }))] });

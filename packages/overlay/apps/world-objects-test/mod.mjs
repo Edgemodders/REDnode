@@ -5,7 +5,8 @@
 //   1 Spawn     a person by TweakDB record (stands still, friendly, through world.spawn), a
 //               prop by mesh alone, the package's spawn list, a move of the newest spawn (#27:
 //               a swap's respawn must keep the moved place); far from V (#35): a spawn that
-//               times out is removed, and one with wait: false is kept until it comes in
+//               times out is removed, and one with wait: false is kept until it comes in;
+//               #41's probe: alwaysSpawned boxes far from V, a camera flown to them, a batch
 //   2 Near V    world.near: the entities around V with the files they use, read in the game
 //               in one call; only those that use a given file
 //   3 Scene     writes an EDGEbuilder scene around V into this app's folder, loads it with
@@ -109,6 +110,90 @@ const farLater = () =>
     const { id, entity } = await world.spawn({ mesh: BOX, ...at, wait: false });
     const s = world.spawned().find((e) => e.id.hash === id.hash);
     return `${id.hash} at once, entity ${entity === null ? 'null' : 'given'}, listed ${s ? (s.attached ? 'and in the world' : 'and not in the world yet') : 'NOT'}`;
+  });
+
+// #41: does alwaysSpawned bring an object in far from V, stay there, and cost little? Every box
+// is logged when it comes in and when it leaves, with how long it took and how far V is then.
+const watched = new Map();
+const distanceToV = async (at) => {
+  const v = await api.GetPlayer(game.instance).catch(() => null);
+  const p = v ? await v.GetWorldPosition().catch(() => null) : null;
+  return p ? Math.hypot(p.X - at.x, p.Y - at.y, p.Z - at.z).toFixed(0) : '?';
+};
+world.on('Entity/AfterAttach', async (e) => {
+  const w = watched.get(String(e.entityId));
+  if (!w) return;
+  if (w.batch) return void (w.batch.in += 1);
+  say(`${w.label}: in the world after ${((performance.now() - w.started) / 1000).toFixed(1)} s, V ${await distanceToV(w.position)} m away`);
+});
+world.on('Entity/Detach', async (e) => {
+  const w = watched.get(String(e.entityId));
+  if (!w) return;
+  if (w.batch) return void (w.batch.left += 1);
+  say(`${w.label}: left the world, V ${await distanceToV(w.position)} m away`);
+});
+
+const boxAt = (metres, always, side = 0) =>
+  step(`${always ? 'Always' : 'Not always'}, ${metres} m`, async () => {
+    const at = await inFront(metres, side);
+    const label = `${always ? 'Always' : 'Not always'} box ${metres} m`;
+    const started = performance.now();
+    const { id } = await world.spawn({ mesh: BOX, ...at, alwaysSpawned: always, wait: false });
+    watched.set(id.hash, { label, started, position: at.position });
+    // The event can come before the id does.
+    const already = world.spawned().find((e) => e.id.hash === id.hash)?.attached;
+    return `${id.hash} asked for${already ? ', and in the world already' : ''}`;
+  });
+
+// A few hundred, for what they cost: 200 boxes on a grid, 1 km ahead. The log says how long the
+// calls took and, on Batch count, how many are in. Watch the game's frame rate while they come in.
+let batch = null;
+const spawnBatch = () =>
+  step('Always, 200 boxes', async () => {
+    const at = await inFront(1000);
+    batch = { in: 0, left: 0, started: performance.now() };
+    const before = performance.now();
+    for (let i = 0; i < 200; i++) {
+      const position = { ...at.position, x: at.position.x + (i % 20) * 2, y: at.position.y + Math.floor(i / 20) * 2 };
+      const { id } = await world.spawn({ mesh: BOX, position, yaw: at.yaw, alwaysSpawned: true, wait: false });
+      watched.set(id.hash, { label: 'batch', started: before, position, batch });
+    }
+    return `200 asked for in ${(performance.now() - before).toFixed(0)} ms; press Batch count`;
+  });
+const batchCount = () =>
+  step('Batch count', async () =>
+    batch ? `${batch.in} of 200 in the world, ${batch.left} left, ${((performance.now() - batch.started) / 1000).toFixed(0)} s after asking` : 'no batch yet',
+  );
+
+// The camera EDGEbuilder flies, as far as a look needs: an empty entity with a camera component,
+// put 6 m short of the newest box, looking at it. V stays where V is.
+const EMPTY = 'base\\gameplay\\loot\\containers\\common_suitcases\\appearances\\suitcase_small_placeholder.ent';
+let camera = null;
+const cameraBack = () =>
+  step('Camera back', async () => {
+    if (!camera) return 'the camera is V\'s already';
+    await camera.component.Deactivate(0, false).catch(() => {});
+    await world.remove(camera.id).catch(() => false);
+    camera = null;
+    const v = await api.GetPlayer(game.instance);
+    const fpp = v ? await v.GetFPPCameraComponent() : null;
+    if (fpp) await fpp.Activate(0, false);
+    return 'V\'s camera is back';
+  });
+const cameraToNewest = () =>
+  step('Camera to the newest box', async () => {
+    const newest = [...watched.values()].filter((w) => !w.batch).at(-1) ?? [...watched.values()].at(-1);
+    if (!newest) return 'no box yet: press one of the Always buttons first';
+    if (!camera) {
+      const component = await api.$new('gameCameraComponent', { name: 'world_test_camera' });
+      const { id, entity } = await world.spawn({ template: EMPTY, ...(await inFront(1)), components: [component] });
+      const cam = (entity && (await entity.FindComponentByName('world_test_camera'))) ?? component;
+      await cam.Activate(0, false);
+      camera = { id, component: cam };
+    }
+    const t = newest.position;
+    await world.move(camera.id, { x: t.x, y: t.y - 6, z: t.z + 1.5 }, undefined, 0);
+    return `looking at ${newest.label === 'batch' ? 'the batch' : newest.label} from 6 m, V ${await distanceToV(t)} m from it. Is the box drawn? The ground and buildings?`;
   });
 
 // Moves the newest spawn 2 m to its right and turns it a quarter, as an editor's gizmo would.
@@ -253,6 +338,24 @@ ui.window({
     ui.row(
       ui.button('Far, waiting', farWaiting, { variant: 'ghost' }),
       ui.button('Far, wait: false', farLater, { variant: 'ghost' }),
+    ),
+    ui.row(
+      ui.button('Always, 8 m', () => boxAt(8, true, -1), { variant: 'ghost' }),
+      ui.button('Not always, 8 m', () => boxAt(8, false, 1), { variant: 'ghost' }),
+      ui.button('Not always, 300 m', () => boxAt(300, false), { variant: 'ghost' }),
+    ),
+    ui.row(
+      ui.button('Always, 300 m', () => boxAt(300, true), { variant: 'ghost' }),
+      ui.button('Always, 1 km', () => boxAt(1000, true), { variant: 'ghost' }),
+      ui.button('Always, 4 km', () => boxAt(4000, true), { variant: 'ghost' }),
+    ),
+    ui.row(
+      ui.button('Camera to the newest box', cameraToNewest, { variant: 'ghost' }),
+      ui.button('Camera back', cameraBack, { variant: 'ghost' }),
+    ),
+    ui.row(
+      ui.button('Always, 200 boxes', spawnBatch, { variant: 'ghost' }),
+      ui.button('Batch count', batchCount, { variant: 'ghost' }),
     ),
     ui.heading('2. Near V'),
     ui.slider('Radius (m)', (v) => (radius = v), { min: 5, max: 60, step: 5, value: radius }),
