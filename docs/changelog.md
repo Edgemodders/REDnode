@@ -24,7 +24,7 @@ For game version 2.5.
 
 **Changed**
 
-- EDGEmat's tools for in-game assistants use REDnode's own REDbridge instead of starting a second one beside it (https://github.com/Edgemodders/REDnode/issues/40), so one REDbridge runs while you play. It needs an EDGEmat newer than 0.3.1; with 0.3.1 nothing changes. `"edgematBridge": "own"` in the host's settings gives EDGEmat its own again.
+- EDGEmat's tools for in-game assistants use REDnode's own REDbridge instead of starting a second one beside it (https://github.com/Edgemodders/REDnode/issues/40), so one REDbridge runs while you play. It needs an EDGEmat newer than 0.3.1. This release still carries 0.3.1, so nothing changes yet: a later REDnode release with the newer EDGEmat turns it on. `"edgematBridge": "own"` in the host's settings gives EDGEmat its own again.
 
 **Fixed**
 
