@@ -84,7 +84,7 @@ REDnode 0.45.0 runs [EDGEmat](https://edgemodders.github.io/EDGEmat/)'s MCP serv
 
 ### EDGEmat's tools on REDnode's REDbridge (#40)
 
-From REDnode 0.57.0 the host shares its REDbridge, the one packages reach through `kernel.bridge()`, with EDGEmat's server, so one REDbridge loads WolvenKit and the game's archive list while the player plays, not two. Asked for by EDGEmat ([#40](https://github.com/Edgemodders/REDnode/issues/40)) at the owner's request, 2026-11-03.
+From REDnode 0.57.0 the host shares its REDbridge, the one packages reach through `kernel.bridge()`, with EDGEmat's server, so one REDbridge loads WolvenKit and the game's archive list while the player plays, not two. Asked for by EDGEmat ([#40](https://github.com/Edgemodders/REDnode/issues/40)) at the owner's request, 2026-11-03. Passed in game on 2026-11-05 with EDGEmat's server from its main ([test](testing.md#edgemat-on-rednodes-redbridge-40)); players get it once REDnode's pin moves past 0.3.1.
 
 | | |
 |---|---|

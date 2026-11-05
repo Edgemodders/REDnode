@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://edgemodders.github.io/REDnode/"><img src="docs/assets/brand/badges/docs.svg" alt="docs: read the docs"></a>
-  <img src="docs/assets/brand/badges/status.svg" alt="status: 0.56.1 released">
+  <img src="docs/assets/brand/badges/status.svg" alt="status: 0.58.0 released">
   <img src="docs/assets/brand/badges/game.svg" alt="game: 2.5">
   <img src="docs/assets/brand/badges/red4ext.svg" alt="RED4ext: 1.31">
   <img src="docs/assets/brand/badges/node.svg" alt="Node: 24">
@@ -18,7 +18,7 @@ REDnode attaches to the game through RED4ext and exposes the game's reflection (
 **[Read the docs](https://edgemodders.github.io/REDnode/)** &middot; [API reference](https://edgemodders.github.io/REDnode/api/) &middot; [Design](https://edgemodders.github.io/REDnode/design.html)
 
 > [!NOTE]
-> **Status: 0.56.1 released on 2026-11-03, for game 2.5** (for game 2.31, use 0.37.0). Archives hot swap through [REDswap](https://www.nexusmods.com/cyberpunk2077/mods/36172), installed with REDnode. Download it from [Nexus Mods](https://www.nexusmods.com/cyberpunk2077/mods/35419) or [GitHub releases](https://github.com/Edgemodders/REDnode/releases). Optional packs: [UI Tools](https://www.nexusmods.com/cyberpunk2077/mods/36958) (the UI Workbench: inspect the game's own UI and build native UI of your own), [Sound Tools](https://www.nexusmods.com/cyberpunk2077/mods/35537) and [Admin Tools](https://www.nexusmods.com/cyberpunk2077/mods/35793). The in-game assistant [REDagent](https://www.nexusmods.com/cyberpunk2077/mods/35670) runs on it. The current work and the roadmap are on the [docs home page](https://edgemodders.github.io/REDnode/).
+> **Status: 0.58.0 released on 2026-11-05, for game 2.5** (for game 2.31, use 0.37.0). New: mods get their own title-bar buttons and can swap a window's views in place, and objects can stay spawned far from V. Archives hot swap through [REDswap](https://www.nexusmods.com/cyberpunk2077/mods/36172), installed with REDnode. Download it from [Nexus Mods](https://www.nexusmods.com/cyberpunk2077/mods/35419) or [GitHub releases](https://github.com/Edgemodders/REDnode/releases). Optional packs: [UI Tools](https://www.nexusmods.com/cyberpunk2077/mods/36958) (the UI Workbench: inspect the game's own UI and build native UI of your own), [Sound Tools](https://www.nexusmods.com/cyberpunk2077/mods/35537) and [Admin Tools](https://www.nexusmods.com/cyberpunk2077/mods/35793). The in-game assistant [REDagent](https://www.nexusmods.com/cyberpunk2077/mods/35670) runs on it. The current work and the roadmap are on the [docs home page](https://edgemodders.github.io/REDnode/).
 
 ## How it works
 

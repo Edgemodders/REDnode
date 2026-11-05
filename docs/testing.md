@@ -89,8 +89,9 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [Solo mask and Ask answers (0.50.1)](#solo-mask-and-ask-answers-0501) | In the game | Overlay, REDagent | Passed | 0.50.1 + Layers test 0.2.0, REDagent 0.4.1, game 2.5 | Passed on the dev PC on 2026-11-01. Mock game: 10 checks for the in-page drag (scratchpad `mask/check.mjs`, 21:9) |
 | [Keys and modifiers (#33, #34)](#keys-and-modifiers-33-34) | In the game | Overlay | Passed | 0.52.1 + Input test 0.1.0, EDGEbuilder 0.5.3, game 2.5 | Retest passed 2026-11-02 (0.52.1). 0.52.0: all but steps 3 (End came as Shift+End: no `"mods"` with none held; fixed in 0.52.1) and 8's Esc (EDGEbuilder 0.5.2 installed, which never asks). Mock game: 19 checks (scratchpad `keys/check.mjs`) |
 | [A picture in a mod window (#37)](#a-picture-in-a-mod-window-37) | In the game | Overlay | Passed | 0.55.0 + Image mod 0.1.0, game 2.5 | Passed on the dev PC on 2026-11-02; both `ui.image:` lines in the Mod log. #37 closed. Mock game: 15 checks (scratchpad `img/check.mjs`), dev and packaged host |
-| [Title-bar buttons and views (#38)](#title-bar-buttons-and-views-38) | In the game | Overlay | Not run | 0.57.0 + Views mod 0.1.0, game 2.5 | Built 2026-11-03. Mock game: 19 checks (scratchpad `views/check.mjs`), dev and packaged host |
-| [EDGEmat on REDnode's REDbridge (#40)](#edgemat-on-rednodes-redbridge-40) | In the game | MCP | Not run | 0.57.0 + EDGEmat's server from its main, REDagent, game 2.5 | Built 2026-11-03. Outside the game: 21 checks on the share, 12 end to end with a real REDbridge (scratchpad `w40/`) |
+| [Title-bar buttons and views (#38)](#title-bar-buttons-and-views-38) | In the game | Overlay | Passed 2026-11-05 | 0.58.0 + Views mod 0.1.0, game 2.5 | Every step as written (dev PC). Mock game: 19 checks (scratchpad `views/check.mjs`), dev and packaged host |
+| [EDGEmat on REDnode's REDbridge (#40)](#edgemat-on-rednodes-redbridge-40) | In the game | MCP | Passed 2026-11-05 | 0.58.0 + EDGEmat's server from its main, REDagent, game 2.5 | One REDbridge, EDGEmat through the shared one (dev PC). The release keeps npm's 0.3.1, which ignores it, until EDGEmat publishes. Outside the game: 21 checks on the share, 12 end to end with a real REDbridge (scratchpad `w40/`) |
+| [The game's MCP port (0.57.1)](#the-games-mcp-port-0571) | In the game | MCP | Passed 2026-11-05 | 0.58.0, game 2.5 | The host waited 70 s for a port held by `node.exe`, named it, took the port when freed; a sign-in then reached the game (dev PC). Outside the game: 9 checks (scratchpad `mcpport-check.cjs`) |
 | [Edit and Run (UT3a)](ink.md#ut3a-test) | In the game | UI Tools | Passed | 0.55.0 + UI Workbench 0.2.0, Codeware, game 2.5 | Passed on the dev PC on 2026-11-02, with #37's test. The player's notes (resize, a splitter) went into 0.55.1. Mock game: 21 checks (scratchpad `ut3/check.mjs`) and Inspect's 40 |
 | [UT3a polish (0.55.1)](ink.md#ut3a-polish-rednode-0551-ui-workbench-021) | In the game | UI Tools, Overlay | Passed 2026-11-03 | 0.55.1 + UI Workbench 0.2.1, Codeware, game 2.5 | Every step as expected (dev PC). Mock game: 19 checks (scratchpad `wb/check.mjs`) and the keys check's 19 |
 | [Mod Manager details and status tooltips (0.56.1)](ink.md#mod-manager-details-and-status-tooltips-rednode-0561-ui-workbench-041) | In the game | Overlay, UI Tools | Passed 2026-11-03 | 0.56.1 + UI Workbench 0.4.1 | Every step as expected (dev PC). Mock game: 14 checks (scratchpad `mm2/check.mjs`) |
@@ -1128,6 +1129,8 @@ Built 2026-11-03 in REDnode 0.57.0 for EDGEmat's [#38](https://github.com/Edgemo
 5. Drag the window somewhere else and press the gear: the settings view opens where you left it. Close the window with ✕, then press **Show** for it in the launcher: it comes back in the settings view. Mark.
 6. Switch the Views mod off. Mark.
 
+**Passed on 2026-11-05** (dev PC, REDnode 0.58.0): every step as written, and the Mod log has the mod's `Settings view`, `Main view`, `Pinned`, `Unpinned` and `Help:` lines in order.
+
 ### EDGEmat on REDnode's REDbridge (#40)
 
 Built 2026-11-03 in REDnode 0.57.0 for EDGEmat's [#40](https://github.com/Edgemodders/REDnode/issues/40): the host shares its REDbridge with EDGEmat's in-game server over `POST http://127.0.0.1:<port>/bridge` with a token per start (`packages/overlay/bridge-share.js`; docs/mcp.md, "EDGEmat's tools on REDnode's REDbridge (#40)"). This test build carries EDGEmat's server from its main branch (`EDGEMAT_MCP_DIR`), since 0.3.1 on npm ignores the shared REDbridge. Checked outside the game: 21 checks on `bridge-share.js` alone and 12 end to end with a real REDbridge (scratchpad `w40/share-check.cjs`, `w40/e2e-check.cjs`): `mat_find` answered in 4.4 s through the shared REDbridge, with one new REDbridge.exe, not two.
@@ -1139,6 +1142,10 @@ REDagent needs its Anthropic key, as before.
 2. Ask REDagent: "Find the materials of Items.Pants_01_basic_01." It runs `mat_find` without asking you and names the trousers' meshes and materials. Mark.
 3. Ask: "Describe the layers of its first material setup." It runs `mat_describe` without asking. Mark.
 4. Quit the game. Claude reads the host log: `Shared REDbridge on http://127.0.0.1:<port>/bridge`, `Shared REDbridge: first call from EDGEmat (...)`, EDGEmat's `using REDnode's REDbridge`, one `REDbridge ... starting` line (the host's), and none of EDGEmat's own `starting ... REDbridge.exe` lines.
+
+**Passed on 2026-11-05** (dev PC, REDnode 0.58.0, EDGEmat's server from its main, which still calls itself 0.3.1): every step as written. The host log has `Shared REDbridge on http://127.0.0.1:52188/bridge`, EDGEmat's `using REDnode's REDbridge`, `Shared REDbridge: first call from EDGEmat (archive.archives)`, and one REDbridge start, the host's. Both `mat_find` and `mat_describe` ran without asking.
+
+The 0.58.0 release ships EDGEmat 0.3.1 from npm, which ignores the shared REDbridge and starts its own. That combination was checked outside the game on 2026-11-05 with REDnode's variables set (scratchpad `e1/check-pin.cjs`, E1's 21 checks: tools listed, reads answered, ask flags). Raise the pin in `packages/overlay/package.json` once EDGEmat publishes a newer version.
 
 ## The game's MCP port (0.57.1)
 
@@ -1153,6 +1160,8 @@ Test, with the next deploy:
 2. Start the game. In the launcher's Settings, under **MCP server**, a line says REDnode is waiting for port 41820 and names `node.exe` with its pid.
 3. Close the terminal's node (Ctrl+C). Within about 10 seconds the line goes, and the host log says `MCP server on http://127.0.0.1:41820/mcp, after waiting N s for the port`.
 4. Reconnect Claude Code to REDnode (`/mcp`): the Connect window shows in the game with the code your browser shows. Allow it.
+
+**Passed on 2026-11-05** (dev PC, REDnode 0.58.0), in a second run: in the first, the holder was not running when the game started, so the host took the port and there was rightly no line. The host log: `port 41820 is in use by another program`, `held by node.exe (pid 17544)`, `MCP server on http://127.0.0.1:41820/mcp, after waiting 70 s for the port`, then the sign-in `asks to connect (code AGB-2561)`, `the player allowed`, `is connected`.
 
 ## Game 2.5
 

@@ -11,6 +11,10 @@ How to keep it:
 
 ## Unreleased
 
+## 0.58.0 (2026-11-05)
+
+For game version 2.5.
+
 **New**
 
 - Title-bar buttons for Node mod windows (https://github.com/Edgemodders/REDnode/issues/38): `ui.window({ titleButtons: [{ id, label, icon, onClick }] })` puts buttons of the mod's own beside close, with an icon from the UI kit (`key`, `settings`, `back`, `refresh`, `help`, `pin`...) or the label as text, and `on: true` for a lit switch. The window's own actions move into its ⋯ menu when there are more than three. Page apps get the same with the UI kit's `rn-window` `titleButtons` property.
