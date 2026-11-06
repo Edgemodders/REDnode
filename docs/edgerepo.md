@@ -4,7 +4,7 @@ title: EDGErepo
 
 # EDGErepo: a base repo for the EDGE tools
 
-**Status: might do, later.** Proposed by the user on 2026-10-25. Not scheduled. Nothing is built.
+**Status: R1 agreed, not built.** Proposed by the user on 2026-10-25. On 2026-11-06, with twelve copies of the Nexus tool in six versions and the #36 fix in only four, the owner chose **a shared tag**: each repo's release workflow checks out EDGErepo at `v1` and runs the script from there, so a fix reaches every repo by moving the tag. Not a submodule, which pins a commit per repo and so needs a bump commit in each. R1 is smaller than written below: the scripts only, with EDGEwave's second-file support folded in, a checkout step rather than a reusable workflow (REDnode releases several pages in one run), and on a PC a sibling checkout, `../EDGErepo`. One low-risk tool moves first and is tested with a real release, then the rest. Agreed order: after EDGEhack's H3.3 test. The template and shared docs styling stay parked.
 
 ## The problem
 
