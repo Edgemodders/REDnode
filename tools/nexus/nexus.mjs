@@ -11,7 +11,9 @@
 //
 // <dir> is the folder with nexus.json (default: nexus). nexus.json names the page ("page": 35419)
 // and how the file is uploaded ("upload"); pull adds the internal mod id, the main file's id and
-// the hash of the description it pulled. A page released with tags of its own sets their prefix
+// the hash of the description it pulled. "primary" makes the new version the page's Primary file, its
+// default download, and is true on every page, also with "modManager": false: sent as false, a new
+// version never takes over and Primary stays on an old one. A page released with tags of its own sets their prefix
 // ("tag": "wardrobe-designer-v"); without it the page's release tags are v<version>.
 //
 // The description is pushed only when the live one is what the repo last saw: the one pulled
@@ -54,6 +56,8 @@ const fromNexus = (s) =>
 const sha = (s) => createHash('sha256').update(s.replace(/\s+/g, '')).digest('hex');
 const readConfig = () => JSON.parse(readFileSync(configFile, 'utf8'));
 const repoDescription = () => lf(readFileSync(descFile, 'utf8'));
+/** A warning: an annotation on the run in CI, a plain line on the dev PC. */
+const warn = (title, msg) => console.log(process.env.GITHUB_ACTIONS ? `::warning title=${title}::${msg}` : msg);
 
 async function mainFile(modId, fileId) {
   if (fileId) return { file: { id: String(fileId) }, versions: (await api('GET', `/mod-files/${fileId}/versions`)).versions };
@@ -140,16 +144,26 @@ async function plan(version) {
   const mod = await modByPage(config.page);
   const { file, versions } = await mainFile(mod.id, config.file);
   const already = versions.find((v) => v.version === version);
-  const previous = versions.find((v) => v.is_primary) ?? null;
-  const description = descriptionPlan(mod, config, version);
+  // The version this one replaces, and Nexus archives when archivePrevious is set: the newest still
+  // under Main files. Not simply the Primary one, which can be a version archived since (0.28.0 on
+  // EDGEdeck's page and 0.10.2 on REDcode's, while they uploaded with "primary": false).
+  const shown = versions.filter((v) => v.category === 'main' && v.version !== version).sort((a, b) => String(b.uploaded_at).localeCompare(String(a.uploaded_at)));
+  const previous = shown[0] ?? versions.find((v) => v.is_primary && v.category !== 'archived') ?? null;
+  // Older ones still under Main files: the API cannot archive a version by itself, so say so.
+  const stale = shown.slice(1);
+  const settings = `mod manager download ${config.upload.modManager ? 'on' : 'off'}; ${config.upload.primary ? 'the new Primary file' : 'not Primary'}`;
   console.log(`${mod.name} on Nexus (page ${config.page}): version ${mod.version}, ${file ? `main file ${file.id}` : 'no files yet'}`);
   console.log(
     already
       ? `File: ${version} is already on Nexus (version ${already.id}); no upload and no changelog`
       : !file
-        ? `File: create the main file with ${version}; mod manager download ${config.upload.modManager ? 'on' : 'off'}; the page's version becomes ${version}`
-        : `File: upload ${version} as the main file's new version${previous ? `, replacing ${previous.version}${config.upload.archivePrevious ? ' (archived)' : ''}` : ''}; mod manager download ${config.upload.modManager ? 'on' : 'off'}; the page's version becomes ${version}`,
+        ? `File: create the main file with ${version}; ${settings}; the page's version becomes ${version}`
+        : `File: upload ${version} as the main file's new version${previous ? `, replacing ${previous.version}${config.upload.archivePrevious ? ' (archived)' : ''}` : ''}; ${settings}; the page's version becomes ${version}`,
   );
+  if (stale.length) console.log(`Also under Main files: ${stale.map((v) => v.version).join(', ')}. Nexus's API cannot archive these; archive them on the page's Files tab (Manage files)`);
+  if (!already && !config.upload.primary) warn('Nexus Primary file', `nexus.json has "primary": false, so ${version} will not become the page's Primary file. Set it to true, also with "modManager": false.`);
+  // Last, so the file's plan shows even when this stops the release.
+  const description = descriptionPlan(mod, config, version);
   console.log(`Description: ${description.push ? 'push' : 'no push'} (${description.why})`);
   return { config, mod, file, already, previous, description };
 }
@@ -213,6 +227,17 @@ async function release() {
     const after = await modByPage(p.config.page);
     const same = sha(fromNexus(after.description)) === sha(repoDescription());
     console.log(same ? 'Pushed the description' : 'Pushed the description, but Nexus answers with a different text: check the page');
+  }
+
+  if (!p.already) {
+    // What Nexus made of the upload, read back: update_mod_version is the API's only way to set the
+    // page's version, and whether "primary" takes with Mod Manager Download off is unverified.
+    const after = await modByPage(p.config.page);
+    if (after.version === version) console.log(`The page's version is ${version}`);
+    else warn('Nexus page version', `The page's version is still ${after.version}, not ${version}: set it by hand on Nexus (Edit mod page, Version). The API has no other way to set it.`);
+    const { versions } = await mainFile(p.mod.id, p.file?.id ?? p.config.file);
+    if (versions.find((v) => v.version === version)?.is_primary) console.log(`${version} is the page's Primary file`);
+    else if (p.config.upload.primary) warn('Nexus Primary file', `${version} is not the page's Primary file, though nexus.json asks for it: set it by hand on the page's Files tab (Manage files).`);
   }
 }
 
