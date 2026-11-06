@@ -87,6 +87,8 @@ npm install
 npm run typecheck
 ```
 
+The Nexus tool is moving to a shared repo. To run it on a PC for a repo that has moved, check [EDGErepo](https://github.com/Edgemodders/EDGErepo) out beside the others (`git clone https://github.com/Edgemodders/EDGErepo.git ..\EDGErepo`, with the same repo-local identity). A release workflow clones it by itself.
+
 Pushing needs Git Credential Manager signed in as `CyberbuildsAI`. If a push fails with `Permission ... denied to <other account>`, the machine has another GitHub account cached. Remove the `github.com` entry in Windows Credential Manager and push again to get a sign-in prompt.
 
 GitHub Pages serves `docs/` from `main`: https://edgemodders.github.io/REDnode/. It is configured in the repository settings, not in code.
