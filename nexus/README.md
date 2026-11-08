@@ -68,14 +68,16 @@ The release workflow sets it from `upload.description` in `nexus.json` ({version
 
 ## Updating the page
 
-The page is kept through Nexus's v3 API (`tools/nexus/nexus.mjs`, on top of `tools/nexus/api.mjs`) with the owner's key: on the dev PC a file in `%APPDATA%\Edgemodders` that Windows encrypts for the owner's user (made once, see `api.mjs`), in CI the organization's `NEXUS_KEY` secret. `nexus.json` holds the page number, the internal mod id, the main file's id, how a new version is uploaded (`upload`: main file, primary, mod manager download on, the old version archived; `"primary": true` makes it the page's Primary file, its default download, and stays true on every page, also those with `"modManager": false`) and the hash of the description last pulled. A page released with tags of its own, apart from its repo's `v<version>` tags, names their prefix in `"tag"` (such as `"wardrobe-designer-v"`), so a release compares the live description with the one its own previous release pushed.
+The page is kept through Nexus's v3 API with the owner's key: on the dev PC a file in `%APPDATA%\Edgemodders` that Windows encrypts for the owner's user (made once, see EDGErepo's `tools/nexus/api.mjs`), in CI the organization's `NEXUS_KEY` secret. `nexus.json` holds the page number, the internal mod id, the main file's id, how a new version is uploaded (`upload`: main file, primary, mod manager download on, the old version archived; `"primary": true` makes it the page's Primary file, its default download, and stays true on every page, also those with `"modManager": false`) and the hash of the description last pulled. A page released with tags of its own, apart from its repo's `v<version>` tags, names their prefix in `"tag"` (such as `"wardrobe-designer-v"`), so a release compares the live description with the one its own previous release pushed.
+
+The Nexus tool is shared, in [EDGErepo](https://github.com/Edgemodders/EDGErepo). These commands need it checked out beside this repo (`../EDGErepo`). The release workflow clones it at the tag `v1`. Change it there.
 
 | Command | What it does |
 |---|---|
 | `npm run nexus:pull` | Writes the live description into `description.bbcode` (with any edit made on Nexus itself, such as pictures added by hand) and the ids and hash into `nexus.json`. Read only on Nexus |
 | `npm run nexus:status` | The page's version, the main file's versions, and whether the description changed on Nexus since the last pull |
-| `node tools/nexus/nexus.mjs check --version <v>` | What a release would do, and whether it may |
-| `node tools/nexus/nexus.mjs release --version <v> --zip <zip> --notes <file> [--dry-run]` | What the workflow runs: the upload, the changelog and the description. It skips the upload and changelog when the version is already on Nexus |
+| `node ../EDGErepo/tools/nexus/nexus.mjs check --version <v>` | What a release would do, and whether it may |
+| `node ../EDGErepo/tools/nexus/nexus.mjs release --version <v> --zip <zip> --notes <file> [--dry-run]` | What the workflow runs: the upload, the changelog and the description. It skips the upload and changelog when the version is already on Nexus |
 
 To change the description:
 
@@ -89,7 +91,7 @@ For a new version, first the release gate: every in-game test of the builds sinc
 
 1. In `docs/changelog.md`, rename **Unreleased** to `## <version> (<date>)`, start a new empty **Unreleased** above it, commit and push.
 2. Run the **Release zip** workflow with **Make a release** and **Update Nexus Mods** ticked. It checks the page first, builds, makes the GitHub release, then uploads the zip to Nexus as the main file's new version (the old one archived, the page's version set), adds that version's changelog from `npm run release:notes -- --nexus`, and pushes the description.
-3. If the Nexus step fails after the GitHub release, download the release's zip and run `node tools/nexus/nexus.mjs release --version <v> --zip <zip> --notes <file>` on the dev PC (the notes from `npm run release:notes -- --nexus --out <file>`).
+3. If the Nexus step fails after the GitHub release, download the release's zip and run `node ../EDGErepo/tools/nexus/nexus.mjs release --version <v> --zip <zip> --notes <file>` on the dev PC (the notes from `npm run release:notes -- --nexus --out <file>`).
 
 Under the tagline, a line links the latest GitHub release and the changelog page. It names no version, so it never needs updating.
 

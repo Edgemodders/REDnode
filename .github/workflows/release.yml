@@ -16,14 +16,16 @@
 #   ... and "Update Nexus Mods" ticked          also, after the GitHub release, uploads the zip to
 #                                               the Nexus page as the main file's new version (the
 #                                               old one archived), adds its changelog and pushes
-#                                               nexus/description.bbcode (tools/nexus/nexus.mjs,
-#                                               the organization's NEXUS_KEY secret). It checks the
-#                                               page first and stops before building if the
-#                                               description changed on Nexus since the last pull
-#                                               (npm run nexus:pull, commit, run again). If the
-#                                               upload fails after the GitHub release, run
-#                                               tools/nexus/nexus.mjs release on the dev PC with the
-#                                               release's zip: it skips what is already done.
+#                                               nexus/description.bbcode (the Nexus tool, from
+#                                               EDGErepo at the tag v1; the organization's NEXUS_KEY
+#                                               secret). It checks the page first and stops before
+#                                               building if the description changed on Nexus since
+#                                               the last pull (npm run nexus:pull, commit, run
+#                                               again). If the upload fails after the GitHub
+#                                               release, run
+#                                               node ../EDGErepo/tools/nexus/nexus.mjs release on the
+#                                               dev PC with the release's zip: it skips what is
+#                                               already done.
 #                                               REDswap's own page (native/redswap/nexus, mod 36172)
 #                                               gets the same: its zip as a new version when
 #                                               native/redswap/redswap.json has a version not on
@@ -107,22 +109,28 @@ jobs:
             if ($LASTEXITCODE) { exit $LASTEXITCODE }
           }
 
+      # The Nexus tool, shared by the Edgemodders repos at this tag (docs/edgerepo.md). Outside the
+      # workspace, so nothing packs it.
+      - name: The Nexus tool
+        if: inputs.release && inputs.nexus
+        run: git -c advice.detachedHead=false clone --quiet --depth 1 --branch v1 https://github.com/Edgemodders/EDGErepo "$env:RUNNER_TEMP/EDGErepo"
+
       - name: Nexus Mods can take this release
         if: inputs.release && inputs.nexus
         env:
           NEXUS_KEY: ${{ secrets.NEXUS_KEY }}
         run: |
           $version = (Get-Content VERSION -Raw).Trim()
-          node tools/nexus/nexus.mjs check --version $version
+          node "$env:RUNNER_TEMP/EDGErepo/tools/nexus/nexus.mjs" check --version $version
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $redswap = (Get-Content native/redswap/redswap.json -Raw | ConvertFrom-Json).version
-          node tools/nexus/nexus.mjs check native/redswap/nexus --version $redswap
+          node "$env:RUNNER_TEMP/EDGErepo/tools/nexus/nexus.mjs" check native/redswap/nexus --version $redswap
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           foreach ($page in Get-ChildItem packs/*/nexus/nexus.json) {
             $id = $page.Directory.Parent.Name
             $pack = Get-Content "packs/$id/pack.json" -Raw | ConvertFrom-Json
             if ($pack.unreleased) { Write-Host "packs/${id}: unreleased, left out"; continue } # pack.json "unreleased": true (UI Tools until UT3)
-            node tools/nexus/nexus.mjs check "packs/$id/nexus" --version $pack.version
+            node "$env:RUNNER_TEMP/EDGErepo/tools/nexus/nexus.mjs" check "packs/$id/nexus" --version $pack.version
             if ($LASTEXITCODE) { exit $LASTEXITCODE }
           }
 
@@ -170,7 +178,7 @@ jobs:
           NEXUS_KEY: ${{ secrets.NEXUS_KEY }}
         run: |
           $version = (Get-Content VERSION -Raw).Trim()
-          node tools/nexus/nexus.mjs release --version $version --zip "native/build/release/REDnode-$version.zip" --notes "$env:RUNNER_TEMP/nexus-notes.txt"
+          node "$env:RUNNER_TEMP/EDGErepo/tools/nexus/nexus.mjs" release --version $version --zip "native/build/release/REDnode-$version.zip" --notes "$env:RUNNER_TEMP/nexus-notes.txt"
 
       - name: Nexus Mods (REDswap)
         if: inputs.release && inputs.nexus
@@ -178,7 +186,7 @@ jobs:
           NEXUS_KEY: ${{ secrets.NEXUS_KEY }}
         run: |
           $redswap = (Get-Content native/redswap/redswap.json -Raw | ConvertFrom-Json).version
-          node tools/nexus/nexus.mjs release native/redswap/nexus --version $redswap --zip "native/build/release/REDswap-$redswap.zip" --notes "$env:RUNNER_TEMP/redswap-nexus-notes.txt"
+          node "$env:RUNNER_TEMP/EDGErepo/tools/nexus/nexus.mjs" release native/redswap/nexus --version $redswap --zip "native/build/release/REDswap-$redswap.zip" --notes "$env:RUNNER_TEMP/redswap-nexus-notes.txt"
 
       - name: Nexus Mods (app packs)
         if: inputs.release && inputs.nexus
@@ -192,6 +200,6 @@ jobs:
             $pack = Get-Content "packs/$id/pack.json" -Raw | ConvertFrom-Json
             if ($pack.unreleased) { Write-Host "packs/${id}: unreleased, left out"; continue } # pack.json "unreleased": true (UI Tools until UT3)
             $zip = "native/build/release/$($pack.name -replace '\s+', '-')-$($pack.version).zip"
-            node tools/nexus/nexus.mjs release "packs/$id/nexus" --version $pack.version --zip $zip --notes "$env:RUNNER_TEMP/$id-nexus-notes.txt"
+            node "$env:RUNNER_TEMP/EDGErepo/tools/nexus/nexus.mjs" release "packs/$id/nexus" --version $pack.version --zip $zip --notes "$env:RUNNER_TEMP/$id-nexus-notes.txt"
             if ($LASTEXITCODE) { exit $LASTEXITCODE }
           }

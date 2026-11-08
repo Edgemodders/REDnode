@@ -59,4 +59,4 @@ done
 
 ## Updating the page
 
-As every page the workflow keeps: `node tools/nexus/nexus.mjs status packs/ui-tools/nexus` shows the live version and whether the description matches; after an edit on Nexus, `node tools/nexus/nexus.mjs pull packs/ui-tools/nexus`, check the diff, commit. A release stops before uploading anything if the live description changed since the last pull.
+As every page the workflow keeps: `node ../EDGErepo/tools/nexus/nexus.mjs status packs/ui-tools/nexus` shows the live version and whether the description matches; after an edit on Nexus, `node ../EDGErepo/tools/nexus/nexus.mjs pull packs/ui-tools/nexus`, check the diff, commit. A release stops before uploading anything if the live description changed since the last pull.

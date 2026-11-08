@@ -4,7 +4,7 @@ The source of REDswap's own Nexus Mods page, [mod 36172](https://www.nexusmods.c
 
 | File | What it is |
 |---|---|
-| `nexus.json` | The page (36172), how the zip is uploaded, and what the last pull saw (`tools/nexus/nexus.mjs`) |
+| `nexus.json` | The page (36172), how the zip is uploaded, and what the last pull saw (the Nexus tool, in EDGErepo) |
 | `description.bbcode` | The page's description. The release workflow pushes it when it changed; never edit it on Nexus without pulling after |
 | `brand/banner.png` | 2560 x 640, at the top of the description (loaded from GitHub) |
 | `brand/social.png` | 1280 x 640, for links shared on social sites |
@@ -20,11 +20,11 @@ REDswap has its own version (`native/redswap/redswap.json`) and changelog (`nati
 |---|---|
 | Every run | `npm run release:redswap` builds `REDswap-<version>.zip` (`red4ext/plugins/REDswap/` with the DLL, its licenses and a README). It stops if the changelog has no section for the version, or has changes under **Unreleased** |
 | **Make a release** | The zip is attached to REDnode's GitHub release, with a line in its notes |
-| **Update Nexus Mods** | `tools/nexus/nexus.mjs release native/redswap/nexus`: uploads the zip as the main file's new version when that version is not on Nexus yet (the first release creates the main file), adds the changelog section, and pushes `description.bbcode` when it differs. With the version already on Nexus, only the description is pushed. It checks first and stops before building if the description changed on Nexus since the last pull |
+| **Update Nexus Mods** | The Nexus tool's `release native/redswap/nexus` (EDGErepo's, cloned at the tag `v1`): uploads the zip as the main file's new version when that version is not on Nexus yet (the first release creates the main file), adds the changelog section, and pushes `description.bbcode` when it differs. With the version already on Nexus, only the description is pushed. It checks first and stops before building if the description changed on Nexus since the last pull |
 
 To release a change to REDswap: add its line under **Unreleased**, raise `version` in `redswap.json`, rename **Unreleased** to `## <version> (<date>)`, and run the workflow with REDnode's next release.
 
-After an edit made on Nexus: `node tools/nexus/nexus.mjs pull native/redswap/nexus`, check the diff, commit. `node tools/nexus/nexus.mjs status native/redswap/nexus` shows the page's state.
+After an edit made on Nexus: `node ../EDGErepo/tools/nexus/nexus.mjs pull native/redswap/nexus`, check the diff, commit. `node ../EDGErepo/tools/nexus/nexus.mjs status native/redswap/nexus` shows the page's state.
 
 ## The Nexus form (by hand)
 
