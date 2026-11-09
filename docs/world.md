@@ -1697,3 +1697,62 @@ Proposed on 2026-11-04, to agree with the owner. EDGEquest's request (not urgent
 **What A1 decides:** whether a quest's workspot plays outside its scene on an ordinary spawned NPC (EDGEquest's first question), whether the device needs more than the component (a sync slot, a navmesh), and what a failure looks like (wrong rig, missing set), for the answer `started` / `finished` / `failed` with a reason.
 
 **A2, the call** (after A1, shaped by it): `world.useWorkspot(id, { workspot, entry? })` and `world.stopWorkspot(id)` in the package, the device made and removed by REDnode, its state on `world.spawned()`; `world.playAnimation(id, { anim, set?, loop? })` only if A1 finds a way to play an animation that no workspot holds (else it is a workspot's `SendJumpToAnimEnt`, or a workspot REDnode makes for it: later, unverified); the MCP tool `world_animate` (asks first, as `world_spawn` does).
+
+## World pins (#43): plan
+
+Drafted on 2026-11-10 from EDGEfab's request #43, to agree with the owner. Nothing here has run in the game yet.
+
+**What is asked:** a pin a modder, a mod or an assistant drops in the world: a glowing marker with a label above it (a title, an optional line of text, the distance), found again from far away. The label goes to the screen's edge with an arrow when the pin is out of view. A player can drop one where V stands, save sets of pins to a file, and click a pin to teleport V to it. EDGEfab tried the game's own two ways on 2026-11-09: `DebugVisualizerSystem.DrawText3D` draws nothing in the release game, and `MappinSystem.RegisterMappin` shows only on the minimap, with no caption.
+
+**How REDnode would draw them: on its overlay, placed by the plugin each frame.** The overlay already draws on the game's own frame. Two ways to use it:
+
+| Way | How | Trade-off |
+|---|---|---|
+| A page draws every pin | A transparent page that fills the screen gets the camera from the plugin and places the labels itself | Simple, but the page shows a frame or more late, so labels swim when the camera turns, and a full-screen page redraws on every turn |
+| **The plugin places each pin (recommended)** | The host draws each label once into a small picture, and again only when its text or distance changes. Each frame, the plugin reads the camera, works out where every pin lands on screen, and draws its marker (a glowing post, from the plugin's own shader) and its label there, or at the screen's edge with an arrow | Labels stay fixed to the world whatever the camera does. The cost is a few quads a frame |
+
+A real light or glowing mesh spawned in the world (`world.spawn`) is a later option for a marker that is also part of the game's own picture. The overlay's marker can be seen through walls and from any distance, which the request needs more.
+
+**The scales** (the owner's idea):
+
+| `scale` | Size | Behind a wall or a hill |
+|---|---|---|
+| `world` | A real size: shrinks with distance | Hidden |
+| `screen` | The same size on screen at any distance | Shown through |
+| `fit` (recommended default) | Shrinks with distance down to `minScreenSize`, then stays | Shown through once hidden, dimmed |
+
+The overlay has no depth from the game, so "hidden" comes from the game's own ray casts from the camera to each pin, a few times a second, not every frame (unverified: their cost and whether the scripts reach them).
+
+**The API, in the `rednode` package's `world`:**
+
+| Call | What |
+|---|---|
+| `world.pin({ at, title, text?, style?, until? })` | `at` is a place or a spawned entity (the pin follows it). Answers a pin id |
+| `world.unpin(id)`, `world.pins()`, `world.clearPins()`, `world.pinStyle(id, style)` | Remove, list, clear, restyle |
+| `style` | `color`, `font`, `titleSize`, `textSize`, `pinHeight` (metres), `scale`, `minScreenSize`; defaults in the HUD style |
+| `world.goTo(id)` | V to the pin, on the ground beside it, facing it (through `game.player.teleport`) |
+| `world.pinSet.save(file)`, `.load(file)`, `.show(name, on)` | Sets of pins in a `.pins.json` file a package or tool names (EDGEbuilder's scene folder, a mod project) |
+| `label` on `world.spawn` and `world.load` | Pins what they spawn; the pin goes with the entity |
+
+Pins belong to the package that made them and go when it stops, as spawns do; pins from the API alone go at a save load, saved sets come back with **Load**. Pins only draw, so they need no permission, and the MCP tools `world_pin`, `world_unpin`, `world_pins` need no approval each time.
+
+**The Pins window**, a built-in tool window: every pin with its distance and **Go there**, **Drop a pin here** (V's place, a name typed in), the saved sets with show and hide, **Hide all**, and the switch **Click a pin to go there** (off by default; clicks reach pins only in the overlay's interactive mode).
+
+**Steps:**
+
+| Step | What | Test |
+|---|---|---|
+| **WP1 Spike** | The plugin reads the camera each frame and draws a test pin set by a bridge method: a post and a plain label, with the edge arrow. Answers: the camera's field of view and its axes, how many frames the pin lags when the camera turns fast, the cost a frame for 1 and 100 pins, and whether a ray cast can tell a pin is behind a wall | In the game, with the Console |
+| **WP2 Pins** | The plugin's pin drawing; the host's label pictures; `world.pin` and the rest; the scales; following an entity; `label` on spawns; the MCP tools; the docs simulation | By hand in the mock game, then in the game: ten spawned props with their names, found again from 100 m and from 1 km, and through a wall |
+| **WP3 Pins window** | The window, Drop a pin here, Go there, pin sets, click to teleport | In the game |
+
+**Open questions, with recommendations:**
+
+| Question | Recommendation |
+|---|---|
+| Draw on the overlay, placed by the plugin? | Yes, as above; a spawned light later if a marker in the game's own picture is wanted |
+| The default scale? | `fit`, with `world` and `screen` per pin and for all pins at once |
+| Pins in which overlay modes? | Shown in passive and interactive mode, gone in hidden mode, in menus and in photo mode |
+| A key for Drop a pin here? | No key at first: a button in the Pins window and the API. A key later, set by the player, since free keys are few |
+| Click to teleport | Off by default, a switch in the Pins window; Go there in the list always works |
+| Minimap and world map, `world.guide(pin)` | Later, after WP3 |
