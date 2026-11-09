@@ -60,6 +60,7 @@
 
 #include "jvalue.hpp"
 #include "overlay.hpp"
+#include "pins.hpp"
 
 #include <RED4ext/CNamePool.hpp>
 #include <RED4ext/ResourcePath.hpp>
@@ -2096,5 +2097,129 @@ void ClearRefs()
 {
     g_refs.clear();
     g_refIds.clear();
+}
+
+// ---- World pins (#43): the active camera, for pins.cpp, on the game thread ----
+
+namespace
+{
+bool CameraSystem(Handle<IScriptable>& aOut, std::string& aError)
+{
+    Handle<IScriptable> none;
+    if (!CallNative(none, "ScriptGameInstance", "GetCameraSystem", NullArgs(1), &aOut, aError))
+        return false;
+    if (!aOut)
+    {
+        aError = "no camera system";
+        return false;
+    }
+    return true;
+}
+
+Value NumberValue(double aNumber)
+{
+    Value v;
+    v.kind = Value::Kind::Number;
+    v.number = aNumber;
+    v.text = std::to_string(aNumber);
+    return v;
+}
+} // namespace
+
+bool ReadCamera(pins::Camera& aOut, std::string& aError)
+{
+    Handle<IScriptable> sys;
+    if (!CameraSystem(sys, aError))
+        return false;
+
+    CBaseFunction* fn = FindNative(sys, nullptr, "GetActiveCameraWorldTransform", 1, aError);
+    if (!fn)
+        return false;
+    Value args = NullArgs(1);
+    Value out;
+    out.kind = Value::Kind::Object;
+    Value yes;
+    yes.kind = Value::Kind::Bool;
+    yes.boolean = true;
+    out.fields.emplace_back("$out", yes);
+    args.items[0] = out;
+    std::vector<std::unique_ptr<Slot>> slots;
+    std::vector<bool> wanted;
+    std::unique_ptr<Slot> ret;
+    if (!Run(fn, sys, args, slots, wanted, ret, aError))
+        return false;
+    if (slots.empty() || slots[0]->type->GetSize() < 32)
+    {
+        aError = "GetActiveCameraWorldTransform's transform is not 32 bytes";
+        return false;
+    }
+    if (ret && ret->type->GetType() == Kind::Fundamental && !*static_cast<bool*>(ret->mem))
+    {
+        aError = "no active camera";
+        return false;
+    }
+    // Transform: position (Vector4: X, Y, Z, W), then orientation (Quaternion: i, j, k, r).
+    const auto* f = static_cast<const float*>(slots[0]->mem);
+    aOut.px = f[0];
+    aOut.py = f[1];
+    aOut.pz = f[2];
+    aOut.qi = f[4];
+    aOut.qj = f[5];
+    aOut.qk = f[6];
+    aOut.qr = f[7];
+
+    std::unique_ptr<Slot> fov;
+    if (!RunPlain(sys, nullptr, "GetActiveCameraFOV", 0, fov, aError))
+        return false;
+    aOut.fovDeg = *static_cast<const float*>(fov->mem);
+    std::unique_ptr<Slot> aspect;
+    if (RunPlain(sys, nullptr, "GetAspectRatio", 0, aspect, aError))
+        aOut.aspect = *static_cast<const float*>(aspect->mem);
+    aOut.valid = aOut.fovDeg > 1 && aOut.fovDeg < 179;
+    if (!aOut.valid)
+        aError = "the camera's field of view reads " + std::to_string(aOut.fovDeg);
+    return aOut.valid;
+}
+
+bool GameProjectPoint(float aX, float aY, float aZ, float aOut[4], std::string& aError)
+{
+    Handle<IScriptable> sys;
+    if (!CameraSystem(sys, aError))
+        return false;
+    CBaseFunction* fn = FindNative(sys, nullptr, "ProjectPoint", 1, aError);
+    if (!fn)
+        return false;
+    Value point;
+    point.kind = Value::Kind::Object;
+    point.fields.emplace_back("X", NumberValue(aX));
+    point.fields.emplace_back("Y", NumberValue(aY));
+    point.fields.emplace_back("Z", NumberValue(aZ));
+    point.fields.emplace_back("W", NumberValue(1));
+    Value args;
+    args.kind = Value::Kind::Array;
+    args.items.push_back(point);
+    std::vector<std::unique_ptr<Slot>> slots;
+    std::vector<bool> wanted;
+    std::unique_ptr<Slot> ret;
+    if (!Run(fn, sys, args, slots, wanted, ret, aError) || !ret || ret->type->GetSize() < 16)
+    {
+        if (aError.empty())
+            aError = "ProjectPoint answered no Vector4";
+        return false;
+    }
+    std::memcpy(aOut, ret->mem, 4 * sizeof(float));
+    return true;
+}
+
+bool GameCameraForward(float aOut[3], std::string& aError)
+{
+    Handle<IScriptable> sys;
+    if (!CameraSystem(sys, aError))
+        return false;
+    std::unique_ptr<Slot> ret;
+    if (!RunPlain(sys, nullptr, "GetActiveCameraForward", 0, ret, aError) || ret->type->GetSize() < 16)
+        return false;
+    std::memcpy(aOut, ret->mem, 3 * sizeof(float));
+    return true;
 }
 } // namespace rednode::overlay::detail

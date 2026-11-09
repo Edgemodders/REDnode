@@ -29,6 +29,7 @@ const { createMcp } = require('./mcp');
 const { createEditor } = require('./editor');
 const { createOAuth } = require('./oauth');
 const { createServices } = require('./services');
+const { createPins } = require('./pins');
 const { scanGame, checkRequires, validRange, key: gamefilesKey } = require('./gamefiles');
 const { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED } = require('./redbridge');
 const bridgeInstall = require('./bridge-install');
@@ -74,6 +75,8 @@ const BUILTIN_ROOTS = [
   // The Connect window (#19): open only while an MCP client waits for the player's answer.
   { dir: path.join(__dirname, 'connect'), single: true, builtin: true, prompt: true },
   { dir: path.join(__dirname, 'keyask'), single: true, builtin: true, prompt: true },
+  // World pins (#43): the hidden page that draws the pins' labels, open while any pin is dropped.
+  { dir: path.join(__dirname, 'pins'), single: true, builtin: true, pins: true },
   // The Console (O12): a page and a Node mod. Packaged, it sits outside app.asar, in
   // resources/, so its mod's worker thread loads it as plain files.
   { dir: app.isPackaged ? path.join(process.resourcesPath, 'console') : path.join(__dirname, 'console'), single: true, builtin: true },
@@ -702,7 +705,7 @@ function discoverApps() {
           noteHidden(manifest.id, dir, apps.get(manifest.id).dir);
           continue;
         }
-        apps.set(manifest.id, { manifest, dir, builtin: !!root.builtin, pinned: !!root.pinned, manager: !!root.manager, prompt: !!root.prompt, dev: !!root.dev });
+        apps.set(manifest.id, { manifest, dir, builtin: !!root.builtin, pinned: !!root.pinned, manager: !!root.manager, prompt: !!root.prompt, pins: !!root.pins, dev: !!root.dev });
       } catch (err) {
         log(`Skipped an app: ${err.message}`);
       }
@@ -968,6 +971,7 @@ function checkSolo() {
   checkSpawns();
   checkSounds();
   checkInk();
+  checkPins();
   if (!soloOwner) return;
   if (!packageRunning(soloOwner)) endSolo('the package stopped');
 }
@@ -1113,6 +1117,7 @@ function rewatchAppRoots() {
 function shouldOpen(entry) {
   if (entry.pinned) return true;
   if (entry.prompt) return entry.manifest.id === 'keyask' ? keyAsks.length > 0 : !!oauth?.pending();
+  if (entry.pins) return pinsHost.count() > 0;
   if (entry.builtin && entry.manifest.id === 'welcome' && !settings.welcomed) return true; // the first start
   if (chosenApps) return chosenApps.includes(entry.manifest.id);
   return settings.apps[entry.manifest.id]?.open ?? entry.manifest.open;
@@ -1277,6 +1282,7 @@ function openInGame(w) {
     onHud: shownInPassive(w),
     layer: windowLayer(w),
     hidden: windowHidden(w),
+    ...(w.app.pins ? { atlas: true } : {}),
   });
   sendJson({ cmd: 'window.drag', window: w.id, regions: w.dragRegions });
   if (w.escapeLock) sendJson({ cmd: 'keys.lock', window: w.id, escape: true });
@@ -1297,6 +1303,7 @@ function connect() {
     startHold = settings.openAtStart === false;
     if (startHold) log('Open at start is off: only HUD widgets show until the overlay is opened (F10)');
     for (const w of windows.values()) openInGame(w);
+    pinsHost.resend();
     toAllPages({ event: 'link', connected: true });
     stateChanged();
   });
@@ -1584,8 +1591,12 @@ function onGameMessage(m) {
       return;
     }
     case 'game':
+      if (m.name === 'REDnode.SessionEnd') pinsHost.gone(null, 'the game session ended');
       toAllPages(m);
       mods?.broadcast(m);
+      return;
+    case 'pins.camera':
+      pinsHost.camera(m);
       return;
     case 'sound-end':
       onSoundEnd(m);
@@ -1824,6 +1835,11 @@ async function packageCallNow(id, method, params) {
   }
   if (method === 'archives.soundState') return bridgeCall('opus.state', { sounds: Array.isArray(params?.sounds) ? params.sounds : [] });
   if (method === 'world.scene') return readSceneFile(id ? apps.get(id) : null, params?.file);
+  // World pins (#43): drawn by the overlay, so they change nothing in the game.
+  if (method === 'pins.add') return pinsHost.add(id ?? null, params);
+  if (method === 'pins.remove') return pinsHost.remove(id ?? null, params?.id);
+  if (method === 'pins.list') return pinsHost.list(params?.all ? null : id ?? null);
+  if (method === 'pins.clear') return pinsHost.clear(id ?? null);
   if (method === 'tweakdb.set' && id && params?.path) {
     const path = String(params.path);
     if (!tweakJournal.has(id)) tweakJournal.set(id, new Map());
@@ -2996,6 +3012,37 @@ function clearInk(id) {
   bridgeCall('ink.clear', { package: id }).catch(() => {});
 }
 
+// World pins (#43): a package's pins go when it stops, as its spawns do.
+const pinsHost = createPins({
+  sendJson: (o) => sendJson(o),
+  log: (t) => log(t),
+  openAtlas: () => {
+    const entry = apps.get('pins');
+    if (entry?.pins && !windowOfApp('pins')) openApp(entry);
+  },
+  closeAtlas: () => {
+    if (windowOfApp('pins')) closeApp('pins');
+  },
+  atlasWindow: () => windowOfApp('pins'),
+  toPage: (w, m) => toPage(w, m),
+});
+function checkPins() {
+  const owners = new Set(pinsHost.list(null).map((p) => p.owner).filter(Boolean));
+  for (const id of owners) if (!packageRunning(id)) pinsHost.gone(id, 'the package stopped');
+}
+function fromPins(event) {
+  const w = windowFor(event.sender);
+  if (!w?.app.pins) throw new Error("Only REDnode's world pins page lays out pins");
+}
+ipcMain.handle('rednode:pins:current', (event) => {
+  fromPins(event);
+  return pinsHost.current();
+});
+ipcMain.handle('rednode:pins:layout', (event, l) => {
+  fromPins(event);
+  pinsHost.layout(l);
+});
+
 function checkInk() {
   for (const id of new Set([...inkUsers, ...inkTriers])) if (!packageRunning(id)) clearInk(id);
 }
@@ -3134,7 +3181,7 @@ function isEnabled(entry) {
 function appList() {
   const metrics = app.getAppMetrics();
   return [...apps.values()]
-    .filter((a) => !a.pinned && !a.prompt)
+    .filter((a) => !a.pinned && !a.prompt && !a.pins)
     .map((entry) => {
       const m = entry.manifest;
       return {
@@ -4085,7 +4132,7 @@ async function taskList() {
   const rows = [];
   for (const entry of apps.values()) {
     const m = entry.manifest;
-    if (entry.pinned || entry.prompt) continue; // the launcher, the Connect window
+    if (entry.pinned || entry.prompt || entry.pins) continue; // the launcher, the Connect window, the pins' page
     const mod = modRows.get(m.id) ?? null;
     const wins = windowsOfPackage(m.id).map((w) => {
       let pid = null;
@@ -5200,6 +5247,7 @@ app.whenReady().then(() => {
       removeSpawns(id, 'the mod stopped');
       stopSounds(id);
       clearInk(id);
+      pinsHost.gone(id, 'the mod stopped');
       if (tracers.delete(id) && !tracers.size) Promise.resolve(stopTrace(`${id} stopped`)).catch(() => {});
     },
     onLog: onModLog,

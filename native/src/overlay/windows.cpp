@@ -34,6 +34,8 @@
 //   {"cmd":"window.size","window":1,"width":800,"height":500}   a resizable window's new size; its
 //                                         top-left corner stays, and "moved" answers where it is
 //   {"cmd":"window.close","window":1}
+//   "atlas":true on window.open: the window holds the world pins' labels (#43, pins.cpp); it is
+//   uploaded like any window but never drawn whole, and never takes input
 // Plugin -> host events:
 //   {"event":"input","window":1,"type":"mouseMove","x":..,"y":..}   page pixels; mouse and key
 //                                         input carries "mods": those of control, shift, alt held, [] for none (#33)
@@ -76,6 +78,7 @@ struct Window
     bool onHud = true;                // drawn in passive mode too, not only in interactive mode
     uint8_t layer = 0;                // 0: packages' windows; 1: tool windows, always above
     bool hidden = false;              // another package asked for the screen (solo mode)
+    bool atlas = false;               // the pins' labels (#43): uploaded, never drawn whole, no input
     uint32_t width = 0, height = 0;
     bool draggable = true;
     bool wantsEscape = false;         // the page asked for Esc (keys.lock, #34)
@@ -424,6 +427,9 @@ void HandleWindowCommand(const std::string& aJson)
                 std::string kind;
                 return json::String(aJson, "kind", kind) && kind == "hud";
             }();
+            w->atlas = json::Bool(aJson, "atlas", false);
+            if (w->atlas)
+                w->hud = true; // never takes input or focus
             w->draggable = !w->hud && json::Bool(aJson, "draggable", true);
             w->onHud = w->hud || json::Bool(aJson, "onHud", true);
             w->hideWith = 0;
@@ -738,7 +744,7 @@ std::vector<WindowView> SnapshotWindows()
     for (const auto& w : g_windows)
     {
         if (w.placed && !w.hidden && !(w.hideWith & state) && (w.onHud || !passive))
-            out.push_back({w.id, w.x, w.y, w.width, w.height});
+            out.push_back({w.id, w.x, w.y, w.width, w.height, w.atlas});
     }
     return out;
 }

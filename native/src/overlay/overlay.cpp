@@ -96,6 +96,7 @@ void Update(uint64_t aFrame)
     detail::UpdateFaults();
     detail::UpdateTrace();
     detail::UpdateInk(aFrame);
+    detail::UpdatePins(aFrame);
 }
 
 uint64_t detail::NowMs()

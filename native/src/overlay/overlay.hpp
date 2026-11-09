@@ -86,6 +86,7 @@ struct WindowView // what the compositor needs, back to front
     uint32_t id;
     float x, y;             // reference pixels, top-left
     uint32_t width, height; // page pixels
+    bool atlas = false;     // never drawn itself: pins (#43) draw parts of it
 };
 // The changed part of a window's image, ready to upload.
 struct WindowFrame
@@ -326,6 +327,31 @@ std::string Ink(const std::string& aMethod, const json::Value& aParams, std::str
 void UpdateInk(uint64_t aFrame); // game thread, each frame: builds again what the game removed
 void InkHostGone();             // any thread: the host left, and its packages' widgets go with it
 void ClearInk();                // game thread: forget every mount (the game is stopping)
+// pins.cpp: world pins (#43). HandlePinsCommand takes the host's "pins.set" (false for any other
+// command); UpdatePins reads the camera on the game thread each frame with pins; the compositor's
+// CollectPinDraws gives the parts of the atlas window to draw this frame, in reference pixels on a
+// screen of aWidth x aHeight, and answers the atlas window's id (0: nothing to draw).
+struct PinDraw
+{
+    float x, y, w, h;     // on the screen, reference pixels
+    float u0, v0, u1, v1; // in the atlas window, page pixels
+};
+bool HandlePinsCommand(const std::string& aJson);
+void UpdatePins(uint64_t aFrame);
+uint32_t CollectPinDraws(float aWidth, float aHeight, std::vector<PinDraw>& aOut);
+void ClearPins();
+} // namespace detail
+namespace pins
+{
+struct Camera;
+}
+namespace detail
+{
+// reflect.cpp, for pins.cpp on the game thread: the active camera (position, orientation, field of
+// view, aspect), the game's own projection of a point, and the camera's forward direction.
+bool ReadCamera(pins::Camera& aOut, std::string& aError);
+bool GameProjectPoint(float aX, float aY, float aZ, float aOut[4], std::string& aError);
+bool GameCameraForward(float aOut[3], std::string& aError);
 // overlay.cpp
 const RED4ext::v1::Sdk* GetSdk();
 RED4ext::v1::PluginHandle GetHandle();

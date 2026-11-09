@@ -56,16 +56,18 @@ cbuffer Draw : register(b0)
     float mode;    // 0 SDR, 1 scRGB, 2 PQ
     float nits;
     float pad;
+    float4 part;   // the part of the texture drawn: u0, v0, u1, v1 (0, 0, 1, 1 for all of it)
 };
 Texture2D tex : register(t0);
 SamplerState smp : register(s0);
-struct V { float4 pos : SV_Position; float2 uv : TEXCOORD0; };
+struct V { float4 pos : SV_Position; float2 uv : TEXCOORD0; float2 tuv : TEXCOORD1; };
 
 V vs(uint id : SV_VertexID)
 {
     float2 uv = float2(id & 1, id >> 1);
     V o;
     o.uv = uv;
+    o.tuv = lerp(part.xy, part.zw, uv);
     o.pos = float4(lerp(rect.x, rect.z, uv.x), lerp(rect.y, rect.w, uv.y), 0, 1);
     return o;
 }
@@ -107,7 +109,7 @@ float4 ps(V i) : SV_Target
     float4 c;
     if (kind < 0.5)
     {
-        c = tex.Sample(smp, i.uv); // premultiplied, from Chromium
+        c = tex.Sample(smp, i.tuv); // premultiplied, from Chromium
     }
     else
     {
@@ -141,6 +143,7 @@ struct Constants
     float mode;
     float nits;
     float pad;
+    float part[4] = {0, 0, 1, 1};
 };
 
 using PresentFn = HRESULT(STDMETHODCALLTYPE*)(IDXGISwapChain*, UINT, UINT);
@@ -1189,6 +1192,7 @@ void ToNdc(float aX, float aY, float aW, float aH, float aScale, float aOut[4])
 
 void RenderFrame(IDXGISwapChain* aSwapChain);
 bool g_cursorDrawn = false; // RenderFrame drew the cursor this present
+std::vector<PinDraw> g_pinDraws; // this frame's world pins, kept to reuse its memory
 
 // Times the overlay's CPU work on the present path.
 void Render(IDXGISwapChain* aSwapChain)
@@ -1343,11 +1347,37 @@ void RenderFrame(IDXGISwapChain* aSwapChain)
     c.mode = g.mode;
     c.nits = HdrPaperWhiteNits;
 
+    // World pins (#43), under every window: parts of their atlas window, placed where each pin
+    // lands on the screen this frame.
+    {
+        g_pinDraws.clear();
+        const uint32_t atlas = CollectPinDraws(float(g.width) / scale, ReferenceHeight, g_pinDraws);
+        GpuWindow* w = atlas ? FindGpu(atlas) : nullptr;
+        if (w && w->texReady && w->texWidth && w->texHeight)
+        {
+            const float tw = float(w->texWidth), th = float(w->texHeight);
+            g.list->SetGraphicsRootDescriptorTable(1, SrvGpu(w->srvIndex));
+            c.kind = 0;
+            for (const auto& d : g_pinDraws)
+            {
+                ToNdc(d.x, d.y, d.w, d.h, scale, c.rect);
+                c.part[0] = d.u0 / tw;
+                c.part[1] = d.v0 / th;
+                c.part[2] = d.u1 / tw;
+                c.part[3] = d.v1 / th;
+                g.list->SetGraphicsRoot32BitConstants(0, sizeof(Constants) / 4, &c, 0);
+                g.list->DrawInstanced(4, 1, 0, 0);
+            }
+            c.part[0] = c.part[1] = 0;
+            c.part[2] = c.part[3] = 1;
+        }
+    }
+
     // Windows, back to front. Their size comes from the frame, so a resize shows when the page repaints.
     for (const auto& v : views)
     {
         GpuWindow* w = FindGpu(v.id);
-        if (!w || !w->texReady)
+        if (!w || !w->texReady || v.atlas)
             continue;
         ToNdc(v.x, v.y, float(w->texWidth), float(w->texHeight), scale, c.rect);
         c.kind = 0;

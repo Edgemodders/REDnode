@@ -30,7 +30,7 @@ export { agent } from "./agent.js";
 export { service, use } from "./service.js";
 export type { ServiceInfo, ServiceCaller, ServiceCallOptions, ServiceHandle, ServiceDescription, FunctionDescriptor, ParamDescriptor, EventDescriptor, Schema } from "./service.js";
 export { world } from "./world.js";
-export type { EntityId, WorldPoint, WorldRotation, SpawnOptions, Spawned, EntityEventName, NearEntity, NearOptions, EntityFiles, SpawnedEntry, LoadResult } from "./world.js";
+export type { EntityId, WorldPoint, WorldRotation, SpawnOptions, Spawned, EntityEventName, NearEntity, NearOptions, EntityFiles, SpawnedEntry, LoadResult, PinOptions, PinEntry } from "./world.js";
 export type { Scene, SceneObject } from "./scene.js";
 export type { AgentAnswer, AskOptions, AgentRequest, AgentResult } from "./agent.js";
 export type { PackageInfo, KernelMcp, KernelBridge, Requirement, AskSharedOptions } from "./pkg.js";

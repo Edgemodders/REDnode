@@ -129,6 +129,11 @@ contextBridge.exposeInMainWorld('rednode', {
     answer: (allow) => ipcRenderer.invoke('rednode:connect:answer', allow),
   },
   /** The Key request window (#23, K3): a package's ask for a shared key, and the player's answer. Built-in only. */
+  /** The world pins' page (#43, built in): the labels to draw, and where it drew each piece. */
+  pins: {
+    current: () => ipcRenderer.invoke('rednode:pins:current'),
+    layout: (l) => ipcRenderer.invoke('rednode:pins:layout', l),
+  },
   keyask: {
     pending: () => ipcRenderer.invoke('rednode:keyask:pending'),
     answer: (aid, allow, how, key) => ipcRenderer.invoke('rednode:keyask:answer', aid, allow, how, key),

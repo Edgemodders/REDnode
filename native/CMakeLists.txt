@@ -52,6 +52,7 @@ add_library(REDnode SHARED
   src/overlay/soundtrace.cpp
   src/overlay/ink.cpp
   src/overlay/inkread.cpp
+  src/overlay/pins.cpp
 )
 target_link_libraries(REDnode PRIVATE RED4ext::SDK d3d12 d3dcompiler)
 target_include_directories(REDnode SYSTEM PRIVATE ${miniaudio_SOURCE_DIR})
@@ -131,6 +132,9 @@ target_compile_options(REDnode_opus_tests PRIVATE /W4 /utf-8)
 
 add_executable(REDswap_table_tests tests/redswap_table_test.cpp)
 target_compile_options(REDswap_table_tests PRIVATE /W4 /utf-8)
+
+add_executable(REDnode_pins_tests tests/pins_test.cpp)
+target_compile_options(REDnode_pins_tests PRIVATE /W4 /utf-8)
 
 add_executable(REDnode_capture_tests tests/capture_test.cpp)
 target_compile_definitions(REDnode_capture_tests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)

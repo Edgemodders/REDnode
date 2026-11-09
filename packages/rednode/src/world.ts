@@ -134,6 +134,34 @@ export interface EntityFiles {
 }
 
 /** One of this package's spawns, as {@link world.spawned} lists them. */
+/** What {@link world.pin} takes (#43). */
+export interface PinOptions {
+  /** Where the post stands, in world metres (its foot). */
+  at: WorldPoint;
+  /** The label's first line, up to 80 characters. */
+  title: string;
+  /** An optional second line, up to 160 characters. */
+  text?: string;
+  /** The label's colour, as `#rrggbb`. The HUD's cyan by default. */
+  color?: string;
+  /** The post's height in metres; 3 by default. The label sits on top of it. */
+  height?: number;
+}
+
+/** A pin, as {@link world.pins} lists it. */
+export interface PinEntry {
+  id: number;
+  /** The package that dropped it. */
+  owner: string | null;
+  at: WorldPoint;
+  title: string;
+  text: string;
+  color: string;
+  height: number;
+  /** Metres from the camera, or null before REDnode has read the camera. */
+  distance: number | null;
+}
+
 export interface SpawnedEntry {
   id: EntityId;
   options: SpawnOptions;
@@ -399,6 +427,41 @@ export const world = {
     } finally {
       stop();
     }
+  },
+
+  /**
+   * Drops a pin in the world (#43): a glowing post at `at` with a label above it (the title, an
+   * optional line of text, and the distance from the camera), seen from any distance and
+   * through walls. Out of view, the label waits at the screen's edge with an arrow to turn
+   * toward. REDnode's overlay draws it, so it changes nothing in the game.
+   *
+   * Answers the pin's id. A package's pins go when it stops, and every pin goes when the game
+   * session ends. Experimental (WP1): styles, scales and following an entity come later.
+   *
+   * @example
+   * ```ts
+   * const here = await game.player.position();
+   * const id = await world.pin({ at: here, title: "Scene 3", text: "the drums by the stairs" });
+   * await world.unpin(id);
+   * ```
+   */
+  async pin(options: PinOptions): Promise<number> {
+    return (await transport().call("pins.add", options)) as number;
+  },
+
+  /** Removes one of this package's pins. Answers false when there was none with that id. */
+  async unpin(id: number): Promise<boolean> {
+    return (await transport().call("pins.remove", { id })) as boolean;
+  },
+
+  /** This package's pins, with each one's distance from the camera in metres (null until known). */
+  async pins(): Promise<PinEntry[]> {
+    return (await transport().call("pins.list", {})) as PinEntry[];
+  },
+
+  /** Removes every pin of this package. Answers how many there were. */
+  async clearPins(): Promise<number> {
+    return (await transport().call("pins.clear", {})) as number;
   },
 
   /** This package's spawns that are still listed: what each was spawned with, and its scene. */

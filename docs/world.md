@@ -1700,7 +1700,7 @@ Proposed on 2026-11-04, to agree with the owner. EDGEquest's request (not urgent
 
 ## World pins (#43): plan
 
-Drafted on 2026-11-10 from EDGEfab's request #43, to agree with the owner. Nothing here has run in the game yet.
+Drafted on 2026-11-10 from EDGEfab's request #43 and **agreed with the owner the same day**, every recommendation below. Then, in the order agreed the same day: #42, #39, #22, #24.
 
 **What is asked:** a pin a modder, a mod or an assistant drops in the world: a glowing marker with a label above it (a title, an optional line of text, the distance), found again from far away. The label goes to the screen's edge with an arrow when the pin is out of view. A player can drop one where V stands, save sets of pins to a file, and click a pin to teleport V to it. EDGEfab tried the game's own two ways on 2026-11-09: `DebugVisualizerSystem.DrawText3D` draws nothing in the release game, and `MappinSystem.RegisterMappin` shows only on the minimap, with no caption.
 
@@ -1756,3 +1756,37 @@ Pins belong to the package that made them and go when it stops, as spawns do; pi
 | A key for Drop a pin here? | No key at first: a button in the Pins window and the API. A key later, set by the player, since free keys are few |
 | Click to teleport | Off by default, a switch in the Pins window; Go there in the list always works |
 | Minimap and world map, `world.guide(pin)` | Later, after WP3 |
+
+### WP1: build
+
+Built in REDnode 0.59.0 on 2026-11-10. The spike is a first working path: `world.pin` draws real pins, and the plugin's log answers the spike's questions.
+
+| Part | Where | What |
+|---|---|---|
+| Projection | `native/src/overlay/pins.hpp` | A point to the screen from the camera's place, orientation, field of view and aspect, for both meanings of the field of view; an off-screen point held at the edge, behind the camera at the side to turn toward. Unit test `native/tests/pins_test.cpp` (14 checks) |
+| Pins in the plugin | `native/src/overlay/pins.cpp` | `pins.set` from the host (the atlas window, each pin's place, height and label rectangle, the post and the four arrows); the camera read on the game thread each frame with pins (`ReadCamera` in reflect.cpp: `GetActiveCameraWorldTransform`, `GetActiveCameraFOV`, `GetAspectRatio`); `CollectPinDraws` for the compositor; `pins.camera` to the host every 20 frames |
+| The spike's log | pins.cpp | Every 120 frames: the field of view and aspect, the first pin's place by the game's own `ProjectPoint` beside this projection read as vertical and as horizontal, the game's forward beside this one's, and the camera read's and the placing's cost |
+| Drawing | compositor.cpp | The shader draws part of a texture (`part`); pins are drawn under every window, from the atlas window, which is never drawn whole (`"atlas": true` on `window.open`, a HUD window that takes no input) |
+| Host | `packages/overlay/pins.js`, `packages/overlay/pins/` | The pins per package, the distances from `pins.camera`, the hidden **World pins** page (1024 x 2048) that draws the labels, post and arrows and measures them; a pins.set once the page has laid them out. Pins go when their package stops and at `REDnode.SessionEnd` |
+| Package | world.ts | `world.pin`, `unpin`, `pins`, `clearPins`, `PinOptions`, `PinEntry` |
+
+Checked in the mock game (scratchpad `pins/run.sh` with the scratch mod `pins/apps/pin-check`): three pins give one `pins.set` with their label rectangles, the camera event fills in the distances (23 m, 72 m, 1.5 km), a bad place and a missing title are refused, and an unpin sends the plugin the new layout only once the page has redrawn.
+
+Not in WP1: the scales, following an entity, labels on spawns, the MCP tools, a post per colour (the post is the HUD's cyan for every pin), occlusion. The field of view is read as vertical until the spike's log says which it is.
+
+### WP1 test
+
+In the game, with REDnode's Console. Outdoors, in a loaded save.
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | Switch on **Console** in the launcher. Run `const here = await game.player.position(); const a = await world.pin({ at: { x: here.x + 10, y: here.y, z: here.z }, title: 'Pin A', text: '10 m from where you stood' })` | A glowing post with a label on top, about 10 m away. Say whether the post's foot sits on the ground where it should |
+| 2 | Turn slowly all the way round, then look up and down | The label stays on its post. Out of view, it waits at the screen's edge with an arrow pointing the way to turn |
+| 3 | Turn fast with the mouse, left and right | Say whether the label stays on the post or swims behind it, and by how much |
+| 4 | Run `for (let i = 0; i < 100; i++) { const t = i / 100 * Math.PI * 2; await world.pin({ at: { x: here.x + 30 * Math.cos(t), y: here.y + 30 * Math.sin(t), z: here.z }, title: 'Pin ' + i }); }` | 100 labels in a ring 30 m round you. Say whether the frame rate drops or stutters |
+| 5 | Run `await world.clearPins(); await world.pin({ at: here, title: 'Start' })`, then walk or drive about 300 m away and look back | The Start pin is found from far away, through buildings, its distance counting up |
+| 6 | Stand so a wall is between you and the Start pin, and run `const cam = (await (await api.GameInstance.GetCameraSystem(game.instance)).GetActiveCameraWorldTransform(api.$out)).out.transform.position; const sq = await api.GameInstance.GetSpatialQueriesSystem(game.instance); const t0 = performance.now(); const hit = await sq.SyncRaycastByCollisionGroup(cam, { X: here.x, Y: here.y, Z: here.z + 1.5, W: 1 }, 'Static', api.$out, false, false); [hit, Math.round(performance.now() - t0)]` | Copy what it prints. Then stand with a clear view of the pin and run the same line again |
+| 7 | Open the pause menu, then photo mode | The pins hide in both, and come back after |
+| 8 | Run `await world.clearPins()`, then quit the game | |
+
+Claude then reads the plugin's log: its `Pins:` lines say which meaning of the field of view matches the game's own projection, and what the camera read and the placing cost.

@@ -43,6 +43,8 @@ if ($LASTEXITCODE) { throw 'JSON unit tests failed.' }
 if ($LASTEXITCODE) { throw 'Fault watch unit tests failed.' }
 & (Join-Path $build "$Config\REDnode_opus_tests.exe")
 if ($LASTEXITCODE) { throw 'Opus state unit tests failed.' }
+& (Join-Path $build "$Config\REDnode_pins_tests.exe")
+if ($LASTEXITCODE) { throw 'World pins unit tests failed.' }
 & (Join-Path $build "$Config\REDnode_capture_tests.exe")
 if ($LASTEXITCODE) { throw 'Capture unit tests failed.' }
 & (Join-Path $build "$Config\REDswap_table_tests.exe")

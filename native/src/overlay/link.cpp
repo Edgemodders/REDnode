@@ -207,6 +207,8 @@ void Dispatch(uint32_t aType, std::vector<uint8_t>&& aPayload)
             RequestCapture(uint32_t(id), json.find("\"overlay\":true") != std::string::npos, uint32_t(maxWidth));
             return;
         }
+        if (HandlePinsCommand(json)) // world pins (#43)
+            return;
         if (json.find("\"cmd\":") != std::string::npos)
             HandleWindowCommand(json);
         else
@@ -283,6 +285,7 @@ void ReaderLoop()
             if (GetMode() == Mode::Interactive)
                 SetMode(Mode::Passive); // give input back to the game
             InkHostGone(); // the host's packages are gone: so are their ink widgets
+            ClearPins();   // and their world pins
             Log("Overlay: host disconnected");
         }
 
