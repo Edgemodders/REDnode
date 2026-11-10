@@ -109,6 +109,36 @@ int main()
         Check(Near(p.distance, 5), "the distance is from the camera");
     }
 
+    // ---- WP2: the scales and the wall test ----
+    {
+        const auto near = SizeFor(ScaleMode::Fit, 5, 300, 0.45f, 36, 420);
+        Check(Near(near.scale, 1) && Near(near.postPx, 300), "fit, close: full size, the post as projected");
+        const auto mid = SizeFor(ScaleMode::Fit, 30, 100, 0.45f, 36, 420);
+        Check(Near(mid.scale, 0.5f), "fit at 30 m: half size (full size at 15 m)");
+        const auto far = SizeFor(ScaleMode::Fit, 1000, 1, 0.45f, 36, 420);
+        Check(Near(far.scale, 0.45f) && Near(far.postPx, 36 * 0.45f) && !far.hide, "fit, far: stays at its smallest, the post at its shortest");
+        const auto tall = SizeFor(ScaleMode::Fit, 2, 5000, 0.45f, 36, 420);
+        Check(Near(tall.postPx, 420), "fit: the post is never taller than postMax");
+    }
+    {
+        const auto close = SizeFor(ScaleMode::World, 3, 600, 0.45f, 36, 420);
+        Check(Near(close.scale, WorldMaxScale) && Near(close.postPx, 600), "world, close: grows to its largest, the post as projected");
+        const auto mid = SizeFor(ScaleMode::World, 60, 40, 0.45f, 36, 420);
+        Check(Near(mid.scale, 0.25f) && !mid.hide, "world at 60 m: a quarter size");
+        const auto far = SizeFor(ScaleMode::World, 1000, 1, 0.45f, 36, 420);
+        Check(far.hide, "world at 1 km: too small, not drawn");
+    }
+    {
+        const auto a = SizeFor(ScaleMode::Screen, 2, 900, 0.45f, 36, 420);
+        const auto b = SizeFor(ScaleMode::Screen, 3000, 0.1f, 0.45f, 36, 420);
+        Check(Near(a.scale, 1) && Near(b.scale, 1) && Near(a.postPx, ScreenPost) && Near(b.postPx, ScreenPost), "screen: the same size at any distance");
+    }
+    {
+        Check(!Blocked(false, 0, 50), "no hit: in view");
+        Check(Blocked(true, 20, 50), "a hit 30 m short of the pin: behind a wall");
+        Check(!Blocked(true, 49.5f, 50), "a hit at the pin's own place: in view");
+    }
+
     std::printf(g_failed ? "%d failed\n" : "all passed\n", g_failed);
     return g_failed ? 1 : 0;
 }

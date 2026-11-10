@@ -123,4 +123,71 @@ inline void ToScreen(const Projected& p, float aW, float aH, float aMargin, floa
     else
         aSide = vy < 0 ? 3 : 4;
 }
+
+// ---- WP2: how big a pin is drawn, and whether a wall hides it ----
+
+// A pin's `scale` (docs/world.md, "World pins (#43): plan"):
+//   Fit:    shrinks with distance down to minScreen of its full size, then stays; dimmed behind a wall
+//   World:  a real size, shrinking with distance; hidden behind a wall
+//   Screen: the same size at any distance; shown through walls
+enum class ScaleMode
+{
+    Fit,
+    World,
+    Screen,
+};
+
+// The distance at which a pin is drawn at its full size, in metres.
+constexpr float FullSizeDistance = 15.0f;
+// The largest a World pin grows when the camera is close.
+constexpr float WorldMaxScale = 2.0f;
+// Below this, a World pin is too small to read and is not drawn.
+constexpr float WorldMinScale = 0.05f;
+// A Screen pin's post, in reference pixels.
+constexpr float ScreenPost = 72.0f;
+
+struct Sizing
+{
+    float scale = 1;  // the label's and the post's width, times their size in the atlas
+    float postPx = 0; // the post's height on screen, reference pixels
+    bool hide = false;
+};
+
+// aDepth: metres along the camera's forward axis; aProjectedPost: the post's height on screen
+// from the world (its foot to its top, projected).
+inline Sizing SizeFor(ScaleMode aMode, float aDepth, float aProjectedPost, float aMinScreen, float aPostMin, float aPostMax)
+{
+    Sizing s;
+    const float natural = aDepth > 0.05f ? FullSizeDistance / aDepth : WorldMaxScale;
+    switch (aMode)
+    {
+    case ScaleMode::Screen:
+        s.scale = 1;
+        s.postPx = ScreenPost;
+        break;
+    case ScaleMode::World:
+        s.scale = std::min(natural, WorldMaxScale);
+        s.postPx = std::clamp(aProjectedPost, 0.0f, 4000.0f);
+        s.hide = s.scale < WorldMinScale;
+        break;
+    case ScaleMode::Fit:
+    default:
+        s.scale = std::clamp(natural, std::clamp(aMinScreen, 0.05f, 1.0f), 1.0f);
+        s.postPx = std::clamp(aProjectedPost, aPostMin * s.scale, aPostMax);
+        break;
+    }
+    return s;
+}
+
+// A ray cast from the camera toward a pin hit something before the pin: a hit within this many
+// metres of the pin counts as the pin's own place (it stands on, or in, what it marks).
+constexpr float CastSlack = 0.75f;
+
+inline bool Blocked(bool aHit, float aHitDistance, float aPinDistance)
+{
+    return aHit && aHitDistance < aPinDistance - CastSlack;
+}
+
+// How opaque a pin is drawn: Fit pins behind a wall are dimmed (World ones are not drawn).
+constexpr float DimmedAlpha = 0.45f;
 } // namespace rednode::overlay::pins

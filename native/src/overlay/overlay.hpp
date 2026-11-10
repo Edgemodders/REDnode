@@ -335,6 +335,7 @@ struct PinDraw
 {
     float x, y, w, h;     // on the screen, reference pixels
     float u0, v0, u1, v1; // in the atlas window, page pixels
+    float alpha = 1;      // WP2: dimmed behind a wall
 };
 bool HandlePinsCommand(const std::string& aJson);
 void UpdatePins(uint64_t aFrame);
@@ -352,6 +353,9 @@ namespace detail
 bool ReadCamera(pins::Camera& aOut, std::string& aError);
 bool GameProjectPoint(float aX, float aY, float aZ, float aOut[4], std::string& aError);
 bool GameCameraForward(float aOut[3], std::string& aError);
+// WP2: where a followed entity is now, and a ray cast against static collision for "behind a wall".
+bool EntityPosition(uint64_t aHash, float aOut[3], std::string& aError);
+bool RaycastStatic(const float aFrom[3], const float aTo[3], bool& aHit, float aPoint[3], std::string& aError);
 // overlay.cpp
 const RED4ext::v1::Sdk* GetSdk();
 RED4ext::v1::PluginHandle GetHandle();

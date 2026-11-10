@@ -55,7 +55,7 @@ cbuffer Draw : register(b0)
     float kind;    // 0 window texture, 1 cursor
     float mode;    // 0 SDR, 1 scRGB, 2 PQ
     float nits;
-    float pad;
+    float alpha;   // the whole draw's opacity (world pins behind a wall are dimmed)
     float4 part;   // the part of the texture drawn: u0, v0, u1, v1 (0, 0, 1, 1 for all of it)
 };
 Texture2D tex : register(t0);
@@ -132,7 +132,7 @@ float4 ps(V i) : SV_Target
             c.rgb = ToPQ(mul(toRec2020, lin) * nits) * c.a; // HDR10 PQ
         }
     }
-    return c;
+    return c * alpha; // premultiplied: every channel
 }
 )";
 
@@ -142,7 +142,7 @@ struct Constants
     float kind;
     float mode;
     float nits;
-    float pad;
+    float alpha = 1;
     float part[4] = {0, 0, 1, 1};
 };
 
@@ -1352,7 +1352,9 @@ void RenderFrame(IDXGISwapChain* aSwapChain)
     {
         g_pinDraws.clear();
         const uint32_t atlas = CollectPinDraws(float(g.width) / scale, ReferenceHeight, g_pinDraws);
-        GpuWindow* w = atlas ? FindGpu(atlas) : nullptr;
+        // Only while the atlas window is shown: it hides with the game's menus and photo mode.
+        const bool shown = atlas && std::any_of(views.begin(), views.end(), [&](const WindowView& v) { return v.id == atlas; });
+        GpuWindow* w = shown ? FindGpu(atlas) : nullptr;
         if (w && w->texReady && w->texWidth && w->texHeight)
         {
             const float tw = float(w->texWidth), th = float(w->texHeight);
@@ -1365,11 +1367,13 @@ void RenderFrame(IDXGISwapChain* aSwapChain)
                 c.part[1] = d.v0 / th;
                 c.part[2] = d.u1 / tw;
                 c.part[3] = d.v1 / th;
+                c.alpha = d.alpha;
                 g.list->SetGraphicsRoot32BitConstants(0, sizeof(Constants) / 4, &c, 0);
                 g.list->DrawInstanced(4, 1, 0, 0);
             }
             c.part[0] = c.part[1] = 0;
             c.part[2] = c.part[3] = 1;
+            c.alpha = 1;
         }
     }
 

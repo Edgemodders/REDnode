@@ -2222,4 +2222,101 @@ bool GameCameraForward(float aOut[3], std::string& aError)
     std::memcpy(aOut, ret->mem, 3 * sizeof(float));
     return true;
 }
+
+// WP2: where an entity a pin follows is now (FindEntityByID, then GetWorldPosition). False with
+// the reason when it is not in the world (streamed out, or removed).
+bool EntityPosition(uint64_t aHash, float aOut[3], std::string& aError)
+{
+    Value hash;
+    hash.kind = Value::Kind::Object;
+    hash.fields.emplace_back("hash", Text(std::to_string(aHash)));
+    Value args = NullArgs(1);
+    args.items.push_back(std::move(hash));
+    Handle<IScriptable> none;
+    Handle<IScriptable> entity;
+    if (!CallNative(none, "ScriptGameInstance", "FindEntityByID", args, &entity, aError))
+        return false;
+    if (!entity)
+    {
+        aError = "not in the world";
+        return false;
+    }
+    std::unique_ptr<Slot> pos;
+    if (!RunPlain(entity, nullptr, "GetWorldPosition", 0, pos, aError) || pos->type->GetSize() < 12)
+        return false;
+    std::memcpy(aOut, pos->mem, 3 * sizeof(float));
+    return true;
+}
+
+// WP2: a ray cast against the world's static collision, from aFrom to aTo
+// (SpatialQueriesSystem.SyncRaycastByCollisionGroup with "Static", as WP1's test tried through
+// the Console). aHit says whether it hit; aPoint is where.
+bool RaycastStatic(const float aFrom[3], const float aTo[3], bool& aHit, float aPoint[3], std::string& aError)
+{
+    aHit = false;
+    Handle<IScriptable> none;
+    Handle<IScriptable> sys;
+    if (!CallNative(none, "ScriptGameInstance", "GetSpatialQueriesSystem", NullArgs(1), &sys, aError))
+        return false;
+    if (!sys)
+    {
+        aError = "no spatial queries system";
+        return false;
+    }
+    CBaseFunction* fn = FindNative(sys, nullptr, "SyncRaycastByCollisionGroup", 6, aError);
+    if (!fn)
+        return false;
+    auto vec = [](const float* p) {
+        Value v;
+        v.kind = Value::Kind::Object;
+        v.fields.emplace_back("X", NumberValue(p[0]));
+        v.fields.emplace_back("Y", NumberValue(p[1]));
+        v.fields.emplace_back("Z", NumberValue(p[2]));
+        v.fields.emplace_back("W", NumberValue(1));
+        return v;
+    };
+    Value no;
+    no.kind = Value::Kind::Bool;
+    no.boolean = false;
+    Value yes = no;
+    yes.boolean = true;
+    Value out;
+    out.kind = Value::Kind::Object;
+    out.fields.emplace_back("$out", yes);
+    Value args;
+    args.kind = Value::Kind::Array;
+    args.items.push_back(vec(aFrom));
+    args.items.push_back(vec(aTo));
+    args.items.push_back(Text("Static"));
+    args.items.push_back(out);
+    args.items.push_back(no);
+    args.items.push_back(no);
+    std::vector<std::unique_ptr<Slot>> slots;
+    std::vector<bool> wanted;
+    std::unique_ptr<Slot> ret;
+    if (!Run(fn, sys, args, slots, wanted, ret, aError))
+        return false;
+    aHit = ret && ret->type->GetType() == Kind::Fundamental && *static_cast<bool*>(ret->mem);
+    if (!aHit)
+        return true;
+    // TraceResult's position (a Vector3), found by name, since the struct is native.
+    if (slots.size() < 4 || slots[3]->type->GetType() != Kind::Class)
+    {
+        aError = "the ray cast gave no TraceResult";
+        return false;
+    }
+    for (const CClass* c = static_cast<const CClass*>(slots[3]->type); c; c = c->parent)
+    {
+        for (const CProperty* p : c->props)
+        {
+            if (Str(p->name) == "position" && p->type->GetSize() >= 12)
+            {
+                std::memcpy(aPoint, static_cast<const uint8_t*>(slots[3]->mem) + p->valueOffset, 3 * sizeof(float));
+                return true;
+            }
+        }
+    }
+    aError = "TraceResult has no position";
+    return false;
+}
 } // namespace rednode::overlay::detail
