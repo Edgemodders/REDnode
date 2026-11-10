@@ -1791,3 +1791,22 @@ In the game, with REDnode's Console. Outdoors, in a loaded save.
 | 9 | Once the game is gone from the screen, open Task Manager's **Details** tab | No `REDnode-overlay.exe` left. If `Cyberpunk2077.exe` is still there after a minute, the quit has stalled again: right-click it, **Create memory dump file**, tell Claude where it went, then end it |
 
 Claude then reads the plugin's log: its `Pins:` lines say which meaning of the field of view matches the game's own projection, and what the camera read and the placing cost.
+
+### WP1 test: results
+
+Run on 2026-11-09 (the owner's evening, dev PC, game 2.5, REDnode 0.59.0). **Passed, every step.**
+
+| What | Found |
+|---|---|
+| The field of view | **Vertical.** In every sample of the log, this projection read as vertical matched the game's own `ProjectPoint` to four decimals (for example game (-0.0943, -0.2866), own (-0.0943, -0.2866)); read as horizontal it was off by the aspect. 51.01 degrees, aspect 1.7778 at 16:9 |
+| The camera's axes | Its forward (+Y rotated by the transform) matched the game's `GetActiveCameraForward` in every sample |
+| Cost a frame | The camera read 16 to 20 us on the game thread; placing 1.3 us for one pin and 7 us for the ring of 100 (202 draws). No drop or stutter seen with 100 |
+| Turning fast | The labels stayed on their posts |
+| From 300 m, through buildings | Found, the distance counting up |
+| A ray cast for "behind a wall" | `SpatialQueriesSystem.SyncRaycastByCollisionGroup(camera, pin, "Static", out)` answered true with the hit point on the wall (`default_material.physmat`) when a wall was between, false with a clear view. 27 to 29 ms through the Console, most of it the call's wait for a game frame, so WP2 runs it in the plugin, a few pins a frame |
+| Menus and photo mode | The pins hid in both and came back |
+| The quit | The host ended at once ("the game is quitting: the host was ended"), so its files were free; the game's own quit stalled again (below) |
+
+**The stalled quits (2026-11-09).** A full dump of the stalled game (Task Manager, 12.8 GB) read with a small reader of the dump's streams (scratchpad `crash/dumpthreads.py`: each thread's stop and the code addresses on its stack, named by module and nearest export; a scan, not a true unwind): the game thread waits in NVIDIA's D3D12 driver (`nvwgf2umx.dll`, WaitForSingleObject), reached from the game's release of its graphics device through Streamline, ReShade's `dxgi.dll`, Steam's overlay and **Discord's overlay, whose `DiscordHook64.dll` calls `D3D11CreateDevice` there**; the driver never returns. REDnode is not on that stack, and RED4ext never got to unloading plugins (no `Unloading` line). The owner noticed the stalls began after ReShade was installed again with the RenoDX add-on, whose `dxgi.dll` is in the same chain, just above Discord's hook: either, or the two together, may be the cause (unverified until quits with Discord's overlay off, then with ReShade set aside, exit cleanly). 0.59.0's host change keeps REDnode's files free either way.
+
+WP1 settles for WP2: the field of view is vertical; the plugin can place every pin each frame at little cost; occlusion comes from the game's ray casts, run by the plugin.
