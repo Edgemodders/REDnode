@@ -11,6 +11,16 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- World pins (https://github.com/Edgemodders/REDnode/issues/43): a pin can follow an entity (`world.pin({ at: id, ... })`), and takes a `style`: its colour, font, title and text sizes, post height, and `scale`. `"fit"` (the default) shrinks with distance down to a smallest size and is dimmed behind walls; `"world"` has a real size and hides behind walls; `"screen"` keeps one size and shows through walls. REDnode tells walls apart with the game's own ray casts. `world.pinStyle` restyles one pin or sets the style for all of a package's pins.
+- `label` on `world.spawn` pins what it spawns: the pin follows the entity and goes when it is removed. `world.load(scene, { label: true })` labels every object of a scene with its id.
+- MCP tools `world_pin`, `world_unpin` and `world_pins`: assistants can drop pins at a place or on an entity. They only draw, so they do not ask first.
+
+**Changed**
+
+- Each pin colour now has its own post and edge arrow (they were always the HUD's cyan).
+
 ## 0.59.1 (2026-11-10)
 
 For game version 2.5.

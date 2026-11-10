@@ -1812,3 +1812,41 @@ Run on 2026-11-09 (the owner's evening, dev PC, game 2.5, REDnode 0.59.0). **Pas
 **Found on 2026-11-09, later the same evening: the stalled quits are a crash in the RenoDX add-on.** A quit with Discord closed stalled too. The game's own crash report (`%LOCALAPPDATA%\REDEngine\ReportQueue\Cyberpunk2077-20261109-203016-48136-7492`, read with WinDbg's `cdbX64.exe`, which the owner installed) says: an access violation on the game thread at `renodx_dlss5_v8_5_model+0x15cc6d` (`vmovdqu ymm0,[rdx]` reading `0x7FFFFC790000`, memory no longer mapped), in ReShade's RenoDX DLSS 5 add-on, `renodx-dlss5-v8.5-model.addon64` (v8.5.0-rc10, a pre-release), as the game quits. The game's crash handler catches it and its report dialog keeps the process open: the "hang". The owner noticed it began after ReShade was installed again with RenoDX. The earlier dump's wait under Discord's hook came from the same teardown. REDnode is not involved; 0.59.0's host change keeps its files free when it happens. Fix on the player's side: leave that add-on out (move it out of `bin\x64`), or report it to RenoDX's author.
 
 WP1 settles for WP2: the field of view is vertical; the plugin can place every pin each frame at little cost; occlusion comes from the game's ray casts, run by the plugin.
+
+### WP2: build
+
+Built in REDnode 0.60.0 on 2026-11-10.
+
+| Part | Where | What |
+|---|---|---|
+| Scales | `native/src/overlay/pins.hpp` (`SizeFor`, `Blocked`) | `fit` (default): full size up to 15 m, then shrinks down to `minScreenSize` (0.45) and stays, post at least 36 px times that; `world`: 15 m over the depth, at most 2, not drawn below 0.05, post as projected; `screen`: full size and a 72 px post anywhere. Edge labels are drawn at 0.8. Unit test `pins_test` (24 checks, 10 new) |
+| Walls | pins.cpp (`Cast`), reflect.cpp (`RaycastStatic`) | On the game thread, up to 4 rays a frame from the camera to the top of a pin's post, `SpatialQueriesSystem.SyncRaycastByCollisionGroup` with `"Static"`, the oldest first, each pin again after 10 frames; only pins in view, never `screen` ones. A hit more than 0.75 m short of the pin: behind a wall. A `fit` pin there is drawn at 45 % opacity (the shader's new per-draw `alpha`); a `world` pin is not drawn |
+| Following an entity | pins.cpp (`Follow`), reflect.cpp (`EntityPosition`) | Up to 24 `FindEntityByID` and `GetWorldPosition` lookups a frame, taking turns; a pin keeps its last place while the entity is out of the world. The places that moved go to the host in `pins.camera`'s `follow`, for the distances and `world.pins()` |
+| Styles | `packages/overlay/pins.js`, `pins/` | `style`: `color`, `font`, `titleSize`, `textSize`, `pinHeight`, `scale`, `minScreenSize`, checked (a wrong field or value is refused with its name); WP1's `color` and `height` are still read. A pin's style is the HUD style, then the package's (`world.pinStyle(style)`), then its own (`world.pinStyle(id, style)`). The labels page is 2048 by 2048 and draws a post and four arrows per colour (up to 15 colours); labels that do not fit are logged and not drawn |
+| Package | world.ts | `PinStyle`, `PinLabel`; `at` takes an entity id; `world.pinStyle`; `label` on `world.spawn` (the pin follows the entity, goes with `world.remove` and comes back with a respawn), `label` on `world.load` (`true`, or a function per object) |
+| MCP | mcp.js | `world_pin` (a place, an entity or both, title, text, style), `world_unpin` (one, or `all` of the assistants' pins; refuses a mod's), `world_pins` (every pin). No ask: pins only draw |
+| Atlas shown | compositor.cpp | Pins draw only while their atlas window is among the shown windows (menus, photo mode, the main menu and hidden mode) |
+| Docs simulation | `docs/assets/examples/sim/rednode.js` | `world.pin` and the rest keep and list pins (the preview has no 3D view), labels on spawns |
+| Log | pins.cpp | Every 30 s with pins: how many, how many behind a wall, and the cost a frame of the camera read, the placing, each entity lookup and each ray cast. The WP1 spike's comparison with the game's own projection is gone (settled) |
+
+Checked: the plugin builds and every native test passes; the mock game (scratchpad `pins/run.sh`, its own small stand-in for the plugin, `pins/mock.mjs`, and the scratch mod `pins/apps/pin-check`): 19 checks of styles, refusals, an entity pin placed by the plugin's `follow`, distances, package and pin styles, a spawn's label and its removal; with `--render=cpu`, a picture of the labels page (`pins/atlas.png`: three colours, a 24 px title, the followed pin's 50 m); `pins/run-mcp.sh`: 8 checks of the three MCP tools over HTTP. Unverified until the game: the ray casts' cost in the plugin, followed entities, and how the scales read on screen.
+
+### WP2 test
+
+In the game, with REDnode's Console. Outdoors in a loaded save, on open ground with a building or wall nearby.
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | Switch on **Console** in the launcher. Run `const here = await game.player.position(); const box = 'base\\environment\\decoration\\containers\\packaging\\cardboard_box\\cardboard_box_a_closed.mesh'; const ids = []; for (let i = 0; i < 10; i++) { const t = i / 10 * Math.PI * 2; ids.push((await world.spawn({ mesh: box, position: { x: here.x + 12 * Math.cos(t), y: here.y + 12 * Math.sin(t), z: here.z }, label: 'Box ' + (i + 1) })).id); }` | Ten boxes in a ring 12 m round you, each with a cyan post and a label, Box 1 to Box 10, at full size |
+| 2 | Walk about 100 m away, then look back at the ring | The labels are smaller (the `fit` scale), not tiny, and the distances read about 100 m |
+| 3 | Run `await world.pin({ at: ids[0], title: 'Box 1 again', style: { color: '#ff4fd8', scale: 'screen' } })`, then walk or drive about 1 km away and look back | Box 1 has a second, pink pin. From 1 km both are found: the cyan labels at their smallest, the pink one at full size. Turn away: they wait at the screen's edge with arrows in their own colours |
+| 4 | Come back so a building or wall stands between you and the ring, still within about 100 m | The cyan labels are dimmed behind the wall; the pink one is not. Step into a clear view: the cyan ones are bright again within a moment |
+| 5 | Run `await world.pinStyle({ scale: 'world' })` | Behind the wall, the cyan labels are gone; in a clear view they are back, smaller the farther away, and very small at 100 m. The pink one does not change (its own style wins) |
+| 6 | Run `await world.pinStyle({ scale: 'fit', titleSize: 26, color: '#ffcf3f' })` | Every box's label turns yellow, with a larger title |
+| 7 | Stand near a box and run `await world.move(ids[1], { x: here.x, y: here.y + 3, z: here.z + 2 })` | Box 2 jumps; its pin follows it within a moment |
+| 8 | Run `await world.remove(ids[2])` | Box 3 and its pin are gone |
+| 9 | Open the map, then photo mode, then press **F10** until the overlay is hidden | The pins hide in each and come back after |
+| 10 | Run `await world.clearPins(); for (const id of ids) await world.remove(id);` | Every pin and box is gone |
+
+Claude then reads the plugin's `Pins:` lines: the ray casts' and entity lookups' cost a frame.
+

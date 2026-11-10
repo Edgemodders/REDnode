@@ -92,6 +92,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [Title-bar buttons and views (#38)](#title-bar-buttons-and-views-38) | In the game | Overlay | Passed 2026-11-05 | 0.58.0 + Views mod 0.1.0, game 2.5 | Every step as written (dev PC). Mock game: 19 checks (scratchpad `views/check.mjs`), dev and packaged host |
 | [EDGEmat on REDnode's REDbridge (#40)](#edgemat-on-rednodes-redbridge-40) | In the game | MCP | Passed 2026-11-05 | 0.58.0 + EDGEmat's server from its main, REDagent, game 2.5 | One REDbridge, EDGEmat through the shared one (dev PC). The release keeps npm's 0.3.1, which ignores it, until EDGEmat publishes. Outside the game: 21 checks on the share, 12 end to end with a real REDbridge (scratchpad `w40/`) |
 | [The game's MCP port (0.57.1)](#the-games-mcp-port-0571) | In the game | MCP | Passed 2026-11-05 | 0.58.0, game 2.5 | The host waited 70 s for a port held by `node.exe`, named it, took the port when freed; a sign-in then reached the game (dev PC). Outside the game: 9 checks (scratchpad `mcpport-check.cjs`) |
+| [World pins WP2 (#43)](#world-pins-wp2-43) | In the game, with the Console | World | Waiting | 0.60.0, game 2.5 | Mock game: 19 checks (styles, refusals, an entity pin, package and pin styles, a spawn's label) and a picture of the labels page (scratchpad `pins/run.sh`); MCP tools: 8 checks (`pins/run-mcp.sh`); unit test `pins_test` (24 checks) |
 | [World pins WP1 (#43)](#world-pins-wp1-43) | In the game, with the Console | World | Passed 2026-11-09 | 0.59.0, game 2.5 | **Pass**, every step (dev PC): the field of view is vertical, 100 pins cost 7 us a frame to place, a ray cast tells a wall from a clear view, the host ended at the quit. Before it: Mock game: 3 pins, distances, refusals, one pins.set per change (scratchpad `pins/run.sh`); unit test `pins_test` (14 checks) |
 | [A game started from VS Code (0.59.1)](#a-game-started-from-vs-code-0591) | In the game | Overlay | Passed 2026-11-10 | 0.59.1, game 2.5 | **Pass** (laptop): started by EDGEdeck's Run game with `edgedeck.launch` `exe`, the plugin dropped `ELECTRON_RUN_AS_NODE`, the host connected and F10 showed the launcher; the plugin logged `Unloading` at the quit |
 | [Edit and Run (UT3a)](ink.md#ut3a-test) | In the game | UI Tools | Passed | 0.55.0 + UI Workbench 0.2.0, Codeware, game 2.5 | Passed on the dev PC on 2026-11-02, with #37's test. The player's notes (resize, a splitter) went into 0.55.1. Mock game: 21 checks (scratchpad `ut3/check.mjs`) and Inspect's 40 |
@@ -1148,6 +1149,13 @@ REDagent needs its Anthropic key, as before.
 **Passed on 2026-11-05** (dev PC, REDnode 0.58.0, EDGEmat's server from its main, which still calls itself 0.3.1): every step as written. The host log has `Shared REDbridge on http://127.0.0.1:52188/bridge`, EDGEmat's `using REDnode's REDbridge`, `Shared REDbridge: first call from EDGEmat (archive.archives)`, and one REDbridge start, the host's. Both `mat_find` and `mat_describe` ran without asking.
 
 The 0.58.0 release ships EDGEmat 0.3.1 from npm, which ignores the shared REDbridge and starts its own. That combination was checked outside the game on 2026-11-05 with REDnode's variables set (scratchpad `e1/check-pin.cjs`, E1's 21 checks: tools listed, reads answered, ask flags). Raise the pin in `packages/overlay/package.json` once EDGEmat publishes a newer version.
+
+## World pins WP2 (#43)
+
+World pins with styles, scales and walls (REDnode 0.60.0): ten labelled boxes found again from 100 m and 1 km, through a wall, a pin on an entity, the `fit`, `world` and `screen` scales, package styles, and the pins hidden in menus, photo mode and the overlay's hidden mode. Steps and what each should show: [docs/world.md, "WP2 test"](world.md#wp2-test).
+
+| Run | Result |
+|---|---|
 
 ## World pins WP1 (#43)
 
