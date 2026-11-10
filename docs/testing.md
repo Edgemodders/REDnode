@@ -93,6 +93,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [EDGEmat on REDnode's REDbridge (#40)](#edgemat-on-rednodes-redbridge-40) | In the game | MCP | Passed 2026-11-05 | 0.58.0 + EDGEmat's server from its main, REDagent, game 2.5 | One REDbridge, EDGEmat through the shared one (dev PC). The release keeps npm's 0.3.1, which ignores it, until EDGEmat publishes. Outside the game: 21 checks on the share, 12 end to end with a real REDbridge (scratchpad `w40/`) |
 | [The game's MCP port (0.57.1)](#the-games-mcp-port-0571) | In the game | MCP | Passed 2026-11-05 | 0.58.0, game 2.5 | The host waited 70 s for a port held by `node.exe`, named it, took the port when freed; a sign-in then reached the game (dev PC). Outside the game: 9 checks (scratchpad `mcpport-check.cjs`) |
 | [World pins WP1 (#43)](#world-pins-wp1-43) | In the game, with the Console | World | Passed 2026-11-09 | 0.59.0, game 2.5 | **Pass**, every step (dev PC): the field of view is vertical, 100 pins cost 7 us a frame to place, a ray cast tells a wall from a clear view, the host ended at the quit. Before it: Mock game: 3 pins, distances, refusals, one pins.set per change (scratchpad `pins/run.sh`); unit test `pins_test` (14 checks) |
+| [A game started from VS Code (0.59.1)](#a-game-started-from-vs-code-0591) | In the game | Overlay | Passed 2026-11-10 | 0.59.1, game 2.5 | **Pass** (laptop): started by EDGEdeck's Run game with `edgedeck.launch` `exe`, the plugin dropped `ELECTRON_RUN_AS_NODE`, the host connected and F10 showed the launcher; the plugin logged `Unloading` at the quit |
 | [Edit and Run (UT3a)](ink.md#ut3a-test) | In the game | UI Tools | Passed | 0.55.0 + UI Workbench 0.2.0, Codeware, game 2.5 | Passed on the dev PC on 2026-11-02, with #37's test. The player's notes (resize, a splitter) went into 0.55.1. Mock game: 21 checks (scratchpad `ut3/check.mjs`) and Inspect's 40 |
 | [UT3a polish (0.55.1)](ink.md#ut3a-polish-rednode-0551-ui-workbench-021) | In the game | UI Tools, Overlay | Passed 2026-11-03 | 0.55.1 + UI Workbench 0.2.1, Codeware, game 2.5 | Every step as expected (dev PC). Mock game: 19 checks (scratchpad `wb/check.mjs`) and the keys check's 19 |
 | [Mod Manager details and status tooltips (0.56.1)](ink.md#mod-manager-details-and-status-tooltips-rednode-0561-ui-workbench-041) | In the game | Overlay, UI Tools | Passed 2026-11-03 | 0.56.1 + UI Workbench 0.4.1 | Every step as expected (dev PC). Mock game: 14 checks (scratchpad `mm2/check.mjs`) |
@@ -1155,6 +1156,16 @@ The spike of world pins (REDnode 0.59.0): `world.pin` from the Console, the labe
 | Run | Result |
 |---|---|
 | 2026-11-09, REDnode 0.59.0, dev PC | **Pass**, steps 1 to 9. Details in [docs/world.md, "WP1 test: results"](world.md#wp1-test-results). The game's own quit stalled again after the host had ended: a dump points at Discord's overlay (unverified) |
+
+## A game started from VS Code (0.59.1)
+
+Found on the laptop on 2026-11-10: F10 showed only REDnode's cursor, with no launcher or apps. EDGEdeck's Run game, with `"edgedeck.launch": "exe"`, starts `Cyberpunk2077.exe` from VS Code's extension host, which runs with `ELECTRON_RUN_AS_NODE=1`; the game passed it on to the overlay host, which ran as plain Node, refused its arguments and exited before writing `rednode-overlay.log`. Reproduced by starting the packaged host by hand with the variable set. REDnode 0.59.1's plugin starts the host without it (`HostEnvironment` in `native/src/overlay/host.cpp`). Requests filed for the launchers: EDGEdeck #12, REDcode #24.
+
+Steps: start the game from VS Code (EDGEdeck's Run game with `edgedeck.launch` set to `exe`, or a VS Code terminal), press F10 at the main menu, quit. The plugin log should have `Overlay: the game was started with ELECTRON_RUN_AS_NODE set` then `Overlay: host connected`, and the launcher should show.
+
+| Run | Result |
+|---|---|
+| 2026-11-10, REDnode 0.59.1, laptop | **Pass**: the line, `host connected`, the launcher and apps at F10; at the quit `the host was ended` and `Unloading` |
 
 ## The game's MCP port (0.57.1)
 
