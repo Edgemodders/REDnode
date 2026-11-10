@@ -21,6 +21,37 @@ namespace
 {
 HANDLE g_job = nullptr;
 HANDLE g_process = nullptr;
+
+// The game's environment for the host, without the variables that stop an Electron app
+// from starting as one. A game started from VS Code (EDGEdeck's Run game, a terminal, a
+// Claude session) inherits ELECTRON_RUN_AS_NODE=1, which makes the host run as plain Node:
+// it refuses its own arguments and exits before writing a line of its log.
+std::wstring HostEnvironment(int& aDropped)
+{
+    aDropped = 0;
+    std::wstring block;
+    LPWCH env = GetEnvironmentStringsW();
+    if (!env)
+        return block;
+    for (const wchar_t* p = env; *p; p += wcslen(p) + 1)
+    {
+        constexpr const wchar_t* kDrop[] = {L"ELECTRON_RUN_AS_NODE=", L"ELECTRON_NO_ATTACH_CONSOLE="};
+        bool drop = false;
+        for (const auto* name : kDrop)
+            if (_wcsnicmp(p, name, wcslen(name)) == 0)
+                drop = true;
+        if (drop)
+        {
+            ++aDropped;
+            continue;
+        }
+        block.append(p);
+        block.push_back(L'\0');
+    }
+    FreeEnvironmentStringsW(env);
+    block.push_back(L'\0');
+    return block;
+}
 } // namespace
 
 void StartHost(const std::filesystem::path& aPluginDir)
@@ -54,10 +85,17 @@ void StartHost(const std::filesystem::path& aPluginDir)
         SetInformationJobObject(g_job, JobObjectExtendedLimitInformation, &limits, sizeof(limits));
     }
 
+    int dropped = 0;
+    auto env = HostEnvironment(dropped);
+    if (dropped)
+        Log("Overlay: the game was started with ELECTRON_RUN_AS_NODE set (from VS Code?); the host starts "
+            "without it");
+
     STARTUPINFOW si{};
     si.cb = sizeof(si);
     PROCESS_INFORMATION pi{};
-    if (!CreateProcessW(exe.c_str(), cmd.data(), nullptr, nullptr, FALSE, CREATE_SUSPENDED, nullptr,
+    if (!CreateProcessW(exe.c_str(), cmd.data(), nullptr, nullptr, FALSE,
+                        CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT, env.size() > 1 ? env.data() : nullptr,
                         hostDir.c_str(), &si, &pi))
     {
         Log("Overlay: could not start the host (error %lu)", GetLastError());

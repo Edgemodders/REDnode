@@ -17,6 +17,7 @@ How to keep it:
 
 **Fixed**
 
+- F10 showed only the cursor, with no launcher or apps, when the game was started from VS Code (EDGEdeck's Run game, a terminal or a Claude session): the game passed VS Code's `ELECTRON_RUN_AS_NODE` setting on to REDnode's overlay host, which then quit at once without a log. The plugin now starts the host without it.
 - REDnode's overlay host now ends as soon as the game starts to quit, instead of with the game's process. When a quit stalled and left the game's process open, the host stayed too and kept its files locked, so a mod manager could not deploy over REDnode (its error named `host\resources\app.asar`) until the stuck game was ended in Task Manager.
 
 ## 0.58.0 (2026-11-05)
