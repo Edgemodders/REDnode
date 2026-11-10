@@ -15,6 +15,10 @@ How to keep it:
 
 - World pins, experimental (https://github.com/Edgemodders/REDnode/issues/43): `world.pin({ at, title, text?, color?, height? })` drops a glowing post with a label (its title, a line of text and the distance) that can be seen from any distance and through walls; out of view, the label waits at the screen's edge with an arrow to turn toward. `world.unpin`, `world.pins` and `world.clearPins` go with it. REDnode's overlay draws them, placed each frame where the pin is, so they change nothing in the game. A package's pins go when it stops, and every pin goes when the game session ends.
 
+**Fixed**
+
+- REDnode's overlay host now ends as soon as the game starts to quit, instead of with the game's process. When a quit stalled and left the game's process open, the host stayed too and kept its files locked, so a mod manager could not deploy over REDnode (its error named `host\resources\app.asar`) until the stuck game was ended in Task Manager.
+
 ## 0.58.0 (2026-11-05)
 
 For game version 2.5.

@@ -1788,5 +1788,6 @@ In the game, with REDnode's Console. Outdoors, in a loaded save.
 | 6 | Stand so a wall is between you and the Start pin, and run `const cam = (await (await api.GameInstance.GetCameraSystem(game.instance)).GetActiveCameraWorldTransform(api.$out)).out.transform.position; const sq = await api.GameInstance.GetSpatialQueriesSystem(game.instance); const t0 = performance.now(); const hit = await sq.SyncRaycastByCollisionGroup(cam, { X: here.x, Y: here.y, Z: here.z + 1.5, W: 1 }, 'Static', api.$out, false, false); [hit, Math.round(performance.now() - t0)]` | Copy what it prints. Then stand with a clear view of the pin and run the same line again |
 | 7 | Open the pause menu, then photo mode | The pins hide in both, and come back after |
 | 8 | Run `await world.clearPins()`, then quit the game | |
+| 9 | Once the game is gone from the screen, open Task Manager's **Details** tab | No `REDnode-overlay.exe` left. If `Cyberpunk2077.exe` is still there after a minute, the quit has stalled again: right-click it, **Create memory dump file**, tell Claude where it went, then end it |
 
 Claude then reads the plugin's log: its `Pins:` lines say which meaning of the field of view matches the game's own projection, and what the camera read and the placing cost.

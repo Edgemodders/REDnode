@@ -238,6 +238,13 @@ bool OnRunningExit(RED4ext::CGameApplication* aApp)
     rednode::overlay::ClearGameRefs();
     rednode::overlay::detail::ClearInk();
     rednode::overlay::detail::ClearInkRead();
+    rednode::overlay::detail::ClearPins();
+    // The game is quitting: the host has nothing more to do, so it ends now rather than with the
+    // game's process. Some quits stall after this point and leave the process open for good
+    // (2026-11-09, unexplained), and the host with it, which kept its files locked and stopped a
+    // player's mod manager from deploying.
+    rednode::overlay::detail::StopHost();
+    g_sdk->logger->Info(g_handle, "Overlay: the game is quitting: the host was ended");
     return true;
 }
 } // namespace
@@ -273,7 +280,10 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle aHandle, RED4e
     }
     case RED4ext::v1::EMainReason::Unload:
     {
+        // Logged, so a quit that never ends shows whether it got this far.
+        aSdk->logger->Info(aHandle, "Unloading");
         rednode::overlay::Stop();
+        aSdk->logger->Info(aHandle, "Unloaded");
         break;
     }
     }
