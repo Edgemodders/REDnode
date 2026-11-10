@@ -1850,3 +1850,19 @@ In the game, with REDnode's Console. Outdoors in a loaded save, on open ground w
 
 Claude then reads the plugin's `Pins:` lines: the ray casts' and entity lookups' cost a frame.
 
+### WP2 test: results
+
+Run on 2026-11-10 (dev PC, game 2.5, REDnode 0.60.0). **Passed, every step**, as written: the ten labelled boxes, the smaller `fit` labels from 100 m, the pink `screen` pin at full size from 1 km, the edge arrows in each pin's colour, dimmed labels behind a wall, the `world` scale hiding them there, the package restyle, a moved box's pin following it, a removed box taking its pin, and the pins hidden in the map, photo mode and the overlay's hidden mode.
+
+The plugin's cost lines, each over 1,800 frames with 10 or 11 pins:
+
+| What | Cost |
+|---|---|
+| The camera read | 12 to 18 us a frame |
+| Placing the pins | 2.0 to 2.5 us a frame, up to 22 draws |
+| Following entities | 2.2 to 2.7 us a lookup, 11 a frame (every box and the pink pin): about 26 us a frame |
+| Ray casts | 17.6 to 33.4 us a cast, about 0.9 a frame: about 20 us a frame |
+| In all | about 60 us a frame of the game thread with 11 followed pins |
+
+1 to 4 pins were behind a wall at each line. No errors in the plugin's or the host's log, and the game quit cleanly. WP3 (the Pins window) is next.
+
