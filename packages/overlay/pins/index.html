@@ -5,11 +5,12 @@
     <title>World pins</title>
     <style>
       /* An atlas: REDnode draws parts of this page where each pin lands on the screen. Pieces sit
-         at whole pixels with gaps, so a stretched or scaled piece never picks up its neighbour. */
+         at whole pixels with gaps, so a stretched or scaled piece never picks up its neighbour.
+         A post and four arrows per colour, then the labels (app.js). */
       html,
       body {
         margin: 0;
-        width: 1024px;
+        width: 2048px;
         height: 2048px;
         overflow: hidden;
         background: transparent;
@@ -18,21 +19,18 @@
       .piece {
         position: absolute;
       }
-      #post {
-        left: 4px;
-        top: 4px;
+      .post {
         width: 10px;
-        height: 256px;
+        height: 128px;
         background: linear-gradient(to top, var(--c) 0%, var(--c) 6%, color-mix(in srgb, var(--c) 70%, transparent) 30%, transparent 100%);
         border-radius: 5px 5px 2px 2px;
         box-shadow: 0 0 6px var(--c);
-        --c: #19f3ff;
       }
       .arrow {
         width: 28px;
         height: 28px;
-        color: #19f3ff;
-        filter: drop-shadow(0 0 3px #000) drop-shadow(0 0 2px #19f3ff);
+        color: var(--c);
+        filter: drop-shadow(0 0 3px #000) drop-shadow(0 0 2px var(--c));
       }
       .arrow svg {
         width: 28px;
@@ -51,9 +49,11 @@
         color: #e8f6ff;
         box-shadow: 0 0 8px color-mix(in srgb, var(--c) 45%, transparent);
         --c: #19f3ff;
+        --title: 18px;
+        --text: 14px;
       }
       .title {
-        font-size: 18px;
+        font-size: var(--title);
         font-weight: 700;
         line-height: 1.15;
         color: var(--c);
@@ -62,13 +62,13 @@
         text-overflow: ellipsis;
       }
       .text {
-        font-size: 14px;
+        font-size: var(--text);
         line-height: 1.2;
         margin-top: 2px;
         overflow-wrap: anywhere;
       }
       .distance {
-        font-size: 13px;
+        font-size: calc(var(--text) - 1px);
         margin-top: 2px;
         color: #9fb6c8;
         font-variant-numeric: tabular-nums;
@@ -76,19 +76,7 @@
     </style>
   </head>
   <body>
-    <div id="post" class="piece"></div>
-    <div id="arrow-left" class="piece arrow" style="left: 24px; top: 4px">
-      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M16 3 6 12l10 9z" /></svg>
-    </div>
-    <div id="arrow-right" class="piece arrow" style="left: 60px; top: 4px">
-      <svg viewBox="0 0 24 24"><path fill="currentColor" d="m8 3 10 9-10 9z" /></svg>
-    </div>
-    <div id="arrow-up" class="piece arrow" style="left: 96px; top: 4px">
-      <svg viewBox="0 0 24 24"><path fill="currentColor" d="m3 16 9-10 9 10z" /></svg>
-    </div>
-    <div id="arrow-down" class="piece arrow" style="left: 132px; top: 4px">
-      <svg viewBox="0 0 24 24"><path fill="currentColor" d="m3 8 9 10 9-10z" /></svg>
-    </div>
+    <div id="pieces"></div>
     <div id="labels"></div>
     <script src="app.js"></script>
   </body>

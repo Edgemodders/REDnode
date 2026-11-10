@@ -593,6 +593,9 @@ export function undoTweaks() {
 
 const worldListeners = new Map(); // event name -> Set
 const entities = new Map();
+const pins = new Map();
+let nextPin = 1;
+const PIN_STYLE = Object.freeze({ color: '#19f3ff', font: null, titleSize: 18, textSize: 14, pinHeight: 3, scale: 'fit', minScreenSize: 0.45 });
 function worldEvent(name, e) {
   for (const fn of worldListeners.get(name) ?? []) fn({ name, ...e });
 }
@@ -617,6 +620,10 @@ export const world = {
     const hash = String(2n ** 40n + BigInt(Math.floor(Math.random() * 1e9)));
     const e = { entityId: hash, entityType: 'entEntity' };
     entities.set(hash, { ...options });
+    if (options.label) {
+      const l = typeof options.label === 'string' ? { title: options.label } : options.label;
+      entities.get(hash).pin = await world.pin({ at: { hash, ...(options.position ?? {}) }, title: l.title, text: l.text, style: l.style });
+    }
     setTimeout(() => worldEvent('Entity/Initialize', e), 30);
     setTimeout(() => worldEvent('Entity/AfterAttach', e), 90);
     return { id: { hash }, entity: new Remote('entEntity', {}) };
@@ -629,6 +636,8 @@ export const world = {
   },
   async remove(id) {
     const hash = typeof id === 'string' ? id : id?.hash;
+    const pin = entities.get(hash)?.pin;
+    if (pin) pins.delete(pin);
     if (!entities.delete(hash)) return false;
     await nextFrame();
     worldEvent('Entity/Detach', { entityId: hash, entityType: 'entEntity' });
@@ -669,6 +678,45 @@ export const world = {
   },
   async unload() {
     return 0;
+  },
+  // World pins (#43): kept and listed, not drawn (the preview has no 3D view). Distances are
+  // from the simulated V; a pin on an entity stands where the preview spawned it.
+  async pin(options) {
+    const title = String(options?.title ?? '').slice(0, 80);
+    if (!title) throw new Error('world.pin needs a title');
+    const at = options?.at ?? {};
+    const hash = typeof at === 'string' ? at : at.hash ? String(at.hash) : null;
+    const place = [at.x, at.y, at.z].every(Number.isFinite) ? { x: at.x, y: at.y, z: at.z } : hash ? entities.get(hash)?.position ?? null : null;
+    if (!hash && !place) throw new Error('world.pin needs at: a place { x, y, z } in metres, or an entity id { hash } to follow');
+    const id = nextPin++;
+    pins.set(id, { id, owner: 'preview', at: place, entity: hash ? { hash } : null, title, text: options.text ?? '', style: { ...PIN_STYLE, ...(options.style ?? {}) } });
+    return id;
+  },
+  async unpin(id) {
+    return pins.delete(Number(id));
+  },
+  async pinStyle(idOrStyle, style) {
+    if (typeof idOrStyle === 'number') {
+      const p = pins.get(idOrStyle);
+      if (!p) return 0;
+      Object.assign(p.style, style ?? {});
+      return 1;
+    }
+    for (const p of pins.values()) Object.assign(p.style, idOrStyle ?? {});
+    return pins.size;
+  },
+  async pins() {
+    return [...pins.values()].map((p) => ({
+      ...p,
+      color: p.style.color,
+      height: p.style.pinHeight,
+      distance: p.at ? Math.hypot(p.at.x - sim.pos.x, p.at.y - sim.pos.y, p.at.z - sim.pos.z) : null,
+    }));
+  },
+  async clearPins() {
+    const n = pins.size;
+    pins.clear();
+    return n;
   },
   async entity(id) {
     const hash = typeof id === 'string' ? id : id?.hash;

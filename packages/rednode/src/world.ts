@@ -85,6 +85,11 @@ export interface SpawnOptions {
    * removed, wherever V goes, so remove what you no longer show. Default `false`.
    */
   alwaysSpawned?: boolean;
+  /**
+   * Pins the entity with a label (#43): a title, or a {@link PinLabel}. The pin follows the
+   * entity, is spawned again with it after an archive swap, and goes when it is removed.
+   */
+  label?: string | PinLabel;
 }
 
 /** A spawned entity. */
@@ -134,17 +139,52 @@ export interface EntityFiles {
 }
 
 /** One of this package's spawns, as {@link world.spawned} lists them. */
+/**
+ * How a pin looks (#43). Every field is optional; a pin starts from the HUD style, then from
+ * the style {@link world.pinStyle} set for all of this package's pins, then its own.
+ */
+export interface PinStyle {
+  /** The label's border and title, the post and the edge arrow, as `#rrggbb`. The HUD's cyan by default. */
+  color?: string;
+  /** The label's font family, such as `"Rajdhani"` (the default) or `"Segoe UI"`. */
+  font?: string;
+  /** The title's size in pixels at full size, 10 to 48. Default 18. */
+  titleSize?: number;
+  /** The text line's size in pixels at full size, 8 to 36. Default 14; the distance is a pixel smaller. */
+  textSize?: number;
+  /** The post's height in metres; the label sits on top of it. Default 3. */
+  pinHeight?: number;
+  /**
+   * How the pin's size follows distance, and what a wall between does:
+   *
+   * - `"fit"` (default): full size up to 15 m, then shrinks with distance down to
+   *   `minScreenSize`, and stays. Behind a wall it is still drawn, dimmed.
+   * - `"world"`: a real size, shrinking with distance, too small to see from far away.
+   *   Hidden behind a wall.
+   * - `"screen"`: the same size on screen at any distance, seen through walls.
+   */
+  scale?: "fit" | "world" | "screen";
+  /** For `"fit"`: the smallest it gets, from 0.1 to 1 of its full size. Default 0.45. */
+  minScreenSize?: number;
+}
+
 /** What {@link world.pin} takes (#43). */
 export interface PinOptions {
-  /** Where the post stands, in world metres (its foot). */
-  at: WorldPoint;
+  /**
+   * Where the post stands: a place in world metres (its foot), or an entity's id, which the pin
+   * follows wherever it goes (its foot at the entity's position). With an entity id, `x`, `y`
+   * and `z` beside `hash` are where it is drawn until REDnode finds the entity.
+   */
+  at: WorldPoint | EntityId | (EntityId & WorldPoint);
   /** The label's first line, up to 80 characters. */
   title: string;
   /** An optional second line, up to 160 characters. */
   text?: string;
-  /** The label's colour, as `#rrggbb`. The HUD's cyan by default. */
+  /** How it looks: colour, font, sizes, the post's height and its scale. */
+  style?: PinStyle;
+  /** WP1's name for `style.color`, still read. */
   color?: string;
-  /** The post's height in metres; 3 by default. The label sits on top of it. */
+  /** WP1's name for `style.pinHeight`, still read. */
   height?: number;
 }
 
@@ -153,13 +193,27 @@ export interface PinEntry {
   id: number;
   /** The package that dropped it. */
   owner: string | null;
-  at: WorldPoint;
+  /** Where it is: its own place, or where the entity it follows was last seen. Null for an entity not found yet. */
+  at: WorldPoint | null;
+  /** The entity it follows, or null. */
+  entity: EntityId | null;
   title: string;
   text: string;
+  /** Its whole style, with every default filled in. */
+  style: Required<Omit<PinStyle, "font">> & { font: string | null };
+  /** `style.color`, as WP1 listed it. */
   color: string;
+  /** `style.pinHeight`, as WP1 listed it. */
   height: number;
   /** Metres from the camera, or null before REDnode has read the camera. */
   distance: number | null;
+}
+
+/** A label for what {@link world.spawn} or {@link world.load} spawns: a pin that goes with the entity. */
+export interface PinLabel {
+  title: string;
+  text?: string;
+  style?: PinStyle;
 }
 
 export interface SpawnedEntry {
@@ -169,6 +223,8 @@ export interface SpawnedEntry {
   attached: boolean;
   /** The scene it belongs to, when {@link world.load} spawned it. */
   scene?: string;
+  /** The id of its label's pin, with `label`. */
+  pin?: number;
 }
 
 /** What {@link world.load} did. */
@@ -202,6 +258,13 @@ function rotation(o?: WorldRotation, yaw?: number): WorldRotation {
   return { i: 0, j: 0, k: Math.sin(half), r: Math.cos(half) };
 }
 const idOf = (id: EntityId | string) => (typeof id === "string" ? { hash: id } : { hash: String(id.hash) });
+
+// A spawn's label as a pin on the entity, drawn at its spawn place until REDnode finds it.
+async function pinSpawn(id: EntityId, options: SpawnOptions): Promise<number | undefined> {
+  if (!options.label) return undefined;
+  const label: PinLabel = typeof options.label === "string" ? { title: options.label } : options.label;
+  return world.pin({ at: { hash: id.hash, ...options.position }, title: label.title, text: label.text, style: label.style });
+}
 
 // A bare entity with no components or appearances, for a mesh on its own (W1's World test).
 const BARE_TEMPLATE = "base\\gameplay\\loot\\containers\\common_suitcases\\appearances\\suitcase_small_placeholder.ent";
@@ -398,6 +461,7 @@ export const world = {
         // Listed now, so it can be moved and removed; the listener in listen() follows it from here.
         const entry: SpawnedEntry = { id, options, attached: attached.has(id.hash) };
         mine.set(id.hash, entry);
+        entry.pin = await pinSpawn(id, options).catch(() => undefined);
         if (isPerson(options)) {
           if (entry.attached) settleLater(entry);
           else unsettled.add(id.hash);
@@ -420,7 +484,9 @@ export const world = {
           setTimeout(resolve, Math.min(left, 250));
         });
       }
-      mine.set(id.hash, { id, options, attached: true });
+      const entry: SpawnedEntry = { id, options, attached: true };
+      mine.set(id.hash, entry);
+      entry.pin = await pinSpawn(id, options).catch(() => undefined);
       const entity = await world.entity(id);
       if (entity && isPerson(options)) await settlePerson(entity, options);
       return { id, entity };
@@ -431,18 +497,29 @@ export const world = {
 
   /**
    * Drops a pin in the world (#43): a glowing post at `at` with a label above it (the title, an
-   * optional line of text, and the distance from the camera), seen from any distance and
-   * through walls. Out of view, the label waits at the screen's edge with an arrow to turn
-   * toward. REDnode's overlay draws it, so it changes nothing in the game.
+   * optional line of text, and the distance from the camera), found again from far away. Out of
+   * view, the label waits at the screen's edge with an arrow to turn toward. REDnode's overlay
+   * draws it, so it changes nothing in the game and needs no permission.
+   *
+   * `at` is a place, or an entity's id: the pin then follows the entity. `style` sets its look
+   * and how its size follows distance ({@link PinStyle}).
    *
    * Answers the pin's id. A package's pins go when it stops, and every pin goes when the game
-   * session ends. Experimental (WP1): styles, scales and following an entity come later.
+   * session ends. Pins hide with the game's menus, in photo mode and in the overlay's hidden mode.
    *
    * @example
    * ```ts
    * const here = await game.player.position();
    * const id = await world.pin({ at: here, title: "Scene 3", text: "the drums by the stairs" });
+   * await world.pin({ at: { x: here.x, y: here.y + 200, z: here.z }, title: "Far", style: { color: "#ff4fd8", scale: "screen" } });
    * await world.unpin(id);
+   * ```
+   *
+   * @example
+   * ```ts
+   * // A pin that follows what you spawned (or use world.spawn's label).
+   * const { id } = await world.spawn({ record: "Character.Judy", position: here });
+   * await world.pin({ at: id, title: "Judy" });
    * ```
    */
   async pin(options: PinOptions): Promise<number> {
@@ -452,6 +529,21 @@ export const world = {
   /** Removes one of this package's pins. Answers false when there was none with that id. */
   async unpin(id: number): Promise<boolean> {
     return (await transport().call("pins.remove", { id })) as boolean;
+  },
+
+  /**
+   * Restyles a pin, or with no id sets the style every pin of this package starts from, its
+   * pins now and later (each pin's own style still wins). Answers how many pins changed.
+   *
+   * @example
+   * ```ts
+   * await world.pinStyle({ scale: "screen", color: "#ffcf3f" }); // all of this package's pins
+   * await world.pinStyle(id, { titleSize: 26 });                 // one
+   * ```
+   */
+  async pinStyle(idOrStyle: number | PinStyle, style?: PinStyle): Promise<number> {
+    const params = typeof idOrStyle === "number" ? { id: idOrStyle, style: style ?? {} } : { style: idOrStyle };
+    return (await transport().call("pins.style", params)) as number;
   },
 
   /** This package's pins, with each one's distance from the camera in metres (null until known). */
@@ -511,7 +603,9 @@ export const world = {
    * scene of the same name again replaces it. With `wait: false`, objects are spawned without
    * waiting for each to be in the world, as {@link world.spawn} does with it, so a scene far
    * from V loads in full and shows once V gets near. `alwaysSpawned` asks for every object what
-   * {@link world.spawn}'s option of that name asks for one.
+   * {@link world.spawn}'s option of that name asks for one. `label: true` pins every object with
+   * its id in the scene (a function picks each label, or null for none), as `world.spawn`'s
+   * `label` does.
    *
    * @example
    * ```ts
@@ -520,7 +614,10 @@ export const world = {
    * await world.unload(r.name);
    * ```
    */
-  async load(scene: Scene | string, options: { name?: string; wait?: boolean; alwaysSpawned?: boolean } = {}): Promise<LoadResult> {
+  async load(
+    scene: Scene | string,
+    options: { name?: string; wait?: boolean; alwaysSpawned?: boolean; label?: boolean | ((object: string) => string | PinLabel | null) } = {},
+  ): Promise<LoadResult> {
     const started = Date.now();
     let read: SceneRead;
     try {
@@ -537,7 +634,13 @@ export const world = {
     const skipped = [...read.skipped];
     for (const plan of read.plans) {
       try {
-        const { id } = await world.spawn({ ...planOptions(plan), ...(options.wait === false ? { wait: false } : {}), ...(options.alwaysSpawned ? { alwaysSpawned: true } : {}) });
+        const label = options.label === true ? plan.object : typeof options.label === "function" ? options.label(plan.object) : null;
+        const { id } = await world.spawn({
+          ...planOptions(plan),
+          ...(options.wait === false ? { wait: false } : {}),
+          ...(options.alwaysSpawned ? { alwaysSpawned: true } : {}),
+          ...(label ? { label } : {}),
+        });
         ids.push(id.hash);
         const entry = mine.get(id.hash);
         if (entry) entry.scene = name;
@@ -573,6 +676,8 @@ export const world = {
 
   /** Removes an entity spawned with {@link world.spawn}. */
   async remove(id: EntityId | string): Promise<boolean> {
+    const pin = mine.get(idOf(id).hash)?.pin;
+    if (pin !== undefined) await world.unpin(pin).catch(() => false);
     mine.delete(idOf(id).hash);
     unsettled.delete(idOf(id).hash);
     return (await script("Delete", idOf(id))) === true;

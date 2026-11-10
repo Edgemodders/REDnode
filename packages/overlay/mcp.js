@@ -33,6 +33,7 @@ REDnode runs overlay apps (web pages drawn on top of the game) and Node mods (No
 - tweakdb: TweakDB flats and records, read from the running game.
 - archives_reload: swaps changed archives into the running game (through REDswap, installed with REDnode), for seeing an asset change without a restart. Afterwards what V wears, REDnode's spawns and the game's entities within 30 m of V that use a swapped file show the new version. Archives that change the game's sound paks are swapped with the game paused and its sound index loaded again; a sound that just played may keep its old version until the game loads it again (for a weapon, equip it again).
 - world_near, world_spawned: the entities near V (with the files they use), and what REDnode spawned. world_spawn, world_remove and world_load (EDGEbuilder scene files) place things in the world, and ask first.
+- world_pin, world_unpin, world_pins: glowing pins with a label, drawn by the overlay (they change nothing in the game, so they do not ask), at a place or following an entity, seen from far away and through walls.
 - api_read, api_call, api_get: live calls into the game. Game objects come back as {"$ref": n, "$type": "..."}; pass {"$ref": n} back as self. Most functions take the game instance first: pass {}. 64-bit numbers are strings. References die when a save loads.
 For a quest: game_facts and game_journal read facts and journal entries; game_facts_set, game_journal_set and game_teleport change the player's save or move V, and ask first.
 Use api_read for reads: it runs functions named like reads (Get, Is, Has, Can, Find) and a TweakDB record's methods, and refuses the rest. api_call runs any function and can change the player's game, such as their money or health; archives_reload replaces files in the game's mod folder. Both ask the player before every call.
@@ -639,6 +640,85 @@ function createMcp(host) {
           return fail(err.message);
         }
       },
+    );
+
+    // ---------- world pins (#43): drawn by the overlay only, so they ask nothing ----------
+
+    const PIN_STYLE = z
+      .object({
+        color: z.string().optional().describe('A colour such as "#ff4fd8"; default the HUD\'s cyan'),
+        font: z.string().optional().describe('A font family name'),
+        titleSize: z.number().optional().describe('Pixels, 10 to 48; default 18'),
+        textSize: z.number().optional().describe('Pixels, 8 to 36; default 14'),
+        pinHeight: z.number().optional().describe('The post\'s height in metres; default 3'),
+        scale: z.enum(['fit', 'world', 'screen']).optional().describe('fit (default): shrinks with distance, then stays, dimmed behind walls; world: real size, hidden behind walls; screen: the same size anywhere, seen through walls'),
+        minScreenSize: z.number().optional().describe('For fit: the smallest it gets, 0.1 to 1 of its full size; default 0.45'),
+      })
+      .optional();
+
+    mcp.registerTool(
+      'world_pin',
+      {
+        title: 'Drop a pin in the world',
+        description:
+          'Drops a pin: a glowing post with a label (a title, an optional line of text and the distance) drawn by REDnode\'s overlay, seen from any distance ' +
+          'and, out of view, held at the screen\'s edge with an arrow. It changes nothing in the game. At a place, or following an entity by its id ' +
+          '(such as one world_spawn or world_near answered). It stays until world_unpin or the game session ends. Answers the pin\'s id.',
+        inputSchema: {
+          at: POINT.optional().describe('Where the post stands, in world metres'),
+          entity: z.string().optional().describe('An entity id hash to follow, instead of or as well as at'),
+          title: z.string().max(80),
+          text: z.string().max(160).optional(),
+          style: PIN_STYLE,
+        },
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+      },
+      async ({ at, entity, title, text: line, style }) => {
+        try {
+          if (!at && !entity) return fail('Give at (a place) or entity (an id to follow)');
+          const id = host.pins.add(null, { at: entity ? { hash: entity, ...(at ?? {}) } : at, title, text: line, style });
+          return text({ id });
+        } catch (err) {
+          return fail(err.message);
+        }
+      },
+    );
+
+    mcp.registerTool(
+      'world_unpin',
+      {
+        title: 'Remove a pin',
+        description: 'Removes a pin an assistant dropped with world_pin, by its id, or every such pin with all. Pins of mods are theirs to remove.',
+        inputSchema: { id: z.number().int().optional(), all: z.boolean().optional() },
+        annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+      },
+      async ({ id, all }) => {
+        try {
+          const mine = host.pins.list(null).filter((p) => p.owner === null);
+          if (all) {
+            for (const p of mine) host.pins.remove(null, p.id);
+            return text({ removed: mine.length });
+          }
+          if (id === undefined) return fail('Give the pin\'s id, or all');
+          const pin = host.pins.list(null).find((p) => p.id === id);
+          if (!pin) return text({ removed: false });
+          if (pin.owner !== null) return fail(`Pin ${id} belongs to the mod ${pin.owner}`);
+          return text({ removed: host.pins.remove(null, id) });
+        } catch (err) {
+          return fail(err.message);
+        }
+      },
+    );
+
+    mcp.registerTool(
+      'world_pins',
+      {
+        title: 'World pins',
+        description: 'Lists every pin in the world: its id, the mod that dropped it (null for assistants), its place or the entity it follows, its label, style and distance from the camera in metres.',
+        inputSchema: {},
+        annotations: READ,
+      },
+      async () => text(host.pins.list(null)),
     );
 
     // ---------- quest facts, the journal and moving V (Q-A, asked for by EDGEquest) ----------

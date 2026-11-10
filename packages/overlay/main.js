@@ -1840,6 +1840,7 @@ async function packageCallNow(id, method, params) {
   if (method === 'pins.remove') return pinsHost.remove(id ?? null, params?.id);
   if (method === 'pins.list') return pinsHost.list(params?.all ? null : id ?? null);
   if (method === 'pins.clear') return pinsHost.clear(id ?? null);
+  if (method === 'pins.style') return pinsHost.restyle(id ?? null, params?.id, params?.style);
   if (method === 'tweakdb.set' && id && params?.path) {
     const path = String(params.path);
     if (!tweakJournal.has(id)) tweakJournal.set(id, new Map());
@@ -4554,6 +4555,8 @@ function mcpHost() {
     worldRemove: removeForAgent,
     worldLoad: loadSceneForAgent,
     worldUnload: unloadSceneForAgent,
+    // #43: world pins dropped by assistants belong to no package.
+    pins: pinsHost,
     // #19: OAuth sign-in for MCP clients.
     oauth: oauthFor(),
   };
