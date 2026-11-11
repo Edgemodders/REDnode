@@ -27,6 +27,7 @@ How to keep it:
 
 **Fixed**
 
+- Vortex can install REDnode: its deploy stopped with "Invalid package ...\hostesourcespp.asar". Vortex is an Electron app, and Electron treats any file named `.asar` as an archive to look into, so it could not link or copy REDnode's. The overlay host's code now ships as a plain `hostesourcespp` folder, with no `.asar` file. This also ends a deploy failing on that one file while the game ran. After updating by hand, the old `hostesourcespp.asar` can be deleted; it is no longer used.
 - Try Live: `tweakdb.apply` keeps a record an earlier try made (TweakDB cannot remove one) and sets its flats again, so a tool can send the same try again in one session.
 - `tweakdb.set` takes text keys: an item's `displayName` and other `gamedataLocKeyWrapper` flats accept a number, `"LocKey#27968"` or a named key such as `"LocKey#MyMod-Name"`, and read back as `"LocKey#<number>"`. Before, they were refused with "cannot be set from JSON yet".
 

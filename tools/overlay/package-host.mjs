@@ -5,6 +5,7 @@
 // Output, next to the plugin that tools/build-native.ps1 staged, so that
 // tools/deploy-native.ps1 copies everything into the game:
 //   native/build/dist/red4ext/plugins/REDnode/host/REDnode-overlay.exe  the host, with its own Electron
+//   native/build/dist/red4ext/plugins/REDnode/host/resources/app/        the host's code, as plain files
 //   native/build/dist/red4ext/plugins/REDnode/host/resources/sdk/        the rednode package, for apps and mods
 //   native/build/dist/red4ext/plugins/REDnode/host/resources/runtime/    the Node mod runtime
 //   native/build/dist/red4ext/plugins/REDnode/host/resources/edgemat/    EDGEmat's MCP server, for in-game assistants
@@ -41,7 +42,7 @@ for (const f of ['main.js', 'preload.js', 'mods.js', 'mcp.js', 'gameapi-lookup.j
 for (const d of ['launcher', 'modlog', 'manager', 'welcome', 'connect', 'keyask', 'editorask', 'builder', 'pins']) cpSync(join(overlay, d), join(stage, d), { recursive: true });
 cpSync(join(repo, 'packages', 'ui', 'src'), join(stage, 'ui'), { recursive: true });
 
-// The SDK and the mod runtime go outside app.asar, into resources/, so mod
+// The SDK and the mod runtime go outside the host's own code, into resources/, so mod
 // processes and their worker threads load them as plain files.
 const resources = join(work, 'resources');
 const sdk = join(resources, 'sdk');
@@ -99,7 +100,11 @@ const [out] = await packager({
   arch: 'x64',
   electronVersion,
   appVersion: pkg.version,
-  asar: true,
+  // No app.asar: the host's code ships as a plain resources/app folder. Vortex is an Electron app,
+  // and Electron treats any path through an .asar file as an archive to look into, so Vortex could not
+  // link or copy REDnode's app.asar ("Invalid package ...app.asar", players' reports of 2026-11-09 and
+  // 2026-11-11). A running host also kept app.asar open, so a deploy with the game running failed on it.
+  asar: false,
   extraResource: [sdk, join(resources, 'runtime'), join(resources, 'console'), edgemat, join(resources, 'keys'), gameapi],
   overwrite: true,
   quiet: true,
