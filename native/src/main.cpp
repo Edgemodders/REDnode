@@ -37,12 +37,16 @@ const RED4ext::v1::Sdk* g_sdk = nullptr;
 std::mutex g_eventsMutex;
 std::vector<std::pair<std::string, int32_t>> g_events;
 
-// Entity events from REDnodeWorld.reds (Codeware callbacks), sent on the next frame.
+// Entity events from REDnodeWorld.reds (Codeware callbacks), sent on the next frame. An event from
+// REDnode_EntityText carries a text instead of a class (#42: a quickhack scan's snapshot), so a script
+// can send data that changes each time without making a game name (CName) of it.
 struct EntityEvent
 {
     std::string name;
     uint64_t entityId = 0;
     std::string entityType;
+    std::string text;
+    bool hasText = false;
 };
 std::vector<EntityEvent> g_entityEvents;
 
@@ -117,6 +121,27 @@ void REDnode_EntityEvent(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* a
     g_entityEvents.push_back({name.c_str(), entityId.hash, type ? type : ""});
 }
 
+// redscript: public static native func REDnode_EntityText(name: String, entityID: EntityID, text: String) -> Void
+// An entity event with a text (#42: REDnodeQuickhacks.reds sends a scan's snapshot and a landing's
+// action this way). Queued like REDnode_Emit; Node mods get it as a game event with entityId and text.
+void REDnode_EntityText(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4)
+{
+    RED4EXT_UNUSED_PARAMETER(aContext);
+    RED4EXT_UNUSED_PARAMETER(aOut);
+    RED4EXT_UNUSED_PARAMETER(a4);
+
+    RED4ext::CString name;
+    RED4ext::ent::EntityID entityId;
+    RED4ext::CString text;
+    RED4ext::GetParameter(aFrame, &name);
+    RED4ext::GetParameter(aFrame, &entityId);
+    RED4ext::GetParameter(aFrame, &text);
+    aFrame->code++; // skip ParamEnd
+
+    std::scoped_lock lock(g_eventsMutex);
+    g_entityEvents.push_back({name.c_str(), entityId.hash, "", text.c_str(), true});
+}
+
 void PostRegisterTypes()
 {
     auto rtti = RED4ext::CRTTISystem::Get();
@@ -140,6 +165,13 @@ void PostRegisterTypes()
     entityEvent->AddParam("entEntityID", "entityID");
     entityEvent->AddParam("CName", "entityType");
     rtti->RegisterFunction(entityEvent);
+
+    auto entityText = RED4ext::CGlobalFunction::Create("REDnode_EntityText", "REDnode_EntityText", &REDnode_EntityText);
+    entityText->flags = flags;
+    entityText->AddParam("String", "name");
+    entityText->AddParam("entEntityID", "entityID");
+    entityText->AddParam("String", "text");
+    rtti->RegisterFunction(entityText);
 
     g_sdk->logger->InfoF(g_handle, "RTTI ready: %u types, %u global functions", rtti->types.size,
                          rtti->funcs.size);
@@ -203,8 +235,10 @@ bool OnRunningUpdate(RED4ext::CGameApplication* aApp)
     {
         rednode::overlay::SendJson("{\"event\":\"game\",\"name\":" + rednode::overlay::JsonString(e.name) +
                                    ",\"value\":0,\"frame\":" + std::to_string(g_frames) + ",\"entityId\":\"" +
-                                   std::to_string(e.entityId) + "\",\"entityType\":" +
-                                   rednode::overlay::JsonString(e.entityType) + "}");
+                                   std::to_string(e.entityId) + "\"," +
+                                   (e.hasText ? "\"text\":" + rednode::overlay::JsonString(e.text)
+                                              : "\"entityType\":" + rednode::overlay::JsonString(e.entityType)) +
+                                   "}");
     }
 
     for (const auto& [name, value] : events)
