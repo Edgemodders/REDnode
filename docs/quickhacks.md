@@ -1,6 +1,6 @@
 # Quickhack functions
 
-Status: **H3c.2 passed in game on 2026-11-11** (REDnode 0.61.1, on the laptop; [results](#quickhack-functions-test)): every step but spread, which was not run. Its first run, on 0.61.0, failed at the define ([first run](#first-run-0610)). It answers [EDGEhack](https://edgemodders.github.io/EDGEhack/design.html#h3c-scripts-plan)'s request [#42](https://github.com/Edgemodders/REDnode/issues/42): a quickhack can carry two functions, for what its TweakDB records cannot say. Open to any mod, not only EDGEhack's. People only for now: devices build their list elsewhere.
+Status: **H3c.2 passed in game on 2026-11-11** (REDnode 0.61.1, on the laptop; [results](#quickhack-functions-test)): every step but spread, which was not run. Its first run, on 0.61.0, failed at the define ([first run](#first-run-0610)). EDGEhack's Scripts section (its H3c.3 and H3c.4, passed in game the same day) writes a mod's `quickhacks.define` for it, into a REDnode package the mod ships. It answers [EDGEhack](https://edgemodders.github.io/EDGEhack/design.html#h3c-scripts-plan)'s request [#42](https://github.com/Edgemodders/REDnode/issues/42): a quickhack can carry two functions, for what its TweakDB records cannot say. Open to any mod, not only EDGEhack's. People only for now: devices build their list elsewhere.
 
 | Function | When | Does |
 |---|---|---|
