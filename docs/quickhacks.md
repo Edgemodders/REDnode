@@ -1,6 +1,6 @@
 # Quickhack functions
 
-Status: **H3c.2 built in REDnode 0.61.0** (2026-11-11); its first run failed at the define, fixed in **0.61.1**, awaiting its [in-game test](#quickhack-functions-test) again ([first run](#first-run-0610)). It answers [EDGEhack](https://edgemodders.github.io/EDGEhack/design.html#h3c-scripts-plan)'s request [#42](https://github.com/Edgemodders/REDnode/issues/42): a quickhack can carry two functions, for what its TweakDB records cannot say. Open to any mod, not only EDGEhack's. People only for now: devices build their list elsewhere.
+Status: **H3c.2 passed in game on 2026-11-11** (REDnode 0.61.1, on the laptop; [results](#quickhack-functions-test)): every step but spread, which was not run. Its first run, on 0.61.0, failed at the define ([first run](#first-run-0610)). It answers [EDGEhack](https://edgemodders.github.io/EDGEhack/design.html#h3c-scripts-plan)'s request [#42](https://github.com/Edgemodders/REDnode/issues/42): a quickhack can carry two functions, for what its TweakDB records cannot say. Open to any mod, not only EDGEhack's. People only for now: devices build their list elsewhere.
 
 | Function | When | Does |
 |---|---|---|
@@ -76,10 +76,10 @@ From the spike, still unverified:
 
 | Question | How the test answers it |
 |---|---|
-| Does a status effect from a function work? | Step 9 |
-| Does a kill by `target.damage` count as V's (experience, the kill feed)? | Step 10. V at the level cap shows no level experience: watch Intelligence's skill instead |
-| Does spread reach `onLand`, with `hack.spread`? | Step 11, if V has a way to spread Overheat |
-| Do Boss and Chimera versions reach both? | Not in this test unless a boss is handy |
+| Does a status effect from a function work? | Step 9: **yes** (0.61.1) |
+| Does a kill by `target.damage` count as V's (experience, the kill feed)? | Step 10: the kill worked as expected (0.61.1) |
+| Does spread reach `onLand`, with `hack.spread`? | Step 11, if V has a way to spread Overheat. **Not run yet: unverified** |
+| Do Boss and Chimera versions reach both? | Not in this test unless a boss is handy. **Unverified** |
 
 ## Quickhack functions: test
 
@@ -113,4 +113,5 @@ Then quit the game and say what differed. I read REDnode's logs and redscript's 
 
 | Run | Result |
 |---|---|
+| 2026-11-11, laptop, 0.61.1 (the update zip over 0.59.1) | **Pass**, steps 1 to 10 and 12 to 14, as written: the define, "Checking" then usable, Nobody and the remembered answer, Humans, Silent and Throws leaving the game's own result, Damage, the poison from V, the kill, Counts, the functions gone with the package and set again after a load. Step 11 (spread) not run |
 | 2026-11-11, laptop, 0.61.0 (the update zip over 0.59.1) | **Failed at step 1**: the app, on from the game's start, said "The game did not answer within 5 seconds" (its define ran while the game was starting); **Define** with a save loaded said the six Overheat items "have no quickhack actions". See [first run](#first-run-0610) |
