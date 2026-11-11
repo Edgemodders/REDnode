@@ -97,6 +97,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [World pins WP2 (#43)](#world-pins-wp2-43) | In the game, with the Console | World | Passed 2026-11-10 | 0.60.0, game 2.5 | **Pass**, every step (dev PC): about 60 us a frame with 11 followed pins (entity lookups 2.4 us each, ray casts about 22 us each, under one a frame). Before it: Mock game: 19 checks (styles, refusals, an entity pin, package and pin styles, a spawn's label) and a picture of the labels page (scratchpad `pins/run.sh`); MCP tools: 8 checks (`pins/run-mcp.sh`); unit test `pins_test` (24 checks) |
 | [World pins WP1 (#43)](#world-pins-wp1-43) | In the game, with the Console | World | Passed 2026-11-09 | 0.59.0, game 2.5 | **Pass**, every step (dev PC): the field of view is vertical, 100 pins cost 7 us a frame to place, a ray cast tells a wall from a clear view, the host ended at the quit. Before it: Mock game: 3 pins, distances, refusals, one pins.set per change (scratchpad `pins/run.sh`); unit test `pins_test` (14 checks) |
 | [A game started from VS Code (0.59.1)](#a-game-started-from-vs-code-0591) | In the game | Overlay | Passed 2026-11-10 | 0.59.1, game 2.5 | **Pass** (laptop): started by EDGEdeck's Run game with `edgedeck.launch` `exe`, the plugin dropped `ELECTRON_RUN_AS_NODE`, the host connected and F10 showed the launcher; the plugin logged `Unloading` at the quit |
+| [Vortex installs REDnode (0.62.4)](#vortex-installs-rednode-0624) | Vortex, then in the game | Packaging | Passed 2026-11-11 | 0.62.4 + REDswap 1.0.3, Vortex, game 2.5 | **Pass** (dev PC): the player zip installed and deployed in Vortex with no "Invalid package" error, the overlay showed in the game, and a purge took REDnode out again (the next start loaded neither plugin) |
 | [Edit and Run (UT3a)](ink.md#ut3a-test) | In the game | UI Tools | Passed | 0.55.0 + UI Workbench 0.2.0, Codeware, game 2.5 | Passed on the dev PC on 2026-11-02, with #37's test. The player's notes (resize, a splitter) went into 0.55.1. Mock game: 21 checks (scratchpad `ut3/check.mjs`) and Inspect's 40 |
 | [UT3a polish (0.55.1)](ink.md#ut3a-polish-rednode-0551-ui-workbench-021) | In the game | UI Tools, Overlay | Passed 2026-11-03 | 0.55.1 + UI Workbench 0.2.1, Codeware, game 2.5 | Every step as expected (dev PC). Mock game: 19 checks (scratchpad `wb/check.mjs`) and the keys check's 19 |
 | [Mod Manager details and status tooltips (0.56.1)](ink.md#mod-manager-details-and-status-tooltips-rednode-0561-ui-workbench-041) | In the game | Overlay, UI Tools | Passed 2026-11-03 | 0.56.1 + UI Workbench 0.4.1 | Every step as expected (dev PC). Mock game: 14 checks (scratchpad `mm2/check.mjs`) |
@@ -1266,3 +1267,18 @@ Errors seen, neither from 2.5:
 ## Adding a test
 
 When a phase's test runs for the first time, add it here: a row in the table, then its steps with the expected result, what it showed and what is open, with a link to its source section in the phase's page. Keep the steps runnable with the current build; when a later version changes a step, say so in the step.
+
+## Vortex installs REDnode (0.62.4)
+
+A second player's Vortex 2.10.1 could not deploy REDnode 0.59.1: `failed to link ... host\resources\app.asar ... Invalid package`. Vortex is an Electron app, and Electron's fs treats a path through an `.asar` file as an archive. REDnode 0.62.4 ships the host's code as a plain `host\resources\app` folder, with no `.asar`.
+
+Steps (game closed; only REDnode enabled in Vortex, so nothing is deployed over EDGEdeck's files):
+
+1. Move any REDnode and REDswap files Vortex did not install out of the game folder (to the Recycle Bin), keeping your own apps in `red4ext\plugins\REDnode\apps`.
+2. Drag the player zip into Vortex, enable it and deploy. Expected: no "Invalid package" error.
+3. Start the game, load a save, press F10. Expected: the launcher opens (the host runs from `host\resources\app`).
+4. Quit, purge in Vortex, start the game again. Expected: no overlay; RED4ext's log loads neither REDnode nor REDswap.
+
+| Run | Result |
+|---|---|
+| 2026-11-11, by the owner, dev PC, REDnode 0.62.4 + REDswap 1.0.3, Vortex | **Pass**, every step. RED4ext's log at 16:11 loaded REDnode 0.62.4 and REDswap 1.0.3, and at 16:12, after the purge, three plugins without them. The purge also took REDnode's own log files from `red4ext\logs` |

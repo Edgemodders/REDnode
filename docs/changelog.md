@@ -11,6 +11,8 @@ How to keep it:
 
 ## Unreleased
 
+## 0.62.4 (2026-11-11)
+
 **New**
 
 - Try Live on the editor channel (https://github.com/Edgemodders/REDnode/issues/44, for EDGEhack): a tool on your PC can change the game while you play, after you allow it in REDnode's new **Editor request** window: `tweakdb.apply` (clone, create, set and append, in order), `tweakdb.reset` (puts everything that tool changed back), `quickhacks.refresh` (V's quickhack list, so changed effects apply) and `player.give`. A tool's changes are undone when REDnode stops. Docs: https://edgemodders.github.io/REDnode/overlay-apps.html#try-live-changing-the-game-from-a-tool
