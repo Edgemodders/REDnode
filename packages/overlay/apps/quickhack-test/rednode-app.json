@@ -1,0 +1,8 @@
+{
+  "id": "quickhack-test",
+  "name": "Quickhack test",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "A sample of quickhack functions (#42): gives the game's Overheat a scan check and an on-land function, switched between test rules with buttons, and logs each ask and landing.",
+  "main": "mod.mjs"
+}

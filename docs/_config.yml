@@ -51,6 +51,8 @@ nav:
     url: /ink.html
   - title: Quest API
     url: /quests.html
+  - title: Quickhack functions
+    url: /quickhacks.html
   - title: Sound API
     url: /sound.html
   - title: Sound Tools

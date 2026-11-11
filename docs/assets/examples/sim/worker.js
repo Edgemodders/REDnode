@@ -404,6 +404,20 @@ export const quests = path(['quests'], {
   },
 });
 export const journal = path(['journal']);
+// Quickhack functions stay in the worker: the simulated game has no enemies to scan, so they are kept
+// and listed but never asked. Each item stands for its own quickhack action.
+const quickhackDefines = new Set();
+export const quickhacks = {
+  async define(items, fns) {
+    const list = Array.isArray(items) ? items : [items];
+    if (!fns || (!fns.canUse && !fns.onLand)) throw new Error('quickhacks.define: give canUse, onLand or both');
+    const d = { items: list, actions: list.map((i) => i.replace(/^Items\./, 'QuickHack.').replace(/Program$/, 'Hack')) };
+    quickhackDefines.add(d);
+    return async () => void quickhackDefines.delete(d);
+  },
+  defined: () => [...quickhackDefines].map((d) => ({ items: [...d.items], actions: [...d.actions] })),
+  counts: async () => `defines ${[...quickhackDefines].reduce((n, d) => n + d.actions.length, 0)} (the preview has no enemies to scan)`,
+};
 export const kernel = path(['kernel']);
 export const archives = path(['archives']);
 export const pkg = path(['pkg']);

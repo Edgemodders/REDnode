@@ -278,6 +278,19 @@ export const NOTES = {
     tryThis: ['Press Watch, then Set +1: the watcher logs the change on its own.', 'Press Here, then Teleport after V has moved.'],
     preview: 'The preview\'s quests system holds a few made-up facts and one journal entry. In the game they are the player\'s own.',
   },
+  'quickhack-test': {
+    group: 'game',
+    summary: "Give the game's Overheat a scan check that decides per enemy whether it shows usable, and a function that runs when it lands: the calls behind a quickhack's own logic.",
+    teaches: ['quickhacks.define', 'quickhacks.defined', 'quickhacks.counts'],
+    how: [
+      "The game builds the scan's list in one go and cannot wait for a Node mod, so a hack with a check shows \"Checking...\" while REDnode asks `canUse`, then the list is built again with the answer. It holds for one second the first time V scans an enemy, so it can be read.",
+      "With no answer in about a second (the rule Silent, or Throws), the game's own result stands and the mod log says why.",
+      '`onLand` runs a frame or two after the upload completes, with the enemy as it was then. `target.damage` lowers its health with V as the one who did it; `target.addEffect` puts a status effect on it from V.',
+      "Pass a family's items lowest tier first: `hack.tier` is then the tier. REDnode finds the items' hacks, their Boss, Chimera and spread versions included.",
+    ],
+    tryThis: ['In the game: press Humans, then scan a person and a drone.', 'Press Damage, upload Overheat, and watch the log.'],
+    preview: 'The preview has no enemies to scan, so the functions are defined and never asked. In the game they run on every scan of a person.',
+  },
   'world-test': {
     group: 'game',
     summary: 'Spawn an entity in front of V with a mesh component built by api.$new, move it in a circle as fast as the game allows, and remove it.',

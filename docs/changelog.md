@@ -13,6 +13,9 @@ How to keep it:
 
 **New**
 
+- Quickhack functions (https://github.com/Edgemodders/REDnode/issues/42, for EDGEhack): `quickhacks.define(items, { canUse, onLand })` gives a quickhack, or a family of them, a scan check that decides per person whether it shows usable or disabled (with your own text), and a function that runs when it lands. The function gets the target (level, health, kind) with `damage(amount)` and `addEffect(effect)` from V, and the hack (action, tier, spread). While a check waits, the hack shows "Checking..." for a second the first time V scans someone; with no answer, the game's own result stands. A package's functions go when it stops. Docs: https://edgemodders.github.io/REDnode/quickhacks.html
+- `REDnode_EntityText(name, entityID, text)` for scripts: a game event with an entity and a text, which reaches mods as `entityId` and `text`.
+- The Quickhack test sample, in the player zip.
 - World pins (https://github.com/Edgemodders/REDnode/issues/43): a pin can follow an entity (`world.pin({ at: id, ... })`), and takes a `style`: its colour, font, title and text sizes, post height, and `scale`. `"fit"` (the default) shrinks with distance down to a smallest size and is dimmed behind walls; `"world"` has a real size and hides behind walls; `"screen"` keeps one size and shows through walls. REDnode tells walls apart with the game's own ray casts. `world.pinStyle` restyles one pin or sets the style for all of a package's pins.
 - `label` on `world.spawn` pins what it spawns: the pin follows the entity and goes when it is removed. `world.load(scene, { label: true })` labels every object of a scene with its id.
 - MCP tools `world_pin`, `world_unpin` and `world_pins`: assistants can drop pins at a place or on an entity. They only draw, so they do not ask first.
