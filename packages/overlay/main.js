@@ -969,6 +969,7 @@ function endSolo(why) {
 function checkSolo() {
   checkTweaks();
   checkSpawns();
+  for (const id of [...quickhackOwners]) if (!packageRunning(id)) releaseQuickhacks(id, 'the package stopped');
   checkSounds();
   checkInk();
   checkPins();
@@ -1847,9 +1848,25 @@ async function packageCallNow(id, method, params) {
     const journal = tweakJournal.get(id);
     if (!journal.has(path)) journal.set(path, await bridgeCall('tweakdb.get', { path }).catch(() => null));
   }
+  // Quickhack functions (#42): a package defines under its own id only, and the host takes its
+  // defines away when it stops (releaseQuickhacks).
+  if (method === 'rtti.call' && params?.class === 'REDnodeQuickhacks' && /^(Define|Release)$/.test(params.fn) && id) {
+    params = { ...params, args: [id, ...(Array.isArray(params.args) ? params.args.slice(1) : [])] };
+    if (params.fn === 'Define') quickhackOwners.add(id);
+  }
   const result = await bridgeCall(method, params);
   if (method === 'rtti.call' && params?.class === 'REDnodeWorld') noteWorldCall(id, params, result);
   return result;
+}
+
+// Packages that defined quickhack functions (#42), so the host can release them when they stop.
+const quickhackOwners = new Set();
+
+function releaseQuickhacks(id, why) {
+  if (!quickhackOwners.delete(id) || !connected) return;
+  bridgeCall('rtti.call', { class: 'REDnodeQuickhacks', fn: 'Release', args: [id] })
+    .then((n) => { if (Number(n) > 0) log(`Released ${n} quickhack function${Number(n) === 1 ? '' : 's'} of ${id} (${why})`); })
+    .catch(() => {});
 }
 
 function undoTweaks(id, why) {
@@ -5248,6 +5265,7 @@ app.whenReady().then(() => {
       undoTweaks(id, 'the mod stopped');
       dropKeyAsks(id);
       removeSpawns(id, 'the mod stopped');
+      releaseQuickhacks(id, 'the mod stopped');
       stopSounds(id);
       clearInk(id);
       pinsHost.gone(id, 'the mod stopped');

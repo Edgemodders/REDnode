@@ -45,6 +45,8 @@ export interface GameEvent {
   entityId?: string;
   /** For entity events: the entity's class, for example `"gameObject"`. */
   entityType?: string;
+  /** For entity events a script sends with a text (`REDnode_EntityText`), such as {@link quickhacks}'s: the text. */
+  text?: string;
   /** For the `"language"` event: the game's new interface language, such as `"fr-fr"`. */
   language?: string;
 }
@@ -333,6 +335,7 @@ export const game: Game = {
         const e: GameEvent = { name: String(m.name), value: Number(m.value), frame: Number(m.frame) };
         if (typeof m.entityId === "string") e.entityId = m.entityId;
         if (typeof m.entityType === "string") e.entityType = m.entityType;
+        if (typeof m.text === "string") e.text = m.text;
         if (typeof m.language === "string") e.language = m.language;
         void handler(e as T);
       }

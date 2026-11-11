@@ -40,6 +40,8 @@ export { audio } from "./audio.js";
 export { ink, InkMarkupError } from "./ink.js";
 export { quests, journal } from "./quests.js";
 export type { FactChange, JournalState, JournalEntry, JournalKind } from "./quests.js";
+export { quickhacks } from "./quickhacks.js";
+export type { QuickhackTarget, QuickhackUse, QuickhackFunctions, QuickhackDefine } from "./quickhacks.js";
 export { t, LocalText, languageTag, loc } from "./i18n.js";
 export type { Language, TextParams, Loc } from "./i18n.js";
 export type { InkAnchor, InkColor, InkTone, InkTextStyle, InkAlign, InkSource, InkProps, InkTextProps, InkContainerProps, InkImageProps, InkBarProps, InkListProps, InkNode, InkMount, InkMountOptions, InkView, InkBox, InkLayerInfo, InkTreeNode, InkReadResult, InkWidgetInfo, InkHit, InkTryProp, InkTryValue } from "./ink.js";
