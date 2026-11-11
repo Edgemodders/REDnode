@@ -6,7 +6,7 @@
 // game's own result stands after about a second), Throws (the same, and the log says why).
 // Land (onLand): Nothing, Damage (30 points from V), Effect (a poison from V), Kill (all its health).
 
-import { quickhacks, ui } from 'rednode';
+import { game, quickhacks, tweakdb, ui } from 'rednode';
 
 const OVERHEAT = [
   'Items.OverheatProgram',
@@ -16,6 +16,13 @@ const OVERHEAT = [
   'Items.OverheatLvl4Program',
   'Items.OverheatLvl4PlusPlusProgram',
 ];
+
+// The running game names records by id; teaching REDnode these names makes the log read
+// QuickHack.OverheatLvl2Hack rather than 0x… (a name that is not a record does no harm).
+const LEVELS = ['', 'Lvl1', 'Lvl2', 'Lvl3', 'Lvl4', 'Lvl4PlusPlus'];
+tweakdb.learn(
+  ['', 'Boss', 'Chimera'].flatMap((who) => LEVELS.flatMap((lvl) => [`QuickHack.${who}Overheat${lvl}Hack`, `QuickHack.${who}Overheat${lvl}HackSpread`])),
+);
 
 let check = 'Everyone';
 let land = 'Nothing';
@@ -79,14 +86,23 @@ async function define() {
   if (undefine) return say('Overheat is defined already.');
   try {
     undefine = await quickhacks.define(OVERHEAT, { canUse, onLand, disabledText: 'Not on this enemy (test)' });
-    const [d] = quickhacks.defined();
-    say(`Overheat is defined: ${d.actions.length} hacks, spread and Boss and Chimera versions included.`, 'success');
-    note(`Defined: ${d.actions.join(', ')}`);
+    report();
   } catch (err) {
     say(`Define failed: ${err.message}`, 'danger');
     console.log(`Define failed: ${err.message}`);
   }
 }
+
+// Made before a save loaded, the define waits for the load: say so, and report again after each load.
+function report() {
+  const [d] = quickhacks.defined();
+  if (!d) return;
+  if (!d.actions.length) return say('Overheat will be defined when a save loads.');
+  say(`Overheat is defined: ${d.actions.length} hacks, spread and Boss and Chimera versions included.`, 'success');
+  note(`Defined: ${d.actions.join(', ')}`);
+}
+
+game.on('PlayerPuppet.OnGameAttached', () => setTimeout(report, 2000));
 
 async function remove() {
   if (!undefine) return say('Overheat is not defined.');

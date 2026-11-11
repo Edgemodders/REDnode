@@ -1,6 +1,6 @@
 # Quickhack functions
 
-Status: **H3c.2 built in REDnode 0.61.0** (2026-11-11), awaiting its [in-game test](#quickhack-functions-test). It answers [EDGEhack](https://edgemodders.github.io/EDGEhack/design.html#h3c-scripts-plan)'s request [#42](https://github.com/Edgemodders/REDnode/issues/42): a quickhack can carry two functions, for what its TweakDB records cannot say. Open to any mod, not only EDGEhack's. People only for now: devices build their list elsewhere.
+Status: **H3c.2 built in REDnode 0.61.0** (2026-11-11); its first run failed at the define, fixed in **0.61.1**, awaiting its [in-game test](#quickhack-functions-test) again ([first run](#first-run-0610)). It answers [EDGEhack](https://edgemodders.github.io/EDGEhack/design.html#h3c-scripts-plan)'s request [#42](https://github.com/Edgemodders/REDnode/issues/42): a quickhack can carry two functions, for what its TweakDB records cannot say. Open to any mod, not only EDGEhack's. People only for now: devices build their list elsewhere.
 
 | Function | When | Does |
 |---|---|---|
@@ -28,7 +28,7 @@ await quickhacks.define(
 
 | Call (the `rednode` package) | Does |
 |---|---|
-| `quickhacks.define(items, { canUse?, onLand?, disabledText?, hold? })` | `items` is one quickhack item record, or a family's items lowest tier first. REDnode finds their hacks itself (each item's `objectActions` of type `PuppetQuickHack`), with their Boss and Chimera versions and each one's `…Spread` action. A hack another package has defined is refused. It can be called at the main menu: the functions start with the next save load, and are set again after each load. Resolves to a function that takes the define away |
+| `quickhacks.define(items, { canUse?, onLand?, disabledText?, hold? })` | `items` is one quickhack item record, or a family's items lowest tier first. REDnode finds their hacks itself (each item's `objectActions` of type `PuppetQuickHack`), with their Boss and Chimera versions and each one's `…Spread` action. A hack another package has defined is refused. Called before a save is loaded (the game starting, the main menu), it resolves at once and the functions start with the next load; a mistake then goes to the mod log instead of throwing. They are set again after each load. Resolves to a function that takes the define away |
 | `quickhacks.defined()` | This package's defines: `{ items, actions }` |
 | `quickhacks.counts()` | The script's counters (defines, list rebuilds, asks, answers given up on, landings), for tests |
 
@@ -44,7 +44,7 @@ What a function gets:
 
 | `hack` | |
 |---|---|
-| `action` | The hack's action record, such as `"QuickHack.OverheatLvl2Hack"` |
+| `action` | The hack's action record, such as `"QuickHack.OverheatLvl2Hack"`; its id (`"0x…"`) when the package has not seen the name (`tweakdb.learn` teaches it) |
 | `item`, `tier` | The first item in the list that has this hack, and its place in the list from 1: the tier, when the list is lowest tier first |
 | `spread` | `onLand` only: it reached this person by spreading (its `…Spread` action) |
 | `byV` | `onLand` only: V uploaded it |
@@ -68,6 +68,8 @@ A `canUse` that reads only `target` answers fastest: each game call costs about 
 
 The scan's snapshot and the landing reach the package as game events with a text, `quickhacks.scan` and `quickhacks.land`, sent by the plugin's new `REDnode_EntityText(name, entityID, text)`. It is open to any script: a text that changes each time, unlike `REDnode_EntityEvent`'s class name, makes no new game name (CName).
 
+**Ids, not names.** The running game answers a record link as its id (`0x…`) unless the package has seen the name. So `quickhacks.define` finds a hack's type flat and its `…Spread` record from the id itself: a TweakDB id is the CRC32 of the name and its length, and a CRC32 can be carried on over more text without the text before it, so `QuickHack.OverheatHack`'s id and the suffix `Spread` give `QuickHack.OverheatHackSpread`'s id (checked against the game's ids). This works for records TweakXL adds too, such as EDGEhack's.
+
 ## Open, for the test
 
 From the spike, still unverified:
@@ -81,11 +83,11 @@ From the spike, still unverified:
 
 ## Quickhack functions: test
 
-REDnode 0.61.0, on game 2.5. Overheat in V's cyberdeck. The **Quickhack test** app gives the game's Overheat family both functions, switched between rules with its buttons, and logs each ask and landing.
+REDnode 0.61.1, on game 2.5. Overheat in V's cyberdeck. The **Quickhack test** app gives the game's Overheat family both functions, switched between rules with its buttons, and logs each ask and landing.
 
 | Step | Do | Expect |
 |---|---|---|
-| 1 | Load a save. In REDnode's launcher (F10), switch on **Console** and **Quickhack test**. If V has no Overheat in the cyberdeck: in the Console, `await game.player.addItem("Items.OverheatLvl2Program")`, then put it in the cyberdeck | The app's window says "Overheat is defined: 12 hacks…" (the number may differ), and its log lists them |
+| 1 | Load a save. In REDnode's launcher (F10), switch on **Console** and **Quickhack test**. If V has no Overheat in the cyberdeck: in the Console, `await game.player.addItem("Items.OverheatLvl2Program")`, then put it in the cyberdeck | The app's window says "Overheat is defined: … hacks" (on before the save loaded, it says so about 2 s after the load), and its log lists them by name, `QuickHack.OverheatHack` and the rest |
 | 2 | Press F10 to close the overlay, scan a person | Overheat shows "Checking..." for about a second, then usable. The log has an "Asked" line with the person's level, health and "human" |
 | 3 | Press **Nobody** (F10, then F10 again), scan a new person | "Checking..." for a second, then disabled with "Not on this enemy (test)". Uploading it does nothing |
 | 4 | Scan the same person again | Disabled at once, with no "Checking..." |
@@ -102,5 +104,13 @@ REDnode 0.61.0, on game 2.5. Overheat in V's cyberdeck. The **Quickhack test** a
 
 Then quit the game and say what differed. I read REDnode's logs and redscript's log.
 
+### First run (0.61.0)
+
+| Seen | Why | 0.61.1 |
+|---|---|---|
+| "The game did not answer within 5 seconds" from the app started with the game | Its define ran while the game was starting, when calls can wait for seconds | A define made before a save is loaded waits for the load |
+| "… have no quickhack actions" from **Define** with a save loaded | The game answered each item's hacks as ids (`0x…`), and the define built each hack's flat path from its name, so it read nothing. The mock game answered names, so its check passed | Hacks are found from their ids (see "Ids, not names"); the mock game now answers ids, as the game does, and its 9 checks pass on both hosts |
+
 | Run | Result |
 |---|---|
+| 2026-11-11, laptop, 0.61.0 (the update zip over 0.59.1) | **Failed at step 1**: the app, on from the game's start, said "The game did not answer within 5 seconds" (its define ran while the game was starting); **Define** with a save loaded said the six Overheat items "have no quickhack actions". See [first run](#first-run-0610) |
