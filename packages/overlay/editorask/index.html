@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Editor request</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<style>
+  html, body { margin: 0; width: 540px; height: 300px; overflow: hidden; background: transparent; }
+  rn-window { position: absolute; inset: 0; }
+  p { margin: 0 0 10px; font-size: 15px; line-height: 1.45; }
+  .dim { color: var(--rn-dim); font-size: 13px; }
+  .label { font-style: italic; }
+  #error { color: var(--rn-danger); font-size: 13px; margin: 0 0 8px; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  #left { flex: 1; font: 600 13px var(--rn-mono); color: var(--rn-dim); }
+  kbd { font: 700 12px var(--rn-mono); padding: 1px 6px; border: 1px solid var(--rn-line); color: var(--rn-fg); }
+</style>
+</head>
+<body>
+  <rn-window title="A tool asks to change the game" no-space>
+    <p><b id="editor">A tool</b> on this PC asks to change the game while you play.</p>
+    <p class="label dim" id="label" hidden></p>
+    <p id="what">It can change TweakDB records, refresh V's quickhacks and give V items. Its changes are undone when it stops, and the game's own records come back at the next start.</p>
+    <p class="dim">Allow lasts until REDnode restarts. Deny refuses it until then too.</p>
+    <p id="error" hidden></p>
+    <div class="row">
+      <span id="left">Press <kbd>F10</kbd> to use the mouse here.</span>
+      <rn-button id="deny" variant="ghost">Deny</rn-button>
+      <rn-button id="allow">Allow</rn-button>
+    </div>
+  </rn-window>
+  <script src="app.js"></script>
+</body>
+</html>

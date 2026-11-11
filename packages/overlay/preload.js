@@ -138,6 +138,11 @@ contextBridge.exposeInMainWorld('rednode', {
     pending: () => ipcRenderer.invoke('rednode:keyask:pending'),
     answer: (aid, allow, how, key) => ipcRenderer.invoke('rednode:keyask:answer', aid, allow, how, key),
   },
+  /** REDnode's Editor request window only (#44): the waiting request, and the player's answer. */
+  editorask: {
+    pending: () => ipcRenderer.invoke('rednode:editorask:pending'),
+    answer: (aid, allow) => ipcRenderer.invoke('rednode:editorask:answer', aid, allow),
+  },
   /** The mod log, for apps built into REDnode. Other apps get an error. New lines arrive as {event: 'mod-log', entries}. */
   logs: {
     recent: () => ipcRenderer.invoke('rednode:logs:recent'),

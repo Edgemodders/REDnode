@@ -1,0 +1,15 @@
+{
+  "id": "editorask",
+  "name": "Editor request",
+  "version": "0.62.0",
+  "author": "Edgemodders",
+  "description": "Shown while a tool on this PC, such as EDGEhack in VS Code, asks to change the game while you play (Try Live): which tool and what it will do, with Allow and Deny.",
+  "entry": "index.html",
+  "kind": "window",
+  "width": 540,
+  "height": 300,
+  "anchor": "center",
+  "x": 0,
+  "y": -100,
+  "open": false
+}

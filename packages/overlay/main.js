@@ -27,6 +27,7 @@ const path = require('node:path');
 const { createMods } = require('./mods');
 const { createMcp } = require('./mcp');
 const { createEditor } = require('./editor');
+const zlib = require('node:zlib');
 const { createOAuth } = require('./oauth');
 const { createServices } = require('./services');
 const { createPins } = require('./pins');
@@ -75,6 +76,8 @@ const BUILTIN_ROOTS = [
   // The Connect window (#19): open only while an MCP client waits for the player's answer.
   { dir: path.join(__dirname, 'connect'), single: true, builtin: true, prompt: true },
   { dir: path.join(__dirname, 'keyask'), single: true, builtin: true, prompt: true },
+  // The Editor request window (#44): open only while a tool on the PC waits for the player's Allow.
+  { dir: path.join(__dirname, 'editorask'), single: true, builtin: true, prompt: true },
   // World pins (#43): the hidden page that draws the pins' labels, open while any pin is dropped.
   { dir: path.join(__dirname, 'pins'), single: true, builtin: true, pins: true },
   // The Console (O12): a page and a Node mod. Packaged, it sits outside app.asar, in
@@ -1117,7 +1120,11 @@ function rewatchAppRoots() {
 
 function shouldOpen(entry) {
   if (entry.pinned) return true;
-  if (entry.prompt) return entry.manifest.id === 'keyask' ? keyAsks.length > 0 : !!oauth?.pending();
+  if (entry.prompt) {
+    if (entry.manifest.id === 'keyask') return keyAsks.length > 0;
+    if (entry.manifest.id === 'editorask') return editorAsks.length > 0;
+    return !!oauth?.pending();
+  }
   if (entry.pins) return pinsHost.count() > 0;
   if (entry.builtin && entry.manifest.id === 'welcome' && !settings.welcomed) return true; // the first start
   if (chosenApps) return chosenApps.includes(entry.manifest.id);
@@ -1894,6 +1901,7 @@ async function restoreTweaks(id, journal, why) {
     }
   }
   log(`Undid ${restored} TweakDB change(s) of ${id} (${why})${kept ? `; ${kept} flat(s) it added stay until the game closes` : ''}`);
+  return { restored, kept };
 }
 
 // A package's changes are undone once it no longer runs: no window and no mod.
@@ -1904,7 +1912,8 @@ function packageRunning(id) {
 }
 
 function checkTweaks() {
-  for (const id of [...tweakJournal.keys()]) if (!packageRunning(id)) undoTweaks(id, 'the package stopped');
+  // An editor's changes (#44, "editor:<name>") are undone when it asks, or when the host stops.
+  for (const id of [...tweakJournal.keys()]) if (!id.startsWith('editor:') && !packageRunning(id)) undoTweaks(id, 'the package stopped');
 }
 
 // ---------- world objects per package (H2c-b) ----------
@@ -3825,6 +3834,157 @@ async function answerKeyAsk(aid, allow, how, typed) {
   return true;
 }
 
+// ---------- Try Live from an editor (#44) ----------
+//
+// A tool on the player's PC, such as EDGEhack in VS Code, changes the game through the editor
+// channel (editor.js) while the player plays: TweakDB changes kept in an undo journal of its own
+// ("editor:<name>", as a package's), V's quickhack list refreshed, an item given. The first change
+// from a tool waits for the player's Allow in REDnode's Editor request window; Allow and Deny last
+// until the host restarts.
+
+const EDITOR_ASK_MS = 5 * 60 * 1000;
+const editorAsks = []; // waiting requests, the first one shown
+const editorAnswers = new Map(); // editor name -> true (allowed) or false (denied), this run
+let nextEditorAid = 1;
+
+function editorAskView(a) {
+  return a ? { aid: a.aid, editor: a.editor, label: a.label, waiting: editorAsks.length - 1 } : null;
+}
+
+function showEditorAsk() {
+  const entry = apps.get('editorask');
+  if (!entry) return;
+  if (editorAsks.length) {
+    openApp(entry);
+    const w = windowOfApp('editorask');
+    if (w) toPage(w, { event: 'editorask', request: editorAskView(editorAsks[0]) });
+  } else {
+    closeApp('editorask');
+  }
+}
+
+function finishEditorAsk(a, allowed, why) {
+  const i = editorAsks.indexOf(a);
+  if (i < 0) return;
+  editorAsks.splice(i, 1);
+  clearTimeout(a.timer);
+  if (allowed !== null) editorAnswers.set(a.editor, allowed);
+  log(`Editor: ${a.editor}'s request to change the game: ${why}`);
+  for (const r of a.waiting) r(allowed);
+  showEditorAsk();
+}
+
+/** Resolves true once the player allowed the editor, false if denied, null with no answer in time. */
+function editorAllowed(editor, label) {
+  if (editorAnswers.has(editor)) return Promise.resolve(editorAnswers.get(editor));
+  const same = editorAsks.find((a) => a.editor === editor);
+  if (same) return new Promise((resolve) => same.waiting.push(resolve));
+  return new Promise((resolve) => {
+    const a = { aid: nextEditorAid++, editor, label, waiting: [resolve] };
+    a.timer = setTimeout(() => finishEditorAsk(a, null, 'no answer in 5 minutes'), EDITOR_ASK_MS);
+    editorAsks.push(a);
+    log(`Editor: ${editor} asks to change the game${label ? ` (${label})` : ''}`);
+    showEditorAsk();
+  });
+}
+
+function answerEditorAsk(aid, allow) {
+  const a = editorAsks.find((x) => x.aid === aid);
+  if (!a) throw new Error('That request is no longer waiting');
+  finishEditorAsk(a, allow, allow ? 'allowed' : 'denied');
+  return true;
+}
+
+// TweakDB ids for comparing a list's values: the game answers ids ("0x..."), an editor may send
+// names. An id is the name's CRC32 and its length; the bits above 40 are the game's own.
+function tweakIdOf(v) {
+  const s = String(v);
+  if (/^0x[0-9a-f]+$/i.test(s)) return BigInt(s) & ((1n << 40n) - 1n);
+  const bytes = Buffer.from(s, 'utf8');
+  return (BigInt(bytes.length) << 32n) | BigInt(zlib.crc32(bytes));
+}
+
+/** The editor channel's Try Live calls; `editor` names the tool, as the player sees it. */
+const tryLive = {
+  async ask(editor, label) {
+    const ok = await editorAllowed(editor, label);
+    if (ok === true) return null;
+    return ok === false ? `The player denied ${editor} for this session` : 'No answer in the game: allow it in the Editor request window';
+  },
+  async apply(editor, ops) {
+    const owner = `editor:${editor}`;
+    let applied = 0;
+    for (const [index, op] of ops.entries()) {
+      try {
+        let ok;
+        if (op.clone) ok = await packageCall(owner, 'tweakdb.clone', { path: String(op.clone), base: String(op.base) });
+        else if (op.create) ok = await packageCall(owner, 'tweakdb.create', { path: String(op.create), type: String(op.type) });
+        else if (op.set) ok = await packageCall(owner, 'tweakdb.set', { path: String(op.set), value: op.value, ...(op.type ? { type: String(op.type) } : {}) });
+        else if (op.append) {
+          const flat = await bridgeCall('tweakdb.get', { path: String(op.append) });
+          if (!flat || !Array.isArray(flat.value)) throw new Error(`${op.append} is not a list flat`);
+          const have = new Set(flat.value.map((v) => tweakIdOf(v)));
+          const more = (Array.isArray(op.values) ? op.values : []).filter((v) => !have.has(tweakIdOf(v)));
+          ok = more.length ? await packageCall(owner, 'tweakdb.set', { path: String(op.append), value: [...flat.value, ...more], type: flat.type }) : true;
+        } else throw new Error('An op is { clone, base }, { create, type }, { set, value, type? } or { append, values }');
+        if (ok !== true) throw new Error('TweakXL refused it');
+        applied += 1;
+      } catch (err) {
+        log(`Editor: ${editor}'s TweakDB op ${index + 1} failed: ${err.message}`);
+        return { ok: false, applied, failed: { index, reason: err.message } };
+      }
+    }
+    log(`Editor: ${editor} applied ${applied} TweakDB op(s)`);
+    return { ok: true, applied };
+  },
+  async reset(editor) {
+    const owner = `editor:${editor}`;
+    undoTweaks(owner, `${editor} reset it`);
+    const done = await undoing.get(owner);
+    return { ok: true, restored: done?.restored ?? 0 };
+  },
+  /** Every editor's changes put back: the host is stopping. */
+  resetAll(why) {
+    for (const id of [...tweakJournal.keys()]) if (id.startsWith('editor:')) undoTweaks(id, why);
+  },
+  async withPlayer(fn) {
+    const refs = [];
+    const call = async (params) => {
+      const r = await bridgeCall('rtti.call', params);
+      if (r && typeof r === 'object' && typeof r.$ref === 'number') refs.push(r.$ref);
+      return r;
+    };
+    try {
+      const v = await call({ fn: 'GetPlayer', args: [{}] });
+      if (!v?.$ref) throw new Error('No player: load a save first');
+      return await fn(call, v);
+    } finally {
+      if (refs.length) bridgeCall('rtti.release', { refs }).catch(() => {});
+    }
+  },
+  async refreshQuickhacks() {
+    return tryLive.withPlayer(async (call, v) => {
+      await call({ class: 'PlayerPuppet', fn: 'ChacheQuickHackListCleanup', args: [{ $ref: v.$ref }] });
+      return { ok: true };
+    });
+  },
+  async give(editor, item, count) {
+    if (!(await bridgeCall('tweakdb.record', { path: item }).catch(() => null))) throw new Error(`No record "${item}" in TweakDB`);
+    return tryLive.withPlayer(async (call, v) => {
+      const shop = await call({ class: 'GameInstance', fn: 'GetTransactionSystem', args: [{}] });
+      const ok = await call({ self: { $ref: shop.$ref }, fn: 'GiveItemByTDBID', args: [{ $ref: v.$ref }, item, count] });
+      if (ok !== true) throw new Error(`The game did not give "${item}"`);
+      log(`Editor: ${editor} gave V ${count} x ${item}`);
+      return { ok: true };
+    });
+  },
+};
+
+function fromEditorAsk(event) {
+  const w = windowFor(event.sender);
+  if (w?.app.manifest.id !== 'editorask' || !w.app.builtin) throw new Error("Only REDnode's Editor request window answers editor requests");
+}
+
 /** The kernel MCP server's address and a token for one package, if the player granted it. */
 function mcpFor(id) {
   if (!isGranted(id, 'mcp')) {
@@ -4643,6 +4803,14 @@ function fromKeyAsk(event) {
   const w = windowFor(event.sender);
   if (w?.app.manifest.id !== 'keyask' || !w.app.builtin) throw new Error("Only REDnode's Key request window answers key requests");
 }
+ipcMain.handle('rednode:editorask:pending', (event) => {
+  fromEditorAsk(event);
+  return editorAskView(editorAsks[0]);
+});
+ipcMain.handle('rednode:editorask:answer', (event, aid, allow) => {
+  fromEditorAsk(event);
+  return answerEditorAsk(Number(aid), allow === true);
+});
 ipcMain.handle('rednode:keyask:pending', (event) => {
   fromKeyAsk(event);
   return keyAskView(keyAsks[0]);
@@ -5213,7 +5381,7 @@ app.whenReady().then(() => {
   // The editor channel (#17): tools on this PC, such as EDGEwave, play game sounds through
   // it. "editorChannel": "off" in settings.json turns it off.
   if (settings.editorChannel !== 'off') {
-    editor = createEditor({ log, version: VERSION, connected: () => connected, bridgeCall });
+    editor = createEditor({ log, version: VERSION, connected: () => connected, bridgeCall, tryLive });
     editor.start();
   } else log('Editor channel: off in settings');
   // Mods start below; one may ask for the kernel's tools at once (mcpFor).
@@ -5323,6 +5491,7 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   mods?.stopAll();
   mcp?.stop();
+  tryLive.resetAll('REDnode stopped');
   editor?.stop();
   redbridge.stop();
   for (const a of ATTACHED) a.stop();

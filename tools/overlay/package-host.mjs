@@ -38,7 +38,7 @@ if (build.status !== 0) throw new Error('Building the rednode package failed');
 rmSync(work, { recursive: true, force: true });
 mkdirSync(stage, { recursive: true });
 for (const f of ['main.js', 'preload.js', 'mods.js', 'mcp.js', 'gameapi-lookup.js', 'gamefiles.js', 'redbridge.js', 'bridge-install.js', 'archive-index.js', 'game-sounds.js', 'services.js', 'oauth.js', 'editor.js', 'attached.js', 'bridge-share.js', 'frames.js', 'pins.js']) cpSync(join(overlay, f), join(stage, f));
-for (const d of ['launcher', 'modlog', 'manager', 'welcome', 'connect', 'keyask', 'builder', 'pins']) cpSync(join(overlay, d), join(stage, d), { recursive: true });
+for (const d of ['launcher', 'modlog', 'manager', 'welcome', 'connect', 'keyask', 'editorask', 'builder', 'pins']) cpSync(join(overlay, d), join(stage, d), { recursive: true });
 cpSync(join(repo, 'packages', 'ui', 'src'), join(stage, 'ui'), { recursive: true });
 
 // The SDK and the mod runtime go outside app.asar, into resources/, so mod

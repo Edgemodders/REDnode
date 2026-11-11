@@ -12,8 +12,19 @@
 //   POST /editor/sound.play    { name, on? }        -> { ok, playingId, on, note }
 //   POST /editor/sound.stop    { playingId? }       -> { ok, stopped }   (all when none)
 //
-// Errors answer { ok: false, reason }. The calls cannot change the game's files or
-// its state; archive swaps come later, behind an in-game Allow.
+// Try Live (#44), for a tool that changes the game while the player plays, such as EDGEhack.
+// `editor` names the tool as the player sees it. Its first change waits for the player's Allow
+// in REDnode's Editor request window (up to 5 minutes); Allow and Deny last until the host
+// restarts. Its TweakDB changes are undone by tweakdb.reset, and when the host stops.
+//
+//   POST /editor/tweakdb.apply     { editor, label?, ops }  -> { ok, applied, failed?: { index, reason } }
+//        ops in order: { clone, base } | { create, type } | { set, value, type? } | { append, values }
+//   POST /editor/tweakdb.reset     { editor }               -> { ok, restored }
+//   POST /editor/quickhacks.refresh { editor }              -> { ok }   V's cached quickhack list cleared
+//   POST /editor/player.give       { editor, item, count? } -> { ok }
+//
+// Errors answer { ok: false, reason }. The sound calls cannot change the game's files or its
+// state; the Try Live calls change TweakDB (never a file) once the player allows it.
 
 'use strict';
 
@@ -23,6 +34,8 @@ const http = require('node:http');
 const path = require('node:path');
 
 const MAX_BODY = 16 * 1024;
+// tweakdb.apply carries a quickhack's records: a few hundred flats.
+const MAX_APPLY_BODY = 2 * 1024 * 1024;
 
 /**
  * @param {object} host
@@ -31,6 +44,7 @@ const MAX_BODY = 16 * 1024;
  * @param {() => boolean} host.connected                  whether the game is linked
  * @param {(method: string, params: object) => Promise<any>} host.bridgeCall
  * @param {string} [host.file]                            where editor.json goes
+ * @param {object} [host.tryLive]                         Try Live (#44): ask, apply, reset, refreshQuickhacks, give
  */
 function createEditor(host) {
   const file = host.file ?? path.join(process.env.LOCALAPPDATA ?? path.join(require('node:os').homedir(), 'AppData', 'Local'), 'REDnode', 'editor.json');
@@ -43,12 +57,12 @@ function createEditor(host) {
   const send = (res, status, body) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
   const fail = (res, status, reason) => send(res, status, { ok: false, reason });
 
-  async function readBody(req) {
+  async function readBody(req, max = MAX_BODY) {
     const chunks = [];
     let size = 0;
     for await (const c of req) {
       size += c.length;
-      if (size > MAX_BODY) throw new Error('The request is too large');
+      if (size > max) throw new Error('The request is too large');
       chunks.push(c);
     }
     const text = Buffer.concat(chunks).toString('utf8');
@@ -82,6 +96,38 @@ function createEditor(host) {
     return [200, { ok: true, stopped }];
   }
 
+  // Try Live (#44): each call names its editor, which the player must have allowed.
+  const editorOf = (params) => {
+    const name = String(params.editor ?? '').trim();
+    if (!name || name.length > 40) throw new Error('Name your tool in "editor", such as "EDGEhack"');
+    return name;
+  };
+  const live = (fn) => async (params) => {
+    if (!host.tryLive) return [404, { ok: false, reason: 'Try Live is not available in this REDnode' }];
+    let editor;
+    try {
+      editor = editorOf(params);
+    } catch (err) {
+      return [400, { ok: false, reason: err.message }];
+    }
+    const refused = await host.tryLive.ask(editor, typeof params.label === 'string' ? params.label.slice(0, 80) : '');
+    if (refused) return [403, { ok: false, reason: refused }];
+    return fn(editor, params);
+  };
+  const apply = live(async (editor, params) => {
+    if (!Array.isArray(params.ops) || !params.ops.length) return [400, { ok: false, reason: 'Send the changes in "ops", a list' }];
+    const r = await host.tryLive.apply(editor, params.ops);
+    return [r.ok ? 200 : 422, r];
+  });
+  const reset = live(async (editor) => [200, await host.tryLive.reset(editor)]);
+  const refresh = live(async () => [200, await host.tryLive.refreshQuickhacks()]);
+  const give = live(async (editor, params) => {
+    const item = String(params.item ?? '').trim();
+    if (!item) return [400, { ok: false, reason: 'Name the item in "item", such as "Items.OverheatLvl2Program"' }];
+    const count = Math.max(1, Math.min(100, Math.trunc(Number(params.count ?? 1)) || 1));
+    return [200, await host.tryLive.give(editor, item, count)];
+  });
+
   async function handle(req, res) {
     // Only this server's own name, and no web page: a browser sends an Origin.
     const here = [`127.0.0.1:${port}`, `localhost:${port}`];
@@ -96,12 +142,19 @@ function createEditor(host) {
     if (url.pathname === '/editor/info' && req.method === 'GET') {
       return send(res, 200, { ok: true, version: host.version, connected: host.connected() });
     }
-    const call = { '/editor/sound.play': play, '/editor/sound.stop': stop }[url.pathname];
+    const call = {
+      '/editor/sound.play': play,
+      '/editor/sound.stop': stop,
+      '/editor/tweakdb.apply': apply,
+      '/editor/tweakdb.reset': reset,
+      '/editor/quickhacks.refresh': refresh,
+      '/editor/player.give': give,
+    }[url.pathname];
     if (!call) return fail(res, 404, `No call ${url.pathname}`);
     if (req.method !== 'POST') return fail(res, 405, 'Use POST');
     let params;
     try {
-      params = await readBody(req);
+      params = await readBody(req, url.pathname === '/editor/tweakdb.apply' ? MAX_APPLY_BODY : MAX_BODY);
       if (!params || typeof params !== 'object' || Array.isArray(params)) throw new Error('The body is a JSON object');
     } catch (err) {
       return fail(res, 400, err.message);

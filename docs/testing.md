@@ -74,6 +74,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [H3a REDswap](world.md#h3a-test) | In the game | H3 | 2026-10-27 | 0.41.0 + REDswap, Refresh test 0.3.1, game 2.5, no RED Hot Tools | **Pass** (dev PC): four swaps through REDswap (three replaces of `EDGEmatA.archive`, one new archive added), 52 to 59 ms each, 0 faults; V and the inventory preview refreshed with no button, inventory open or closed, which also verifies PV-b (0.40.2) on 2.5 ([results](world.md#h3a-test-results-2026-10-27-passed)) |
 | [H3b World refresh and sound on 2.5](world.md#h3b-test) | In the game | H3 | 2026-10-27, 2026-10-31 | 0.42.1 + REDswap 1.0.0, then 0.49.5 + REDswap 1.0.3, World objects test 0.2.2, Hot swap 0.1.1, game 2.5 | **Pass** (dev PC): steps 7 to 10 on 2026-10-31 (EDGEwave's 2.5 katana override swapped, its sound heard; #18's checks through MCP). Steps 1 to 6 on 2026-10-27: the spawned box respawned after each of three REDswap swaps (69 to 77 ms), no game entity near V used its mesh, 0 faults. Steps 7 to 10 wait for a new EDGEwave katana override; step 9 checks #18 ([results](world.md#h3b-test)) |
 | [O12 Console](#o12-console) | In the game | O12 | 2026-10-27 | 0.42.1, game 2.5 | **Pass** (dev PC): every step. The first run (0.42.0) lost the history at Stop (an unfinished asynchronous write), fixed in 0.42.1 and passed on retest ([results](overlay.md#o12-console-test)). Mock game: 21 checks |
+| [Try Live on the editor channel (#44)](#try-live-on-the-editor-channel-44) | In the game, with Claude | Editor channel | Waiting | 0.62.0, game 2.5 | Built 2026-11-11. Mock game: 21 checks, dev and packaged host (scratchpad `ed/check.mjs`: Deny and its 403s, Allow with the window's label, five ops in order, append adding only what a list lacks, a failing op stopping the batch, a 400-op batch over 16 KB, refresh, give, an unknown item, changes kept by the host's sweep, reset with its count, no editor name) |
 | [Editor channel (#17)](#editor-channel-17) | In the game, with Claude | Sound API | 2026-10-29 | 0.45.0, game 2.5 | **Pass** (dev PC): info, play, play and stop a loop, play after the pause menu, the port closed after the quit. Mock game: 15 checks |
 | [Shared keys: the Keys view (K2)](#shared-keys-the-keys-view-k2) | In the game | #23 | 2026-10-30 | 0.47.0, game 2.5 | **Pass** (laptop): every step. Found: no sign of the save while a key is encrypted (about 1 s, the box still editable), and an id typed under Other service is saved and logged whatever it is; both changed in 0.47.1; its [retest](#keys-retest-on-0471) **passed** on 2026-10-30 (laptop). Mock game: 23 checks, 30 on 0.47.1 |
 | [Shared keys for packages (K3)](#shared-keys-for-packages-k3) | In the game, with Claude | #23 | 2026-10-31 | 0.49.5 + Keys test 0.1.0, REDagent 0.4.0, game 2.5 | **Pass** (dev PC): all nine steps; one `asks for` and one answer line per ask, `Granted keys:` for each grant, no key value in any log. Mock game: 20 checks (Keys test) |
@@ -786,6 +787,24 @@ Showed: pan did nothing on the 8-channel HDMI device (miniaudio pans only a ster
 3. Hold the scanner: note "V's dilation".
 
 Showed: the volume reads follow each slider. Step 3: the scanner did not slow time in that run.
+
+### Try Live on the editor channel (#44)
+
+REDnode 0.62.0, on the dev PC with the game running, Claude sending the calls from its session with a small script (`ed/try.mjs` in its scratchpad) while the owner plays. Overheat (Rare) in V's cyberdeck; **Quickhack test** off.
+
+| Step | Claude sends | The owner sees |
+|---|---|---|
+| 1 | `tweakdb.apply` from "EDGEhack": two more Tier 4 RAM increases on Overheat (Rare) | The **Editor request** window: "EDGEhack on this PC asks to change the game while you play", "For: Try Live test". Press F10, then **Allow** |
+| 2 | (the call goes on once allowed) | Scan an enemy: Overheat (Rare) costs more RAM |
+| 3 | `tweakdb.apply`: Contagion's poison added to Overheat (Rare), then `quickhacks.refresh` | Upload Overheat on an enemy: burning and poisoned. No second Allow |
+| 4 | `tweakdb.apply`: a new quickhack (a clone of Overheat (Rare) with no tier RAM increase, named Short Circuit), then `player.give` | "Short Circuit" (Rare) in the backpack: put it in the cyberdeck, scan: lower RAM, and it burns |
+| 5 | `tweakdb.reset` | Take Overheat (Rare) out of the cyberdeck and put it back, scan: its RAM is back, and it no longer poisons |
+| 6 | `tweakdb.apply` from "Other tool" | The Editor request window again, for Other tool: press **Deny**. The script reports 403 |
+
+Then quit without saving (the given item's record is gone at the next start). I read the host log for the Editor lines.
+
+| Run | Result |
+|---|---|
 
 ### Editor channel (#17)
 

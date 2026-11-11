@@ -686,6 +686,35 @@ await rednode('sound.stop', { playingId: played.playingId });             // { o
 
 An error answers `{ ok: false, reason }`: 401 without the right token, 409 while the game is not linked, 400 for a bad body. The channel listens on 127.0.0.1 only and refuses requests from web pages (any `Origin` header) and under another host name, so call it from the extension's Node side, not from a webview. When the game ends, Windows ends REDnode at once and `editor.json` stays behind: a refused connection, or a `pid` that no longer runs, means no game. Players can turn the channel off with `"editorChannel": "off"` in `%APPDATA%\@rednode\overlay\settings.json`. More calls, such as hot-loading an archive after an in-game Allow, come later.
 
+### Try Live: changing the game from a tool
+
+A tool can also change the game while the player plays, and undo it: EDGEhack's **Try Live** sends a quickhack's records and the player tries it at once, with no packing. REDnode 0.62.0 ([#44](https://github.com/Edgemodders/REDnode/issues/44)). These calls name the tool in `editor`. The first change from a tool opens REDnode's **Editor request** window in the game, with **Allow** and **Deny**, and the call waits for the answer (up to 5 minutes). The answer lasts until REDnode restarts.
+
+```js
+// TweakDB changes, in order: then refresh V's quickhacks and give V the item.
+await rednode('tweakdb.apply', {
+  editor: 'EDGEhack', label: 'Static Skull',
+  ops: [
+    { clone: 'QuickHack.MyMod_StaticSkullHack', base: 'QuickHack.OverheatLvl2Hack' },
+    { set: 'QuickHack.MyMod_StaticSkullHack.priority', value: 3 },
+    { append: 'Items.MyMod_StaticSkullProgram.objectActions', values: ['QuickHack.MyMod_StaticSkullHack'] },
+  ],
+}); // { ok, applied } or { ok: false, applied, failed: { index, reason } }
+await rednode('quickhacks.refresh', { editor: 'EDGEhack' });
+await rednode('player.give', { editor: 'EDGEhack', item: 'Items.MyMod_StaticSkullProgram' });
+// Later: every flat it changed back as it was.
+await rednode('tweakdb.reset', { editor: 'EDGEhack' }); // { ok, restored }
+```
+
+| Call | Body | Answer |
+|---|---|---|
+| `POST /editor/tweakdb.apply` | `{ editor, label?, ops }`. Each op: `{ clone, base }`, `{ create, type }`, `{ set, value, type? }` (values as [`tweakdb.set`](tweakdb.md) takes them, text keys too), or `{ append, values }` (adds to a list the values it lacks). Up to 2 MB | `{ ok, applied }`; a failing op stops the batch: `{ ok: false, applied, failed: { index, reason } }`, status 422 |
+| `POST /editor/tweakdb.reset` | `{ editor }` | `{ ok, restored }`: every flat the tool changed, back as it was. Records it made stay until the game closes (TweakDB cannot remove them) |
+| `POST /editor/quickhacks.refresh` | `{ editor }` | `{ ok }`: V's cached quickhack list cleared (the game's own `ChacheQuickHackListCleanup`), so a changed effect applies. A changed RAM cost shows on the next scan without it |
+| `POST /editor/player.give` | `{ editor, item, count? }` | `{ ok }`: the item in V's backpack (1 to 100) |
+
+A tool the player denied gets 403 at once until REDnode restarts. Every tool's changes are undone when REDnode stops. What shows live was settled by EDGEhack's H4.1 spike: a changed number on the next scan, an added effect after a refresh, a renamed item at once, a quickhack made live working.
+
 ## Calling other packages
 
 A package can offer functions to every other package, and call theirs: a quest mod asks a world builder for a scene's places, a HUD widget asks a stats mod for its numbers. REDnode 0.34.0 and later; descriptions from JSDoc come with 0.35.0 and AI assistants calling them as tools with 0.36.0. The design and its tests are on the [Mod services](services.md) page.

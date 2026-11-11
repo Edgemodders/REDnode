@@ -13,6 +13,7 @@ How to keep it:
 
 **New**
 
+- Try Live on the editor channel (https://github.com/Edgemodders/REDnode/issues/44, for EDGEhack): a tool on your PC can change the game while you play, after you allow it in REDnode's new **Editor request** window: `tweakdb.apply` (clone, create, set and append, in order), `tweakdb.reset` (puts everything that tool changed back), `quickhacks.refresh` (V's quickhack list, so changed effects apply) and `player.give`. A tool's changes are undone when REDnode stops. Docs: https://edgemodders.github.io/REDnode/overlay-apps.html#try-live-changing-the-game-from-a-tool
 - Quickhack functions (https://github.com/Edgemodders/REDnode/issues/42, for EDGEhack): `quickhacks.define(items, { canUse, onLand })` gives a quickhack, or a family of them, a scan check that decides per person whether it shows usable or disabled (with your own text), and a function that runs when it lands. The function gets the target (level, health, kind) with `damage(amount)` and `addEffect(effect)` from V, and the hack (action, tier, spread). While a check waits, the hack shows "Checking..." for a second the first time V scans someone; with no answer, the game's own result stands. A package's functions go when it stops. Docs: https://edgemodders.github.io/REDnode/quickhacks.html
 - `REDnode_EntityText(name, entityID, text)` for scripts: a game event with an entity and a text, which reaches mods as `entityId` and `text`.
 - The Quickhack test sample, in the player zip.
