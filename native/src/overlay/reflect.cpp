@@ -340,6 +340,11 @@ void ToJson(const rtti::IType* aType, const void* aMem, std::string& aOut, int a
         {
             Quoted64(aOut, false, *static_cast<const uint64_t*>(aMem));
         }
+        else if (name == "gamedataLocKeyWrapper")
+        {
+            // A name or description's text key, as "LocKey#<number>".
+            aOut += "\"LocKey#" + std::to_string(static_cast<const gamedataLocKeyWrapper*>(aMem)->primaryKey) + "\"";
+        }
         else if (name == "Variant")
         {
             // A value with its type: {"$type":"Float","value":1.5}, or null when empty.
@@ -586,6 +591,35 @@ bool FromJson(const rtti::IType* aType, void* aMem, const Value& aValue, std::st
                         aError))
                 return false;
             *static_cast<uint64_t*>(aMem) = u;
+            return true;
+        }
+        if (name == "gamedataLocKeyWrapper")
+        {
+            // A text key (EDGEhack's H4.1 spike: an item's displayName): a number, "LocKey#27968", or a
+            // named key such as "LocKey#EDGEhack-mod-Name", which TweakXL and ArchiveXL turn into a number
+            // with FNV-1a 64, as the SDK's gamedataLocKeyWrapper(const char*) does.
+            int64_t s = 0;
+            uint64_t u = 0;
+            bool negative = false;
+            auto* key = static_cast<gamedataLocKeyWrapper*>(aMem);
+            if (json::Integer(aValue, s, u, negative) && !negative)
+            {
+                key->primaryKey = u;
+                return true;
+            }
+            if (!Expect(aValue.kind == Value::Kind::String && !aValue.text.empty(), aType,
+                        "a text key: a number, \"LocKey#27968\", or \"LocKey#<a key in an onscreens file>\"", aError))
+                return false;
+            std::string text = aValue.text;
+            if (text.rfind("LocKey#", 0) == 0)
+                text = text.substr(7);
+            if (text.empty())
+            {
+                aError = "gamedataLocKeyWrapper: an empty key";
+                return false;
+            }
+            const bool digits = text.find_first_not_of("0123456789") == std::string::npos && text.size() <= 20;
+            key->primaryKey = digits ? std::strtoull(text.c_str(), nullptr, 10) : FNV1a64(text.c_str());
             return true;
         }
         if (name == "Variant")

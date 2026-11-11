@@ -24,6 +24,10 @@ How to keep it:
 
 - Each pin colour now has its own post and edge arrow (they were always the HUD's cyan).
 
+**Fixed**
+
+- `tweakdb.set` takes text keys: an item's `displayName` and other `gamedataLocKeyWrapper` flats accept a number, `"LocKey#27968"` or a named key such as `"LocKey#MyMod-Name"`, and read back as `"LocKey#<number>"`. Before, they were refused with "cannot be set from JSON yet".
+
 ## 0.59.1 (2026-11-10)
 
 For game version 2.5.
