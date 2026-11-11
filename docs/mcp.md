@@ -117,7 +117,7 @@ REDnode 0.45.0, REDagent 0.3.3 (its briefing knows the tools). REDagent needs it
 
 ### EDGEhack's tools (H4.6)
 
-REDnode 0.63.0 runs [EDGEhack](https://edgemodders.github.io/EDGEhack/)'s MCP server for in-game assistants the same way, so REDagent can make and change quickhacks while the player plays and try them live. EDGEhack's phase H4.6, agreed with the owner on 2026-11-11 ([#45](https://github.com/Edgemodders/REDnode/issues/45)).
+REDnode 0.63.0 runs [EDGEhack](https://edgemodders.github.io/EDGEhack/)'s MCP server for in-game assistants the same way (**passed in game on 2026-11-11** with REDagent 0.4.2), so REDagent can make and change quickhacks while the player plays and try them live. EDGEhack's phase H4.6, agreed with the owner on 2026-11-11 ([#45](https://github.com/Edgemodders/REDnode/issues/45)).
 
 | | |
 |---|---|
