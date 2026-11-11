@@ -3906,6 +3906,12 @@ function tweakIdOf(v) {
 
 /** The editor channel's Try Live calls; `editor` names the tool, as the player sees it. */
 const tryLive = {
+  /** Whether TweakDB has a record, releasing the handle the look-up makes. */
+  async recordExists(path) {
+    const r = await bridgeCall('tweakdb.record', { path }).catch(() => null);
+    if (r && typeof r.$ref === 'number') bridgeCall('rtti.release', { refs: [r.$ref] }).catch(() => {});
+    return !!r;
+  },
   async ask(editor, label) {
     const ok = await editorAllowed(editor, label);
     if (ok === true) return null;
@@ -3917,8 +3923,10 @@ const tryLive = {
     for (const [index, op] of ops.entries()) {
       try {
         let ok;
-        if (op.clone) ok = await packageCall(owner, 'tweakdb.clone', { path: String(op.clone), base: String(op.base) });
-        else if (op.create) ok = await packageCall(owner, 'tweakdb.create', { path: String(op.create), type: String(op.type) });
+        // A record made by an earlier try stays until the game closes (TweakDB cannot remove one), so
+        // the same try sent again finds it there: kept as it is, its flats set again by the ops after.
+        if (op.clone) ok = (await tryLive.recordExists(String(op.clone))) || (await packageCall(owner, 'tweakdb.clone', { path: String(op.clone), base: String(op.base) }));
+        else if (op.create) ok = (await tryLive.recordExists(String(op.create))) || (await packageCall(owner, 'tweakdb.create', { path: String(op.create), type: String(op.type) }));
         else if (op.set) ok = await packageCall(owner, 'tweakdb.set', { path: String(op.set), value: op.value, ...(op.type ? { type: String(op.type) } : {}) });
         else if (op.append) {
           const flat = await bridgeCall('tweakdb.get', { path: String(op.append) });
@@ -3969,7 +3977,7 @@ const tryLive = {
     });
   },
   async give(editor, item, count) {
-    if (!(await bridgeCall('tweakdb.record', { path: item }).catch(() => null))) throw new Error(`No record "${item}" in TweakDB`);
+    if (!(await tryLive.recordExists(item))) throw new Error(`No record "${item}" in TweakDB`);
     return tryLive.withPlayer(async (call, v) => {
       const shop = await call({ class: 'GameInstance', fn: 'GetTransactionSystem', args: [{}] });
       const ok = await call({ self: { $ref: shop.$ref }, fn: 'GiveItemByTDBID', args: [{ $ref: v.$ref }, item, count] });
