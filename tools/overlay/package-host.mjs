@@ -9,6 +9,7 @@
 //   native/build/dist/red4ext/plugins/REDnode/host/resources/sdk/        the rednode package, for apps and mods
 //   native/build/dist/red4ext/plugins/REDnode/host/resources/runtime/    the Node mod runtime
 //   native/build/dist/red4ext/plugins/REDnode/host/resources/edgemat/    EDGEmat's MCP server, for in-game assistants
+//   native/build/dist/red4ext/plugins/REDnode/host/resources/edgehack/   EDGEhack's MCP server, when the build finds one
 //   native/build/dist/red4ext/plugins/REDnode/host/resources/keys/       the shared keys library, for the Keys view
 //   native/build/dist/red4ext/plugins/REDnode/apps/<id>/                 the example apps and mods
 //
@@ -61,6 +62,23 @@ if (process.env.EDGEMAT_MCP_DIR) console.log(`EDGEmat's MCP server from ${edgema
 const edgemat = join(resources, 'edgemat');
 mkdirSync(edgemat, { recursive: true });
 for (const f of ['dist/server.cjs', 'package.json', 'LICENSE', 'THIRD-PARTY-NOTICES.txt']) cpSync(join(edgematFrom, f), join(edgemat, f.replace('dist/', '')));
+// EDGEhack's MCP server (H4.6), the same way: EDGEHACK_MCP_DIR, else the npm package once EDGEhack
+// releases it, else the sibling repo's packages/edgehack-mcp (built there with npm run build), for a
+// test build before EDGEhack's first release. With none, the build goes on without it, and the host
+// logs that EDGEhack's tools are not shipped.
+const edgehackFrom = [
+  process.env.EDGEHACK_MCP_DIR,
+  join(repo, 'node_modules', '@edgemodders', 'edgehack-mcp'),
+  join(repo, '..', 'EDGEhack', 'packages', 'edgehack-mcp'),
+].find((dir) => dir && existsSync(join(dir, 'dist', 'server.cjs')));
+const edgehack = join(resources, 'edgehack');
+if (edgehackFrom) {
+  console.log(`EDGEhack's MCP server from ${edgehackFrom}`);
+  mkdirSync(edgehack, { recursive: true });
+  for (const f of ['dist/server.cjs', 'package.json', 'LICENSE', 'THIRD-PARTY-NOTICES.txt']) {
+    if (existsSync(join(edgehackFrom, f))) cpSync(join(edgehackFrom, f), join(edgehack, f.replace('dist/', '')));
+  }
+} else console.log("EDGEhack's MCP server not found: this build ships without EDGEhack's tools");
 // The shared keys library (#23), for the launcher's Keys view: an ES module, loaded as a plain file.
 mkdirSync(join(resources, 'keys'), { recursive: true });
 cpSync(join(repo, 'tools', 'keys', 'keys.mjs'), join(resources, 'keys', 'keys.mjs'));
@@ -105,7 +123,7 @@ const [out] = await packager({
   // link or copy REDnode's app.asar ("Invalid package ...app.asar", players' reports of 2026-11-09 and
   // 2026-11-11). A running host also kept app.asar open, so a deploy with the game running failed on it.
   asar: false,
-  extraResource: [sdk, join(resources, 'runtime'), join(resources, 'console'), edgemat, join(resources, 'keys'), gameapi],
+  extraResource: [sdk, join(resources, 'runtime'), join(resources, 'console'), edgemat, ...(edgehackFrom ? [edgehack] : []), join(resources, 'keys'), gameapi],
   overwrite: true,
   quiet: true,
   win32metadata: {

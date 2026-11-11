@@ -96,6 +96,7 @@ Last updated 2026-10-16. REDagent's own tests (C2 to C5, the chat and authoring)
 | [Quickhack functions (#42)](quickhacks.md#quickhack-functions-test) | In the game, with the Console | Quickhacks | Passed 2026-11-11 | 0.61.1 + Quickhack test 0.1.0, game 2.5 | **Pass** (laptop), every step but 11 (spread, not run: unverified). First run on 0.61.0 (laptop, 2026-11-11) failed at step 1: a define at the game's start timed out, and Overheat's hacks came back as ids the define could not read ([first run](quickhacks.md#first-run-0610)); fixed in 0.61.1. Built 2026-11-11. Before it: redscript-cli compiles `REDnodeQuickhacks.reds` with 0 errors, alone and beside Codeware 1.21.0's scripts (its 23 errors all in Codeware's own files); Mock game: 9 checks, on the dev host and the packaged one (scratchpad `qh/run.sh`: a stand-in TweakDB and script class; four hacks of two items defined under the package's own id, spread with no check, the text and hold, a human usable, a drone not, a throwing check unanswered, onLand's damage and effect, the release when the package restarts and the defines again after it, a second package and a second define of the same package refused) |
 | [World pins WP2 (#43)](#world-pins-wp2-43) | In the game, with the Console | World | Passed 2026-11-10 | 0.60.0, game 2.5 | **Pass**, every step (dev PC): about 60 us a frame with 11 followed pins (entity lookups 2.4 us each, ray casts about 22 us each, under one a frame). Before it: Mock game: 19 checks (styles, refusals, an entity pin, package and pin styles, a spawn's label) and a picture of the labels page (scratchpad `pins/run.sh`); MCP tools: 8 checks (`pins/run-mcp.sh`); unit test `pins_test` (24 checks) |
 | [World pins WP1 (#43)](#world-pins-wp1-43) | In the game, with the Console | World | Passed 2026-11-09 | 0.59.0, game 2.5 | **Pass**, every step (dev PC): the field of view is vertical, 100 pins cost 7 us a frame to place, a ray cast tells a wall from a clear view, the host ended at the quit. Before it: Mock game: 3 pins, distances, refusals, one pins.set per change (scratchpad `pins/run.sh`); unit test `pins_test` (14 checks) |
+| [EDGEhack's tools for REDagent (H4.6)](#edgehacks-tools-for-redagent-h46) | In the game, with REDagent | MCP | Waiting | 0.63.0 + REDagent 0.4.2 + EDGEhack 0.0.30's server, game 2.5 | Outside the game: pass, 8 checks on the dev host and 8 on the packaged one |
 | [A game started from VS Code (0.59.1)](#a-game-started-from-vs-code-0591) | In the game | Overlay | Passed 2026-11-10 | 0.59.1, game 2.5 | **Pass** (laptop): started by EDGEdeck's Run game with `edgedeck.launch` `exe`, the plugin dropped `ELECTRON_RUN_AS_NODE`, the host connected and F10 showed the launcher; the plugin logged `Unloading` at the quit |
 | [Vortex installs REDnode (0.62.4)](#vortex-installs-rednode-0624) | Vortex, then in the game | Packaging | Passed 2026-11-11 | 0.62.4 + REDswap 1.0.3, Vortex, game 2.5 | **Pass** (dev PC): the player zip installed and deployed in Vortex with no "Invalid package" error, the overlay showed in the game, and a purge took REDnode out again (the next start loaded neither plugin) |
 | [Edit and Run (UT3a)](ink.md#ut3a-test) | In the game | UI Tools | Passed | 0.55.0 + UI Workbench 0.2.0, Codeware, game 2.5 | Passed on the dev PC on 2026-11-02, with #37's test. The player's notes (resize, a splitter) went into 0.55.1. Mock game: 21 checks (scratchpad `ut3/check.mjs`) and Inspect's 40 |
@@ -788,6 +789,27 @@ Showed: pan did nothing on the 8-channel HDMI device (miniaudio pans only a ster
 3. Hold the scanner: note "V's dilation".
 
 Showed: the volume reads follow each slider. Step 3: the scanner did not slow time in that run.
+
+### EDGEhack's tools for REDagent (H4.6)
+
+REDnode 0.63.0 (with EDGEhack's server, from EDGEhack 0.0.30), REDagent 0.4.2, game 2.5, on the dev PC. REDagent makes a quickhack in the game and tries it live. Source: [docs/mcp.md, "EDGEhack's tools (H4.6)"](mcp.md#edgehacks-tools-h46). Ask REDagent in your own words; the words below are examples.
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | Load a save. In the launcher, switch on **REDagent** and its **Allowed** switch for REDnode's tools (`mcp`) | REDagent's window opens |
+| 2 | "Which EDGEhack tools do you have?" | It lists the `edgehack__hack_*` tools |
+| 3 | "Find Overheat and tell me its Rare tier's RAM and upload." | It answers without asking you (the first call takes about 15 s: the game's TweakDB loads) |
+| 4 | "Make a new quickhack from Overheat called Agent Heat, with 2 more RAM on every tier and Contagion's poison added." | It asks before each change, and says Agent Heat is on EDGEhack's Desk |
+| 5 | "Try Agent Heat live and give me its Rare tier." | It asks first. The game shows the **Editor request** window for EDGEhack: **Allow**. Agent Heat (Rare) is in V's backpack. Put it in the cyberdeck and upload it on an enemy: it burns and poisons |
+| 6 | "Stop trying it." | It asks first; Agent Heat stops working (the game is put back) |
+| 7 | Quit the game. In VS Code, EDGEhack's Desk view | It lists Agent Heat. Claude reads the host log: `EDGEhack tools: edgehack 0.0.30 started`, each call, `Shared REDbridge: first call from EDGEhack` |
+
+If the Admin Tools pack is installed, the Tools Manager also shows the group **EDGEhack** with its 8 tools.
+
+| Run | Result |
+|---|---|
+| Outside the game, 2026-11-11, by Claude (scratchpad `h46/run.sh` and `h46/run-packaged.sh`) | **Pass**, 8 checks on the dev host and 8 on the packaged one (docs/mcp.md, "EDGEhack's tools (H4.6)") |
+| In the game | Waiting |
 
 ### Try Live on the editor channel (#44)
 

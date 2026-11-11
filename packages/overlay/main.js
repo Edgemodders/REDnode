@@ -549,9 +549,58 @@ const edgemat = createAttached({
   log,
   ended: () => bridgeShare.revoke('EDGEmat'),
 });
-const ATTACHED = [edgemat];
-// Whether an assistant sees the attached servers' tools: in-game ones always, desktop ones by setting.
-const seesAttached = (who) => who?.kind === 'package' || settings.edgematTools === 'all';
+
+// EDGEhack's MCP server (H4.6, EDGEhack's quickhack editor), shipped in resources/edgehack when the
+// build found it: its tools for in-game assistants as edgehack__hack_*. With no project, a quickhack
+// an assistant makes goes on EDGEhack's Desk (%LOCALAPPDATA%\EDGEhack\desk), which EDGEhack in VS Code
+// lists; hack_try reaches the game through REDnode's editor channel, after the player's Allow.
+// "edgehackTools": "all" lists them to desktop assistants too (Claude Code gets EDGEhack from
+// EDGEchat or EDGEhack's Connect an Assistant). In a dev run, EDGEHACK_MCP_DIR or the sibling repo.
+const EDGEHACK_DIR = (() => {
+  if (app.isPackaged) return path.join(process.resourcesPath, 'edgehack');
+  for (const dir of [process.env.EDGEHACK_MCP_DIR, path.join(__dirname, '..', '..', '..', 'EDGEhack', 'packages', 'edgehack-mcp')]) {
+    if (dir && fs.existsSync(path.join(dir, 'dist', 'server.cjs'))) return dir;
+  }
+  try {
+    return path.dirname(require.resolve('@edgemodders/edgehack-mcp/package.json'));
+  } catch {
+    return null;
+  }
+})();
+const edgehack = createAttached({
+  id: 'edgehack',
+  name: 'EDGEhack',
+  script: () => EDGEHACK_DIR && path.join(EDGEHACK_DIR, app.isPackaged ? 'server.cjs' : path.join('dist', 'server.cjs')),
+  env: async () => {
+    const env = {};
+    if (GAME_DIR) env.EDGEHACK_GAME_PATH = GAME_DIR;
+    // A scratch Desk for checks; players have none set, so EDGEhack's own Desk is used.
+    if (process.env.EDGEHACK_DESK) env.EDGEHACK_DESK = process.env.EDGEHACK_DESK;
+    // REDnode's REDbridge, shared (#40), as EDGEmat's: no second REDbridge beside the game's.
+    if (settings.edgehackBridge !== 'own') {
+      try {
+        Object.assign(env, await bridgeShare.grant('EDGEhack'));
+      } catch (err) {
+        log(`EDGEhack tools: the shared REDbridge could not start (${err.message}); EDGEhack starts its own`);
+      }
+    }
+    const b = redbridge.status();
+    if (b.exe) env.REDBRIDGE_EXE = b.exe;
+    const runtime = bridgeInstall.dotnet10(settings.bridgeTest === 'clean');
+    if (runtime && !runtime.machine) env.DOTNET_ROOT = runtime.root;
+    return env;
+  },
+  // hack_new, hack_edit, hack_script, hack_pack and hack_try ask first.
+  reads: new Set(['hack_find', 'hack_describe', 'hack_effects']),
+  version: VERSION,
+  log,
+  ended: () => bridgeShare.revoke('EDGEhack'),
+});
+
+const ATTACHED = [edgemat, edgehack];
+// Whether an assistant sees an attached server's tools: in-game ones always, desktop ones by its
+// setting ("edgematTools" or "edgehackTools": "all"). Without a server, whether it sees any.
+const seesAttached = (who, a) => who?.kind === 'package' || (a ? settings[`${a.id}Tools`] === 'all' : ATTACHED.some((x) => settings[`${x.id}Tools`] === 'all'));
 
 // ---------- getting REDbridge from the Mod Manager (W3) ----------
 
@@ -4580,7 +4629,7 @@ async function callModTool(who, pkg, fn, input) {
   const t = allModTools().find((x) => x.pkg === pkg && x.fn.name === fn);
   if (!t) throw new Error(`${pkg} offers no tool "${fn}" now`);
   if (t.off) throw new Error(`The player switched ${t.pkgName}'s ${fn} off for assistants (Tools Manager)`);
-  if (t.attached && !seesAttached(who)) throw new Error(`${t.pkgName}'s tools are for in-game assistants`);
+  if (t.attached && !seesAttached(who, t.attached)) throw new Error(`${t.pkgName}'s tools are for in-game assistants`);
   const started = Date.now();
   const record = { at: started, assistant: who.name, tool: `${pkg}__${fn}`, pkg, fn, ok: false, ms: 0, detail: '' };
   toolCalls.push(record);
@@ -4688,12 +4737,12 @@ function mcpHost() {
     log,
     version: VERSION,
     // SV3: packages' tools that are switched on, their calls, REDnode's own switches, the assistants.
-    modTools: (who) => allModTools().filter((x) => !x.off && (!x.attached || seesAttached(who))),
+    modTools: (who) => allModTools().filter((x) => !x.off && (!x.attached || seesAttached(who, x.attached))),
     callModTool,
     // Before a request is answered: an assistant that sees the attached servers' tools waits
     // for them to start, the first time, so its tool list has them (E1).
     prepare: async (who) => {
-      if (seesAttached(who)) await Promise.all(ATTACHED.map((a) => a.ready()));
+      await Promise.all(ATTACHED.filter((a) => seesAttached(who, a)).map((a) => a.ready()));
     },
     toolOff: (key) => toolKeyOff(key),
     seen: seenToken,

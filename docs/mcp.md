@@ -115,6 +115,28 @@ REDnode 0.45.0, REDagent 0.3.3 (its briefing knows the tools). REDagent needs it
 
 **First run, 2026-10-29: steps 1 to 5 passed** (dev PC, game 2.5, REDnode 0.45.0, REDagent 0.3.3), reported by the player: REDagent listed the tools, `mat_find` and `mat_describe` ran without asking, and the recolor asked first and wrote nothing on Deny. Step 6 passed later the same day, in a new game session, once REDagent had been asked for the tools first: the Tools Manager listed EDGEmat's group only after its server had started, which happens at an in-game assistant's first request. REDnode 0.45.1 starts it when the Tools Manager asks for its list. Step 7: the host log has `EDGEmat tools: edgemat 0.3.1 started in 133 ms, 10 tools`, the two switches, and no `server ended` before the quit. **E1 passed.**
 
+### EDGEhack's tools (H4.6)
+
+REDnode 0.63.0 runs [EDGEhack](https://edgemodders.github.io/EDGEhack/)'s MCP server for in-game assistants the same way, so REDagent can make and change quickhacks while the player plays and try them live. EDGEhack's phase H4.6, agreed with the owner on 2026-11-11 ([#45](https://github.com/Edgemodders/REDnode/issues/45)).
+
+| | |
+|---|---|
+| What ships | EDGEhack's server (`@edgemodders/edgehack-mcp`, MIT), one bundled file, in the host's `resources/edgehack` with its licence and notices. Until EDGEhack's first release puts it on npm, `tools/overlay/package-host.mjs` takes it from `EDGEHACK_MCP_DIR` or the sibling repo's `packages/edgehack-mcp` (built there); a build that finds none ships without it, and the host logs `EDGEhack tools: not shipped with this build` |
+| What it gets | The game folder (`EDGEHACK_GAME_PATH`), REDnode's shared REDbridge (#40: `REDNODE_BRIDGE_URL`, `REDNODE_BRIDGE_TOKEN`, a token per start), `REDBRIDGE_EXE` and a per-user .NET 10, beside the MCP SDK's safe variables, which include `LOCALAPPDATA`: EDGEhack's Desk and REDnode's `editor.json` are there |
+| Names | `edgehack__<tool>`, beside the packages' tools and in `mod_services` |
+| Reads, without asking | `hack_find`, `hack_describe`, `hack_effects` |
+| Ask first | `hack_new`, `hack_edit`, `hack_script`, `hack_pack`, `hack_try` |
+| No project | An in-game assistant has none open: a new quickhack goes on EDGEhack's Desk (`%LOCALAPPDATA%\EDGEhack\desk`), which EDGEhack in VS Code lists and adds to a project. A call can name a project (`project`) |
+| Try Live | `hack_try` reaches the game through REDnode's editor channel (#44) as the editor `EDGEhack`, so the first try waits for the player's **Allow** in the Editor request window |
+| Who sees them | In-game assistants. Desktop ones only with `"edgehackTools": "all"` in the host's `settings.json` (Claude Code gets EDGEhack through EDGEhack's Connect an Assistant, or EDGEchat). `"edgehackBridge": "own"` gives the server its own REDbridge |
+| Switches | The Tools Manager's group EDGEhack (`edgehack:<tool>`) |
+
+Checked outside the game on 2026-11-11 (scratchpad `h46/run.sh`, dev host, and `h46/run-packaged.sh`, the packaged host; 8 checks each, with the mock game, the real game folder and a scratch Desk): the eight tools listed through the kernel to a desktop assistant with `"edgehackTools": "all"`, EDGEmat's not; the five that change something with the ask flag, the three reads read-only; `hack_find` on Overheat in 12.3 s through the shared REDbridge (one REDbridge, `Shared REDbridge: first call from EDGEhack`); a quickhack made on the Desk and changed there.
+
+### EDGEhack's tools: test
+
+REDnode 0.63.0 with EDGEhack's server, REDagent 0.4.2 (its briefing knows the tools), game 2.5. REDagent needs its Anthropic key and the Claude Agent SDK, as before. EDGEhack in VS Code is only for step 7. The steps are in [docs/testing.md](testing.md#edgehacks-tools-for-redagent-h46).
+
 ### How `api_read` tells a read
 
 The game's own `const` flag cannot: in 2.31, 1,865 `const` functions are not getters (such as `SetAIRole` and `SendMinigameFailedToAllNPCs`), and two thirds of the functions named like getters are not `const`. So the name decides:

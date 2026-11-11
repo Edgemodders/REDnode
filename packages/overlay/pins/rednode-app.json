@@ -1,7 +1,7 @@
 {
   "id": "pins",
   "name": "World pins",
-  "version": "0.62.4",
+  "version": "0.63.0",
   "author": "Edgemodders",
   "description": "Draws the labels of the pins mods drop in the world (world.pin). Never shown itself: REDnode places its parts where each pin is.",
   "entry": "index.html",
