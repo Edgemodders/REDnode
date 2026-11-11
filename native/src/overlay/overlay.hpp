@@ -275,6 +275,10 @@ int OpusStepNow();
 void OpusFrameEnd(const OpusPlaces& aPlaces); // the audio thread, at the end of each frame
 OpusOutcome OpusTakeOutcome();                // done -> idle, with the result
 bool IsOpusMethod(const std::string& aMethod);
+// The game's on-screen text table (loctable.cpp): its load hooked at start, loc.table and loc.put.
+void AttachTextTableHook();
+bool IsLocTableMethod(const std::string& aMethod);
+std::string LocTable(const std::string& aMethod, const json::Value& aParams, std::string& aError);
 std::string Opus(const std::string& aMethod, const json::Value& aParams, std::string& aError);
 // The Sound Tracer's places (SP1), found by byte patterns next to the opus tables:
 //   postEvent  Wwise's PostEvent by id: uint32_t (event id, game object id, flags, callback,

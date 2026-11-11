@@ -73,6 +73,7 @@ void Start(RED4ext::v1::PluginHandle aHandle, const RED4ext::v1::Sdk* aSdk, cons
     g_handle = aHandle;
     g_sdk = aSdk;
     detail::StartFaults(aPluginDir);
+    detail::AttachTextTableHook();
     detail::StartLink();
     detail::StartHost(aPluginDir);
 }
