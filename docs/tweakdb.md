@@ -93,7 +93,7 @@ Use the **Test timer**: Start, then Mark after each step.
 
 ## T2: built
 
-**Text keys (REDnode 0.61.2).** A flat of the type `gamedataLocKeyWrapper`, such as an item's `displayName` or `localizedDescription`, takes a number, `"LocKey#27968"`, or a named key, `"LocKey#EDGEhack-mod-Name"` (a key from an `onscreens` file, turned into its number with FNV-1a 64 as TweakXL and ArchiveXL do), and reads back as `"LocKey#<number>"`. Before 0.61.2, `tweakdb.set` refused them with "cannot be set from JSON yet": found by EDGEhack's H4.1 Try Live spike on 2026-11-11. Whether a changed name shows on an item V already has is part of that spike.
+**Text keys (REDnode 0.61.2).** A flat of the type `gamedataLocKeyWrapper`, such as an item's `displayName` or `localizedDescription`, takes a number, `"LocKey#27968"`, or a named key, `"LocKey#EDGEhack-mod-Name"` (a key from an `onscreens` file, turned into its number with FNV-1a 64 as TweakXL and ArchiveXL do), and reads back as `"LocKey#<number>"`. Before 0.61.2, `tweakdb.set` refused them with "cannot be set from JSON yet": found by EDGEhack's H4.1 Try Live spike on 2026-11-11. Passed in game the same day with 0.61.2: a changed `displayName` showed in the inventory at once, and a quickhack item cloned and renamed live showed its new name.
 
 REDnode 0.20.0. How to use it: [Overlay apps: changing TweakDB](overlay-apps.md#changing-tweakdb).
 
