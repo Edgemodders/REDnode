@@ -4,11 +4,13 @@
 // Localization_LoadOnScreens (address hash 3550098299, the one Codeware hooks to merge its providers'
 // texts, also through RED4ext, so the two chain). REDnode keeps the table it returns, and:
 //
-//   loc.table   {}                  -> { caught, entries, loads }       what was caught, for the spike
-//   loc.put     { key, text }       -> { changed, added }
-//       key "LocKey#27962" (a number) or a secondary key "EDGEhack-mod-Name": the entries with that key
-//       get the text; a secondary key not in the table is added twice, under its FNV-1a 32 and 64
-//       numbers, as Codeware adds its providers' entries.
+//   loc.table   {}                  -> { attached, tables: [{ entries, path }], loads }   for the spike
+//   loc.put     { key, text }       -> { changed, added, tables }
+//       key "LocKey#27962" (a number) or a secondary key "EDGEhack-mod-Name": the entries with that key,
+//       in every table, get the text; a secondary key in none is added to the largest table (the base
+//       game's) twice, under its FNV-1a 32 and 64 numbers, as Codeware adds its providers' entries.
+// The game loads several tables at start (on game 2.5: 62,229, 7, 66 and 10,276 entries); every one is
+// kept, by its path.
 //
 // Unverified, for the spike: whether the game reads the table again for each name (so a change shows),
 // or keeps what it read at load.
@@ -21,6 +23,7 @@
 #include <cstdlib>
 #include <mutex>
 #include <string>
+#include <vector>
 
 namespace rednode::overlay::detail
 {
@@ -34,8 +37,12 @@ constexpr uint32_t LoadOnScreensHash = 3550098299;
 LoadTexts_t g_original = nullptr;
 bool g_attached = false;
 std::mutex g_mutex;
-RED4ext::Handle<Table> g_table;
-uint64_t g_path = 0;
+struct Kept
+{
+    uint64_t path;
+    RED4ext::Handle<Table> table;
+};
+std::vector<Kept> g_tables;
 int g_loads = 0;
 
 uint64_t LoadTextsDetour(RED4ext::Handle<Table>& aOut, RED4ext::ResourcePath aPath)
@@ -44,8 +51,15 @@ uint64_t LoadTextsDetour(RED4ext::Handle<Table>& aOut, RED4ext::ResourcePath aPa
     if (aOut)
     {
         std::scoped_lock lock(g_mutex);
-        g_table = aOut;
-        g_path = aPath.hash;
+        bool replaced = false;
+        for (auto& k : g_tables)
+            if (k.path == aPath.hash)
+            {
+                k.table = aOut;
+                replaced = true;
+            }
+        if (!replaced)
+            g_tables.push_back({aPath.hash, aOut});
         ++g_loads;
         Log("Text table: loaded %u entries (load %d)", aOut->entries.Size(), g_loads);
     }
@@ -86,10 +100,13 @@ std::string LocTable(const std::string& aMethod, const json::Value& aParams, std
     std::scoped_lock lock(g_mutex);
     if (aMethod == "loc.table")
     {
-        return std::string("{\"attached\":") + (g_attached ? "true" : "false") + ",\"caught\":" + (g_table ? "true" : "false") +
-               ",\"entries\":" + std::to_string(g_table ? g_table->entries.Size() : 0) + ",\"loads\":" + std::to_string(g_loads) + "}";
+        std::string out = std::string("{\"attached\":") + (g_attached ? "true" : "false") + ",\"tables\":[";
+        for (size_t i = 0; i < g_tables.size(); ++i)
+            out += (i ? "," : "") + std::string("{\"entries\":") + std::to_string(g_tables[i].table ? g_tables[i].table->entries.Size() : 0) +
+                   ",\"path\":\"" + std::to_string(g_tables[i].path) + "\"}";
+        return out + "],\"loads\":" + std::to_string(g_loads) + "}";
     }
-    if (!g_table)
+    if (g_tables.empty())
     {
         aError = "the game's text table was not caught (is REDnode's hook attached?)";
         return {};
@@ -109,17 +126,30 @@ std::string LocTable(const std::string& aMethod, const json::Value& aParams, std
     const uint64_t k32 = number ? 0 : RED4ext::FNV1a32(k.c_str());
     const uint64_t k64 = number ? 0 : RED4ext::FNV1a64(k.c_str());
     int changed = 0;
-    for (auto& e : g_table->entries)
+    std::string where;
+    Table* largest = nullptr;
+    for (auto& kept : g_tables)
     {
-        const bool hit = number ? e.primaryKey == primary : (e.primaryKey == k32 || e.primaryKey == k64 || k == e.secondaryKey.c_str());
-        if (!hit)
+        if (!kept.table)
             continue;
-        e.femaleVariant = RED4ext::CString(text->text.c_str());
-        e.maleVariant = RED4ext::CString(text->text.c_str());
-        ++changed;
+        if (!largest || kept.table->entries.Size() > largest->entries.Size())
+            largest = kept.table.GetPtr();
+        int here = 0;
+        for (auto& e : kept.table->entries)
+        {
+            const bool hit = number ? e.primaryKey == primary : (e.primaryKey == k32 || e.primaryKey == k64 || k == e.secondaryKey.c_str());
+            if (!hit)
+                continue;
+            e.femaleVariant = RED4ext::CString(text->text.c_str());
+            e.maleVariant = RED4ext::CString(text->text.c_str());
+            ++here;
+        }
+        if (here)
+            where += (where.empty() ? "" : ",") + std::to_string(kept.table->entries.Size());
+        changed += here;
     }
     int added = 0;
-    if (!changed && !number)
+    if (!changed && !number && largest)
     {
         for (const uint64_t p : {k32, k64})
         {
@@ -128,11 +158,12 @@ std::string LocTable(const std::string& aMethod, const json::Value& aParams, std
             e.secondaryKey = RED4ext::CString(k.c_str());
             e.femaleVariant = RED4ext::CString(text->text.c_str());
             e.maleVariant = RED4ext::CString(text->text.c_str());
-            g_table->entries.PushBack(e);
+            largest->entries.PushBack(e);
             ++added;
         }
+        where = std::to_string(largest->entries.Size());
     }
-    Log("Text table: put %s (%d changed, %d added)", key->text.c_str(), changed, added);
-    return "{\"changed\":" + std::to_string(changed) + ",\"added\":" + std::to_string(added) + "}";
+    Log("Text table: put %s (%d changed, %d added, in the table(s) of %s entries)", key->text.c_str(), changed, added, where.c_str());
+    return "{\"changed\":" + std::to_string(changed) + ",\"added\":" + std::to_string(added) + ",\"tables\":\"" + where + "\"}";
 }
 } // namespace rednode::overlay::detail
