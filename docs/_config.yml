@@ -49,6 +49,8 @@ nav:
     url: /tweakdb.html
   - title: Native game UI
     url: /ink.html
+  - title: Semi-native apps
+    url: /semi-native.html
   - title: Quest API
     url: /quests.html
   - title: Quickhack functions
