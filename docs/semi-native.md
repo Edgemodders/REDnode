@@ -11,6 +11,7 @@ A semi-native app is a REDnode app that looks and feels like part of the game's 
 | Shown by the game or by code | It appears on a game event (a click on one of the game's own ink buttons, a recipe selected in the crafting menu, a menu opening) or when a mod's own code shows it. It is never one of the F10 overlay's windows |
 | One cursor, where the game has one | On the game's screens with a cursor (the pause menu, the main menu, the inventory, the crafting bench): while the cursor is outside the app it belongs to the game, and when it crosses into the app the app gets it, with no F10 or key, and the cursor looks the same all the way |
 | Mapped inputs in the world | In gameplay there is no cursor, as in the game itself. A key or button (or another trigger) shows the app, and while it shows it answers its own mapped keys and controller buttons, the way the game's quickhack wheel and interaction prompts do |
+| Input is optional | An app need not take any input at all: a holocall, a video, a visual effect only shows. Taking input is something an app asks for (the cursor on game screens, mapped keys in the world). An app that asks for none never stops the cursor or a key from reaching the game, so its clicks pass straight through, as a HUD widget's do |
 | The game's look | Its elements look exactly like the game's ink: the same colors, text, frames and cursor. It can use REDnode's ink markup (`.ink.html`) drawn in HTML |
 | More than ink can do | Being a web page, it can also draw anything ink cannot: three.js scenes, canvas animation, video, mini-games, holocalls |
 | Managed like any package | It is listed in the Mod Manager, switched on and off and given permissions there, and its logs, debugger and hot reload work like any other package's |
@@ -92,6 +93,8 @@ There are three ways to draw it, in the order to try:
 | **C. Draw the app under the game's cursor** | Composite the app between the game's other ink layers and its cursor layer, so the game's cursor is drawn on top by the game | The real cursor, perfect | Means hooking the game's UI render order. Research only, and likely too deep |
 
 ### Input
+
+All of this applies only to an app that asks for input. An app that asks for none (a holocall, a video, an effect) takes nothing from the game, wherever it shows.
 
 | While | Mouse movement | Buttons and wheel | Keys |
 |---|---|---|---|
