@@ -1866,3 +1866,41 @@ The plugin's cost lines, each over 1,800 frames with 10 or 11 pins:
 
 1 to 4 pins were behind a wall at each line. No errors in the plugin's or the host's log, and the game quit cleanly. WP3 (the Pins window) is next.
 
+
+### WP3: build
+
+Built in REDnode 0.64.0 on 2026-11-13.
+
+| Part | Where | What |
+|---|---|---|
+| The Pins window | `packages/overlay/pinwindow` (built in, id `pinwindow`, a tool window) | Every pin, nearest first, with its colour, where it comes from (a set, a mod, an assistant), its distance and **Go there**; a filter; **Drop a pin here** with a name box (Enter drops too); the switches **Click a pin to go there** (off by default) and **Hide all**. The **Sets** tab: the player's sets, each shown or hidden, the one in use for drops (**USE** / **IN USE**), **New set**, **Open** a `.pins.json` file by its full path (Windows' Copy as path quotes are taken off), ✕ to take one off the list (its file stays). ✕ on a set's pin removes it from the set and its file. Resizable |
+| The player's sets | `packages/overlay/pinsets.js` (in package-host.mjs's list) | One set per `.pins.json` file (`"format": "rednode-pins"`, version 1, places, titles, text, own style; a pin that follows an entity is saved at its place). Sets the player makes live in the host's data folder (`%APPDATA%\@rednode\overlay\pins`); one opened from elsewhere stays there. `settings.pinSets` keeps the list, which are shown, the one in use and the switches. Their pins belong to `set:<file>`, are shown again at the host's start and stay when a game session ends; a drop adds only the new pin, so the others keep their ids |
+| Go there | main.js (`goToPin`) | V on the ground beside the pin, 2.5 m from it on the side V comes from, facing it, through the game's teleportation facility. A pin that follows an entity is gone to where it was last seen |
+| Click a pin | pins.cpp (`PinAt`, `NotePinsShown`), windows.cpp, compositor.cpp | `"clicks": true` on `pins.set`: each frame the plugin keeps where every label, post (at least 16 px wide) and edge arrow was drawn. In interactive mode a left press that no window takes, on a pin's piece, sends the host `{"event":"pin-click","pin":N}` and the overlay stays interactive; the host moves V there when the switch is on. Nothing is clickable while the pins are hidden (menus, photo mode, hidden mode) |
+| Hide all | pins.js (`options`) | Every pin hidden from the plugin, kept in the host; the list shows them dimmed |
+| Package | world.ts | `world.goTo(id)`; `world.pinSet.save(file, { set?, title? })`, `.load(file, name?)`, `.show(name, on)`, `.remove(name)`: a file name without a folder is in `pkg.dataDir` (a relative path may not leave it), any path must end in `.pins.json`; loading a set again replaces it; `world.pins()` gives each pin's `set` and `hidden` |
+| Docs simulation | `docs/assets/examples/sim/rednode.js` | `world.goTo` moves the simulated V; `world.pinSet` keeps its files in memory |
+
+Checked: the plugin builds and every native test passes; the mock game (scratchpad `wp3/check.mjs`, its stand-in plugin `wp3/mock.mjs` answering teleports and sending clicks through a control file, the scratch mod `wp3/apps/pin-check3`): 43 checks of `pinSet` (save, load, replace, show, remove, four refusals), `goTo` (place and yaw), the window's drop into a new My pins set, a drop with no name, clicks off and on, Go there, Hide all, a set hidden and shown, ✕ from a set's file, a new set in use, Open from another folder, forget, the window's calls refused from another page, the session's end keeping only the player's sets, and the settings kept. The mock found that the first click event named the pin `id`, which the host reads as a request's answer: it is `pin`. Unverified until the game: where the teleport lands on slopes and roofs, and clicks on pins in the real compositor.
+
+### WP3 test
+
+In the game, with REDnode's Console. A loaded save, outdoors on open ground.
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | Press **F10**, switch on **Pins** in the launcher | The Pins window opens on the right: "No pins yet" |
+| 2 | Type `Start` in its name box and press **Drop a pin here** | A cyan pin at V's feet, listed as **Start**, "Set: My pins", 0 to 3 m. The **Sets** tab shows My pins, **IN USE**, 1 pin |
+| 3 | Walk about 50 m away, type `Corner` and press **Enter** | A second pin; both distances follow you each second |
+| 4 | In the **Console** (switch it on in the launcher), run `const here = await game.player.position(); await world.pin({ at: { x: here.x + 30, y: here.y, z: here.z }, title: 'Console pin', style: { color: '#ff4fd8' } })` | A pink pin 30 m away, listed "From Console", with no ✕ |
+| 5 | Press **Go there** on **Start** | V stands beside the Start pin, about 2.5 m from it, facing it |
+| 6 | Switch on **Click a pin to go there**. With the overlay interactive, click the **Corner** label in the world, then the pink pin's post | V goes beside Corner, then beside the Console pin; the overlay stays interactive after each. A click on empty screen gives the game the mouse back, as before |
+| 7 | Switch **Hide all** on, then off | Every pin leaves the world (the list dims them), then comes back |
+| 8 | On the **Sets** tab, type `Scene B` and press **New set**. Back on **Pins**, drop `B1` | Scene B is **IN USE**; B1 is listed "Set: Scene B" |
+| 9 | On **Sets**, switch **My pins** off, then on | Start and Corner leave the world and the list, then come back |
+| 10 | Press ✕ on **Corner** | It is gone; Sets shows My pins with 1 pin |
+| 11 | In the Console, run `const s = await world.pinSet.save('console.pins.json'); ui.copy(s.file); s`. On **Sets**, paste into the path box (Ctrl+V) and press **Open** | The answer names the file in the Console's data folder. Opening it lists a set "console" with 1 pin, and a second pink Console pin shows at the same place |
+| 12 | Load a save (or quit to the main menu and load) | The Console's own pin is gone (the session ended); My pins, Scene B and console come back with their pins |
+| 13 | Quit the game, start it again, load a save, open **Pins** | The sets and the switches are as you left them, the shown sets' pins in the world |
+
+Claude then reads the host's `Pins:` lines (drops, Go there, clicks) and the plugin's log.

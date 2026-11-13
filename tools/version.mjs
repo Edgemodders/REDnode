@@ -44,6 +44,7 @@ const PARTS = [
   { name: 'Key request', ...json('packages/overlay/keyask/rednode-app.json') },
   { name: 'Editor request', ...json('packages/overlay/editorask/rednode-app.json') },
   { name: 'World pins', ...json('packages/overlay/pins/rednode-app.json') },
+  { name: 'Pins window', ...json('packages/overlay/pinwindow/rednode-app.json') },
   { name: 'Console', ...json('packages/overlay/console/rednode-app.json') },
   { name: 'Plugin README', ...pattern('native/README.md', /(\(version: )([0-9][^,]*)(,)/) },
 ];

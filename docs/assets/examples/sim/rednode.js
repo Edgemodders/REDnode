@@ -595,6 +595,7 @@ const worldListeners = new Map(); // event name -> Set
 const entities = new Map();
 const pins = new Map();
 let nextPin = 1;
+const pinFiles = new Map(); // WP3: world.pinSet's files, by name
 const PIN_STYLE = Object.freeze({ color: '#19f3ff', font: null, titleSize: 18, textSize: 14, pinHeight: 3, scale: 'fit', minScreenSize: 0.45 });
 function worldEvent(name, e) {
   for (const fn of worldListeners.get(name) ?? []) fn({ name, ...e });
@@ -689,8 +690,45 @@ export const world = {
     const place = [at.x, at.y, at.z].every(Number.isFinite) ? { x: at.x, y: at.y, z: at.z } : hash ? entities.get(hash)?.position ?? null : null;
     if (!hash && !place) throw new Error('world.pin needs at: a place { x, y, z } in metres, or an entity id { hash } to follow');
     const id = nextPin++;
-    pins.set(id, { id, owner: 'preview', at: place, entity: hash ? { hash } : null, title, text: options.text ?? '', style: { ...PIN_STYLE, ...(options.style ?? {}) } });
+    pins.set(id, { id, owner: 'preview', at: place, entity: hash ? { hash } : null, title, text: options.text ?? '', style: { ...PIN_STYLE, ...(options.style ?? {}) }, set: options.set ?? null, hidden: false });
     return id;
+  },
+  // WP3: V moves beside the pin; sets live in the preview's memory, by file name.
+  async goTo(id) {
+    const p = pins.get(Number(id));
+    if (!p) throw new Error(`No pin ${id}`);
+    if (!p.at) throw new Error(`${p.title}: its entity has not been found yet, so its place is not known`);
+    const to = { x: p.at.x, y: p.at.y - 2.5, z: p.at.z, yaw: 0 };
+    await game.player.teleport(to);
+    return to;
+  },
+  pinSet: {
+    async save(file, options = {}) {
+      if (!String(file).toLowerCase().endsWith('.pins.json')) throw new Error(`${file}: a pin set's file ends in .pins.json`);
+      const list = [...pins.values()].filter((p) => p.at && (!options.set || p.set === options.set));
+      const name = options.set ?? options.title ?? String(file).replace(/^.*[\\/]/, '').slice(0, -10);
+      pinFiles.set(String(file), { name, pins: list.map((p) => ({ title: p.title, text: p.text, at: { ...p.at } })) });
+      return { file: String(file), name, count: list.length };
+    },
+    async load(file, name) {
+      const f = pinFiles.get(String(file));
+      if (!f) throw new Error(`${file} was not found`);
+      const set = name ?? f.name;
+      for (const p of [...pins.values()]) if (p.set === set) pins.delete(p.id);
+      const ids = [];
+      for (const p of f.pins) ids.push(await world.pin({ ...p, set }));
+      return { name: set, ids, file: String(file) };
+    },
+    async show(name, on = true) {
+      let n = 0;
+      for (const p of pins.values()) if (p.set === name) (p.hidden = !on), n++;
+      return n;
+    },
+    async remove(name) {
+      let n = 0;
+      for (const p of [...pins.values()]) if (p.set === name) pins.delete(p.id), n++;
+      return n;
+    },
   },
   async unpin(id) {
     return pins.delete(Number(id));

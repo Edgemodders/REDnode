@@ -15,6 +15,8 @@ How to keep it:
 
 - EDGEhack's tools for in-game assistants (EDGEhack, the quickhack editor): REDagent can find and describe the game's quickhacks, make new ones, change their costs, texts and effects, write their scripts and try them live, as `edgehack__hack_*`. Its quickhacks go on EDGEhack's Desk unless a project is named. The reads run at once; every change asks the player first. EDGEhack's server shares REDnode's REDbridge. Docs: https://edgemodders.github.io/REDnode/mcp.html#edgehacks-tools-h46
 - A filter box at the top of the launcher: type part of a name to find any installed package, pinned to the launcher or not, names starting with it first.
+- The **Pins** window (World pins, #43): every pin in the world, nearest first, with its distance and **Go there**, which moves V beside it, facing it. **Drop a pin here** puts a named pin at V's feet. Your pins go in sets, each a `.pins.json` file you can show or hide, make new, or open from a mod project; they come back each time the game starts. **Click a pin to go there** (off by default) moves V to a pin you click while the overlay is interactive, and **Hide all** hides every pin. Docs: https://edgemodders.github.io/REDnode/world.html#wp3-build
+- `world.goTo(id)` moves V beside a pin; `world.pinSet.save`, `load`, `show` and `remove` keep a package's pins in `.pins.json` files, the same files the Pins window opens. `world.pins()` now gives each pin's `set` and `hidden`.
 
 **Changed**
 

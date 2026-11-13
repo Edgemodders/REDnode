@@ -1,0 +1,18 @@
+{
+  "id": "pinwindow",
+  "name": "Pins",
+  "version": "0.64.0",
+  "author": "Edgemodders",
+  "description": "Every pin in the world with its distance and Go there; Drop a pin here where V stands; your own pin sets, saved as files, shown or hidden; Click a pin to go there.",
+  "entry": "index.html",
+  "kind": "window",
+  "width": 560,
+  "height": 520,
+  "resizable": true,
+  "minWidth": 440,
+  "minHeight": 340,
+  "anchor": "right",
+  "x": -16,
+  "y": 0,
+  "open": false
+}

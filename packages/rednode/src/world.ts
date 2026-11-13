@@ -207,6 +207,37 @@ export interface PinEntry {
   height: number;
   /** Metres from the camera, or null before REDnode has read the camera. */
   distance: number | null;
+  /** The set it was loaded in with {@link world.pinSet}, or null. */
+  set: string | null;
+  /** Hidden with its set ({@link world.pinSet}'s `show`). */
+  hidden: boolean;
+}
+
+/** Where {@link world.goTo} put V. */
+export interface GoToResult {
+  x: number;
+  y: number;
+  z: number;
+  /** The way V faces, in degrees (0 faces +Y). */
+  yaw: number;
+}
+
+/** What {@link world.pinSet}'s `save` wrote. */
+export interface PinSetSaved {
+  /** The file's full path. */
+  file: string;
+  /** The set's name in the file. */
+  name: string;
+  count: number;
+}
+
+/** What {@link world.pinSet}'s `load` added. */
+export interface PinSetLoaded {
+  /** The set's name: the one given, or the file's own. */
+  name: string;
+  /** The new pins' ids, in the file's order. */
+  ids: number[];
+  file: string;
 }
 
 /** A label for what {@link world.spawn} or {@link world.load} spawns: a pin that goes with the entity. */
@@ -554,6 +585,58 @@ export const world = {
   /** Removes every pin of this package. Answers how many there were. */
   async clearPins(): Promise<number> {
     return (await transport().call("pins.clear", {})) as number;
+  },
+
+  /**
+   * Moves V beside a pin, on the side V comes from and facing it, as the Pins window's
+   * **Go there** does. Any pin may be gone to, a package's own or not. A pin that follows an
+   * entity is gone to where the entity was last seen.
+   *
+   * @example
+   * ```ts
+   * const [first] = await world.pins();
+   * if (first) await world.goTo(first.id);
+   * ```
+   */
+  async goTo(id: number): Promise<GoToResult> {
+    return (await transport().call("pins.goTo", { id })) as GoToResult;
+  },
+
+  /**
+   * Sets of pins kept in `.pins.json` files, the same files the player's Pins window opens.
+   * A file holds places, titles, text and looks; a pin that follows an entity is saved at the
+   * place it had. A file name without a folder is in the package's data folder (`pkg.dataDir`).
+   *
+   * Loaded pins belong to the package, as any it drops, and go when it stops.
+   *
+   * @example
+   * ```ts
+   * await world.pin({ at: here, title: "Stairs" });
+   * await world.pinSet.save("spots.pins.json");                 // every pin of this package
+   * const { ids } = await world.pinSet.load("spots.pins.json", "Spots");
+   * await world.pinSet.show("Spots", false);                    // hide them, keep them
+   * ```
+   */
+  pinSet: {
+    /**
+     * Writes this package's pins to a `.pins.json` file: those of one set when `set` is given,
+     * else every one. `title` names the set in the file when no set is given.
+     */
+    async save(file: string, options: { set?: string; title?: string } = {}): Promise<PinSetSaved> {
+      return (await transport().call("pins.saveSet", { file, name: options.set, title: options.title })) as PinSetSaved;
+    },
+    /** Drops a file's pins as a set of this package's, named `name` or the file's own name. Loading the same set again replaces it. */
+    async load(file: string, name?: string): Promise<PinSetLoaded> {
+      return (await transport().call("pins.loadSet", { file, name })) as PinSetLoaded;
+    },
+    /** Shows or hides one of this package's sets, keeping its pins. Answers how many pins it has. */
+    async show(name: string, on = true): Promise<number> {
+      return (await transport().call("pins.showSet", { name, on })) as number;
+    },
+    /** Removes one of this package's sets. Answers how many pins it had. */
+    async remove(name: string): Promise<number> {
+      return (await transport().call("pins.clear", { set: name })) as number;
+    },
   },
 
   /** This package's spawns that are still listed: what each was spawned with, and its scene. */

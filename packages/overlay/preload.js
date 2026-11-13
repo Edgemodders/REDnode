@@ -130,6 +130,14 @@ contextBridge.exposeInMainWorld('rednode', {
   },
   /** The Key request window (#23, K3): a package's ask for a shared key, and the player's answer. Built-in only. */
   /** The world pins' page (#43, built in): the labels to draw, and where it drew each piece. */
+  /** The Pins window (#43, WP3, built in): every pin, Drop a pin here, Go there, the player's sets. */
+  pinWindow: {
+    state: () => ipcRenderer.invoke('rednode:pinwindow:state'),
+    drop: (o) => ipcRenderer.invoke('rednode:pinwindow:drop', o),
+    go: (id) => ipcRenderer.invoke('rednode:pinwindow:go', id),
+    remove: (id) => ipcRenderer.invoke('rednode:pinwindow:remove', id),
+    sets: (op, a, b) => ipcRenderer.invoke('rednode:pinwindow:sets', op, a, b),
+  },
   pins: {
     current: () => ipcRenderer.invoke('rednode:pins:current'),
     layout: (l) => ipcRenderer.invoke('rednode:pins:layout', l),

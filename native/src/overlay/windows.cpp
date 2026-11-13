@@ -811,7 +811,15 @@ void OnMouseButton(bool aDown, const char* aButton)
             const Hit hit = HitTest(g_mouseX, g_mouseY);
             Log("Overlay: press at %.0f,%.0f went to window %u; under it:%s", g_mouseX, g_mouseY,
                 hit.window ? hit.window->id : 0u, DescribePoint(g_mouseX, g_mouseY).c_str());
-            if (!hit.window)
+            const uint32_t pin = !hit.window && std::string_view(aButton) == "left" ? PinAt(g_mouseX, g_mouseY) : 0;
+            if (pin)
+            {
+                // WP3: a pin's label or post, with clicks switched on in the Pins window. The
+                // overlay stays interactive; the host decides what the click does.
+                SetFocus(actions, 0);
+                Send(actions, "{\"event\":\"pin-click\",\"pin\":" + std::to_string(pin) + "}");
+            }
+            else if (!hit.window)
             {
                 // Empty screen: give input back to the game.
                 SetFocus(actions, 0);

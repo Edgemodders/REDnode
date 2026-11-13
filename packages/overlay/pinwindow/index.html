@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pins</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<style>
+  /* The window is resizable: the page follows its size. */
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: transparent; }
+  rn-window { position: absolute; inset: 0; }
+  rn-tabs { flex: 1; min-height: 0; }
+  rn-tab[active] { display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .row rn-input { flex: 1; min-width: 0; }
+  .small rn-button::part(button), rn-button.small::part(button) { min-height: 26px; padding: 3px 10px; font-size: 12px; }
+  .switches { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+  .switches rn-toggle { flex: 0 0 auto; }
+  .list { flex: 1; min-height: 60px; overflow-y: auto; border: 1px solid var(--rn-line); background: var(--rn-panel); }
+  .pin, .set { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto auto; align-items: center; gap: 4px 10px;
+    padding: 7px 10px; border-bottom: 1px solid var(--rn-line); }
+  .set { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 6px currentColor; background: currentColor; }
+  .title { font: 700 14px var(--rn-display); letter-spacing: .05em; text-transform: uppercase;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sub { font: 11px var(--rn-mono); color: var(--rn-dim); letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sub.err { color: var(--rn-danger); white-space: normal; }
+  .dist { font: 600 12px var(--rn-mono); color: var(--rn-accent-2); min-width: 54px; text-align: right; }
+  .pin.hidden .title, .pin.hidden .dist { opacity: .5; }
+  .x { all: unset; cursor: pointer; color: var(--rn-dim); font-size: 14px; padding: 0 4px; }
+  .x:hover { color: var(--rn-danger); }
+  .x[disabled] { visibility: hidden; }
+  .current { font: 700 10px var(--rn-mono); letter-spacing: .1em; color: var(--rn-on-accent); background: var(--rn-accent); padding: 1px 5px; }
+  .use { all: unset; cursor: pointer; font: 600 10px var(--rn-mono); letter-spacing: .1em; color: var(--rn-dim); border: 1px solid var(--rn-line); padding: 1px 5px; }
+  .use:hover { color: var(--rn-fg); }
+  .empty { padding: 14px 10px; color: var(--rn-dim); font-size: 14px; }
+  .note { font-size: 12px; color: var(--rn-dim); line-height: 1.35; }
+  .status { font: 11px var(--rn-mono); letter-spacing: .08em; color: var(--rn-dim); }
+  .label { font: 600 11px var(--rn-mono); letter-spacing: .1em; color: var(--rn-dim); text-transform: uppercase; }
+</style>
+</head>
+<body>
+  <rn-window title="Pins" draggable closable>
+    <span class="status" slot="status" id="count">0 PINS</span>
+    <rn-tabs id="tabs">
+      <rn-tab label="Pins">
+        <div class="row small">
+          <rn-input id="title" placeholder="Name for a pin where V stands"></rn-input>
+          <rn-button id="drop" title="Drops a pin at V's feet, in the set marked IN USE on the Sets tab">Drop a pin here</rn-button>
+        </div>
+        <div class="row small">
+          <rn-input id="filter" placeholder="Filter pins..." clearable></rn-input>
+        </div>
+        <div class="list" id="pins"></div>
+        <div class="switches">
+          <rn-toggle id="clicks" label="Click a pin to go there"></rn-toggle>
+          <rn-toggle id="hideAll" label="Hide all"></rn-toggle>
+        </div>
+        <div class="note" id="clicksNote" hidden>Clicks reach pins only while the overlay is interactive (F10). A click on a pin's label or post moves V beside it.</div>
+      </rn-tab>
+      <rn-tab label="Sets">
+        <div class="note">A set is a file of pins (.pins.json). Drop a pin here adds to the set in use. Sets you open from elsewhere, such as a mod project, stay where they are.</div>
+        <div class="row small">
+          <rn-input id="newName" placeholder="Name of a new set"></rn-input>
+          <rn-button id="create" variant="ghost">New set</rn-button>
+        </div>
+        <div class="row small">
+          <rn-input id="openPath" placeholder="Full path of a .pins.json file"></rn-input>
+          <rn-button id="open" variant="ghost">Open</rn-button>
+        </div>
+        <div class="list" id="sets"></div>
+      </rn-tab>
+    </rn-tabs>
+  </rn-window>
+<script src="app.js"></script>
+</body>
+</html>

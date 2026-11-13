@@ -13,6 +13,8 @@
 // arrows (one set per colour); "scale" is fit, world or screen (pins.hpp's SizeFor); "entity" makes
 // the pin follow that entity, with "at" its first place if known (no "at": not drawn until found).
 // An empty "pins" clears them. WP1's form, with "post" and "arrows" at the top, is still read.
+// WP3: "clicks":true makes the pins clickable in the overlay's interactive mode: a left press on a
+// label or post that no window covers sends the host {"event":"pin-click","pin":N} (never "id": the host reads that as an answer).
 //
 // On the game thread, each frame with pins, the plugin reads the active camera, finds where the
 // followed entities are (up to FollowsPerFrame a frame), and casts rays from the camera to a few
@@ -24,6 +26,7 @@
 
 #include "pins.hpp"
 
+#include "json.hpp"
 #include "jvalue.hpp"
 #include "overlay.hpp"
 
@@ -81,6 +84,16 @@ float g_margin = 28, g_postMin = 36, g_postMax = 420;
 pins::Camera g_cam;
 bool g_camError = false; // logged once a session
 size_t g_followCursor = 0;
+
+// WP3: where each pin was drawn in the last frame, for clicks (reference pixels, farthest first).
+struct PinHit
+{
+    uint32_t id;
+    float x, y, w, h;
+};
+std::vector<PinHit> g_hits;
+bool g_clicks = false;
+bool g_hitsShown = false;
 
 // Cost, for the log line every CostLogEvery frames.
 double g_readUs = 0, g_placeUs = 0, g_followUs = 0, g_castUs = 0;
@@ -245,6 +258,7 @@ bool HandlePinsCommand(const std::string& aJson)
         g_postMin = float(m->number);
     if (const json::Value* m = v.Get("postMax"); m && m->kind == json::Value::Kind::Number)
         g_postMax = float(m->number);
+    g_clicks = json::Bool(aJson, "clicks", false);
     if (g_pins.empty())
         g_cam.valid = false;
     if (had != !g_pins.empty())
@@ -482,6 +496,7 @@ uint32_t CollectPinDraws(float aWidth, float aHeight, std::vector<PinDraw>& aOut
 {
     const auto start = std::chrono::steady_clock::now();
     std::scoped_lock lock(g_pinsMutex);
+    g_hits.clear();
     if (g_pins.empty() || !g_cam.valid || !g_atlas || g_styles.empty())
         return 0;
 
@@ -525,6 +540,13 @@ uint32_t CollectPinDraws(float aWidth, float aHeight, std::vector<PinDraw>& aOut
             lx = std::clamp(lx, 0.0f, std::max(0.0f, aWidth - lw));
             ly = std::clamp(ly, 0.0f, std::max(0.0f, aHeight - lh));
             AddDraw(aOut, pin->label, lx, ly, lw, lh, alpha);
+            if (g_clicks)
+            {
+                // The post's thin line is hard to hit: at least 16 px wide.
+                const float hw = std::max(postW, 16.0f);
+                g_hits.push_back({pin->id, sx - hw * 0.5f, sy - size.postPx, hw, size.postPx});
+                g_hits.push_back({pin->id, lx, ly, lw, lh});
+            }
         }
         else
         {
@@ -545,6 +567,11 @@ uint32_t CollectPinDraws(float aWidth, float aHeight, std::vector<PinDraw>& aOut
             ly = std::clamp(ly, 0.0f, std::max(0.0f, aHeight - lh));
             AddDraw(aOut, arrow, ax, ay, arrow.w, arrow.h, 1);
             AddDraw(aOut, pin->label, lx, ly, lw, lh, 1);
+            if (g_clicks)
+            {
+                g_hits.push_back({pin->id, ax, ay, arrow.w, arrow.h});
+                g_hits.push_back({pin->id, lx, ly, lw, lh});
+            }
         }
     }
     g_placeUs += MicrosSince(start);
@@ -553,9 +580,29 @@ uint32_t CollectPinDraws(float aWidth, float aHeight, std::vector<PinDraw>& aOut
     return g_atlas;
 }
 
+void NotePinsShown(bool aShown)
+{
+    std::scoped_lock lock(g_pinsMutex);
+    g_hitsShown = aShown;
+}
+
+uint32_t PinAt(float aX, float aY)
+{
+    std::scoped_lock lock(g_pinsMutex);
+    if (!g_clicks || !g_hitsShown)
+        return 0;
+    // The nearest pins were drawn last, on top: they win.
+    for (auto it = g_hits.rbegin(); it != g_hits.rend(); ++it)
+        if (aX >= it->x && aY >= it->y && aX < it->x + it->w && aY < it->y + it->h)
+            return it->id;
+    return 0;
+}
+
 void ClearPins()
 {
     std::scoped_lock lock(g_pinsMutex);
+    g_hits.clear();
+    g_clicks = false;
     g_pins.clear();
     g_styles.clear();
     g_atlas = 0;

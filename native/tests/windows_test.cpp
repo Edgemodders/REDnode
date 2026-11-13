@@ -51,6 +51,10 @@ uint64_t NowMs()
 {
     return g_now;
 }
+uint32_t PinAt(float, float)
+{
+    return 0; // no world pins here (pins.cpp, #43)
+}
 } // namespace detail
 } // namespace rednode::overlay
 

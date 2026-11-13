@@ -1354,6 +1354,7 @@ void RenderFrame(IDXGISwapChain* aSwapChain)
         const uint32_t atlas = CollectPinDraws(float(g.width) / scale, ReferenceHeight, g_pinDraws);
         // Only while the atlas window is shown: it hides with the game's menus and photo mode.
         const bool shown = atlas && std::any_of(views.begin(), views.end(), [&](const WindowView& v) { return v.id == atlas; });
+        NotePinsShown(shown);
         GpuWindow* w = shown ? FindGpu(atlas) : nullptr;
         if (w && w->texReady && w->texWidth && w->texHeight)
         {

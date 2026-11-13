@@ -31,6 +31,7 @@ const zlib = require('node:zlib');
 const { createOAuth } = require('./oauth');
 const { createServices } = require('./services');
 const { createPins } = require('./pins');
+const { createPinSets, readPinFile, writePinFile, pinFileOf } = require('./pinsets');
 const { scanGame, checkRequires, validRange, key: gamefilesKey } = require('./gamefiles');
 const { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED } = require('./redbridge');
 const bridgeInstall = require('./bridge-install');
@@ -80,6 +81,8 @@ const BUILTIN_ROOTS = [
   { dir: path.join(__dirname, 'editorask'), single: true, builtin: true, prompt: true },
   // World pins (#43): the hidden page that draws the pins' labels, open while any pin is dropped.
   { dir: path.join(__dirname, 'pins'), single: true, builtin: true, pins: true },
+  // The Pins window (#43, WP3): every pin, Drop a pin here, Go there, the player's pin sets.
+  { dir: path.join(__dirname, 'pinwindow'), single: true, builtin: true },
   // The Console (O12): a page and a Node mod. Packaged, it sits outside app.asar, in
   // resources/, so its mod's worker thread loads it as plain files.
   { dir: app.isPackaged ? path.join(process.resourcesPath, 'console') : path.join(__dirname, 'console'), single: true, builtin: true },
@@ -1655,6 +1658,9 @@ function onGameMessage(m) {
     case 'pins.camera':
       pinsHost.camera(m);
       return;
+    case 'pin-click':
+      onPinClick(m);
+      return;
     case 'sound-end':
       onSoundEnd(m);
       return;
@@ -1896,8 +1902,16 @@ async function packageCallNow(id, method, params) {
   if (method === 'pins.add') return pinsHost.add(id ?? null, params);
   if (method === 'pins.remove') return pinsHost.remove(id ?? null, params?.id);
   if (method === 'pins.list') return pinsHost.list(params?.all ? null : id ?? null);
-  if (method === 'pins.clear') return pinsHost.clear(id ?? null);
+  if (method === 'pins.clear') return pinsHost.clear(id ?? null, params?.set ? String(params.set) : undefined);
   if (method === 'pins.style') return pinsHost.restyle(id ?? null, params?.id, params?.style);
+  // WP3: V to a pin, and a package's own sets of pins in .pins.json files.
+  if (method === 'pins.goTo') return goToPin(params?.id);
+  if (method === 'pins.saveSet') return savePinSet(id, params);
+  if (method === 'pins.loadSet') return loadPinSet(id, params);
+  if (method === 'pins.showSet') {
+    if (!params?.name) throw new Error('world.pinSet.show needs the set\'s name');
+    return pinsHost.showSet(id ?? null, String(params.name), params.on !== false);
+  }
   if (method === 'tweakdb.set' && id && params?.path) {
     const path = String(params.path);
     if (!tweakJournal.has(id)) tweakJournal.set(id, new Map());
@@ -3103,9 +3117,150 @@ const pinsHost = createPins({
   toPage: (w, m) => toPage(w, m),
 });
 function checkPins() {
-  const owners = new Set(pinsHost.list(null).map((p) => p.owner).filter(Boolean));
+  // The player's sets ("set:<file>") belong to no package.
+  const owners = new Set(pinsHost.list(null).map((p) => p.owner).filter((o) => o && !o.startsWith('set:')));
   for (const id of owners) if (!packageRunning(id)) pinsHost.gone(id, 'the package stopped');
 }
+
+// The player's pin sets (WP3), shown in the Pins window and kept across starts.
+const pinSets = createPinSets({
+  pinsHost,
+  dir: dataFile('pins'),
+  getSettings: () => settings,
+  save: () => writeJson('settings.json', settings),
+  log: (t) => log(t),
+});
+
+// Game calls with the references they hand out let go after.
+async function withGameRefs(fn) {
+  const refs = [];
+  const call = async (params) => {
+    const r = await bridgeCall('rtti.call', { args: [], ...params });
+    if (r && typeof r === 'object' && typeof r.$ref === 'number') refs.push(r.$ref);
+    return r;
+  };
+  try {
+    return await fn(call);
+  } finally {
+    if (refs.length) bridgeCall('rtti.release', { refs }).catch(() => {});
+  }
+}
+
+async function playerPlace() {
+  return withGameRefs(async (call) => {
+    const v = await call({ fn: 'GetPlayer', args: [{}] });
+    if (!v?.$ref) throw new Error('No player: load a save first');
+    const p = await call({ self: { $ref: v.$ref }, fn: 'GetWorldPosition' });
+    return { x: p.X, y: p.Y, z: p.Z };
+  });
+}
+
+// Go there: V on the ground beside the pin, 2.5 m from it on the side V comes from, facing it.
+// A pin that follows an entity is gone to where the entity was last seen.
+async function goToPin(id) {
+  const pin = pinsHost.get(id);
+  if (!pin) throw new Error(`No pin ${id}`);
+  if (!pin.at) throw new Error(`${pin.title}: its entity has not been found yet, so its place is not known`);
+  return withGameRefs(async (call) => {
+    const v = await call({ fn: 'GetPlayer', args: [{}] });
+    if (!v?.$ref) throw new Error('No player: load a save first');
+    const facility = await call({ class: 'GameInstance', fn: 'GetTeleportationFacility', args: [{}] });
+    if (!facility?.$ref) throw new Error('No teleportation facility: load a save first');
+    const from = await call({ self: { $ref: v.$ref }, fn: 'GetWorldPosition' });
+    let dx = from.X - pin.at.x;
+    let dy = from.Y - pin.at.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 0.5) [dx, dy] = [0, -1];
+    else [dx, dy] = [dx / d, dy / d];
+    const stand = { x: pin.at.x + dx * 2.5, y: pin.at.y + dy * 2.5, z: pin.at.z + 0.05 };
+    // The game's yaw is 0 facing +Y, in degrees.
+    const yaw = (Math.atan2(-dy, -dx) * 180) / Math.PI - 90;
+    await call({ self: { $ref: facility.$ref }, fn: 'Teleport', args: [{ $ref: v.$ref }, { X: stand.x, Y: stand.y, Z: stand.z, W: 1 }, { Roll: 0, Pitch: 0, Yaw: yaw }] });
+    log(`Pins: V went to "${pin.title}" (pin ${pin.id})`);
+    return { x: stand.x, y: stand.y, z: stand.z, yaw };
+  });
+}
+
+// The plugin heard a press on a pin: clicks are on in the Pins window, in interactive mode.
+// The event names the pin "pin": an "id" would be read as the answer to a request.
+function onPinClick(m) {
+  if (!pinSets.clicksOn()) return;
+  goToPin(m.pin).catch((err) => log(`Pins: a click on pin ${m.pin}: ${err.message}`));
+}
+
+// world.pinSet.save: a package's pins (one set's, if named) into a .pins.json file, by default
+// in its data folder.
+function savePinSet(id, params) {
+  const file = pinFileOf(params?.file, id ? dataDirOf(id) : null);
+  const set = params?.name ? String(params.name) : null;
+  const list = pinsHost.forSave(id ?? null, set);
+  const name = set ?? (String(params?.title ?? '').slice(0, 80) || path.basename(file).slice(0, -'.pins.json'.length));
+  writePinFile(file, name, list);
+  return { file, name, count: list.length };
+}
+
+// world.pinSet.load: a .pins.json file's pins as this package's, in a set by the file's name.
+function loadPinSet(id, params) {
+  const file = pinFileOf(params?.file, id ? dataDirOf(id) : null);
+  const read = readPinFile(file);
+  const name = params?.name ? String(params.name).slice(0, 80) : read.name;
+  pinsHost.clear(id ?? null, name); // loading a set again replaces it
+  const ids = read.pins.map((p) => pinsHost.add(id ?? null, { title: p.title, text: p.text, at: p.at, style: p.style }, name));
+  return { name, ids, file };
+}
+
+// The Pins window's calls: only that built-in window may make them.
+function fromPinWindow(event) {
+  const w = windowFor(event.sender);
+  if (!w?.app.builtin || w.app.manifest.id !== 'pinwindow') throw new Error("Only REDnode's Pins window manages the player's pins");
+}
+function ownerName(owner) {
+  if (!owner) return 'An assistant';
+  if (owner.startsWith('set:')) return pinSets.nameOf(owner);
+  return apps.get(owner)?.manifest.name ?? owner;
+}
+ipcMain.handle('rednode:pinwindow:state', (event) => {
+  fromPinWindow(event);
+  return {
+    ...pinSets.state(),
+    game: !!uiState.world,
+    pins: pinsHost.list(null).map((p) => ({
+      id: p.id,
+      title: p.title,
+      text: p.text,
+      color: p.color,
+      distance: p.distance,
+      owner: p.owner,
+      from: ownerName(p.owner),
+      kind: !p.owner ? 'assistant' : p.owner.startsWith('set:') ? 'set' : 'package',
+      set: p.set,
+      hidden: p.hidden,
+      placed: !!p.at,
+    })),
+  };
+});
+ipcMain.handle('rednode:pinwindow:drop', async (event, o) => {
+  fromPinWindow(event);
+  return pinSets.drop(await playerPlace(), o ?? {});
+});
+ipcMain.handle('rednode:pinwindow:go', (event, id) => {
+  fromPinWindow(event);
+  return goToPin(id);
+});
+ipcMain.handle('rednode:pinwindow:remove', (event, id) => {
+  fromPinWindow(event);
+  return pinSets.removePin(id);
+});
+ipcMain.handle('rednode:pinwindow:sets', (event, op, a, b) => {
+  fromPinWindow(event);
+  if (op === 'show') return pinSets.setShown(a, b);
+  if (op === 'create') return pinSets.create(a);
+  if (op === 'open') return pinSets.open(a);
+  if (op === 'forget') return pinSets.forget(a);
+  if (op === 'current') return pinSets.setCurrent(a);
+  if (op === 'options') return pinSets.options(a ?? {});
+  throw new Error(`No pin set operation ${op}`);
+});
 function fromPins(event) {
   const w = windowFor(event.sender);
   if (!w?.app.pins) throw new Error("Only REDnode's world pins page lays out pins");
@@ -5428,6 +5583,7 @@ app.whenReady().then(() => {
   }, 500);
   discoverApps();
   seedPins();
+  pinSets.start();
   // A token is made once and kept, so Claude Code's saved setup keeps working.
   if (!settings.mcp?.token) {
     settings.mcp = { ...settings.mcp, token: crypto.randomBytes(24).toString('base64url') };

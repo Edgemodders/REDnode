@@ -10,7 +10,10 @@
 //
 // About three times a second the plugin sends pins.camera, the camera's place and where the
 // followed entities went, for the distances. Pins of a package go when it stops, and every pin
-// goes when the game session ends.
+// goes when the game session ends, except the player's own sets (owner "set:<file>", WP3).
+//
+// WP3: a pin may belong to a named set (world.pinSet) and be hidden with it; the Pins window's
+// Hide all hides every pin, and its Click a pin switch makes the plugin report clicks on pins.
 
 'use strict';
 
@@ -95,6 +98,10 @@ function createPins({ sendJson, log, openAtlas, closeAtlas, atlasWindow, toPage 
   let layout = null; // the page's last measured rectangles
   let shown = ''; // the labels the page shows now, to send again only on a change
   let fullLogged = false;
+  let hideAll = false;
+  let clicks = false;
+
+  const visible = () => (hideAll ? [] : [...pins.values()].filter((p) => !p.hidden));
 
   const styleFor = (p) => ({ ...BASE, ...(defaults.get(p.owner) ?? {}), ...p.style });
   const distanceOf = (p) => {
@@ -105,7 +112,7 @@ function createPins({ sendJson, log, openAtlas, closeAtlas, atlasWindow, toPage 
   const rounded = (d) => (d === null ? null : d < 100 ? Math.round(d) : d < 1000 ? Math.round(d / 10) * 10 : Math.round(d / 100) * 100);
 
   function labels() {
-    return [...pins.values()].map((p) => {
+    return visible().map((p) => {
       const s = styleFor(p);
       return { id: p.id, title: p.title, text: p.text, distance: rounded(distanceOf(p)), color: s.color, font: s.font, titleSize: s.titleSize, textSize: s.textSize };
     });
@@ -114,7 +121,7 @@ function createPins({ sendJson, log, openAtlas, closeAtlas, atlasWindow, toPage 
   // The page draws the labels; once it has measured them, toPlugin sends the rectangles. Until
   // then the plugin keeps the last list, so a label never shows another pin's place.
   function refresh() {
-    if (!pins.size) {
+    if (!visible().length) {
       shown = '';
       layout = null;
       sendJson({ cmd: 'pins.set', pins: [] });
@@ -135,11 +142,11 @@ function createPins({ sendJson, log, openAtlas, closeAtlas, atlasWindow, toPage 
 
   function toPlugin() {
     const w = atlasWindow();
-    if (!w || !layout || !pins.size) return;
+    if (!w || !layout || !visible().length) return;
     const colors = Object.keys(layout.styles);
     const styles = colors.map((c) => layout.styles[c]);
     const out = [];
-    for (const p of pins.values()) {
+    for (const p of visible()) {
       const label = layout.labels[p.id];
       if (!label) continue;
       const s = styleFor(p);
@@ -155,7 +162,7 @@ function createPins({ sendJson, log, openAtlas, closeAtlas, atlasWindow, toPage 
         min: s.minScreenSize,
       });
     }
-    sendJson({ cmd: 'pins.set', window: w.id, fov: 'vertical', margin: 28, postMin: 36, postMax: 420, styles, pins: out });
+    sendJson({ cmd: 'pins.set', window: w.id, fov: 'vertical', margin: 28, postMin: 36, postMax: 420, clicks, styles, pins: out });
   }
 
   const entryOf = (p) => ({
@@ -165,6 +172,8 @@ function createPins({ sendJson, log, openAtlas, closeAtlas, atlasWindow, toPage 
     entity: p.entity ? { hash: p.entity } : null,
     title: p.title,
     text: p.text,
+    set: p.set,
+    hidden: !!p.hidden,
     style: styleFor(p),
     color: styleFor(p).color,
     height: styleFor(p).pinHeight,
@@ -172,10 +181,11 @@ function createPins({ sendJson, log, openAtlas, closeAtlas, atlasWindow, toPage 
   });
 
   return {
-    count: () => pins.size,
+    /** How many pins are drawn now (the labels' page stays open while any are). */
+    count: () => visible().length,
 
-    /** A package's new pin. Answers its id. */
-    add(owner, options) {
+    /** A package's new pin, in the named set if one is given. Answers its id. */
+    add(owner, options, set = null) {
       if (pins.size >= MAX_PINS) throw new Error(`world.pin: at most ${MAX_PINS} pins at once`);
       const title = String(options?.title ?? '').slice(0, 80);
       if (!title) throw new Error('world.pin needs a title');
@@ -184,7 +194,7 @@ function createPins({ sendJson, log, openAtlas, closeAtlas, atlasWindow, toPage 
       // WP1's color and height, kept as shortcuts.
       if (options?.color !== undefined && style.color === undefined) Object.assign(style, styleOf({ color: options.color }, 'world.pin'));
       if (options?.height !== undefined && style.pinHeight === undefined) Object.assign(style, styleOf({ pinHeight: options.height }, 'world.pin'));
-      const pin = { id: nextId++, owner, at: place, entity, title, text: options?.text ? String(options.text).slice(0, 160) : '', style };
+      const pin = { id: nextId++, owner, at: place, entity, title, text: options?.text ? String(options.text).slice(0, 160) : '', style, set: set ? String(set).slice(0, 80) : null, hidden: false };
       pins.set(pin.id, pin);
       if (pins.size === 1) log(`Pins: ${owner ?? 'a tool'} dropped the first pin`);
       refresh(); // the plugin hears of it once the page has laid it out
@@ -224,19 +234,72 @@ function createPins({ sendJson, log, openAtlas, closeAtlas, atlasWindow, toPage 
       return [...pins.values()].filter((p) => owner === undefined || owner === null || p.owner === owner).map(entryOf);
     },
 
-    clear(owner) {
+    /** Removes every pin of an owner (null: every pin), or only those of one of its sets. */
+    clear(owner, set) {
       let n = 0;
-      for (const p of [...pins.values()]) if (!owner || p.owner === owner) pins.delete(p.id), n++;
+      for (const p of [...pins.values()]) {
+        if (owner && p.owner !== owner) continue;
+        if (set !== undefined && set !== null && p.set !== set) continue;
+        pins.delete(p.id);
+        n++;
+      }
       if (n) refresh();
       return n;
     },
 
-    /** A package stopped, or the session ended (owner null: every pin). */
+    /**
+     * A package stopped, or the session ended (owner null: every pin but the player's own sets,
+     * which are places in the world and stay for the next session).
+     */
     gone(owner, why) {
-      const n = this.clear(owner);
+      let n = 0;
+      if (owner) n = this.clear(owner);
+      else {
+        for (const p of [...pins.values()]) if (!String(p.owner ?? '').startsWith('set:')) pins.delete(p.id), n++;
+        if (n) refresh();
+      }
       if (owner) defaults.delete(owner);
       if (n) log(`Pins: removed ${n} pin(s) of ${owner ?? 'every package'} (${why})`);
     },
+
+    /** Shows or hides one of an owner's sets (world.pinSet.show). Answers how many pins it has. */
+    showSet(owner, set, on) {
+      let n = 0;
+      for (const p of pins.values()) {
+        if (p.owner !== owner || p.set !== set) continue;
+        p.hidden = !on;
+        n++;
+      }
+      if (n) refresh();
+      return n;
+    },
+
+    /** The Pins window's switches: Hide all, and clicks on pins in interactive mode. */
+    options(o) {
+      const before = `${hideAll}${clicks}`;
+      if (o.hideAll !== undefined) hideAll = !!o.hideAll;
+      if (o.clicks !== undefined) clicks = !!o.clicks;
+      if (`${hideAll}${clicks}` !== before) {
+        shown = '';
+        refresh();
+      }
+    },
+
+    /** An owner's pins (one set's, if named) as a set file keeps them: own style, a place. */
+    forSave(owner, set) {
+      return [...pins.values()]
+        .filter((p) => p.owner === owner && p.at && (set === undefined || set === null || p.set === set))
+        .map((p) => ({ title: p.title, text: p.text, at: { ...p.at }, style: { ...p.style } }));
+    },
+
+    /** One pin, any owner's, or null. */
+    get(id) {
+      const p = pins.get(Number(id));
+      return p ? entryOf(p) : null;
+    },
+
+    /** Where the camera is, for Go there's side of a pin. */
+    cameraPos: () => (camera ? [...camera.pos] : null),
 
     /** The plugin's pins.camera: the distances change, and followed pins move. */
     camera(m) {
@@ -249,7 +312,7 @@ function createPins({ sendJson, log, openAtlas, closeAtlas, atlasWindow, toPage 
           if (p && [x, y, z].every(Number.isFinite)) p.at = { x, y, z };
         }
       }
-      if (!pins.size) return;
+      if (!visible().length) return;
       // Only the labels: the plugin already knows where its followed pins are.
       const list = labels();
       const json = JSON.stringify(list);
@@ -279,7 +342,7 @@ function createPins({ sendJson, log, openAtlas, closeAtlas, atlasWindow, toPage 
     /** The game connected again: the plugin has forgotten the pins. */
     resend() {
       shown = '';
-      if (pins.size) refresh();
+      if (visible().length) refresh();
     },
   };
 }

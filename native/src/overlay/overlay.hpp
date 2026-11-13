@@ -340,6 +340,11 @@ struct PinDraw
 bool HandlePinsCommand(const std::string& aJson);
 void UpdatePins(uint64_t aFrame);
 uint32_t CollectPinDraws(float aWidth, float aHeight, std::vector<PinDraw>& aOut);
+// WP3: the compositor says whether the pins were drawn this frame (their atlas window shown);
+// PinAt answers the pin whose label or post is under a point in reference pixels, 0 for none,
+// or when the host has not asked for clicks ("clicks":true on pins.set) or the pins are hidden.
+void NotePinsShown(bool aShown);
+uint32_t PinAt(float aX, float aY);
 void ClearPins();
 } // namespace detail
 namespace pins
