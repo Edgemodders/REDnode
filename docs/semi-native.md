@@ -12,6 +12,7 @@ A semi-native app is a REDnode app that looks and feels like part of the game's 
 | One cursor, where the game has one | On the game's screens with a cursor (the pause menu, the main menu, the inventory, the crafting bench): while the cursor is outside the app it belongs to the game, and when it crosses into the app the app gets it, with no F10 or key, and the cursor looks the same all the way |
 | Mapped inputs in the world | In gameplay there is no cursor, as in the game itself. A key or button (or another trigger) shows the app, and while it shows it answers its own mapped keys and controller buttons, the way the game's quickhack wheel and interaction prompts do |
 | Input is optional | An app need not take any input at all: a holocall, a video, a visual effect only shows. Taking input is something an app asks for (the cursor on game screens, mapped keys in the world). An app that asks for none never stops the cursor or a key from reaching the game, so its clicks pass straight through, as a HUD widget's do |
+| Paused, with the cursor | An app may also pause the game and show the game's pause-menu cursor inside itself, with full control of input until it closes. Mini-games will mostly want this |
 | The game's look | Its elements look exactly like the game's ink: the same colors, text, frames and cursor. It can use REDnode's ink markup (`.ink.html`) drawn in HTML |
 | More than ink can do | Being a web page, it can also draw anything ink cannot: three.js scenes, canvas animation, video, mini-games, holocalls |
 | Managed like any package | It is listed in the Mod Manager, switched on and off and given permissions there, and its logs, debugger and hot reload work like any other package's |
@@ -50,13 +51,20 @@ So the parts that are new are showing on a trigger, input with no F10 (mapped ke
 
 An app follows the game's own rule for input: a cursor only where the game shows one (decided with the owner on 2026-11-12).
 
-| | Over a game screen with a cursor (the pause menu, the main menu, the inventory, the crafting bench, a popup with a cursor) | In the world (gameplay) |
-|---|---|---|
-| The game's cursor | Exists. The game draws it as ink and moves it from the mouse. The Windows cursor is hidden and free (the cursor-flicker run, `docs/overlay.md`) | None. The mouse turns the camera, and the game holds the Windows cursor at the screen's centre |
-| How the app takes input | The game's cursor carries on over the app (the cursor crossover) | No cursor. The app is shown by a key or button (or a game event or a call), and while it shows it answers its mapped keys and controller buttons, as the game's quickhack wheel and interaction prompts do. The camera and movement stay the game's unless the app needs those keys too (S3) |
-| Examples | A panel beside the crafting menu's recipe list, a quickhack preview in the cyberdeck screen | A holocall (display only), a contextual panel with key prompts, a mini-game played with keys or a controller |
+| | Over a game screen with a cursor (the pause menu, the main menu, the inventory, the crafting bench, a popup with a cursor) | In the world (gameplay) | **Paused by the app** (from the world) |
+|---|---|---|---|
+| The game's cursor | Exists. The game draws it as ink and moves it from the mouse. The Windows cursor is hidden and free (the cursor-flicker run, `docs/overlay.md`) | None. The mouse turns the camera, and the game holds the Windows cursor at the screen's centre | The pause-menu cursor, drawn inside the app |
+| How the app takes input | The game's cursor carries on over the app (the cursor crossover) | No cursor. The app is shown by a key or button (or a game event or a call), and while it shows it answers its mapped keys and controller buttons, as the game's quickhack wheel and interaction prompts do. The camera and movement stay the game's unless the app needs those keys too (S3) | The app pauses the game and takes **all** input (mouse, keys, controller) until it closes; then the game resumes. Like the game's own Breach Protocol, but drawn by the app |
+| Examples | A panel beside the crafting menu's recipe list, a quickhack preview in the cyberdeck screen | A holocall (display only), a contextual panel with key prompts, a mini-game played with keys or a controller | A mini-game played with the mouse, a full-screen bench or terminal UI |
 
-An app that only displays (a holocall, an animation) needs no input at all and works in both places from the start. An app that wants a cursor in the world can open a game screen that has one, or use F10's interactive mode as overlay windows do today.
+An app that only displays (a holocall, an animation) needs no input at all and works in all three from the start. An app that wants a cursor in the world pauses the game (the third column), opens a game screen that has one, or is an F10 window as today.
+
+Two ways to do the paused mode, for spike S6:
+
+| | How | For | Against |
+|---|---|---|---|
+| **P1. Pause and take the input in the plugin** | Pause with the game's time system (`TimeSystem.SetPausedState`, already called by the H1b swap spike), and take all input for that one app the way F10's interactive mode does, drawing a copy of the game's cursor (S1's images) | Built from proven parts: interactive mode's input, the virtual cursor, the cursor texture | The cursor is a copy, moved by REDnode. The game's own paused state (its pause music, hiding the HUD, saving disabled) is not there unless REDnode sets each part (unverified which matter) |
+| **P2. Open a game screen** | Open an empty game menu (the `rednode_screen` entry planned for I5 in `docs/design.html`) so the game pauses and draws its own cursor as in any menu, and the app shows over it with the cursor crossover covering the whole screen | The game's own pause and its real cursor | Needs the `rednode_screen` entry, which is unverified (I5), and S1's crossover |
 
 ### Showing
 
@@ -101,6 +109,7 @@ All of this applies only to an app that asks for input. An app that asks for non
 | The cursor is over the app's opaque pixels (over a game screen) | To the game (so its cursor keeps moving) **and** to the page | To the page only. The game must not get the click | To the game, unless the page has a focused text field or asked for keys (as Keyboard Lock does today) |
 | The cursor is outside the app | To the game | To the game | To the game |
 | An app shows in the world | To the game (the camera, as always) | To the game, unless the app maps them | The app's mapped keys and controller buttons to the page and not to the game; every other key to the game. Its close key (Esc or the one that opened it) hides it |
+| An app has paused the game | To the page only (the cursor inside it) | To the page only | To the page only, except Esc, which closes the app (or asks it to) and resumes the game |
 
 In the world, the mapped inputs should behave like the game's own contextual UI: while the quickhack wheel or an interaction prompt shows, its keys do its job and the rest of the game goes on. Which keys an app may take, and what happens when one is also a game action (F is Interact, R is Reload), is S3's question.
 
@@ -126,6 +135,7 @@ Each spike is a test app and a small plugin change, run in game, before the buil
 | **S2 Clicks to the app, movement to the game** | Can the plugin let the game's cursor keep moving while the app takes the buttons and wheel? How does the game read the mouse in menus (raw input messages, a buffer, window messages)? Do game widgets under the app react? | The input design. If the split fails, the fallback is to stop the game's cursor over the app and move the copy from raw input (B with REDnode's own movement) |
 | **S3 Mapped inputs in the world** | Show a test app on a key, then give it a few keys while it shows: can the plugin take those keys from the game and let every other one through (it already takes F10)? What about a key that is also a game action? Controller buttons: the plugin does not read the controller today, so how does the game read it (XInput or another API), and can a button be taken from the game the same way? Or is it cleaner to go through the game's own input actions and contexts, as the quickhack wheel does (Codeware's input callbacks, unverified)? | How an app in the world answers keys and buttons without breaking the game's own |
 | **S4 Listening on a game button** | Register a `REDnodeInkListener` on a game widget found with `ink.at` or `ink.read` (a button in the crafting menu), and hear its clicks. Find it again after the menu rebuilds | Whether "show on a game button's click" needs no redscript from the modder |
+| **S6 Pause with the cursor** | From the world, a test app pauses the game and takes all input: P1 (the time system's pause and interactive mode's input for one app) against P2 (an empty game screen). Does the world stop fully (NPCs, cars, timers, sounds)? Can the player save, or open the pause menu, while it shows? Does the game resume cleanly on close, on a crash of the app, and when the package stops? | Which way paused apps go. P1 needs no unverified game entry, so it is the likely first try |
 | **S5 The game's font and textures** (can wait for the build) | Read the game's font and a few frames and icons through REDbridge into the cache, and draw a game button in HTML beside the game's own | Whether the look can be exact, or close |
 
 ## Plan
@@ -134,11 +144,12 @@ Proposed phases, each tested in game before the next:
 
 | Phase | What | Done when |
 |---|---|---|
-| **SN0 Spikes** | S1, then S2 to S4 (S5 can come with SN2) | The cursor way is chosen, or the owner decides the idea changes |
+| **SN0 Spikes** | S1, then S2 to S4 and S6 (S5 can come with SN2) | The cursor way is chosen, or the owner decides the idea changes |
 | **SN1 Show and display** | `"kind": "native"`, `app.show()`/`app.hide()`, showing on menus and game states, in the Mod Manager. No input yet | A holocall-style test app shows on a call and on a menu opening, with no F10 |
 | **SN2 The look** | The UI kit's game theme, the game's font and textures from the player's game, `.ink.html` drawn as HTML | A game button in HTML next to the game's own looks the same |
 | **SN3 The cursor over game screens** | The chosen cursor way and the input split | Over the crafting menu, the cursor crosses into a test panel, clicks it, and leaves, with no seam and no click reaching the game |
 | **SN4 Mapped inputs in the world and game triggers** | S3's way (an app's own key to show it, its mapped keys and controller buttons while it shows), and showing on a game button's click (S4) or a mod's redscript | A mini-game in the world shows on its key, plays with keys and a controller while the rest of the game goes on, and closes; a crafting-menu button shows an app |
+| **SN4b Paused apps** | S6's way: `app.show({ pause: true })` (proposed), the cursor inside the app, all input to it, the game resumed on close, crash or stop | A mouse mini-game opened from the world pauses the game, plays, and gives the game back as it was |
 | **SN5 The Netrunner bench sample** | A sample built on all of it for EDGEhack's add-on (if the owner still wants it in native ink, a semi-native version as a second sample) | Docs page, examples, release |
 
 ## Decided with the owner
@@ -151,7 +162,7 @@ Agreed on 2026-11-12, every recommendation as drafted:
 | Does F10's hidden mode hide them? | Yes, as it hides pins: the player's one switch to clear the screen of REDnode |
 | Do they show in photo mode and scenes? | Hidden by default, as HUD widgets are, with `hideWith` to change it |
 | Controller | In the world, in scope with S3 (mapped buttons). On game screens, after the mouse works: the game moves its cursor with the stick in menus, so A may carry over (unverified) |
-| A cursor in the world | None, as in the game (decided with the owner on 2026-11-12). An app that needs one opens a game screen that has one, or is an F10 window |
+| A cursor in the world | None while the game runs, as in the game (decided with the owner on 2026-11-12). An app that needs one pauses the game and shows the pause-menu cursor inside itself, with full input (added by the owner the same day), opens a game screen that has one, or is an F10 window |
 | The kind's name | `"kind": "native"` |
 | Can a semi-native app be dragged or resized? | No title bar. Only if the app moves itself (as `fill` pages do with `rn-window`) |
 | Permission | One new switch, `native`, since an app that takes clicks from the game's own screens should be the player's choice |
