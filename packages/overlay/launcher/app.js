@@ -47,17 +47,14 @@ function el(tag, className, text) {
 const ADMIN_WARNING =
   'Allow this only for a package you trust: it can end or restart any of your mods, and switch on AI tools you switched off.';
 
-// How strongly a package matches the filter, strongest first, as the Mod Manager's search ranks:
-// its name starts with it, a word of its name does, its name holds it, then its id, author and
-// description. Null: no match.
+// How strongly a package's name matches the filter, strongest first: the name starts with it, a
+// word of the name does, the name holds it. Names only (the owner, 2026-11-12): a description
+// that mentions a word must not bring a package in. Null: no match.
 function strengthOf(i, q) {
   const name = (i.name ?? '').toLowerCase();
   if (name.startsWith(q)) return 0;
   if (name.split(/[^a-z0-9]+/).some((w) => w.startsWith(q))) return 1;
   if (name.includes(q)) return 2;
-  if ((i.id ?? '').toLowerCase().includes(q)) return 3;
-  if ((i.author ?? '').toLowerCase().includes(q)) return 4;
-  if ((i.description ?? '').toLowerCase().includes(q)) return 5;
   return null;
 }
 
@@ -372,11 +369,13 @@ function renderList() {
   const hidden = all.length - pinned.length;
   const fresh = all.filter((i) => i.isNew).length;
   $('more-open').title = ['Open the Mod Manager', hidden && `${hidden} more there`, fresh && `${fresh} new`].filter(Boolean).join(' · ');
-  // While a filter is typed, only matches, the stronger first (the sort is stable, so the
-  // Mod Manager stays first among equals).
+  // While a filter is typed, every installed package whose name matches, not only the pinned
+  // ones, so anything can be found and shown from here: the stronger first, then by name.
   const q = String($('filter').value ?? '').trim().toLowerCase();
-  const strength = new Map(q ? pinned.map((i) => [i.id, strengthOf(i, q)]) : []);
-  const items = q ? pinned.filter((i) => strength.get(i.id) !== null).sort((a, b) => strength.get(a.id) - strength.get(b.id)) : pinned;
+  const strength = new Map(q ? all.map((i) => [i.id, strengthOf(i, q)]) : []);
+  const items = q
+    ? all.filter((i) => strength.get(i.id) !== null).sort((a, b) => strength.get(a.id) - strength.get(b.id) || a.name.localeCompare(b.name))
+    : pinned;
   const list = $('apps');
   const seen = new Set();
   for (const item of items) {
@@ -397,7 +396,7 @@ function renderList() {
   const order = items.map((i) => rows.get(i.id).root);
   if (order.some((r, i) => list.children[i] !== r) || list.children.length !== order.length) list.replaceChildren(...order);
   if (!items.length) {
-    const p = el('p', 'empty', q ? `Nothing in the launcher matches "${q}". The Mod Manager lists every package.` : 'Nothing installed.');
+    const p = el('p', 'empty', q ? `No package's name matches "${q}".` : 'Nothing installed.');
     list.replaceChildren(p);
   }
   $('count').textContent = `· ${all.filter((a) => a.open).length}/${all.length}`;

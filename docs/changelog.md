@@ -14,7 +14,7 @@ How to keep it:
 **New**
 
 - EDGEhack's tools for in-game assistants (EDGEhack, the quickhack editor): REDagent can find and describe the game's quickhacks, make new ones, change their costs, texts and effects, write their scripts and try them live, as `edgehack__hack_*`. Its quickhacks go on EDGEhack's Desk unless a project is named. The reads run at once; every change asks the player first. EDGEhack's server shares REDnode's REDbridge. Docs: https://edgemodders.github.io/REDnode/mcp.html#edgehacks-tools-h46
-- A filter box at the top of the launcher: type to filter its list, ranked as the Mod Manager's search is.
+- A filter box at the top of the launcher: type part of a name to find any installed package, pinned to the launcher or not, names starting with it first.
 
 **Changed**
 
