@@ -47,10 +47,53 @@ function el(tag, className, text) {
 const ADMIN_WARNING =
   'Allow this only for a package you trust: it can end or restart any of your mods, and switch on AI tools you switched off.';
 
+// How strongly a package matches the filter, strongest first, as the Mod Manager's search ranks:
+// its name starts with it, a word of its name does, its name holds it, then its id, author and
+// description. Null: no match.
+function strengthOf(i, q) {
+  const name = (i.name ?? '').toLowerCase();
+  if (name.startsWith(q)) return 0;
+  if (name.split(/[^a-z0-9]+/).some((w) => w.startsWith(q))) return 1;
+  if (name.includes(q)) return 2;
+  if ((i.id ?? '').toLowerCase().includes(q)) return 3;
+  if ((i.author ?? '').toLowerCase().includes(q)) return 4;
+  if ((i.description ?? '').toLowerCase().includes(q)) return 5;
+  return null;
+}
+
+// A click on a package's name: switch it on if it is off (which also opens the windows the player
+// had closed), else show its closed windows as the Mod Manager's Show does, else bring it from
+// another space into this one.
+async function showPackage(it) {
+  if (!it.open) {
+    await window.rednode.apps.setOpen(it.id, true);
+    return;
+  }
+  if (it.closedWindows?.length) {
+    for (const win of it.closedWindows) await window.rednode.apps.showWindow(it.id, win);
+    return;
+  }
+  if (!it.tool && it.space && it.space !== '*' && it.space !== 'mixed' && it.space !== spaceState.current) {
+    showSpaces(await window.rednode.apps.spaces('move', it.id, spaceState.current));
+    RednodeUI.notify(`Moved from the ${it.space} space to this one`, { title: it.name });
+    return;
+  }
+  RednodeUI.notify(it.hasWindow ? 'Already showing' : 'Running. It has no window', { title: it.name });
+}
+
+function linkTip(it) {
+  if (!it.open) return 'Switch on and show';
+  if (it.closedWindows?.length) return it.closedWindows.length > 1 ? 'Show its closed windows' : 'Show its closed window';
+  if (!it.tool && it.space && it.space !== '*' && it.space !== 'mixed' && it.space !== spaceState.current) return `Bring it here from the ${it.space} space`;
+  return it.hasWindow ? 'Showing' : 'Running, with no window';
+}
+
 function makeRow(item) {
   const root = el('div', 'app');
   const text = el('div');
-  const name = el('div', 'name', item.name);
+  const name = el('div', 'name link', item.name);
+  let current = item;
+  name.addEventListener('click', () => act(current.name, () => showPackage(current)));
   const meta = el('div', 'meta');
   text.append(name, meta);
 
@@ -138,6 +181,8 @@ function makeRow(item) {
   return {
     root,
     update(it) {
+      current = it;
+      name.title = linkTip(it);
       const kind = it.app && it.mod ? 'App + Node mod' : it.mod ? 'Node mod' : it.kind === 'hud' ? 'HUD widget' : 'App';
       meta.textContent = it.builtin
         ? `${kind} · built into REDnode`
@@ -307,41 +352,59 @@ async function refresh() {
     $('solo').hidden = !state.solo;
     $('solo-name').textContent = state.solo?.name ?? '';
     if (state.spaces) showSpaces(state.spaces);
-    const all = await window.rednode.apps.list();
-    // Only packages pinned to the launcher, the Mod Manager first; a crashed one shows
-    // even unpinned, so an error never hides. The Mod Manager lists everything.
-    const items = all
-      .filter((i) => i.manager || i.inLauncher || i.mod?.status === 'crashed')
-      .sort((a, b) => Number(b.manager) - Number(a.manager));
-    const hidden = all.length - items.length;
-    const fresh = all.filter((i) => i.isNew).length;
-    $('more').hidden = !hidden && !fresh;
-    $('more-text').textContent = [hidden && `${hidden} more in the Mod Manager`, fresh && `${fresh} new`].filter(Boolean).join(' · ');
-    const list = $('apps');
-    const seen = new Set();
-    for (const item of items) {
-      seen.add(item.id);
-      let row = rows.get(item.id);
-      if (!row) {
-        row = makeRow(item);
-        rows.set(item.id, row);
-      }
-      row.update(item);
-    }
-    for (const [id, row] of rows) {
-      if (!seen.has(id)) {
-        row.root.remove();
-        rows.delete(id);
-      }
-    }
-    const order = items.map((i) => rows.get(i.id).root);
-    if (order.some((r, i) => list.children[i] !== r)) list.replaceChildren(...order);
-    if (!items.length) list.innerHTML = '<p class="empty">Nothing installed.</p>';
-    $('count').textContent = `· ${all.filter((a) => a.open).length}/${all.length}`;
+    lastList = await window.rednode.apps.list();
+    renderList();
   } finally {
     refreshing = false;
   }
 }
+
+// The list as last read, drawn again on each key typed in the filter without asking the host.
+let lastList = null;
+function renderList() {
+  const all = lastList;
+  if (!all) return;
+  // Only packages pinned to the launcher, the Mod Manager first; a crashed one shows
+  // even unpinned, so an error never hides. The Mod Manager lists everything.
+  const pinned = all
+    .filter((i) => i.manager || i.inLauncher || i.mod?.status === 'crashed')
+    .sort((a, b) => Number(b.manager) - Number(a.manager));
+  const hidden = all.length - pinned.length;
+  const fresh = all.filter((i) => i.isNew).length;
+  $('more-open').title = ['Open the Mod Manager', hidden && `${hidden} more there`, fresh && `${fresh} new`].filter(Boolean).join(' · ');
+  // While a filter is typed, only matches, the stronger first (the sort is stable, so the
+  // Mod Manager stays first among equals).
+  const q = String($('filter').value ?? '').trim().toLowerCase();
+  const strength = new Map(q ? pinned.map((i) => [i.id, strengthOf(i, q)]) : []);
+  const items = q ? pinned.filter((i) => strength.get(i.id) !== null).sort((a, b) => strength.get(a.id) - strength.get(b.id)) : pinned;
+  const list = $('apps');
+  const seen = new Set();
+  for (const item of items) {
+    seen.add(item.id);
+    let row = rows.get(item.id);
+    if (!row) {
+      row = makeRow(item);
+      rows.set(item.id, row);
+    }
+    row.update(item);
+  }
+  for (const [id, row] of rows) {
+    if (!seen.has(id)) {
+      row.root.remove();
+      rows.delete(id);
+    }
+  }
+  const order = items.map((i) => rows.get(i.id).root);
+  if (order.some((r, i) => list.children[i] !== r) || list.children.length !== order.length) list.replaceChildren(...order);
+  if (!items.length) {
+    const p = el('p', 'empty', q ? `Nothing in the launcher matches "${q}". The Mod Manager lists every package.` : 'Nothing installed.');
+    list.replaceChildren(p);
+  }
+  $('count').textContent = `· ${all.filter((a) => a.open).length}/${all.length}`;
+}
+
+// Read from the field itself: the native input event also bubbles out of rn-input, without a detail.
+$('filter').addEventListener('input', renderList);
 
 // ---------- spaces (O11) ----------
 // Named sets of windows. The switcher on the tab shows once there is a second space.

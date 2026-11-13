@@ -100,9 +100,13 @@
   .st-crashed, .st-not-responding { color: var(--rn-danger); }
   .controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .err { font: 11px/1.35 var(--rn-mono); color: var(--rn-danger); white-space: pre-wrap; word-break: break-word; }
-  .more { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; margin-bottom: 8px;
-    font: 11px var(--rn-mono); color: var(--rn-dim); border: 1px dashed var(--rn-line); }
-  .more rn-button::part(button) { min-height: 22px; padding: 2px 8px; font-size: 11px; }
+  /* The filter over the list, and Open for the Mod Manager (its tooltip says how many more are there). */
+  .more { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .more rn-input { flex: 1; min-width: 0; }
+  .more rn-button::part(button) { min-height: 30px; padding: 4px 10px; font-size: 12px; }
+  /* A package's name is a link: it shows the package, switching it on first if it is off. */
+  .name.link { cursor: pointer; justify-self: start; }
+  .name.link:hover { color: var(--rn-accent-2); text-decoration: underline; text-underline-offset: 3px; }
   .closed-line { display: flex; align-items: center; gap: 8px; font: 11px var(--rn-mono); color: var(--rn-dim); }
   .closed-line rn-button::part(button) { min-height: 22px; padding: 2px 8px; font-size: 11px; }
   .log { font: 11px/1.35 var(--rn-mono); color: var(--rn-dim); white-space: pre-wrap; word-break: break-word;
@@ -119,7 +123,7 @@
     <div class="row">
     <rn-window id="panel" title="REDNODE" no-rollup hidden>
       <span class="status" slot="status">GAME <b id="link" class="off">OFF</b></span>
-      <div class="more" id="more" hidden><span id="more-text"></span><rn-button id="more-open" variant="ghost">Open</rn-button></div>
+      <div class="more" id="more"><rn-input id="filter" placeholder="Filter mods..." clearable></rn-input><rn-button id="more-open" variant="ghost" title="Open the Mod Manager">Open</rn-button></div>
       <div id="apps"><p class="empty">Looking for apps...</p></div>
       <div slot="footer" class="footer">
         <div class="spaces">
