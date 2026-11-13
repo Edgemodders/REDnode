@@ -26,3 +26,6 @@ packages/rednode/src/generated/
 
 # editor settings: shared ones live in REDnode.code-workspace
 .vscode/
+
+# Claude Code: personal permission settings for this folder
+.claude/settings.local.json
