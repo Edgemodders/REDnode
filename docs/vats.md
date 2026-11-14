@@ -167,11 +167,12 @@ Built on 2026-11-14: the **VATS spike** app (`packages/overlay/apps/vats-spike`,
 | Zoom (V3) | The player's camera (`GetFPPCameraComponent`): `SetFOV` to a half or a quarter, `SetZoom`, **Back** | V3 |
 | Slow motion (V5) | `TimeSystem.SetTimeDilation` with a reason and a duration (2 to 30 s, a slider), so it always runs out on its own; **Keep V at normal speed** adds `SetIgnoreTimeDilationOnLocalPlayerZero`; **Normal** undoes both | V5 |
 | Watch | Twice a second, a line when the active dilation, the field of view or the zoom changes | What the scanner itself changes |
+| Exposure (V8) | Five points across each shape (its slot, and its capsule's radius to the camera's right, left, up and down). A point is behind the target's own body if the line from the camera passes through another of its shapes, each taken as a sphere of its capsule's radius at its slot (an approximation). The rest get a ray each from the camera (`GetActiveCameraWorldTransform`, `SyncRaycastByCollisionGroup` with `"Static"`), all sent at once so they share a frame; a hit more than 0.15 m short is the world in the way. **Chance on the labels** shows each part's share on its pin while Show parts is on | V8: do the shares match what the player sees, and what do 40 to 70 rays cost |
 | Only one part can be hit | `DisableHitShape` on the target's other shapes, `EnableHitShape` after 6 s | Part 2: can a shot be made to land on one part |
 
 A package has no stop hook, so nothing it changes outlives it unattended: slow motion runs out by its duration, the hit shapes come back after 6 s, and the zoom has **Back** (unverified whether a save load also resets it).
 
-Checked in the mock game (scratchpad `vats/check.mjs`, its stand-in plugin `vats/mock.mjs` with the game's answers in `vats/answer.mjs`): 30 checks, every button, the calls' arguments as the 2.5 types want them, six pins placed again and again and gone when switched off (the check found an update in flight putting them back after the switch; fixed), and the hit shapes back on.
+Checked in the mock game (scratchpad `vats/check.mjs`, its stand-in plugin `vats/mock.mjs` with the game's answers in `vats/answer.mjs`): 39 checks, every button, the calls' arguments as the 2.5 types want them, six pins placed again and again and gone when switched off (the check found an update in flight putting them back after the switch; fixed), and the hit shapes back on. App 0.2.0 adds Exposure: with the mock's camera at the NPC's left side and a kerb below 0.3 m, the left arm read 100 %, the right arm 10 % (9 of 10 points behind the torso), the right leg 20 % (its foot behind the kerb); 43 rays went out within 1 ms.
 
 ### Spike test
 
@@ -189,7 +190,9 @@ In the game, on open ground near enemies who are not fighting yet (a gang's hang
 | 8 | In F10, with **Keep V at normal speed** on, press **0.05**, then leave interactive mode at once and move V, turn the camera, hold the scanner | For 8 s the world crawls. Note whether V and the camera move normally, and what Watch logs while scanning |
 | 9 | Repeat step 8 with Keep V at normal speed off, then with **0.01** | Note the differences |
 | 10 | Aim at the enemy's head and press **Crosshair (V4)** (F10 shows the cursor, but the crosshair stays where V aims). Repeat aiming at a leg | Which component is under the crosshair each time |
-| 11 | Press **Left arm** under "Only one part can be hit", leave interactive mode and shoot the enemy's torso and head within 6 s, then the left arm | Note whether torso and head shots pass through or miss, and whether the arm takes hits. After 6 s the log says every hit shape is back on |
-| 12 | Switch the app off | Its pins go; nothing stays slowed |
+| 11 | Stand so the target is side-on to you (facing left or right in your view) and press **Exposure** (V8) | A share per part. The arm and leg nearer you should read high, the far ones low ("behind its own body"). Note whether that matches what you see |
+| 12 | Move so a low wall, a car or a crate hides part of the target, and press **Exposure** again. Then switch on **Chance on the labels** and **Show parts**, walk round the target, and switch both off | Parts behind the cover read lower ("behind the world"); a car or crate may not count (which collision groups catch them is the question). The labels show "Left arm 90%" and change as you move. Note the cost lines |
+| 13 | Press **Left arm** under "Only one part can be hit", leave interactive mode and shoot the enemy's torso and head within 6 s, then the left arm | Note whether torso and head shots pass through or miss, and whether the arm takes hits. After 6 s the log says every hit shape is back on |
+| 14 | Switch the app off | Its pins go; nothing stays slowed |
 
 Claude then reads `rednode-mods.log` for the `[vats-spike]` lines, the costs and the answers, and writes the results here and into the game API notes (`gameapi/notes/`), since other mods can use them too.

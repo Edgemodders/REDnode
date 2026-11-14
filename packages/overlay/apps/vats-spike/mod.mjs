@@ -15,8 +15,20 @@
 //                the chosen part); EnableHitShape puts them back after a few seconds
 //   Watch        twice a second: the active time dilation and the camera's field of view,
 //                to see what the scanner itself changes
+//   Exposure (V8)   how much of each part the camera sees: five points across each shape,
+//                a ray from the camera to each against the world (SyncRaycastByCollisionGroup,
+//                "Static"), and against the target's own other shapes in plain maths (each
+//                taken as a sphere of its capsule's radius at its slot: an approximation,
+//                since which way a capsule runs on its bone is unverified)
 
 import { api, game, ui, world } from 'rednode';
+
+// Each shape's capsule in npc_base.hitrepresentation: radius and height in metres.
+const SHAPES = {
+  Head: [0.118, 0.1], Belly: [0.2, 0.15], LeftTorso: [0.155, 0.095], RightShoulder: [0.155, 0.095], Chest: [0.05, 0.15],
+  LeftArm: [0.08, 0.25], LeftForeArm: [0.065, 0.3], RightArm: [0.08, 0.25], RightForeArm: [0.065, 0.3],
+  LeftLeg: [0.09, 0.5], LeftUpLeg: [0.11, 0.3], LeftFoot: [0.07, 0.2], RightLeg: [0.09, 0.5], RightUpLeg: [0.11, 0.3], RightFoot: [0.07, 0.2],
+};
 
 // npc_base.hitrepresentation's shapes (docs/vats.md), by VATS part.
 const PARTS = [
@@ -125,20 +137,109 @@ async function clearPartPins() {
   await Promise.all(ids.map((id) => world.unpin(id).catch(() => false)));
 }
 
+// ---------- V8: exposure ----------
+
+const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+const add = (a, b, k = 1) => ({ x: a.x + b.x * k, y: a.y + b.y * k, z: a.z + b.z * k });
+const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+const len = (a) => Math.sqrt(dot(a, a));
+const vec = (v) => ({ x: v.X, y: v.Y, z: v.Z });
+const toGame = (p) => ({ X: p.x, Y: p.y, Z: p.z, W: 1 });
+
+async function cameraView() {
+  const cams = await api.GameInstance.GetCameraSystem(game.instance);
+  const r = await cams.GetActiveCameraWorldTransform(api.$out);
+  const pos = r?.out?.transform?.position;
+  if (!pos) throw new Error('No camera transform');
+  return { at: vec(pos), right: vec(await cams.GetActiveCameraRight()), up: vec(await cams.GetActiveCameraUp()) };
+}
+
+// Does the segment from `from` to `to` pass through the sphere before reaching `to`?
+function blockedBySphere(from, to, centre, radius) {
+  const d = sub(to, from);
+  const total = len(d);
+  const dir = { x: d.x / total, y: d.y / total, z: d.z / total };
+  const t = dot(sub(centre, from), dir);
+  if (t <= 0 || t >= total - radius) return false; // behind the camera, or around the point itself
+  const closest = add(from, dir, t);
+  return len(sub(centre, closest)) < radius;
+}
+
+let exposureCasts = 0;
+
+// Every part's share of points the camera sees, and why the others are hidden.
+async function exposure(t, places) {
+  const started = performance.now();
+  const cam = await cameraView();
+  if (!places) places = (await readSlots(t)).places;
+  const at = new Map(places.filter((p) => p.x !== null).map((p) => [p.slot, p]));
+  const sqs = await api.GameInstance.GetSpatialQueriesSystem(game.instance);
+  const centres = partsOf(places);
+  // Every point first, those behind the target's own body set aside; then every ray at once,
+  // so they share a frame (one at a time, each would wait for the bridge's next frame).
+  const points = [];
+  for (const part of PARTS) {
+    for (const slot of part.slots) {
+      const c = at.get(slot);
+      if (!c) continue;
+      const r = SHAPES[slot][0] * 0.8;
+      for (const p of [c, add(c, cam.right, r), add(c, cam.right, -r), add(c, cam.up, r), add(c, cam.up, -r)]) {
+        const body = [...at.values()].some((o) => o.slot !== slot && blockedBySphere(cam.at, p, o, SHAPES[o.slot][0]));
+        points.push({ part: part.part, p, body, world: false });
+      }
+    }
+  }
+  const cast = points.filter((x) => !x.body);
+  const rays = await Promise.all(cast.map((x) => sqs.SyncRaycastByCollisionGroup(toGame(cam.at), toGame(x.p), 'Static', api.$out, false, false)));
+  rays.forEach((ray, i) => {
+    const hit = ray?.result === true && ray.out?.result?.position;
+    // A hit more than 0.15 m short of the point is something in the way.
+    if (hit && len(sub(vec(ray.out.result.position), cam.at)) < len(sub(cast[i].p, cam.at)) - 0.15) cast[i].world = true;
+  });
+  const result = PARTS.map((part) => {
+    const mine = points.filter((x) => x.part === part.part);
+    const seen = mine.filter((x) => !x.body && !x.world).length;
+    return {
+      part: part.part,
+      color: part.color,
+      at: centres.find((x) => x.part === part.part)?.at ?? null,
+      total: mine.length,
+      seen,
+      body: mine.filter((x) => x.body).length,
+      world: mine.filter((x) => x.world).length,
+      chance: mine.length ? Math.round((seen / mine.length) * 100) : null,
+    };
+  });
+  exposureCasts = cast.length;
+  return { parts: result, ms: performance.now() - started, casts: cast.length };
+}
+
+const exposureOnce = () =>
+  step('Exposure', async () => {
+    const t = needTarget();
+    const { parts, ms, casts } = await exposure(t);
+    for (const p of parts) say(`  ${p.part}: ${p.chance === null ? 'no slots' : `${p.chance}% (${p.seen} of ${p.total} points seen, ${p.body} behind its own body, ${p.world} behind the world)`}`);
+    return `${casts} ray casts in ${ms.toFixed(1)} ms`;
+  });
+
+let exposureLabels = false;
+
 async function pinTick() {
   if (!target) return;
   const started = performance.now();
   const { places, ms } = await readSlots(target);
-  const parts = partsOf(places);
+  let parts = partsOf(places);
+  if (exposureLabels) parts = (await exposure(target, places)).parts;
   await clearPartPins();
   for (const p of parts) {
     if (!pinsOn) break; // switched off while this update ran
     if (!p.at) continue;
-    pinIds.push(await world.pin({ at: p.at, title: p.part, style: { color: p.color, scale: 'screen', pinHeight: 0, titleSize: 14 } }));
+    const title = exposureLabels && p.chance !== null ? `${p.part} ${p.chance}%` : p.part;
+    pinIds.push(await world.pin({ at: p.at, title, style: { color: p.color, scale: 'screen', pinHeight: 0, titleSize: 14 } }));
   }
   pinTicks += 1;
   pinMs += performance.now() - started;
-  if (pinTicks % (hz * 5) === 0) say(`Parts: ${pinTicks} updates, ${(pinMs / pinTicks).toFixed(1)} ms each (slot reads ${ms.toFixed(1)} ms), ${parts.filter((p) => p.at).length} parts`);
+  if (pinTicks % (hz * 5) === 0) say(`Parts: ${pinTicks} updates, ${(pinMs / pinTicks).toFixed(1)} ms each (slot reads ${ms.toFixed(1)} ms${exposureLabels ? `, ${exposureCasts} ray casts` : ''}), ${parts.filter((p) => p.at).length} parts`);
 }
 
 async function showParts(on) {
@@ -331,6 +432,8 @@ ui.window({
       ui.button('Normal', unslow, { variant: 'ghost' }),
     ),
     ui.toggle('Watch the dilation and the camera', (on) => watch(on)),
+    ui.heading('Exposure (V8)'),
+    ui.row(ui.button('Exposure', exposureOnce), ui.toggle('Chance on the labels', (on) => (exposureLabels = on))),
     ui.heading('Only one part can be hit (part 2)'),
     ui.row(...PARTS.map((p) => ui.button(p.part, () => onlyPart(p), { variant: 'ghost' }))),
     ui.heading('Log'),
