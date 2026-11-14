@@ -10,7 +10,9 @@
 //   Zoom (V3)    the player's camera: GetFOV, SetFOV, SetZoom, and back
 //   Slow (V5)    TimeSystem.SetTimeDilation on the world, with V left at normal speed or not;
 //                always with a duration, so it runs out on its own if the mod stops
-//   Crosshair (V4)  TargetingSystem.GetLookAtComponent: which component V looks at
+//   Crosshair (V4)  TargetingSystem.GetLookAtComponent: which component V looks at (the whole
+//                hit representation, 2026-11-14), then a ray along the camera's forward
+//                direction against the 15 shapes for the part
 //   Only one part   HitShapeUserDataBase.DisableHitShape on every other shape of the target, for part 2 (hitting
 //                the chosen part); EnableHitShape puts them back after a few seconds
 //   Watch        twice a second: the active time dilation and the camera's field of view,
@@ -177,7 +179,8 @@ async function cameraView() {
   const r = await cams.GetActiveCameraWorldTransform(api.$out);
   const pos = r?.out?.transform?.position;
   if (!pos) throw new Error('No camera transform');
-  return { at: vec(pos), right: vec(await cams.GetActiveCameraRight()), up: vec(await cams.GetActiveCameraUp()) };
+  const [right, up, forward] = await Promise.all([cams.GetActiveCameraRight(), cams.GetActiveCameraUp(), cams.GetActiveCameraForward()]);
+  return { at: vec(pos), right: vec(right), up: vec(up), forward: vec(forward) };
 }
 
 // Does the segment from `from` to `to` pass through the sphere before reaching `to`?
@@ -377,8 +380,34 @@ const crosshair = () =>
     if (!comp) return 'no component under the crosshair';
     const name = await comp.GetName().catch(() => '?');
     const owner = await targeting.GetLookAtObject(v, true, false);
-    return `${comp.$type} "${name}" on ${owner ? `${owner.$type} "${(await owner.GetDisplayName()) || 'no name'}"` : 'nothing'}`;
+    const what = `${comp.$type} "${name}" on ${owner ? `${owner.$type} "${(await owner.GetDisplayName()) || 'no name'}"` : 'nothing'}`;
+    // The game names only the whole hit representation, not the shape: find the part with a
+    // ray from the camera along its forward direction, against the 15 shapes (as balls).
+    const body = owner ?? target;
+    if (!body) return what;
+    const part = await partUnderCrosshair(body).catch((err) => `part not found (${err?.message ?? err})`);
+    return `${what}; ${part}`;
   });
+
+async function partUnderCrosshair(t) {
+  const [cam, { places }] = await Promise.all([cameraView(), readSlots(t)]);
+  let best = null;
+  let nearest = null;
+  for (const p of places) {
+    if (p.x === null) continue;
+    const along = dot(sub(p, cam.at), cam.forward);
+    if (along <= 0) continue; // behind the camera
+    const miss = len(sub(p, add(cam.at, cam.forward, along)));
+    const [radius, height] = SHAPES[p.slot];
+    const reach = Math.max(radius, height / 2); // the capsule's long axis is unknown: its half length
+    if (!nearest || miss - reach < nearest.miss - nearest.reach) nearest = { slot: p.slot, miss, reach, along };
+    if (miss <= reach && (!best || along < best.along)) best = { slot: p.slot, miss, along };
+  }
+  const partOf = (slot) => PARTS.find((x) => x.slots.includes(slot))?.part ?? '?';
+  if (best) return `the crosshair is on the ${partOf(best.slot)} (${best.slot}, ${best.miss.toFixed(2)} m off its middle, ${best.along.toFixed(1)} m away)`;
+  if (nearest) return `on no shape; nearest the ${partOf(nearest.slot)} (${nearest.slot}, ${(nearest.miss - nearest.reach).toFixed(2)} m outside it)`;
+  return 'no slots to test';
+}
 
 // ---------- part 2: only one part can be hit ----------
 
