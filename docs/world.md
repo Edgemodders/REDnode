@@ -1904,3 +1904,10 @@ In the game, with REDnode's Console. A loaded save, outdoors on open ground.
 | 13 | Quit the game, start it again, load a save, open **Pins** | The sets and the switches are as you left them, the shown sets' pins in the world |
 
 Claude then reads the host's `Pins:` lines (drops, Go there, clicks) and the plugin's log.
+
+### WP3 test: results
+
+| Run | Result |
+|---|---|
+| First run, 2026-11-14, by the owner, dev PC, REDnode 0.64.0, game 2.5 | The owner: every step worked. The host log shows steps 2 and 3 (Start and Corner dropped in My pins, 30 m apart), 5 and 6 (Go there to Start, then clicks on Corner and the Console pin, 1 s apart), 8 (B1 dropped in Scene B), 10 (My pins' file rewritten at 17:13 with one pin left) and 12 (at the save load, "removed 1 pin(s) of every package (the game session ended)": the Console's pin, the sets kept). Not in the logs: step 11 (the saved sets list only My pins and Scene B, no "console" set, so it was not opened, or was forgotten after) and step 13 (the game ran from 17:04, before the test, to after it, so no restart yet). **Steps 1 to 10 and 12 passed; 11 and 13 to confirm** |
+
