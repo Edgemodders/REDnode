@@ -112,6 +112,22 @@ Not researched yet. Candidates, each unverified:
 | Only that part can be hit | Switch off every other hit shape on the target for the shot (`DisableHitShape`), then back on |
 | A scripted hit | Apply the attack to the part's shape directly, as the game's own effects do |
 
+## Hit chance from exposure
+
+The owner's idea, 2026-11-14, not a priority yet: each part's hit chance follows how much of it V can see. An NPC facing left in V's view shows its left arm (90 to 100 %) and hides its right arm behind its own body (a chance by how much of it shows). Nothing found so far prevents it; it would come in a build phase once the spikes pass.
+
+**How it could work:** cast rays from the camera to a few points on each part and count the ones that reach it unblocked.
+
+| Step | How |
+|---|---|
+| Points on each part | Every hit shape is a capsule, sphere or box of a known size (the shape file: the LeftArm capsule is 0.08 m by 0.25 m) on a slot. `GetTargetSlotTransform(target, slot, out transform)` gives a slot's place and orientation, so each shape's points (its ends, middle and sides) can be placed in the world |
+| Blocked by the world | A ray from the camera to each point through `SpatialQueriesSystem.SyncRaycastByCollisionGroup`, as world pins test walls (REDnode's `RaycastStatic`, WP2: 17 to 33 us a ray). `"Static"` catches walls and cover; which groups also catch cars, crates and other NPCs is unverified |
+| Blocked by its own body | Physics rays do not see hit shapes, and the far arm hides behind the NPC's own torso. So test each ray against the target's other capsules with plain maths (a ray against a capsule, in the mod, no game call). Other NPCs in the way can be tested the same way, with their slots read too |
+| The chance | A part's exposure is the share of its rays that reach it. The hit chance is exposure times the mod's own factors (distance, the weapon's spread, the player's skill), a formula to design |
+| Cost | Six parts by six to eight points is 36 to 48 rays, about 1 to 1.5 ms of the game thread if done at once. Spread over frames, or done only when the target, V or the camera moves, a few times a second is enough for a label |
+
+Unverified: the slots' orientation (which axis a capsule runs along), the collision groups for moving things, and whether the game's own bullets agree with the capsules (they hit the same hit shapes, so they should).
+
 ## Spikes
 
 | Spike | Question | How |
@@ -123,8 +139,9 @@ Not researched yet. Candidates, each unverified:
 | **V5 Deep slow motion** | How low can the world's dilation go while scanning, with V and the camera at normal speed, and how does it stack with the scanner's own? | `SetTimeDilation` and the local-player calls from the Console while scanning; undo with `UnsetTimeDilation` |
 | **V6 The smart gun's part** | Can the smart gun lock onto a chosen bone? | Watch `attachedBoneName` on its targets; try its target sorting, or the lock events |
 | **V7 Only VATS quickhacks** | Can EDGEhack's scripts switch every other quickhack off while VATS is on, and back after, beside REDnode's own wrap of the same function? | In EDGEhack: wrap `TranslateChoicesIntoQuickSlotCommands` behind a VATS switch, mark the others unusable with a reason; check the wheel, its keys and REDnode's quickhack test together |
+| **V8 Exposure** (not a priority) | Can each part's exposure be measured from the camera, against the world and the NPC's own body, cheaply enough? | Read the slots' transforms (`GetTargetSlotTransform`), place points on the capsules, cast rays against the world with `SyncRaycastByCollisionGroup`, test them against the other capsules in the mod; compare with where shots land |
 
-V1 and V3 decide whether the first build goes ahead as drawn here. V5 and V7 decide the rest of the play.
+V1 and V3 decide whether the first build goes ahead as drawn here. V5 and V7 decide the rest of the play. V8 waits until those pass.
 
 ## Open questions
 
@@ -135,7 +152,7 @@ V1 and V3 decide whether the first build goes ahead as drawn here. V5 and V7 dec
 | The duration's clock | Real time, so the player's budget stays the same however slow the world is. To decide with the owner |
 | Moving between enemies | Snap to the next or previous enemy with a key or stick, nearest first. To decide with the owner |
 | Enemies VATS covers | Human NPCs on `npc_base` first; bosses, mechs and drones later, each with its own shape file |
-| What a part's label shows | Name, hit chance, damage modifier, armour. Hit chance needs a formula of the mod's own |
+| What a part's label shows | Name, hit chance, damage modifier, armour. Hit chance from the part's exposure (above) times the mod's own factors |
 
 ## The spike app
 
