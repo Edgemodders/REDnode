@@ -16,7 +16,7 @@ The owner's design, 2026-11-14.
 |---|---|
 | Scanning | The game's scanner works as it does today |
 | Enter VATS | While scanning, the VATS button: the camera zooms onto the scanned enemy, time slows far more than the scanner's own slow motion, and the body part targeting and highlights take over |
-| In VATS | The player picks an enemy (the camera moves easily from one enemy to another) and a body part, then attacks it with **quickhacks** from a VATS quickhack wheel of its own (VATS quickhacks made with [EDGEhack](https://github.com/Edgemodders/EDGEhack)), or with a **smart gun** |
+| In VATS | The player picks an enemy (the camera moves easily from one enemy to another) and a body part, then attacks it with **quickhacks** or a **smart gun**. The quickhack wheel is the game's own; in VATS only the VATS quickhacks (made with [EDGEhack](https://github.com/Edgemodders/EDGEhack)) are enabled |
 | Leave VATS | The VATS button again, with the scanner button still held: back to normal scanning |
 | Cancel | Letting go of the scanner cancels VATS too. VATS also has a timed duration: when it runs out, VATS ends, back to scanning, or out of scanning if the scanner is no longer held |
 
@@ -36,11 +36,11 @@ As states:
 | The VATS button | The mod's own redscript input listener, until REDnode's I3 Input | One button enters and leaves; the scanner button is the game's own |
 | Zoom onto the enemy | The player's camera: `SetFOV`/`SetZoom` (spike V3) | Turning the view onto the enemy, and on to the next one, is the targeting system's `LookAt` or the camera itself (unverified). "Moves easily between enemies" suggests snapping to the next enemy with a key or stick, not free aiming |
 | Deeper slow motion | `TimeSystem.SetTimeDilation` (the world) with `SetIgnoreTimeDilationOnLocalPlayerZero` or `SetTimeDilationOnLocalPlayerZero` for V; per object `SetIndividualTimeDilation` | The scanner's own slow motion was never found in the global dilation (REDnode's sound spike), so how VATS's dilation stacks with it is unverified. The Sandevistan sets the world's to 0.3 and leaves V at 1: VATS could go much lower, such as 0.05 (to try) |
-| The VATS quickhack wheel | REDnode's quickhack functions ([Quickhack functions](quickhacks.html), #42) already wrap the game's `TranslateChoicesIntoQuickSlotCommands`, which builds the wheel's list | Showing only VATS's set while VATS is on, and the usual set otherwise, is **a new REDnode need**: today `quickhacks.define` decides only its own hacks (usable or not), and cannot hide the game's. The wrap could filter the list (unverified). EDGEhack makes the VATS quickhacks themselves |
+| Only VATS quickhacks in VATS | The game's own wheel. Its list is built by `TranslateChoicesIntoQuickSlotCommands`, which EDGEhack's scripts can wrap to mark every other quickhack unusable while VATS is on (decided with the owner, 2026-11-14: no wheel of its own, and EDGEhack's scripts handle it). The VATS quickhacks are usable only in VATS | REDnode needs nothing new. REDnode's quickhack functions ([Quickhack functions](quickhacks.html), #42) wrap the same function, and redscript chains wraps, so both run (unverified together). A REDnode package's own VATS hacks could also use `quickhacks.define`'s `canUse` and `disabledText` ("VATS only") |
 | A quickhack on a body part | A quickhack lands on the whole target. The part is VATS's own choice, passed to the hack's effect (`onLand` in `quickhacks.define` knows the target) | Which part was picked travels from VATS to the hack's effect in the mod's own code |
 | The smart gun on a body part | Smart gun targets already carry a bone: `gamesmartGunUITargetParameters.attachedBoneName`, with lock events (`gamesmartGunSmartGunLockEvent`) and target sorting in TweakDB (`SmartGunTargetSortData` records) | Steering its lock to the chosen part's bone is unverified (spike V6) |
 | The duration | A timer that ends VATS | On which clock: in a slowed world, a real-time timer feels right for a player's budget, while game time would stretch it. REDnode's proposed game-time timers would offer both |
-| Ending cleanly | Every change undone: camera zoom, time dilation, the wheel's list, the highlights | Also when the player dies, a scene starts or a menu opens during VATS |
+| Ending cleanly | Every change undone: camera zoom, time dilation, the quickhacks switched off, the highlights | Also when the player dies, a scene starts or a menu opens during VATS |
 
 ## What the engine already has
 
@@ -122,7 +122,7 @@ Not researched yet. Candidates, each unverified:
 | **V4 The crosshair's part** | Does the game report which part the crosshair is on? | `GetComponentClosestToCrosshair` and `GetTargetParts` on a scanned enemy, from the Console |
 | **V5 Deep slow motion** | How low can the world's dilation go while scanning, with V and the camera at normal speed, and how does it stack with the scanner's own? | `SetTimeDilation` and the local-player calls from the Console while scanning; undo with `UnsetTimeDilation` |
 | **V6 The smart gun's part** | Can the smart gun lock onto a chosen bone? | Watch `attachedBoneName` on its targets; try its target sorting, or the lock events |
-| **V7 A wheel of VATS's own** | Can REDnode's wrap of the wheel's list show only a chosen set of quickhacks? | Filter the list in `REDnodeQuickhacks.reds` behind a switch; check the wheel and its keys |
+| **V7 Only VATS quickhacks** | Can EDGEhack's scripts switch every other quickhack off while VATS is on, and back after, beside REDnode's own wrap of the same function? | In EDGEhack: wrap `TranslateChoicesIntoQuickSlotCommands` behind a VATS switch, mark the others unusable with a reason; check the wheel, its keys and REDnode's quickhack test together |
 
 V1 and V3 decide whether the first build goes ahead as drawn here. V5 and V7 decide the rest of the play.
 
