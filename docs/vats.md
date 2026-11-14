@@ -117,9 +117,9 @@ Each shape's data is a `HitShapeUserDataBase`: its type (`Flesh`, `Metal`, `Cybe
 | Piece | How |
 |---|---|
 | The box | REDnode's pin label in the game's look (`MainColors.Red` from the game's style sheet, as I2b's game look reads it), drawn on the labels page like any pin |
-| Where it goes | Outside the body, away from its middle: the head's box above, the arms' to their side, the legs' low and to their side; placed in screen space each frame, so the boxes never sit on the body or on each other |
-| The line | From the box to the part's middle. An elbow line (across, then down or up) needs only straight pieces, as pin posts are drawn; a slanted line needs a turned quad in the compositor (a small addition) |
-| What REDnode needs | A callout pin: a label offset from its point in screen space, with a leader line. Today a pin's label sits straight above its point with a vertical post |
+| Where it goes | The owner, 2026-11-14: the head's box above the head; the limbs' and the torso's boxes off to the side, at about the height of their part, so their lines run across to it rather than down through the body. A part's side is the side of the screen it is on, from the body's middle, not its name: an enemy facing V shows its left arm on the right. The torso's box goes on the side with more room. Placed in screen space each frame, the boxes kept clear of the body's outline and of each other |
+| The line | Horizontal for the side boxes: from the box's inner edge across to the part's outline, at the part's height (a short bend if boxes on one side have to be spread apart). Vertical and short for the head's box. Straight pieces only, as pin posts are drawn; a bend needs two |
+| What REDnode needs | A callout pin: a label placed beside or above its point in screen space, with a horizontal or vertical leader line (an elbow when spread). Today a pin's label sits straight above its point with a vertical post. The side and spread are worked out per frame from the body's projected outline, in the plugin |
 
 The game's own map pins (the mappin system attaches a widget to an object's slot and the engine places it each frame) could give a truly native box, but VATS would need its own ink widget for them, through Codeware (unverified; a later spike).
 
