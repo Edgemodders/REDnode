@@ -51,6 +51,8 @@ nav:
     url: /ink.html
   - title: Semi-native apps
     url: /semi-native.html
+  - title: VATS
+    url: /vats.html
   - title: Quest API
     url: /quests.html
   - title: Quickhack functions
