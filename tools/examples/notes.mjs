@@ -439,6 +439,19 @@ export const NOTES = {
     tryThis: ['Press Spawn a person and Spawn a prop, then Near V and Spawned.', 'Press Files of the nearest.'],
     preview: 'The preview\'s game has only what the preview spawned and cannot read scene files, so some buttons log a failure here: the app is meant for the game.',
   },
+  'vats-spike': {
+    group: 'tests',
+    summary: 'Research for VATS: an enemy\'s body parts read and pinned where they are, the camera zoomed, the world slowed, what the crosshair is on, and only one body part left to hit.',
+    teaches: ['api global functions', 'api.$out', 'TargetingSystem', 'TimeSystem', 'gameCameraComponent', 'world.pin', 'ui.slider', 'ui.list'],
+    how: [
+      'Every NPC is hit through 15 hit shapes on its skeleton. The global `GetTargetSlotPosition(target, slot, api.$out)` reads where each one is; the app groups them into six parts and pins each part at the middle of its slots, again a few times a second.',
+      '**Zoom** halves or quarters the player\'s camera field of view (`GetFPPCameraComponent`, `SetFOV`); **Back** puts it back.',
+      '**Slow motion** calls `TimeSystem.SetTimeDilation` with a reason and a duration, so it always runs out on its own, and can keep V at normal speed.',
+      '**Only one part can be hit** switches the target\'s other hit shapes off with `DisableHitShape` and back on after 6 seconds.',
+    ],
+    tryThis: ['Press Target, then Read slots, then switch on Show parts.', 'Press x2, then Back.'],
+    preview: 'The preview\'s game has no enemies or camera, so most buttons log a failure here: the app is meant for the game.',
+  },
   'refresh-test': {
     group: 'tests',
     summary: 'Swap an archive, then try each way the game offers to load again what is already in the world: V\'s clothes, the inventory\'s preview of V, what V looks at, a spawned object.',

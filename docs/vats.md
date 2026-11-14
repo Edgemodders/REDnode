@@ -136,3 +136,43 @@ V1 and V3 decide whether the first build goes ahead as drawn here. V5 and V7 dec
 | Moving between enemies | Snap to the next or previous enemy with a key or stick, nearest first. To decide with the owner |
 | Enemies VATS covers | Human NPCs on `npc_base` first; bosses, mechs and drones later, each with its own shape file |
 | What a part's label shows | Name, hit chance, damage modifier, armour. Hit chance needs a formula of the mod's own |
+
+## The spike app
+
+Built on 2026-11-14: the **VATS spike** app (`packages/overlay/apps/vats-spike`, a Node mod). It goes through `api` and world pins only, so REDnode itself is unchanged and it runs on REDnode 0.62.4 or later. Each button calls the game and logs what it answered and how long it took, in its window, the Mod log and `red4ext/logs/rednode-mods.log`.
+
+| Section | What it calls | Answers |
+|---|---|---|
+| Target | `TargetingSystem.GetLookAtObject`: what V looks at becomes the target | |
+| Read slots | The global `GetTargetSlotPosition(target, slot, out position)` for the 15 hit shape slots, grouped into the six parts | V1: which slots an NPC has, and the cost |
+| Show parts | The same reads a few times a second (1 to 15, a slider), a pin per part at the middle of its slots (`screen` scale, no post) | V1: do six labels follow a moving enemy, and what does it cost |
+| Crosshair (V4) | `TargetingSystem.GetLookAtComponent`, with its component's name | V4 |
+| Zoom (V3) | The player's camera (`GetFPPCameraComponent`): `SetFOV` to a half or a quarter, `SetZoom`, **Back** | V3 |
+| Slow motion (V5) | `TimeSystem.SetTimeDilation` with a reason and a duration (2 to 30 s, a slider), so it always runs out on its own; **Keep V at normal speed** adds `SetIgnoreTimeDilationOnLocalPlayerZero`; **Normal** undoes both | V5 |
+| Watch | Twice a second, a line when the active dilation, the field of view or the zoom changes | What the scanner itself changes |
+| Only one part can be hit | `DisableHitShape` on the target's other shapes, `EnableHitShape` after 6 s | Part 2: can a shot be made to land on one part |
+
+A package has no stop hook, so nothing it changes outlives it unattended: slow motion runs out by its duration, the hit shapes come back after 6 s, and the zoom has **Back** (unverified whether a save load also resets it).
+
+Checked in the mock game (scratchpad `vats/check.mjs`, its stand-in plugin `vats/mock.mjs` with the game's answers in `vats/answer.mjs`): 30 checks, every button, the calls' arguments as the 2.5 types want them, six pins placed again and again and gone when switched off (the check found an update in flight putting them back after the switch; fixed), and the hit shapes back on.
+
+### Spike test
+
+In the game, on open ground near enemies who are not fighting yet (a gang's hangout, from a distance). The overlay pauses the game while it is interactive, so the scanner cannot be held while clicking: each step sets something up with **F10**, then leaves interactive mode (F10 again) to play.
+
+| Step | Do | Expect, and what to note |
+|---|---|---|
+| 1 | Press **F10** and switch on **VATS spike** in the launcher (it asks for no permission) | Its window opens on the left: "VATS spike ready" |
+| 2 | Look at an enemy and press **Target** | "Target: NPCPuppet ..." with their name |
+| 3 | Press **Read slots** | "15 of 15 slots" (or which are missing) and the time it took |
+| 4 | Switch on **Show parts**, then leave interactive mode and watch the enemy walk | Six coloured labels (Head, Torso, Left arm, Right arm, Left leg, Right leg) on their body. Note whether they keep up, and whether left and right are the enemy's own |
+| 5 | Back in F10, move **Updates a second** to 15, and watch again; then switch Show parts off | Smoother at 15. Note the cost lines ("Parts: ... ms each") |
+| 6 | Switch on **Watch the dilation and the camera**, leave interactive mode, hold the scanner for a few seconds, let go | Watch lines show what the scanner changes: the dilation and the field of view, or nothing |
+| 7 | In F10, press **x2**, leave interactive mode, and hold the scanner | The view zoomed. Note whether it stays zoomed while scanning and after. Then **Back** in F10 |
+| 8 | In F10, with **Keep V at normal speed** on, press **0.05**, then leave interactive mode at once and move V, turn the camera, hold the scanner | For 8 s the world crawls. Note whether V and the camera move normally, and what Watch logs while scanning |
+| 9 | Repeat step 8 with Keep V at normal speed off, then with **0.01** | Note the differences |
+| 10 | Aim at the enemy's head and press **Crosshair (V4)** (F10 shows the cursor, but the crosshair stays where V aims). Repeat aiming at a leg | Which component is under the crosshair each time |
+| 11 | Press **Left arm** under "Only one part can be hit", leave interactive mode and shoot the enemy's torso and head within 6 s, then the left arm | Note whether torso and head shots pass through or miss, and whether the arm takes hits. After 6 s the log says every hit shape is back on |
+| 12 | Switch the app off | Its pins go; nothing stays slowed |
+
+Claude then reads `rednode-mods.log` for the `[vats-spike]` lines, the costs and the answers, and writes the results here and into the game API notes (`gameapi/notes/`), since other mods can use them too.
