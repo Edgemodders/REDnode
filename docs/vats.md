@@ -73,7 +73,7 @@ Each shape's data is a `HitShapeUserDataBase`: its type (`Flesh`, `Metal`, `Cybe
 | Where a part is now | The shapes' slots are the NPC's slots (`entSlot`: a slot name on a bone). `AIActionHelper.GetTargetSlotPosition(target, n"Chest", out pos)` is how the game's scripts read one. `entSlotComponent.GetSlotTransform` reads any slot |
 | Which part the crosshair is on | `TargetingSystem`: `GetComponentClosestToCrosshair`, `GetTargetParts`, `GetBestComponentOnTargetObject`; aim assist uses them |
 | What a shot hit | `hitEvent` carries the hit shape (`GetHitShape`, `GetHitShapeUserDataBase`); the game's hit reactions read its name |
-| Switch a part's hit shape off or on | Global functions `DisableHitShape(object, shapeName, hierarchical)` and `EnableHitShape(...)`, and the event `gamehitRepresentationEventsToggleHitShapeEvent` |
+| Switch a part's hit shape off or on | Static functions `HitShapeUserDataBase.DisableHitShape(object, shapeName, hierarchical)` and `HitShapeUserDataBase.EnableHitShape(...)`, and the event `gamehitRepresentationEventsToggleHitShapeEvent` |
 | Zoom | The player's camera (`gameCameraComponent`): `SetFOV`, `SetZoom`, and `fovOverrideWeight`/`fovOverrideValue`. Whether the scanner leaves them alone is unverified |
 | Slow time | `TimeSystem`'s time dilation; the Sandevistan sets the world's to 0.3 (seen in REDnode's sound spike) |
 | Highlights | The scanner's outlines (`FocusForcedHighlightData`, `gameVisionModeSystem`), weak spot highlights on bosses (`ToggleWeakspotHighlightEvent`: weak spots are objects of their own, so they light up alone), and `entRenderHighlightEvent` with `fillIndex`, `outlineIndex`, `opacity`, `seeThroughWalls` and a `componentName` |
@@ -161,14 +161,14 @@ Built on 2026-11-14: the **VATS spike** app (`packages/overlay/apps/vats-spike`,
 | Section | What it calls | Answers |
 |---|---|---|
 | Target | `TargetingSystem.GetLookAtObject`: what V looks at becomes the target | |
-| Read slots | The global `GetTargetSlotPosition(target, slot, out position)` for the 15 hit shape slots, grouped into the six parts | V1: which slots an NPC has, and the cost |
+| Read slots | `AIActionHelper.GetTargetSlotPosition(target, slot, out position)` (a static, not a global: 0.2.0 called it as a global and was refused) for the 15 hit shape slots, grouped into the six parts | V1: which slots an NPC has, and the cost |
 | Show parts | The same reads a few times a second (1 to 15, a slider), a pin per part at the middle of its slots (`screen` scale, no post) | V1: do six labels follow a moving enemy, and what does it cost |
 | Crosshair (V4) | `TargetingSystem.GetLookAtComponent`, with its component's name | V4 |
 | Zoom (V3) | The player's camera (`GetFPPCameraComponent`): `SetFOV` to a half or a quarter, `SetZoom`, **Back** | V3 |
 | Slow motion (V5) | `TimeSystem.SetTimeDilation` with a reason and a duration (2 to 30 s, a slider), so it always runs out on its own; **Keep V at normal speed** adds `SetIgnoreTimeDilationOnLocalPlayerZero`; **Normal** undoes both | V5 |
 | Watch | Twice a second, a line when the active dilation, the field of view or the zoom changes | What the scanner itself changes |
 | Exposure (V8) | Five points across each shape (its slot, and its capsule's radius to the camera's right, left, up and down). A point is behind the target's own body if the line from the camera passes through another of its shapes, each taken as a sphere of its capsule's radius at its slot (an approximation). The rest get a ray each from the camera (`GetActiveCameraWorldTransform`, `SyncRaycastByCollisionGroup` with `"Static"`), all sent at once so they share a frame; a hit more than 0.15 m short is the world in the way. **Chance on the labels** shows each part's share on its pin while Show parts is on | V8: do the shares match what the player sees, and what do 40 to 70 rays cost |
-| Only one part can be hit | `DisableHitShape` on the target's other shapes, `EnableHitShape` after 6 s | Part 2: can a shot be made to land on one part |
+| Only one part can be hit | `HitShapeUserDataBase.DisableHitShape` on the target's other shapes, `EnableHitShape` after 6 s | Part 2: can a shot be made to land on one part |
 
 A package has no stop hook, so nothing it changes outlives it unattended: slow motion runs out by its duration, the hit shapes come back after 6 s, and the zoom has **Back** (unverified whether a save load also resets it).
 

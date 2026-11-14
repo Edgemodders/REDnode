@@ -5,13 +5,13 @@
 // camera's zoom, time dilation, hit shapes), so its findings go into the game API notes.
 //
 //   Target       what V looks at (TargetingSystem.GetLookAtObject), kept as the target
-//   Parts (V1)   the target's 15 hit shape slots read with the global GetTargetSlotPosition,
+//   Parts (V1)   the target's 15 hit shape slots read with AIActionHelper.GetTargetSlotPosition,
 //                grouped into six parts, pinned where they are, again a few times a second
 //   Zoom (V3)    the player's camera: GetFOV, SetFOV, SetZoom, and back
 //   Slow (V5)    TimeSystem.SetTimeDilation on the world, with V left at normal speed or not;
 //                always with a duration, so it runs out on its own if the mod stops
 //   Crosshair (V4)  TargetingSystem.GetLookAtComponent: which component V looks at
-//   Only one part   DisableHitShape on every other shape of the target, for part 2 (hitting
+//   Only one part   HitShapeUserDataBase.DisableHitShape on every other shape of the target, for part 2 (hitting
 //                the chosen part); EnableHitShape puts them back after a few seconds
 //   Watch        twice a second: the active time dilation and the camera's field of view,
 //                to see what the scanner itself changes
@@ -91,7 +91,7 @@ async function readSlots(t) {
   const started = performance.now();
   const places = await Promise.all(
     SLOTS.map(async (slot) => {
-      const r = await api.GetTargetSlotPosition(t, slot, api.$out);
+      const r = await api.AIActionHelper.GetTargetSlotPosition(t, slot, api.$out);
       const p = r?.out?.slotPosition;
       return r?.result && p ? { slot, x: p.X, y: p.Y, z: p.Z } : { slot, x: null };
     }),
@@ -230,13 +230,17 @@ async function pinTick() {
   const { places, ms } = await readSlots(target);
   let parts = partsOf(places);
   if (exposureLabels) parts = (await exposure(target, places)).parts;
-  await clearPartPins();
-  for (const p of parts) {
-    if (!pinsOn) break; // switched off while this update ran
-    if (!p.at) continue;
-    const title = exposureLabels && p.chance !== null ? `${p.part} ${p.chance}%` : p.part;
-    pinIds.push(await world.pin({ at: p.at, title, style: { color: p.color, scale: 'screen', pinHeight: 0, titleSize: 14 } }));
-  }
+  if (!pinsOn) return; // switched off while this update ran
+  // The new places first, then the old pins away: never a moment with no pins, which would
+  // make the labels flicker and the host make its labels page again on every update.
+  const old = pinIds;
+  pinIds = await Promise.all(
+    parts.filter((p) => p.at).map((p) => {
+      const title = exposureLabels && p.chance !== null ? `${p.part} ${p.chance}%` : p.part;
+      return world.pin({ at: p.at, title, style: { color: p.color, scale: 'screen', pinHeight: 0, titleSize: 14 } });
+    }),
+  );
+  await Promise.all(old.map((id) => world.unpin(id).catch(() => false)));
   pinTicks += 1;
   pinMs += performance.now() - started;
   if (pinTicks % (hz * 5) === 0) say(`Parts: ${pinTicks} updates, ${(pinMs / pinTicks).toFixed(1)} ms each (slot reads ${ms.toFixed(1)} ms${exposureLabels ? `, ${exposureCasts} ray casts` : ''}), ${parts.filter((p) => p.at).length} parts`);
@@ -358,9 +362,9 @@ const onlyPart = (part) =>
   step(`Only ${part.part} can be hit`, async () => {
     const t = needTarget();
     const off = SLOTS.filter((s) => !part.slots.includes(s));
-    for (const shape of off) await api.DisableHitShape(t, shape, false);
+    for (const shape of off) await api.HitShapeUserDataBase.DisableHitShape(t, shape, false);
     setTimeout(async () => {
-      for (const shape of off) await api.EnableHitShape(t, shape, false).catch(() => {});
+      for (const shape of off) await api.HitShapeUserDataBase.EnableHitShape(t, shape, false).catch(() => {});
       say(`Only ${part.part}: every hit shape back on`);
     }, onlySeconds * 1000);
     return `${off.length} other hit shapes off for ${onlySeconds} s: shoot the target and watch where hits land`;
