@@ -1,12 +1,46 @@
 # VATS: Visual Assisted Targeting System
 
-Status: **initial research, 2026-11-14; nothing built.** A mod idea from the owner: during combat, scan an enemy, zoom in with another button, and pick one of its body parts to target: head, torso, left arm, right arm, left leg, right leg. This page covers the first part, **body part targeting**: can REDengine highlight the parts itself, or does REDnode draw them over the game? It lives in REDnode's docs while the parts it needs are REDnode's; the mod may get its own repository later.
+Status: **initial research, 2026-11-14, with the owner's play design added the same day; nothing built.** A mod idea from the owner: during combat, scan an enemy, zoom in with another button, and pick one of its body parts to target: head, torso, left arm, right arm, left leg, right leg. This page covers the first part, **body part targeting**: can REDengine highlight the parts itself, or does REDnode draw them over the game? It lives in REDnode's docs while the parts it needs are REDnode's; the mod may get its own repository later.
 
 Sources: the 2.5 game API dump (`gameapi/2.5/rtti.json`), the game's files read through REDbridge, and a decompile of the game's scripts from an earlier version (2.5 may differ). Everything below is unverified in the game unless it says otherwise.
 
 ## The short answer
 
 **Both, split by job.** The engine knows exactly where each body part is and can aim at it, zoom the camera and slow time. It has no built-in way to outline one limb, because a body is one mesh. So the first build has REDnode draw the six parts over the game, placed by the plugin each frame as world pins are. A spike tries to draw parts in the engine's own picture instead, with small glowing shapes attached to the bones.
+
+## How VATS plays
+
+The owner's design, 2026-11-14.
+
+| Step | What happens |
+|---|---|
+| Scanning | The game's scanner works as it does today |
+| Enter VATS | While scanning, the VATS button: the camera zooms onto the scanned enemy, time slows far more than the scanner's own slow motion, and the body part targeting and highlights take over |
+| In VATS | The player picks an enemy (the camera moves easily from one enemy to another) and a body part, then attacks it with **quickhacks** from a VATS quickhack wheel of its own (VATS quickhacks made with [EDGEhack](https://github.com/Edgemodders/EDGEhack)), or with a **smart gun** |
+| Leave VATS | The VATS button again, with the scanner button still held: back to normal scanning |
+| Cancel | Letting go of the scanner cancels VATS too. VATS also has a timed duration: when it runs out, VATS ends, back to scanning, or out of scanning if the scanner is no longer held |
+
+As states:
+
+| State | VATS button | Scanner released | Timer runs out |
+|---|---|---|---|
+| Not scanning | Nothing | | |
+| Scanning | Enter VATS | Not scanning | |
+| VATS | Back to scanning (scanner still held) | Not scanning (VATS ends with it) | Scanning if the scanner is held, else not scanning |
+
+### What each part of it needs
+
+| Part | Engine side | Notes and unknowns |
+|---|---|---|
+| Knowing the scanner is up | The player's vision mode (`PlayerVisionModeController`, the scanner's blackboard `UI_Scanner`, `gameVisionModeSystem`) | Which signal tells "scanner held" most reliably is unverified |
+| The VATS button | The mod's own redscript input listener, until REDnode's I3 Input | One button enters and leaves; the scanner button is the game's own |
+| Zoom onto the enemy | The player's camera: `SetFOV`/`SetZoom` (spike V3) | Turning the view onto the enemy, and on to the next one, is the targeting system's `LookAt` or the camera itself (unverified). "Moves easily between enemies" suggests snapping to the next enemy with a key or stick, not free aiming |
+| Deeper slow motion | `TimeSystem.SetTimeDilation` (the world) with `SetIgnoreTimeDilationOnLocalPlayerZero` or `SetTimeDilationOnLocalPlayerZero` for V; per object `SetIndividualTimeDilation` | The scanner's own slow motion was never found in the global dilation (REDnode's sound spike), so how VATS's dilation stacks with it is unverified. The Sandevistan sets the world's to 0.3 and leaves V at 1: VATS could go much lower, such as 0.05 (to try) |
+| The VATS quickhack wheel | REDnode's quickhack functions ([Quickhack functions](quickhacks.html), #42) already wrap the game's `TranslateChoicesIntoQuickSlotCommands`, which builds the wheel's list | Showing only VATS's set while VATS is on, and the usual set otherwise, is **a new REDnode need**: today `quickhacks.define` decides only its own hacks (usable or not), and cannot hide the game's. The wrap could filter the list (unverified). EDGEhack makes the VATS quickhacks themselves |
+| A quickhack on a body part | A quickhack lands on the whole target. The part is VATS's own choice, passed to the hack's effect (`onLand` in `quickhacks.define` knows the target) | Which part was picked travels from VATS to the hack's effect in the mod's own code |
+| The smart gun on a body part | Smart gun targets already carry a bone: `gamesmartGunUITargetParameters.attachedBoneName`, with lock events (`gamesmartGunSmartGunLockEvent`) and target sorting in TweakDB (`SmartGunTargetSortData` records) | Steering its lock to the chosen part's bone is unverified (spike V6) |
+| The duration | A timer that ends VATS | On which clock: in a slowed world, a real-time timer feels right for a player's budget, while game time would stretch it. REDnode's proposed game-time timers would offer both |
+| Ending cleanly | Every change undone: camera zoom, time dilation, the wheel's list, the highlights | Also when the player dies, a scene starts or a menu opens during VATS |
 
 ## What the engine already has
 
@@ -86,14 +120,19 @@ Not researched yet. Candidates, each unverified:
 | **V2 Parts in the engine** | Can a glowing shape ride a bone and take the game's outline? | Attach a small mesh to an NPC's `Head` and `LeftArm` slots, send it `entRenderHighlightEvent`; also try `componentName` on the NPC's own head and garments |
 | **V3 Zoom while scanning** | Does `SetFOV` or `SetZoom` on the player's camera hold while the scanner is up? | Call them from the Console while scanning; read them back |
 | **V4 The crosshair's part** | Does the game report which part the crosshair is on? | `GetComponentClosestToCrosshair` and `GetTargetParts` on a scanned enemy, from the Console |
+| **V5 Deep slow motion** | How low can the world's dilation go while scanning, with V and the camera at normal speed, and how does it stack with the scanner's own? | `SetTimeDilation` and the local-player calls from the Console while scanning; undo with `UnsetTimeDilation` |
+| **V6 The smart gun's part** | Can the smart gun lock onto a chosen bone? | Watch `attachedBoneName` on its targets; try its target sorting, or the lock events |
+| **V7 A wheel of VATS's own** | Can REDnode's wrap of the wheel's list show only a chosen set of quickhacks? | Filter the list in `REDnodeQuickhacks.reds` behind a switch; check the wheel and its keys |
 
-V1 and V3 decide whether the first build goes ahead as drawn here.
+V1 and V3 decide whether the first build goes ahead as drawn here. V5 and V7 decide the rest of the play.
 
 ## Open questions
 
 | Question | Recommendation |
 |---|---|
 | Six parts or more (hands, feet)? | Six, as the owner described. The table above already groups the 15 shapes |
-| Time while targeting | Slowed or stopped; decide with the hit research (part 2) |
+| Time while targeting | Slowed far below the scanner's slow motion (the owner, 2026-11-14); how low is V5's question |
+| The duration's clock | Real time, so the player's budget stays the same however slow the world is. To decide with the owner |
+| Moving between enemies | Snap to the next or previous enemy with a key or stick, nearest first. To decide with the owner |
 | Enemies VATS covers | Human NPCs on `npc_base` first; bosses, mechs and drones later, each with its own shape file |
 | What a part's label shows | Name, hit chance, damage modifier, armour. Hit chance needs a formula of the mod's own |
