@@ -112,6 +112,17 @@ Each shape's data is a `HitShapeUserDataBase`: its type (`Flesh`, `Metal`, `Cybe
 | B | The part's capsules projected to the screen and drawn as one red outline (a rounded shape per capsule, merged). REDnode's pins draw labels and posts only, so this needs a new primitive in the plugin: shapes placed from slots each frame, as pins are from points. Drawn over everything, so cover would need the exposure rays to hide what is behind it |
 | C | No gain over B |
 
+**With each part's hit chance as a callout** (the owner, the same day): a small red box in the game's look, outside the body, with the value inside ("72%"), and a line from the box to the part, like a callout in an infographic.
+
+| Piece | How |
+|---|---|
+| The box | REDnode's pin label in the game's look (`MainColors.Red` from the game's style sheet, as I2b's game look reads it), drawn on the labels page like any pin |
+| Where it goes | Outside the body, away from its middle: the head's box above, the arms' to their side, the legs' low and to their side; placed in screen space each frame, so the boxes never sit on the body or on each other |
+| The line | From the box to the part's middle. An elbow line (across, then down or up) needs only straight pieces, as pin posts are drawn; a slanted line needs a turned quad in the compositor (a small addition) |
+| What REDnode needs | A callout pin: a label offset from its point in screen space, with a leader line. Today a pin's label sits straight above its point with a vertical post |
+
+The game's own map pins (the mappin system attaches a widget to an object's slot and the engine places it each frame) could give a truly native box, but VATS would need its own ink widget for them, through Codeware (unverified; a later spike).
+
 Neither can trace the true outline of an arm or a leg, since the body is one mesh: both outline the hit shapes, which is also what a shot can hit.
 
 **Recommendation: B first, with A as a spike.** B reuses what world pins already do and puts all six parts on screen soonest. The scanner's own outline of the whole enemy stays as it is. If A's spike shows bone-attached shapes are cheap and look right, VATS can move its highlights into the engine and keep REDnode's labels.
@@ -183,7 +194,7 @@ V1 and V3 decide whether the first build goes ahead as drawn here. V5 and V7 dec
 | Moving between enemies | Snap to the next or previous enemy with a key or stick, nearest first. To decide with the owner |
 | VATS's zoom | Frame the enemy from V's own camera (turn and narrow the field of view), not a camera moved nearer: the owner's "within the raycast from V's camera". To agree with the owner |
 | Enemies VATS covers | Human NPCs on `npc_base` first; bosses, mechs and drones later, each with its own shape file |
-| What VATS shows on a part | Decided by the owner, 2026-11-14: a red outline, no label. Which parts are outlined (only the one under the crosshair, or all six with the picked one brighter), and where the hit chance shows, if anywhere, are to agree |
+| What VATS shows on a part | Decided by the owner, 2026-11-14: a red outline, and the hit chance in a red callout box outside the body with a line to the part. Which parts show (all six, with the picked one brighter, or only the one under the crosshair) is to agree |
 
 ## The spike app
 
