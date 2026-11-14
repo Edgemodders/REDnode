@@ -444,7 +444,7 @@ export const NOTES = {
     summary: 'Research for VATS: an enemy\'s body parts read and pinned where they are, the camera zoomed, the world slowed, what the crosshair is on, and only one body part left to hit.',
     teaches: ['api global functions', 'api.$out', 'TargetingSystem', 'TimeSystem', 'gameCameraComponent', 'world.pin', 'ui.slider', 'ui.list'],
     how: [
-      'Every NPC is hit through 15 hit shapes on its skeleton. `api.AIActionHelper.GetTargetSlotPosition(target, slot, api.$out)` reads where each one is; the app groups them into six parts and pins each part at the middle of its slots, again a few times a second.',
+      'Every NPC is hit through 15 hit shapes on its skeleton. The native `GetSlotTransform(slot, api.$out)` on its hit representation slot component (`GetHitRepresantationSlotComponent()`, the game's spelling) reads where each one is; the app groups them into six parts and pins each part at the middle of its slots, again a few times a second.',
       '**Zoom** halves or quarters the player\'s camera field of view (`GetFPPCameraComponent`, `SetFOV`); **Back** puts it back.',
       '**Slow motion** calls `TimeSystem.SetTimeDilation` with a reason and a duration, so it always runs out on its own, and can keep V at normal speed.',
       '**Exposure** casts a ray from the camera to five points on each part (`SyncRaycastByCollisionGroup`, every ray sent at once so they share a frame), and tests each against the target\'s own other shapes in plain maths, for a share of each part the camera sees.',

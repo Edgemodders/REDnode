@@ -189,6 +189,12 @@ export interface ApiExtras {
    * call, in `out`. Some native functions write their answer into a parameter
    * the game does not mark as out; the call then returns `{ result, out }`.
    *
+   * Out parameters come back from native functions only. A script function's
+   * out parameter reads its starting value (zeros) after the call: seen on
+   * game 2.5 with `AIActionHelper.GetTargetSlotPosition`, which answered `true`
+   * and left the position at 0, 0, 0 (why is unverified). Call the native
+   * function the script uses instead, here `entSlotComponent.GetSlotTransform`.
+   *
    * @example
    * ```ts
    * const camera = await api.GameInstance.GetCameraSystem(game.instance);

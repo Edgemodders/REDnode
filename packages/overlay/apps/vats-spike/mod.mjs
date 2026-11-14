@@ -5,7 +5,7 @@
 // camera's zoom, time dilation, hit shapes), so its findings go into the game API notes.
 //
 //   Target       what V looks at (TargetingSystem.GetLookAtObject), kept as the target
-//   Parts (V1)   the target's 15 hit shape slots read with AIActionHelper.GetTargetSlotPosition,
+//   Parts (V1)   the target's 15 hit shape slots, read from its hit representation's slot component,
 //                grouped into six parts, pinned where they are, again a few times a second
 //   Zoom (V3)    the player's camera: GetFOV, SetFOV, SetZoom, and back
 //   Slow (V5)    TimeSystem.SetTimeDilation on the world, with V left at normal speed or not;
@@ -86,14 +86,40 @@ const needTarget = () => {
 
 // ---------- V1: the parts ----------
 
+// The target's hit shape slots live on its hit representation's slot component. Its native
+// GetSlotTransform fills its out parameter; the script helper AIActionHelper.GetTargetSlotPosition
+// does not when called through api (0.2.1 read 0, 0, 0 for every slot: a script function's out
+// parameter is not written back to the caller, unverified why).
+let slotsOf = { target: null, component: null, from: '' };
+
+async function slotComponent(t) {
+  if (slotsOf.target === t && slotsOf.component) return slotsOf.component;
+  let component = await t.GetHitRepresantationSlotComponent().catch(() => null);
+  let from = 'GetHitRepresantationSlotComponent';
+  if (!component) {
+    component = await t.GetSlotComponent().catch(() => null);
+    from = 'GetSlotComponent';
+  }
+  if (!component) throw new Error(`${targetName || 'The target'} has no slot component`);
+  slotsOf = { target: t, component, from };
+  say(`Slots: from ${from} (${component.$type})`);
+  return component;
+}
+
+// The game's WorldPosition: fixed point numbers with 17 fraction bits.
+const fixed = (f) => (typeof f === 'number' ? f : (f?.Bits ?? 0) / 131072);
+
 // Every slot's place now, and how long the reads took. A slot the target lacks reads null.
 async function readSlots(t) {
   const started = performance.now();
+  const component = await slotComponent(t);
   const places = await Promise.all(
     SLOTS.map(async (slot) => {
-      const r = await api.AIActionHelper.GetTargetSlotPosition(t, slot, api.$out);
-      const p = r?.out?.slotPosition;
-      return r?.result && p ? { slot, x: p.X, y: p.Y, z: p.Z } : { slot, x: null };
+      const r = await component.GetSlotTransform(slot, api.$out);
+      const p = r?.out?.worldTransformOut?.Position;
+      if (!r?.result || !p) return { slot, x: null };
+      const at = { slot, x: fixed(p.x), y: fixed(p.y), z: fixed(p.z) };
+      return at.x === 0 && at.y === 0 && at.z === 0 ? { slot, x: null, zero: true } : at;
     }),
   );
   return { places, ms: performance.now() - started };
@@ -114,7 +140,7 @@ const readParts = () =>
   step('Read slots', async () => {
     const t = needTarget();
     const { places, ms } = await readSlots(t);
-    const missing = places.filter((p) => p.x === null).map((p) => p.slot);
+    const missing = places.filter((p) => p.x === null).map((p) => (p.zero ? `${p.slot} (read 0, 0, 0)` : p.slot));
     for (const p of places) if (p.x !== null) say(`  ${p.slot}: ${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}`);
     const found = places.filter((p) => p.x !== null);
     const head = found.find((p) => p.slot === 'Head');
