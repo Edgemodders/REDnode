@@ -210,7 +210,9 @@ Built on 2026-11-14: the **VATS spike** app (`packages/overlay/apps/vats-spike`,
 | Slow motion (V5) | `TimeSystem.SetTimeDilation` with a reason and a duration (2 to 30 s, a slider), so it always runs out on its own; **Keep V at normal speed** adds `SetIgnoreTimeDilationOnLocalPlayerZero`; **Normal** undoes both | V5 |
 | Watch | Twice a second, a line when the active dilation, the field of view or the zoom changes | What the scanner itself changes |
 | Exposure (V8) | Five points across each shape (its slot, and its capsule's radius to the camera's right, left, up and down). A point is behind the target's own body if the line from the camera passes through another of its shapes, each taken as a sphere of its capsule's radius at its slot (an approximation). The rest get a ray each from the camera (`GetActiveCameraWorldTransform`, `SyncRaycastByCollisionGroup` with `"Static"`), all sent at once so they share a frame; a hit more than 0.15 m short is the world in the way. **Chance on the labels** shows each part's share on its pin while Show parts is on | V8: do the shares match what the player sees, and what do 40 to 70 rays cost |
-| Only one part can be hit | `HitShapeUserDataBase.DisableHitShape` on the target's other shapes, `EnableHitShape` after 6 s | Part 2: can a shot be made to land on one part |
+| Outline (V2, from 0.3.0) | **List components**: Codeware's `GetComponents()` on the target, each mesh component logged with its type and name. **Outline**: `entRenderHighlightEvent` (made with `api.$new`, sent with `QueueEvent`) with the typed `componentName` (empty: the whole NPC), the colour from a slider (the event's `outlineIndex`, 1 to 7), no fill; **Clear** sends it again with no outline | V2: can the game outline one part (the head, a garment) in red |
+| Frame (V10, from 0.3.0) | The body's middle, height and distance from its slots; the field of view that makes it fill a share of the screen's height (**Body fills**, 40 to 95 %). **Frame (camera)** turns the first-person camera's own local orientation (`SetLocalOrientation`, keeping what its parent adds); **Frame (turn V)** teleports V where V stands, facing the body, with yaw and pitch. Each reads the camera's forward direction after and logs how far the view is off the body's middle (the camera way at once and after 1 s, to see whether the game writes over it). **Camera back** restores the orientation, field of view and zoom | V10: which way turns the view, and whether it holds |
+| Only one part can be hit | `HitShapeUserDataBase.DisableHitShape` on the target's other shapes, `EnableHitShape` after 6 s (from 0.3.0 a slider, 3 to 30 s) | Part 2: can a shot be made to land on one part |
 
 A package has no stop hook, so nothing it changes outlives it unattended: slow motion runs out by its duration, the hit shapes come back after 6 s, and the zoom has **Back** (unverified whether a save load also resets it).
 
@@ -238,6 +240,26 @@ In the game, on open ground near enemies who are not fighting yet (a gang's hang
 | 14 | Switch the app off | Its pins go; nothing stays slowed |
 
 Claude then reads `rednode-mods.log` for the `[vats-spike]` lines, the costs and the answers, and writes the results here and into the game API notes (`gameapi/notes/`), since other mods can use them too.
+
+### Spike test: round 2
+
+App 0.3.0, on REDnode 0.64.0, game 2.5, Codeware. Every line now also goes to `red4ext/logs/rednode-mods.log`, so nothing needs pasting. As before, set each step up in F10, then leave interactive mode to look.
+
+| Step | Do | Expect, and what to note |
+|---|---|---|
+| 1 | In the launcher, switch **VATS spike** off and on (its log says "VATS spike ready"). Find an enemy who is not fighting yet, look at them and press **Target** | "Target: NPCPuppet ..." |
+| 2 | Under **Outline (V2)**, press **List components** | A line per mesh component, with its type and name; the summary counts them. Note which looks like the head (`h0_...`), the body (`t0_...`) and the garments |
+| 3 | Type the head's name into the box (click out of it), press **Outline**, leave F10 and look at the enemy, without and with the scanner | Note whether only the head is outlined, its colour, and whether it shows without the scanner |
+| 4 | Move **Outline colour** through 1 to 7, pressing **Outline** after each (F10 in between) | Note each number's colour: which one is the game's red |
+| 5 | Try a garment's name, the body's name, then an empty box (the whole NPC), pressing **Outline** each time; then **Clear** | Note what each outlines. Clear should take the outline off |
+| 6 | Under **Frame (V10)**, press **Frame (camera)**, then leave F10 | The view turns onto the enemy and their body fills about 80 % of the screen's height. The log says how far off the view is, at once and after 1 s. Note whether it stays, whether you can still look around, and whether the crosshair and your aim follow the turned view. Back in F10, press **Camera back** |
+| 7 | Press **Frame (turn V)**, leave F10 | V turns to face the enemy. Note whether looking up or down (the pitch) also took, and the log's "degrees off". Then **Camera back** |
+| 8 | Set **Body fills** to 60 % and press **Frame (camera)** again; then **Camera back** | A looser frame |
+| 9 | Round 1's steps 6 to 9 again (Watch with the scanner held; **x2** while scanning; **0.05** with **Keep V at normal speed** on, then off, then **0.01**) | Nothing to note: their answers are in the log this time |
+| 10 | Save the game first. Under **Only one part can be hit**, set the seconds to 15 and press **Left arm**. Leave F10 and shoot the enemy's torso and head with a weapon that is **not** smart (a power pistol), then the left arm, until the log says the shapes are back | Note whether torso and head shots do damage (the damage numbers), and whether the arm does. Load the save after if the fight goes badly |
+| 11 | Switch the app off | Nothing stays outlined, turned, zoomed or slowed |
+
+Claude then reads the `[vats-spike]` lines in `rednode-mods.log`.
 
 ### Spike test: first run
 

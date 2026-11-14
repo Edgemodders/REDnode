@@ -10,6 +10,10 @@
 //   Zoom (V3)    the player's camera: GetFOV, SetFOV, SetZoom, and back
 //   Slow (V5)    TimeSystem.SetTimeDilation on the world, with V left at normal speed or not;
 //                always with a duration, so it runs out on its own if the mod stops
+//   Outline (V2)  Codeware's GetComponents lists the target's components; entRenderHighlightEvent
+//                with a componentName puts the game's outline on one of them (or the whole NPC)
+//   Frame (V10)  turn the view onto the target and set the field of view so its body fills
+//                the screen: by the camera's own local orientation, or by turning V; Camera back
 //   Crosshair (V4)  TargetingSystem.GetLookAtComponent: which component V looks at (the whole
 //                hit representation, 2026-11-14), then a ray along the camera's forward
 //                direction against the 15 shapes for the part
@@ -455,6 +459,164 @@ function watch(on) {
   } else say('Watch: off');
 }
 
+// ---------- V2: the game's own outline on one component ----------
+
+// entRenderHighlightEvent names a component (componentName), so the game's outline may go on
+// one mesh of the NPC: its head (NPC heads are their own mesh), a garment, or the body.
+let outlineIndex = 2;
+let outlined = new Set(); // component names outlined on the target, for Clear
+const componentBox = ui.input({ placeholder: 'Component name (empty: the whole NPC)' });
+
+const listComponents = () =>
+  step('Components', async () => {
+    const t = needTarget();
+    // GetComponents is Codeware's (added at runtime, so not in the base game's type list).
+    const list = await t.GetComponents().catch((err) => {
+      throw new Error(`GetComponents failed (${err?.message ?? err}): is Codeware installed?`);
+    });
+    if (!Array.isArray(list)) return `GetComponents answered ${JSON.stringify(list)?.slice(0, 80)}`;
+    const named = await Promise.all(list.map(async (c) => ({ type: c?.$type ?? '?', name: c ? String((await c.GetName().catch(() => '')) || '') : '' })));
+    const meshes = named.filter((c) => /Mesh/i.test(c.type));
+    for (const c of meshes) say(`  ${c.type} "${c.name}"`);
+    return `${list.length} components, ${meshes.length} meshes (listed above; type one into the box to outline it)`;
+  });
+
+async function sendHighlight(t, name, on) {
+  const evt = await api.$new('entRenderHighlightEvent', {
+    outlineIndex: on ? outlineIndex : 0,
+    fillIndex: 0,
+    seeThroughWalls: false,
+    opacity: on ? 1 : 0,
+    componentName: name,
+  });
+  await t.QueueEvent(evt);
+}
+
+const outline = () =>
+  step('Outline', async () => {
+    const t = needTarget();
+    const name = String(componentBox.props.value ?? '').trim();
+    if (name) {
+      const found = await t.FindComponentByName(name).catch(() => null);
+      if (!found) return `no component "${name}" on the target (List components shows the names)`;
+    }
+    await sendHighlight(t, name, true);
+    outlined.add(name);
+    return `outline ${outlineIndex} sent to ${name ? `"${name}"` : 'the whole NPC'}: note its colour, and whether only that part shows it`;
+  });
+
+const clearOutline = () =>
+  step('Clear outline', async () => {
+    const t = needTarget();
+    const names = outlined.size ? [...outlined] : [''];
+    for (const name of names) await sendHighlight(t, name, false);
+    outlined = new Set();
+    return `cleared ${names.length}`;
+  });
+
+// ---------- V10: framing the enemy ----------
+
+// Quaternions as the game writes them: { i, j, k, r }. The game's forward is +Y, up +Z.
+const qmul = (a, b) => ({
+  r: a.r * b.r - a.i * b.i - a.j * b.j - a.k * b.k,
+  i: a.r * b.i + a.i * b.r + a.j * b.k - a.k * b.j,
+  j: a.r * b.j - a.i * b.k + a.j * b.r + a.k * b.i,
+  k: a.r * b.k + a.i * b.j - a.j * b.i + a.k * b.r,
+});
+const qinv = (q) => ({ i: -q.i, j: -q.j, k: -q.k, r: q.r });
+// Facing the direction d with no roll: yaw about Z (0 faces +Y), then pitch about X.
+function facing(d) {
+  const yaw = Math.atan2(d.y, d.x) - Math.PI / 2;
+  const pitch = Math.atan2(d.z, Math.hypot(d.x, d.y));
+  const qy = { i: 0, j: 0, k: Math.sin(yaw / 2), r: Math.cos(yaw / 2) };
+  const qp = { i: Math.sin(pitch / 2), j: 0, k: 0, r: Math.cos(pitch / 2) };
+  return { q: qmul(qy, qp), yaw: (yaw * 180) / Math.PI, pitch: (pitch * 180) / Math.PI };
+}
+const angleBetween = (a, b) => (Math.acos(Math.max(-1, Math.min(1, dot(a, b) / (len(a) * len(b))))) * 180) / Math.PI;
+
+let fill = 0.8; // share of the screen's height the body fills
+let framed = null; // what Back puts back: { local, fov, zoom }
+
+// The body's middle, its height and the camera, from the slots.
+async function bodyView(t) {
+  const [{ places }, cam] = await Promise.all([readSlots(t), cameraView()]);
+  const found = places.filter((p) => p.x !== null);
+  if (!found.length) throw new Error('no slots on the target');
+  const top = Math.max(...found.map((p) => p.z)) + 0.15; // the head's slot is not its top
+  const bottom = Math.min(...found.map((p) => p.z)) - 0.1;
+  const mid = { x: found.reduce((a, p) => a + p.x, 0) / found.length, y: found.reduce((a, p) => a + p.y, 0) / found.length, z: (top + bottom) / 2 };
+  const dir = sub(mid, cam.at);
+  const dist = len(dir);
+  return { mid, height: top - bottom, dir, dist, cam };
+}
+
+const fovFor = (height, dist) => (2 * Math.atan(height / (2 * fill * dist)) * 180) / Math.PI;
+
+async function checkAim(dir, what) {
+  const cams = await api.GameInstance.GetCameraSystem(game.instance);
+  const now = vec(await cams.GetActiveCameraForward());
+  const off = angleBetween(now, dir);
+  say(`  ${what}: the view is ${off.toFixed(1)} degrees off the body's middle`);
+  return off;
+}
+
+// Way 1: rotate the first-person camera's own local orientation (the game may write over it).
+const frameCamera = () =>
+  step('Frame (camera)', async () => {
+    const t = needTarget();
+    const cam = await camera();
+    const { dir, dist, height } = await bodyView(t);
+    const cams = await api.GameInstance.GetCameraSystem(game.instance);
+    const r = await cams.GetActiveCameraWorldTransform(api.$out);
+    const world = r?.out?.transform?.orientation;
+    const local = await cam.GetLocalOrientation();
+    if (!world || !local) throw new Error('no camera orientation');
+    if (!framed) framed = { local, fov: await cam.GetFOV(), zoom: await cam.GetZoom() };
+    // The camera's parent turns it by world * local^-1; keep that, change what the camera adds.
+    const parent = qmul(world, qinv(local));
+    const want = facing(dir);
+    await cam.SetLocalOrientation(qmul(qinv(parent), want.q));
+    const fov = fovFor(height, dist);
+    await cam.SetFOV(fov);
+    say(`Frame (camera): body ${height.toFixed(2)} m tall, ${dist.toFixed(1)} m away; field of view ${framed.fov.toFixed(1)} -> ${fov.toFixed(1)}`);
+    await checkAim(dir, 'at once');
+    await new Promise((res) => setTimeout(res, 1000));
+    await checkAim(dir, 'after 1 s');
+    return 'note whether the view turned onto the body and stayed there, and whether the crosshair and aiming follow it';
+  });
+
+// Way 2: turn V where V stands, facing the body (as the Pins window's Go there faces a pin).
+const frameTurnV = () =>
+  step('Frame (turn V)', async () => {
+    const t = needTarget();
+    const cam = await camera();
+    const v = await player();
+    const { dir, dist, height } = await bodyView(t);
+    if (!framed) framed = { local: await cam.GetLocalOrientation(), fov: await cam.GetFOV(), zoom: await cam.GetZoom() };
+    const want = facing(dir);
+    const at = await v.GetWorldPosition();
+    const tf = await api.GameInstance.GetTeleportationFacility(game.instance);
+    await tf.Teleport(v, at, { Pitch: want.pitch, Yaw: want.yaw, Roll: 0 });
+    const fov = fovFor(height, dist);
+    await cam.SetFOV(fov);
+    say(`Frame (turn V): yaw ${want.yaw.toFixed(1)}, pitch ${want.pitch.toFixed(1)}; body ${height.toFixed(2)} m tall, ${dist.toFixed(1)} m away; field of view ${framed.fov.toFixed(1)} -> ${fov.toFixed(1)}`);
+    await new Promise((res) => setTimeout(res, 300));
+    await checkAim(dir, 'after 0.3 s');
+    return 'note whether V turned to face the body, and whether the pitch (looking up or down) took';
+  });
+
+const frameBack = () =>
+  step('Frame back', async () => {
+    if (!framed) return 'nothing framed';
+    const cam = await camera();
+    await cam.SetLocalOrientation(framed.local);
+    await cam.SetFOV(framed.fov);
+    await cam.SetZoom(framed.zoom);
+    const fov = await cam.GetFOV();
+    framed = null;
+    return `camera back: field of view reads ${fov.toFixed(1)}`;
+  });
+
 // ---------- the window ----------
 
 ui.window({
@@ -496,7 +658,15 @@ ui.window({
     ui.toggle('Watch the dilation and the camera', (on) => watch(on)),
     ui.heading('Exposure (V8)'),
     ui.row(ui.button('Exposure', exposureOnce), ui.toggle('Chance on the labels', (on) => (exposureLabels = on))),
+    ui.heading('Outline (V2)'),
+    ui.row(ui.button('List components', listComponents), ui.button('Outline', outline, { variant: 'ghost' }), ui.button('Clear', clearOutline, { variant: 'ghost' })),
+    componentBox,
+    ui.slider('Outline colour', (v) => (outlineIndex = Math.round(v)), { min: 1, max: 7, step: 1, value: outlineIndex }),
+    ui.heading('Frame (V10)'),
+    ui.slider('Body fills', (v) => (fill = v / 100), { min: 40, max: 95, step: 5, value: fill * 100, unit: ' %' }),
+    ui.row(ui.button('Frame (camera)', frameCamera), ui.button('Frame (turn V)', frameTurnV, { variant: 'ghost' }), ui.button('Camera back', frameBack, { variant: 'ghost' })),
     ui.heading('Only one part can be hit (part 2)'),
+    ui.slider('Seconds before the shapes come back', (v) => (onlySeconds = Math.round(v)), { min: 3, max: 30, step: 1, value: onlySeconds, unit: ' s' }),
     ui.row(...PARTS.map((p) => ui.button(p.part, () => onlyPart(p), { variant: 'ghost' }))),
     ui.heading('Log'),
     log,
