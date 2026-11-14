@@ -46,7 +46,10 @@ const REASON = 'rednode_vats_spike';
 
 const log = ui.list({ keep: 400 });
 const status = ui.text('No target. Look at an enemy and press Target.', { tone: 'dim' });
-const say = (line) => log.push(`${new Date().toLocaleTimeString()}  ${line}`);
+const say = (line) => {
+  log.push(`${new Date().toLocaleTimeString()}  ${line}`);
+  console.log(line); // also to the Mod log and red4ext/logs/rednode-mods.log, for Claude to read after a run
+};
 
 async function step(what, fn) {
   const started = performance.now();

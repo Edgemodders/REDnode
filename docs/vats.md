@@ -20,6 +20,17 @@ The owner's design, 2026-11-14.
 | Leave VATS | The VATS button again, with the scanner button still held: back to normal scanning |
 | Cancel | Letting go of the scanner cancels VATS too. VATS also has a timed duration: when it runs out, VATS ends, back to scanning, or out of scanning if the scanner is no longer held |
 
+### On a controller
+
+The owner's addition, 2026-11-14. The game's scanner already zooms, but only while the quickhack wheel is not showing; that zoom stays as it is for surveillance. VATS takes the triggers while the scanner is held:
+
+| Input, while scanning | What happens |
+|---|---|
+| Right trigger | Enter VATS, with its own zoom: the view frames the enemy so their whole body is large and centred on screen |
+| Left trigger | Leave VATS entirely: the camera goes back to the setting it had before |
+
+The framing keeps the view on V's own line of sight, so what the player sees is what V's rays see (exposure and the crosshair's part stay true). Recommended: keep the camera where it is, turn the view onto the enemy and narrow the field of view until the body fills about 80 % of the screen's height (field of view = 2 x atan(body height / (2 x 0.8 x distance)); a 1.8 m body 15 m away needs about 8.6 degrees). Moving the camera nearer the enemy would show what V cannot see. To agree with the owner.
+
 As states:
 
 | State | VATS button | Scanner released | Timer runs out |
@@ -139,9 +150,11 @@ Unverified: the slots' orientation (which axis a capsule runs along), the collis
 | **V5 Deep slow motion** | How low can the world's dilation go while scanning, with V and the camera at normal speed, and how does it stack with the scanner's own? | `SetTimeDilation` and the local-player calls from the Console while scanning; undo with `UnsetTimeDilation` |
 | **V6 The smart gun's part** | Can the smart gun lock onto a chosen bone? | Watch `attachedBoneName` on its targets; try its target sorting, or the lock events |
 | **V7 Only VATS quickhacks** | Can EDGEhack's scripts switch every other quickhack off while VATS is on, and back after, beside REDnode's own wrap of the same function? | In EDGEhack: wrap `TranslateChoicesIntoQuickSlotCommands` behind a VATS switch, mark the others unusable with a reason; check the wheel, its keys and REDnode's quickhack test together |
+| **V9 The triggers while scanning** | Can a mod read the right and left triggers while the scanner is held, and keep the game from using them (the scanner's own zoom, aiming, shooting) while VATS has them? | A redscript input listener on the triggers' actions in the scanner's context, and REDnode's I3 Input when it comes; check what the game still does with them |
+| **V10 Framing** | Can VATS turn the view onto an enemy and frame the whole body, then put the camera back exactly? | Turn the view (the player's orientation, or the camera's own rotation: which one works is the question) and set the field of view from the body's height and distance (from the slots); keep the field of view and zoom from before to restore |
 | **V8 Exposure** (not a priority) | Can each part's exposure be measured from the camera, against the world and the NPC's own body, cheaply enough? | Read the slots' transforms (`GetTargetSlotTransform`), place points on the capsules, cast rays against the world with `SyncRaycastByCollisionGroup`, test them against the other capsules in the mod; compare with where shots land |
 
-V1 and V3 decide whether the first build goes ahead as drawn here. V5 and V7 decide the rest of the play. V8 waits until those pass.
+V1 and V3 decide whether the first build goes ahead as drawn here. V5 and V7 decide the rest of the play. V8 waits until those pass. V9 and V10 are the controller design's.
 
 ## Open questions
 
@@ -151,6 +164,7 @@ V1 and V3 decide whether the first build goes ahead as drawn here. V5 and V7 dec
 | Time while targeting | Slowed far below the scanner's slow motion (the owner, 2026-11-14); how low is V5's question |
 | The duration's clock | Real time, so the player's budget stays the same however slow the world is. To decide with the owner |
 | Moving between enemies | Snap to the next or previous enemy with a key or stick, nearest first. To decide with the owner |
+| VATS's zoom | Frame the enemy from V's own camera (turn and narrow the field of view), not a camera moved nearer: the owner's "within the raycast from V's camera". To agree with the owner |
 | Enemies VATS covers | Human NPCs on `npc_base` first; bosses, mechs and drones later, each with its own shape file |
 | What a part's label shows | Name, hit chance, damage modifier, armour. Hit chance from the part's exposure (above) times the mod's own factors |
 
@@ -172,7 +186,7 @@ Built on 2026-11-14: the **VATS spike** app (`packages/overlay/apps/vats-spike`,
 
 A package has no stop hook, so nothing it changes outlives it unattended: slow motion runs out by its duration, the hit shapes come back after 6 s, and the zoom has **Back** (unverified whether a save load also resets it).
 
-Checked in the mock game (scratchpad `vats/check.mjs`, its stand-in plugin `vats/mock.mjs` with the game's answers in `vats/answer.mjs`): 39 checks, every button, the calls' arguments as the 2.5 types want them, six pins placed again and again and gone when switched off (the check found an update in flight putting them back after the switch; fixed), and the hit shapes back on. App 0.2.0 adds Exposure: with the mock's camera at the NPC's left side and a kerb below 0.3 m, the left arm read 100 %, the right arm 10 % (9 of 10 points behind the torso), the right leg 20 % (its foot behind the kerb); 43 rays went out within 1 ms.
+Checked in the mock game (scratchpad `vats/check.mjs`, its stand-in plugin `vats/mock.mjs` with the game's answers in `vats/answer.mjs`, which since 0.2.1 answers the slot and hit shape calls only by their class and, like the game, leaves the script helper's out parameter at zero): 40 checks from 0.2.3, every button, the calls' arguments as the 2.5 types want them, six pins placed again and again and gone when switched off (the check found an update in flight putting them back after the switch; fixed), and the hit shapes back on. App 0.2.0 adds Exposure: with the mock's camera at the NPC's left side and a kerb below 0.3 m, the left arm read 100 %, the right arm 10 % (9 of 10 points behind the torso), the right leg 20 % (its foot behind the kerb); 43 rays went out within 1 ms.
 
 ### Spike test
 
@@ -196,3 +210,28 @@ In the game, on open ground near enemies who are not fighting yet (a gang's hang
 | 14 | Switch the app off | Its pins go; nothing stays slowed |
 
 Claude then reads `rednode-mods.log` for the `[vats-spike]` lines, the costs and the answers, and writes the results here and into the game API notes (`gameapi/notes/`), since other mods can use them too.
+
+### Spike test: first run
+
+2026-11-14, by the owner, dev PC, game 2.5, REDnode 0.64.0. The app went from 0.2.0 to 0.2.3 during the run (each copied into the game while it ran; the host restarted the app on its own). The owner: after the fixes, every step worked as written. The app's lines went only to its window up to 0.2.3, so the numbers below are the ones the owner pasted; 0.2.4 also writes them to `rednode-mods.log`.
+
+| Step | Result |
+|---|---|
+| 3 Read slots | 0.2.0: refused, "no game function GetTargetSlotPosition" (a static of `AIActionHelper`). 0.2.1: 15 of 15 found, every one at 0, 0, 0 (a script function's out parameter does not come back through `api`). 0.2.2: read from the NPC's hit representation slot component (`GetSlotTransform`, native): **passed** |
+| 4 and 5 Show parts | Passed after 0.2.2 (at 0.2.1 the labels went to the map's origin). 0.2.1's cost lines, with the script helper: 25 to 27 ms an update at 5 a second, slot reads 9 to 19 ms |
+| 6 to 9 Watch, zoom, slow motion | Worked as written (no numbers pasted) |
+| 10 Crosshair (V4) | `GetLookAtComponent` answers the whole `gameHitRepresentationComponent` "HitRepresentation" for head and leg alike, in 170 to 178 ms: **the game does not name the part**. 0.2.3 finds it with a ray along the camera against the shapes; worked as written |
+| 11 Exposure, side-on (V8) | **Passed**: head 80 %, torso 75 %, near (left) arm 100 %, far (right) arm 20 % (8 of 10 points behind its own body), left leg 33 % (10 of 15 behind the world), right leg 7 % (7 behind its body, 7 behind the world). 54 rays in 205 ms: far slower than one frame, so the rays do not share frames as hoped (unverified why). The legs' "behind the world" likely includes the ground: points at or under the floor, with 0.15 m of slack |
+| 12 Exposure behind cover | Worked as written (no numbers pasted) |
+| 13 Only one part can be hit | **Inconclusive**: shooting aggroed the enemies, and with a smart pistol where hits land could not be told (it may aim for the game's own target capsule). Retest with a weapon that is not smart, on an enemy that cannot fight back |
+| 14 Switch off | Worked as written |
+
+What it decides:
+
+| Question | Answer |
+|---|---|
+| V1 Can REDnode read and follow the 15 shapes? | Yes, through the native `GetSlotTransform`; labels at 5 and 15 updates a second kept up |
+| V4 Does the game name the part under the crosshair? | No, only the whole hit representation. VATS finds the part itself, by a ray against the shapes |
+| V8 Exposure | Works side-on. Too slow to run live as it is (205 ms for 54 rays); fewer points, a ground cut-off, and finding why the rays do not share a frame come first |
+| For REDnode | `api.$out` works on native functions only; documented on `api.$out` and in the game API notes (`AIActionHelper`, `entSlotComponent`, `gametargetingTargetingSystem`). A package whose `mod.mjs` and manifest change together is restarted twice by the host (hot reload and the package rescan), harmless since the runner keeps one worker per mod |
+
