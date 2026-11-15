@@ -30,6 +30,10 @@ const READY_WAIT = 10000; // a call to a provider that is starting waits this lo
  * @param {(id: string, functions: string[]) => object | null} host.describe   the service's descriptor (SV2):
  *        its JSDoc, read from service.json or the service file; null when it cannot be read
  * @param {(functionKey: string) => boolean} [host.toolOff]   SV3: whether the player switched a tool off
+ * @param {(caller: object, provider: string, fn: string, described: object | undefined) => string | null} [host.refuse]
+ *        #22: why the player does not let this package call that function, or null when it may
+ * @param {(call: object) => void} [host.noted]   #22: a package's call of another's @tool function, answered or refused,
+ *        for the Tools Manager's recent calls: { caller, provider, fn, ok, ms, detail }
  */
 function createServices(host) {
   /** Providers whose service file has loaded: id -> { functions: string[], descriptor, at } */
@@ -157,6 +161,11 @@ function createServices(host) {
      */
     async call(caller, provider, fn, args, options = {}) {
       count(caller.id, 'out');
+      let tool = false; // a package's call of another's @tool function, noted for the Tools Manager
+      const began = Date.now();
+      const note = (ok, detail) => {
+        if (tool) host.noted?.({ caller, provider, fn, ok, ms: Date.now() - began, detail });
+      };
       try {
         if (typeof fn !== 'string' || !fn) throw new Error('A service call needs a function name');
         await whenReady(provider);
@@ -167,6 +176,10 @@ function createServices(host) {
         // SV2: the arguments are checked against the function's description before the
         // provider sees them.
         const described = offer.descriptor?.functions?.[fn];
+        tool = !!(caller.id && caller.id !== provider && described?.tool);
+        // #22: the player's say over which packages may call a tool: refused up front, never a prompt.
+        const refused = host.refuse?.(caller, provider, fn, described);
+        if (refused) throw Object.assign(new Error(refused), { refused: true });
         const list = Array.isArray(args) ? args : [];
         if (described && host.checkArgs) {
           const why = host.checkArgs(described, list);
@@ -192,8 +205,10 @@ function createServices(host) {
         });
         count(provider, 'in');
         count(provider, 'ms', performance.now() - started);
+        note(true, JSON.stringify(result)?.slice(0, 200) ?? 'undefined');
         return result;
       } catch (err) {
+        note(false, err.refused ? `refused: ${err.message}` : err.message);
         count(caller.id, 'errors');
         if (caller.id) host.modLog(caller.id, 'error', `Service call ${provider}.${fn} failed: ${err.message}`);
         throw err;

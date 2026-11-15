@@ -22,7 +22,7 @@
   .group { display: flex; align-items: center; gap: 8px; position: sticky; top: 0; z-index: 1; padding: 6px 8px;
     background: var(--rn-panel-2); border-bottom: 1px solid var(--rn-line); font: 600 11px var(--rn-mono); letter-spacing: .1em; text-transform: uppercase; }
   .group .count { color: var(--rn-dim); font-weight: 400; }
-  .tool { display: grid; grid-template-columns: 34px minmax(0, 210px) 64px minmax(0, 1fr); gap: 8px; align-items: baseline;
+  .tool { display: grid; grid-template-columns: 34px minmax(0, 190px) 64px 66px minmax(0, 1fr); gap: 8px; align-items: baseline;
     padding: 5px 8px; border-bottom: 1px solid color-mix(in srgb, var(--rn-line) 60%, transparent); cursor: pointer; font-size: 13px; }
   .tool:hover { background: color-mix(in srgb, var(--rn-accent-2) 6%, transparent); }
   .tool.selected { background: color-mix(in srgb, var(--rn-accent) 12%, transparent); }
@@ -37,6 +37,18 @@
   .sw.on { border-color: color-mix(in srgb, var(--rn-accent) 60%, transparent); }
   .sw.on::after { left: 16px; background: var(--rn-accent); }
   .empty { padding: 16px; color: var(--rn-dim); }
+  /* #22: calls from other packages: on, allowed only, off. A click goes to the next. */
+  .mods { font: 700 9px var(--rn-mono); letter-spacing: .08em; padding: 1px 4px; border: 1px solid var(--rn-line); background: var(--rn-panel-2);
+    color: var(--rn-dim); cursor: pointer; text-align: center; white-space: nowrap; }
+  .mods.on { color: var(--rn-ok); border-color: color-mix(in srgb, var(--rn-ok) 50%, transparent); }
+  .mods.allowed { color: var(--rn-accent-2); border-color: color-mix(in srgb, var(--rn-accent-2) 50%, transparent); }
+  .mods.off { color: var(--rn-danger); border-color: color-mix(in srgb, var(--rn-danger) 50%, transparent); }
+  .mods.none { visibility: hidden; }
+  .group .mods { margin-left: auto; }
+  .details .callers { margin-top: 6px; }
+  .details .callers div { font: 11px var(--rn-mono); }
+  .details .callers .no { color: var(--rn-dim); }
+  .details rn-button { margin-top: 6px; }
 
   .side { width: 300px; flex: none; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
   .box { border: 1px solid var(--rn-line); background: var(--rn-panel); padding: 8px 10px; overflow-y: auto; overflow-x: hidden; }
@@ -60,7 +72,8 @@
       <span id="server"></span>
       <span class="spacer"></span>
       <rn-input id="search" placeholder="Search tools" clearable></rn-input>
-      <rn-toggle id="newoff" label="Off for new packages" title="On: a package installed from now on starts with its tools switched off, until you switch them on here"></rn-toggle>
+      <rn-toggle id="newoff" label="Off for new packages" title="On: a package installed from now on starts with its tools switched off for assistants, until you switch them on here"></rn-toggle>
+      <rn-toggle id="modsnewoff" label="Mods: off for new packages" title="On: a package installed from now on starts with its tools switched off for other mods, until you change its MODS switch here"></rn-toggle>
     </div>
     <div class="main">
       <div class="list" id="list"></div>

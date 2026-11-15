@@ -1218,6 +1218,14 @@ REDagent needs its Anthropic key, as before.
 
 The 0.58.0 release ships EDGEmat 0.3.1 from npm, which ignores the shared REDbridge and starts its own. That combination was checked outside the game on 2026-11-05 with REDnode's variables set (scratchpad `e1/check-pin.cjs`, E1's 21 checks: tools listed, reads answered, ask flags). Raise the pin in `packages/overlay/package.json` once EDGEmat publishes a newer version.
 
+## Calls from mods (#22)
+
+The player's say over which packages may call another package's tools (REDnode 0.66.0, Admin Tools 0.2.0): `"calls"` in a manifest, the Mod Manager's **Calls** section, the Tools Manager's **MODS** switch. Steps and what each should show: [docs/services.md, "Calls from mods test"](services.md#calls-from-mods-test).
+
+| Run | Result |
+|---|---|
+| Dev host, mock game, 2026-11-15, by Claude, REDnode 0.66.0 | **Pass**: 15 calls over three runs (scratchpad `g22/run.sh`) and 19 checks of the two managers' data through DevTools (`g22/ui.mjs`); pictures of both managers looked right |
+
 ## The controller (0.65.1)
 
 Run on REDnode 0.65.2 or later. REDnode 0.65.0 reads Xbox pads through XInput; 0.65.1 adds Sony pads from their HID reports. Mods hear changes with `input.onGamepad` (`packages/rednode/src/input.ts`). The **Controller test** sample (`packages/overlay/apps/controller-test`) shows the state and logs each press to the Mod log. It only reads: the game still gets every button.

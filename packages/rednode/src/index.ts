@@ -49,7 +49,7 @@ export type { Language, TextParams, Loc } from "./i18n.js";
 export type { InkAnchor, InkColor, InkTone, InkTextStyle, InkAlign, InkSource, InkProps, InkTextProps, InkContainerProps, InkImageProps, InkBarProps, InkListProps, InkNode, InkMount, InkMountOptions, InkView, InkBox, InkLayerInfo, InkTreeNode, InkReadResult, InkWidgetInfo, InkHit, InkTryProp, InkTryValue } from "./ink.js";
 export { archives } from "./archives.js";
 export { admin } from "./admin.js";
-export type { TaskRow, TaskList, ToolInfo, ToolGroup, ToolList } from "./admin.js";
+export type { TaskRow, TaskList, ToolInfo, ToolGroup, ToolList, ModMode } from "./admin.js";
 export type { ReloadOptions, ReloadResult, SoundState } from "./archives.js";
 export type { Sound, SoundCategory, SoundEnd, SoundInfo, PlayOptions, TraceBatch, PostedEvent, GameSound, SoundSearch, SoundEventInfo } from "./audio.js";
 export type { GameRef, ApiExtras } from "./api.js";

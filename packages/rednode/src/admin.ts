@@ -67,7 +67,25 @@ export interface ToolInfo {
   readonly off: boolean;
   /** A mod's tool: its parameters. */
   readonly params?: readonly { name: string; type: string; optional: boolean; description?: string }[];
+  /**
+   * A mod's tool: who among other packages may call it (#22). `null` for REDnode's own tools and
+   * for the servers REDnode runs, which only assistants reach.
+   */
+  readonly mods?: ModMode | null;
+  /** The mode it has with no switch set: `"on"` for a read-only tool, `"allowed"` for the rest. */
+  readonly modsDefault?: ModMode | null;
+  /** The player set this tool's own mods switch (else it follows its package's, or the default). */
+  readonly modsSet?: boolean;
+  /** The packages whose manifest lists it in `"calls"`, and whether the player allowed each. */
+  readonly callers?: readonly { id: string; name: string; as: string; granted: boolean }[];
 }
+
+/**
+ * Who among other packages may call a package's `@tool` function (#22): `"on"` any package,
+ * `"allowed"` only packages that list it in their manifest's `"calls"` and that the player
+ * allowed in the Mod Manager, `"off"` none.
+ */
+export type ModMode = "on" | "allowed" | "off";
 
 /** Tools by where they come from: REDnode's own (`id` `rednode`), then each package's. */
 export interface ToolGroup {
@@ -76,6 +94,8 @@ export interface ToolGroup {
   readonly builtin: boolean;
   /** The whole package switched off. */
   readonly off: boolean;
+  /** The package's own mods switch, for every tool of it, or `null` (each tool's own or default). */
+  readonly mods?: ModMode | null;
   readonly tools: readonly ToolInfo[];
 }
 
@@ -85,11 +105,16 @@ export interface ToolList {
   readonly mcp: Record<string, unknown>;
   /** A newly installed package's tools start switched off. */
   readonly newOff: boolean;
+  /** A newly installed package's tools start switched off for other mods (#22). */
+  readonly modsNewOff?: boolean;
   readonly groups: readonly ToolGroup[];
   /** Assistants that have connected, the most recent first. */
   readonly assistants: readonly { name: string; kind: "desktop" | "package"; lastSeenMs: number }[];
-  /** The newest 50 assistant calls of mods' tools, the newest first. */
-  readonly recent: readonly { at: number; assistant: string; tool: string; pkg: string; fn: string; ok: boolean; ms: number; detail: string }[];
+  /**
+   * The newest 50 calls of mods' tools, the newest first: by assistants, and (#22, `kind` `"mod"`)
+   * by other packages, refusals included. `assistant` names the assistant or the calling package.
+   */
+  readonly recent: readonly { at: number; assistant: string; kind?: "assistant" | "mod"; tool: string; pkg: string; fn: string; ok: boolean; ms: number; detail: string }[];
 }
 
 interface AdminBridge {
@@ -100,7 +125,7 @@ interface AdminBridge {
     setOpen(id: string, open: boolean): Promise<{ id: string; open: boolean; running: boolean }>;
     projectsFolder(name: string): Promise<string>;
   };
-  tools: { list(): Promise<ToolList>; set(what: string, id: string | null, on: boolean): Promise<ToolList> };
+  tools: { list(): Promise<ToolList>; set(what: string, id: string | null, on: boolean | ModMode | null): Promise<ToolList> };
 }
 
 function bridge(): AdminBridge {
@@ -205,5 +230,25 @@ export const admin = {
    */
   setTool(what: "tool" | "group" | "new-off", id: string | null, on: boolean): Promise<ToolList> {
     return run(() => bridge().tools.set(what, id, on));
+  },
+
+  /**
+   * Sets who among other packages may call a tool (#22), kept across starts. Answers the new list.
+   *
+   * @param what - `"tool"` (id is a {@link ToolInfo.key}), `"group"` (a package id: every tool of
+   *   it), or `"new-off"` (id `null`; `mode` `"off"` makes new packages' tools start off for
+   *   mods, `null` lets them start with their defaults).
+   * @param mode - A {@link ModMode}, or `null` for the default (a tool follows its package, a
+   *   package each tool's default).
+   *
+   * @example
+   * ```ts
+   * // Only packages the player allowed may call the file system tool's write.
+   * await admin.setModTool("tool", "filesystem:write", "allowed");
+   * ```
+   */
+  setModTool(what: "tool" | "group" | "new-off", id: string | null, mode: ModMode | null): Promise<ToolList> {
+    const op = what === "new-off" ? "mods-new-off" : what === "group" ? "mods-group" : "mods-tool";
+    return run(() => bridge().tools.set(op, id, what === "new-off" ? mode === "off" : mode));
   },
 };

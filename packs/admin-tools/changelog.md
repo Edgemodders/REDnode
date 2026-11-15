@@ -4,6 +4,10 @@ What changed in each release of the Admin Tools pack, for its Nexus page and its
 
 ## Unreleased
 
+**New**
+
+- The **Tools Manager** has a **MODS** switch per tool and per package beside the assistants' one: which of your other mods may call that tool (any, only those you allowed in the Mod Manager, or none), with **Mods: off for new packages**. A tool's details list the mods that ask to call it, and the recent calls show mods' calls, refusals included. Needs REDnode 0.66.0 or later.
+
 ## 0.1.1 (2026-11-03)
 
 For REDnode 0.38.1 or later on game version 2.5 (0.1.0 was for game 2.31).

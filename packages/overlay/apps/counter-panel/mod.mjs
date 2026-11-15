@@ -1,6 +1,11 @@
 // Counter panel: another package's service, called through the REDnode host.
 // service.connect finds Counter service by its id; each of its exported functions is
 // then a method here that returns a promise. Its "changed" events arrive with $on.
+//
+// Since REDnode 0.66.0 (#22) a tool that changes something (add, reset) needs the player's OK
+// for each package that calls it: this manifest's "calls" lists counter-service.add, which the
+// player allows in the Mod Manager, and leaves out reset, so Reset is refused with the reason.
+// get is @readonly, so any package may read it.
 
 import { service, ui } from 'rednode';
 

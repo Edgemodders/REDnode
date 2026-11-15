@@ -1,10 +1,11 @@
 {
   "id": "counter-panel",
   "name": "Counter panel",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": "Edgemodders",
-  "description": "Calls Counter service through REDnode's mod services: reads and changes its count, hears its events, and tries a timeout, Stop, an error and an unknown function.",
+  "description": "Calls Counter service through REDnode's mod services: reads and changes its count, hears its events, and tries a timeout, Stop, an error and an unknown function. Its \"calls\" list Counter service's add (a tool that needs the player's OK, REDnode 0.66.0) and leave out reset, so reset is refused.",
   "main": "mod.mjs",
+  "calls": ["counter-service.add"],
   "open": false,
   "requires": {
     "counter-service": ">=0.1"

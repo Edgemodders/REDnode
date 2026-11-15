@@ -8,6 +8,17 @@ const $ = (id) => document.getElementById(id);
 // Under the admin permission (the Admin Tools pack and other admin packages).
 const ADMIN_WARNING =
   'Allow this only for a package you trust: it can end or restart any of your mods, and switch on AI tools you switched off.';
+// #22: what one of a package's "calls" needs now, by the host's state for it.
+const CALL_STATES = {
+  allowed: () => 'A tool that needs your OK: it is refused until you allow it here.',
+  on: () => 'Open to every mod now (the Tools Manager). Allowing it here keeps it working if that changes.',
+  off: (c) => `Switched off for every mod in the Tools Manager: ${c.providerName} refuses it even when allowed here.`,
+  open: () => 'Not a tool: any mod may call it, so it needs no OK.',
+  'not-ready': (c) => `${c.providerName} is not running, so whether it needs your OK shows once it starts.`,
+  'unknown-function': (c) => `${c.providerName} offers no function "${c.fn}".`,
+  missing: (c, target) => `Nothing installed answers ${target}.`,
+  unresolved: (c, target) => `Several packages provide "${target}": choose which one answers in its Provides section.`,
+};
 let PAGE = 14; // rows a page: as many as the table shows without scrolling, measured as the window's size changes
 
 const STATUS = {
@@ -587,6 +598,16 @@ function renderDetails() {
         const note = r.answers ? `Answers it; also provided by ${r.others.join(', ')}` : `Also provided by ${r.others.join(', ')}`;
         parts.push(el('div', 'dim', r.answers || r.chosen ? note : `${note}. Choose which one answers.`));
       }
+    }
+  }
+  // #22: the other packages' tools it calls (its manifest's "calls"), each allowed or not by the player.
+  if (i.calls?.length) {
+    parts.push(el('div', 'section', 'Calls'));
+    for (const c of i.calls) {
+      const target = c.name.slice(0, c.name.lastIndexOf('.'));
+      parts.push(el('div', 'perm', `Calls ${c.providerName ?? target}'s ${c.fn}${c.providerName && c.provider !== target ? ` (as ${c.name})` : ''}`));
+      parts.push(el('div', c.state === 'off' ? 'perm warn' : 'dim', CALL_STATES[c.state]?.(c, target) ?? c.state));
+      parts.push(toggle('Allowed', c.granted, (on) => act(i.name, () => window.rednode.apps.grant(i.id, `call:${c.name}`, on))));
     }
   }
   const bridgeInRequires = (i.requires ?? []).some((r) => isBridgeName(r.name));

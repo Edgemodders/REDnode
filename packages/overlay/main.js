@@ -200,6 +200,8 @@ const isPermission = (name) => typeof name === 'string' && (name in PERMISSIONS 
 // own broker, REDagent), or any other role name (#20), answered by the package's service
 // file and reached with use("voice") in the rednode package.
 const ROLE_NAME = /^[a-z][a-z0-9-]{0,31}$/;
+// A manifest's "calls" entry (#22): a package id or a role, a dot, an exported function's name.
+const CALL_NAME = /^[a-z0-9][a-z0-9_-]{0,63}\.[A-Za-z_$][A-Za-z0-9_$]{0,63}$/;
 // The UI kit, served to every app as rednode://ui/rednode-ui.js.
 const UI_DIR = app.isPackaged ? path.join(__dirname, 'ui') : path.join(__dirname, '..', 'ui', 'src');
 // The rednode package (built from packages/rednode), served to apps as rednode://sdk/index.js
@@ -397,6 +399,10 @@ function readManifest(dir) {
       problems.push('a package that provides a role answers it with its service file: add "service"');
     }
   }
+  // #22: the other packages' tools this one calls, as "<package>.<function>" or "<role>.<function>".
+  if (m.calls !== undefined && (!Array.isArray(m.calls) || m.calls.some((c) => typeof c !== 'string' || !CALL_NAME.test(c)))) {
+    problems.push('calls must be a list of "<package>.<function>" or "<role>.<function>", such as ["voice.speak"]');
+  }
   if (m.anchor !== undefined && !ANCHORS.includes(m.anchor)) problems.push(`anchor must be one of ${ANCHORS.join(', ')}`);
   if (m.kind !== undefined && !['window', 'hud'].includes(m.kind)) problems.push('kind must be window or hud');
   if (m.hideWith !== undefined && (!Array.isArray(m.hideWith) || m.hideWith.some((h) => !HIDE_WITH.includes(h)))) {
@@ -436,6 +442,7 @@ function readManifest(dir) {
     isolation: m.isolation ?? 'any',
     permissions: m.permissions ?? [],
     provides: m.provides ?? [],
+    calls: [...new Set(m.calls ?? [])],
     kind: m.kind ?? 'window',
     sounds: m.sounds ?? {},
     width: m.width,
@@ -3452,6 +3459,8 @@ function appList() {
         requires: requirementsOf(m.id),
         bridge: m.permissions.includes('bridge') || needsBridge(m) ? bridgeInfo() : null,
         permissions: m.permissions.map((name) => ({ name, what: permissionWhat(name), granted: isGranted(m.id, name) })),
+        // #22: the other packages' tools it calls, each with the player's grant and whether it needs one.
+        calls: m.calls.map((c) => callSummary(m.id, c)),
       };
     });
 }
@@ -3869,9 +3878,12 @@ function mcpConfig() {
   };
 }
 
+// A grant the player gives in the Mod Manager: a permission, or "call:<target>.<function>"
+// for one of the manifest's "calls" (#22).
+const asksFor = (m, name) => (name.startsWith('call:') ? m.calls.includes(name.slice(5)) : m.permissions.includes(name));
 function isGranted(id, permission) {
   const entry = apps.get(id);
-  return !!entry && entry.manifest.permissions.includes(permission) && !!settings.apps[id]?.granted?.includes(permission);
+  return !!entry && asksFor(entry.manifest, permission) && !!settings.apps[id]?.granted?.includes(permission);
 }
 
 // ---------- what a package may use: its data folder, its secrets, the kernel's tools ----------
@@ -4655,7 +4667,7 @@ ipcMain.handle('rednode:pkg:mcp', (event) => mcpFor(packageOf(event)));
 ipcMain.handle('rednode:apps:grant', (event, id, permission, granted) => {
   fromLauncher(event);
   const entry = apps.get(id);
-  if (!entry || !entry.manifest.permissions.includes(permission)) throw new Error(`"${id}" does not ask for ${permission}`);
+  if (!entry || typeof permission !== 'string' || !asksFor(entry.manifest, permission)) throw new Error(`"${id}" does not ask for ${permission}`);
   const list = new Set(settings.apps[id]?.granted ?? []);
   if (granted) list.add(permission);
   else list.delete(permission);
@@ -4727,26 +4739,99 @@ const mcpToolSettings = () => {
   return { off: new Set(t.off ?? []), offPackages: new Set(t.offPackages ?? []), newOff: !!t.newOff, known: new Set(t.known ?? []) };
 };
 function saveToolSettings(t) {
-  settings.mcpTools = { off: [...t.off], offPackages: [...t.offPackages], newOff: t.newOff, known: [...t.known] };
+  settings.mcpTools = { ...settings.mcpTools, off: [...t.off], offPackages: [...t.offPackages], newOff: t.newOff, known: [...t.known] };
   writeJson('settings.json', settings);
 }
 const toolKeyOff = (key, t = mcpToolSettings()) => t.off.has(key) || t.offPackages.has(key.slice(0, key.indexOf(':')));
+
+// #22: calls from other packages ("mods") to a package's @tool functions, beside the switch for
+// assistants. Per tool, else per package, the player picks "on" (any package may call it),
+// "allowed" (only packages that list it in their manifest's "calls" and that the player allowed
+// in the Mod Manager) or "off". Defaults: @readonly tools on, the rest allowed. Exports not
+// marked @tool are not switched. Kept in settings.mcpTools.mods { tools: { key: mode },
+// packages: { id: mode }, newOff }.
+const MOD_MODES = ['on', 'allowed', 'off'];
+const modToolSettings = () => {
+  const m = settings.mcpTools?.mods ?? {};
+  return { tools: { ...m.tools }, packages: { ...m.packages }, newOff: !!m.newOff };
+};
+function saveModToolSettings(m) {
+  settings.mcpTools = { ...settings.mcpTools, mods: m };
+  writeJson('settings.json', settings);
+}
+const modDefault = (readonly) => (readonly ? 'on' : 'allowed');
+const modModeOf = (pkg, fn, readonly, m = modToolSettings()) => m.tools[`${pkg}:${fn}`] ?? m.packages[pkg] ?? modDefault(readonly);
+
+// The names a caller may list for a provider's function: "<package>.<fn>", or "<role>.<fn>" for a role it provides.
+function callNamesFor(provider, fn) {
+  const pm = apps.get(provider)?.manifest;
+  return [`${provider}.${fn}`, ...(pm?.provides ?? []).filter((r) => r !== 'agent').map((r) => `${r}.${fn}`)];
+}
+
+// Why a package may not call another package's function now (#22), in the player's words, or
+// null when it may. Assistants have their own switch (callModTool); a package's pages reach its
+// own service freely.
+function callRefusal(caller, provider, fn, described) {
+  if (!caller.id || caller.id === provider || !described?.tool) return null;
+  const mode = modModeOf(provider, fn, !!described.readonly);
+  if (mode === 'on') return null;
+  const what = `${apps.get(provider)?.manifest.name ?? provider}'s ${fn}`;
+  if (mode === 'off') return `${what} is switched off for mods: the player can switch it on in the Tools Manager`;
+  const cm = apps.get(caller.id)?.manifest;
+  const listed = callNamesFor(provider, fn).filter((n) => cm?.calls.includes(n));
+  if (!listed.length) {
+    return `${cm?.name ?? caller.id} does not list ${provider}.${fn} in its manifest's "calls", so the player cannot allow it; its author must add it`;
+  }
+  if (listed.some((n) => isGranted(caller.id, `call:${n}`))) return null;
+  return `${listed[0]} is not allowed for ${cm.name}. Allow it in the Mod Manager`;
+}
+
+// What the Mod Manager shows of one "calls" entry: who answers it and whether it needs the player's OK.
+function callSummary(id, name) {
+  const dot = name.lastIndexOf('.');
+  const target = name.slice(0, dot);
+  const fn = name.slice(dot + 1);
+  let provider = apps.has(target) ? target : null;
+  if (!provider && ROLE_NAME.test(target)) {
+    try {
+      provider = providerOf(target, id);
+    } catch {
+      // no provider, or several and no choice
+    }
+  }
+  const described = provider ? services?.offer(provider)?.descriptor?.functions?.[fn] : null;
+  const providerName = provider ? apps.get(provider)?.manifest.name ?? provider : null;
+  let state;
+  if (!provider) state = apps.has(target) || providersOf(target).length ? 'unresolved' : 'missing';
+  else if (!services?.offer(provider)) state = 'not-ready';
+  else if (!described) state = 'unknown-function';
+  else if (!described.tool) state = 'open';
+  else state = modModeOf(provider, fn, !!described.readonly);
+  return { name, provider, providerName, fn, state, granted: isGranted(id, `call:${name}`) };
+}
 
 // Every package tool, switched on or not: [{ pkg, pkgName, fn (its descriptor), key, off }].
 function allModTools() {
   const t = mcpToolSettings();
   const out = [];
   let learned = false;
+  let modsLearned = null;
   for (const { id } of services.providers()) {
     const entry = apps.get(id);
     const d = services.offer(id)?.descriptor;
     const fns = Object.values(d?.functions ?? {}).filter((f) => f.tool);
     if (!entry || !fns.length) continue;
-    // The first time a package's tools show, "Off for new packages" switches them off.
+    // The first time a package's tools show, "Off for new packages" switches them off,
+    // for assistants and (#22) for mods, each by its own switch.
     if (!t.known.has(id)) {
       t.known.add(id);
       if (t.newOff) t.offPackages.add(id);
       learned = true;
+      const m = modsLearned ?? modToolSettings();
+      if (m.newOff && !m.packages[id]) {
+        m.packages[id] = 'off';
+        modsLearned = m;
+      }
     }
     for (const fn of fns) out.push({ pkg: id, pkgName: entry.manifest.name, fn, key: `${id}:${fn.name}`, off: toolKeyOff(`${id}:${fn.name}`, t) });
   }
@@ -4763,6 +4848,7 @@ function allModTools() {
     for (const fn of fns) out.push({ pkg: a.id, pkgName: a.name, fn, key: `${a.id}:${fn.name}`, off: toolKeyOff(`${a.id}:${fn.name}`, t), attached: a });
   }
   if (learned) saveToolSettings(t);
+  if (modsLearned) saveModToolSettings(modsLearned);
   return out;
 }
 
@@ -4788,7 +4874,7 @@ async function callModTool(who, pkg, fn, input) {
   if (t.off) throw new Error(`The player switched ${t.pkgName}'s ${fn} off for assistants (Tools Manager)`);
   if (t.attached && !seesAttached(who, t.attached)) throw new Error(`${t.pkgName}'s tools are for in-game assistants`);
   const started = Date.now();
-  const record = { at: started, assistant: who.name, tool: `${pkg}__${fn}`, pkg, fn, ok: false, ms: 0, detail: '' };
+  const record = { at: started, assistant: who.name, kind: 'assistant', tool: `${pkg}__${fn}`, pkg, fn, ok: false, ms: 0, detail: '' };
   toolCalls.push(record);
   if (toolCalls.length > 200) toolCalls.shift();
   // An attached server's tool takes its arguments by name and answers as MCP: passed on as it is.
@@ -4824,13 +4910,28 @@ async function callModTool(who, pkg, fn, input) {
 }
 
 /** What the Tools Manager shows: every tool by where it comes from, the assistants, the recent calls. */
+// #22: the packages whose manifest lists a provider's function in "calls", and whether the player allowed each.
+function callersOf(provider, fn) {
+  const names = callNamesFor(provider, fn);
+  const out = [];
+  for (const e of apps.values()) {
+    const listed = names.filter((n) => e.manifest.calls?.includes(n));
+    if (!listed.length || e.manifest.id === provider) continue;
+    out.push({ id: e.manifest.id, name: e.manifest.name, as: listed[0], granted: listed.some((n) => isGranted(e.manifest.id, `call:${n}`)) });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function toolsList() {
   const t = mcpToolSettings();
+  const m = modToolSettings();
   const own = mcp.ownTools().map((x) => ({ key: `rednode:${x.name}`, name: x.name, title: x.title, description: x.description, input: x.input, readonly: x.readonly, asks: x.asks, off: t.off.has(`rednode:${x.name}`) }));
   const groups = [{ id: 'rednode', name: 'REDnode', builtin: true, off: false, tools: own }];
   const byPkg = new Map();
   for (const x of allModTools()) {
-    if (!byPkg.has(x.pkg)) byPkg.set(x.pkg, { id: x.pkg, name: x.pkgName, builtin: false, off: t.offPackages.has(x.pkg), tools: [] });
+    if (!byPkg.has(x.pkg)) {
+      byPkg.set(x.pkg, { id: x.pkg, name: x.pkgName, builtin: false, off: t.offPackages.has(x.pkg), mods: x.attached ? null : m.packages[x.pkg] ?? null, tools: [] });
+    }
     byPkg.get(x.pkg).tools.push({
       key: x.key,
       name: `${x.pkg}__${x.fn.name}`.replace(/[^A-Za-z0-9_]/g, '_').slice(0, 64),
@@ -4840,12 +4941,18 @@ function toolsList() {
       readonly: x.fn.readonly,
       asks: !x.fn.readonly,
       off: x.off,
+      // #22: calls from other packages. An attached server's tools are for assistants only.
+      mods: x.attached ? null : modModeOf(x.pkg, x.fn.name, !!x.fn.readonly, m),
+      modsDefault: x.attached ? null : modDefault(!!x.fn.readonly),
+      modsSet: !x.attached && x.key in m.tools,
+      callers: x.attached ? [] : callersOf(x.pkg, x.fn.name),
     });
   }
   groups.push(...[...byPkg.values()].sort((a, b) => a.name.localeCompare(b.name)));
   return {
     mcp: mcp.status(),
     newOff: t.newOff,
+    modsNewOff: m.newOff,
     groups,
     assistants: [...assistants.values()].map((a) => ({ name: a.name, kind: a.kind, lastSeenMs: Date.now() - a.lastSeen })).sort((a, b) => a.lastSeenMs - b.lastSeenMs),
     recent: toolCalls.slice(-50).reverse(),
@@ -4882,7 +4989,25 @@ ipcMain.handle('rednode:tools:set', (event, what, id, on) => {
       for (const k of [...t.off]) if (k.startsWith(`${id}:`)) t.off.delete(k);
     } else t.offPackages.add(id);
   } else if (what === 'new-off') t.newOff = !!on;
-  else throw new Error(`Unknown switch "${what}"`);
+  else if (what === 'mods-tool' || what === 'mods-group' || what === 'mods-new-off') {
+    // #22: the switch for calls from other packages. on is a mode (on, allowed, off), or null for the default.
+    const m = modToolSettings();
+    if (what === 'mods-new-off') m.newOff = !!on;
+    else {
+      if (on !== null && !MOD_MODES.includes(on)) throw new Error(`A mods switch is ${MOD_MODES.join(', ')} or null`);
+      if (what === 'mods-tool') {
+        if (on === null) delete m.tools[id];
+        else m.tools[id] = on;
+      } else {
+        if (on === null) delete m.packages[id];
+        else m.packages[id] = on;
+        for (const k of Object.keys(m.tools)) if (k.startsWith(`${id}:`)) delete m.tools[k];
+      }
+    }
+    saveModToolSettings(m);
+    log(`Tools: ${what} ${id ?? ''} ${on}, by ${who}`);
+    return toolsList();
+  } else throw new Error(`Unknown switch "${what}"`);
   saveToolSettings(t);
   log(`Tools: ${what} ${id ?? ''} ${on ? 'on' : 'off'}, by ${who}`);
   return toolsList();
@@ -5611,6 +5736,11 @@ app.whenReady().then(() => {
       for (const w of windowsOfPackage(id)) toPage(w, message);
     },
     modLog: (id, level, text) => mods.log(id, level, text),
+    refuse: callRefusal,
+    noted: ({ caller, provider, fn, ok, ms, detail }) => {
+      toolCalls.push({ at: Date.now() - ms, assistant: caller.name ?? caller.id, kind: 'mod', tool: `${provider}__${fn}`, pkg: provider, fn, ok, ms, detail: String(detail ?? '').slice(0, 200) });
+      if (toolCalls.length > 200) toolCalls.shift();
+    },
   });
   mods = createMods({
     app,

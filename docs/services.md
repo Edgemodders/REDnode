@@ -77,7 +77,7 @@ An assistant sees two tools, `edgebuilder__scenes` and `edgebuilder__load`, with
 | **Validation** | The host checks every call's arguments against the schema before it reaches the provider, so a mod never sees a malformed call from an assistant |
 | **MCP tools** | Only exports marked `@tool`. Named `<package>__<function>` (dashes become underscores, 64 characters at most). The list is built fresh for each request, so a package's tools appear and go as it starts and stops; no `tools/list_changed` notice is sent (the server is stateless). Three fixed tools as well, `mod_services` (every package's descriptors), `mod_read` (read-only tools, no asking) and `mod_call`, for tools started after a client read its list |
 | **Asking first** | A tool marked `@readonly` runs without asking. Every other tool carries `anthropic/requiresUserInteraction`, as `api_call` does, so Claude Code asks before each call. A provider cannot remove the ask; the `@readonly` mark is the author's promise, shown to the player in the Mod Manager |
-| **The player's say** | Each package's details in the Mod Manager list its functions and tools. The **Tools Manager** (below) switches tools off for every assistant, a whole package or one tool at a time. Mod-to-mod calls need no switch, as an npm dependency needs none; a provider limits its callers with `service.caller()` |
+| **The player's say** | Each package's details in the Mod Manager list its functions and tools. The **Tools Manager** (below) switches tools off for every assistant, a whole package or one tool at a time. Since REDnode 0.66.0 (#22) it also has a switch for calls from other packages: a `@tool` that changes something needs the player's OK for each package that calls it (see "Calls from mods (#22)" below). Other exports need no switch, as an npm dependency needs none; a provider limits its callers with `service.caller()` |
 | **The agent broker** | Stays as it is. Later it can become a service of REDagent's (`redagent.ask`), so one router carries everything |
 
 ## Answers to the owner's idea
@@ -342,4 +342,40 @@ REDnode 0.44.0, game 2.5. With Counter service 0.3.0 (`"provides": ["counter"]`)
 8. Type into the password field and press Enter. Expected: dots in the field, and "Got N characters; the field showed dots".
 
 **First run, 2026-10-29: passed** (dev PC, game 2.5, REDnode 0.45.0, which holds 0.44.0's roles). Every step as written, reported by the player. #20 closed.
+
+## Calls from mods (#22): built
+
+Asked for by EDGEquest in [#22](https://github.com/Edgemodders/REDnode/issues/22): a quest made with EDGEquest calls other packages' functions at points in the story, and the owner wants the player to "block 3rd party mods from calling resources" meant for one use, such as a file system tool for REDagent alone. Until 0.66.0 the Tools Manager switched tools for assistants only, and any package could call any other's functions. Agreed with the owner on 2026-11-15: only `@tool` functions are switched, `@readonly` ones open to every mod by default. Built in REDnode 0.66.0 with Admin Tools 0.2.0.
+
+| Part | How |
+|---|---|
+| A caller says what it calls | `"calls": ["counter-service.add", "voice.speak"]` in its rednode-app.json: `<package>.<function>`, or `<role>.<function>` for a role. Checked at load: anything else is refused with the reason |
+| The player allows each | The Mod Manager's **Calls** section on the caller: each entry, who answers it, whether it needs an OK now, and an **Allowed** switch, kept in `settings.apps[id].granted` as `call:<entry>` beside the permissions. Withdrawn the same way |
+| Which functions are switched | A provider's `@tool` functions (its JSDoc, SV2). Other exports stay open to every package, as before |
+| The switch, per tool and per package | The Tools Manager's **MODS** switch beside the assistants' one: **MODS ON** (any package), **ALLOWED** (only packages that list it in `"calls"` and that the player allowed), **MODS OFF** (none). A click goes to the next. The package's row sets every tool of it; a tool's own switch wins, with **Back to the default** in its details |
+| Defaults | `@readonly` tools on, the rest allowed. **Mods: off for new packages** starts a newly installed package's tools off for mods, as **Off for new packages** does for assistants. Kept in `settings.mcpTools.mods` (`tools`, `packages`, `newOff`) |
+| A call that is not allowed | Refused at once, never a prompt mid-play, with a reason the caller can log: "counter.add is not allowed for Calls B. Allow it in the Mod Manager", "Calls A does not list counter-service.reset in its manifest's "calls", so the player cannot allow it; its author must add it", or "Counter service's get is switched off for mods: the player can switch it on in the Tools Manager". It reaches the caller as the call's error and goes to its Mod log |
+| Seeing it | The Tools Manager's recent calls name the calling package, marked `(mod)`, refusals included. A tool's details list the packages whose `"calls"` name it and whether each is allowed |
+| Not switched | An assistant's calls (its own switch, as before); a package's pages calling its own service; the servers REDnode runs (EDGEmat's, EDGEhack's), which only assistants reach |
+| `admin` | `admin.setModTool(what, id, mode)` and the new `ToolInfo` fields (`mods`, `modsDefault`, `modsSet`, `callers`) in the `rednode` package, for admin packages |
+
+This changes what existed: a package that calls another's non-read-only `@tool` function is refused until it lists the call and the player allows it. Counter panel 0.3.0 lists `counter-service.add` (and leaves out `reset`, to show the refusal); Roles test 0.2.0 lists `counter.add`, the role form.
+
+Checked in the mock game: scratchpad `g22/run.sh`, 15 calls over three runs with the grants and switches seeded (a read-only tool open, a listed and allowed tool, an unlisted one, a role call not allowed, a tool off, a package on, a tool back to allowed inside a package that is on, a withdrawn grant), and `g22/ui.mjs`, 19 checks of the Tools Manager's and the Mod Manager's data through DevTools (defaults, callers, recent calls with the refusal, each switch and its reset, a wrong mode refused, the settings kept beside the assistants' switches, a role entry resolved to its provider, a grant from the Mod Manager, a grant of a call not in the manifest refused).
+
+## Calls from mods test
+
+REDnode 0.66.0, Admin Tools 0.2.0 (its Tools Manager), Counter service 0.3.0, Counter panel 0.3.0, Roles test 0.2.0. Load a save first.
+
+1. In the Mod Manager switch on **Counter service**, **Counter panel**, **Roles test** and **Tools Manager**, and the Tools Manager's **Allowed** (the `admin` permission). Open Counter panel's details: a **Calls** section lists "Calls Counter service's add", "A tool that needs your OK", its **Allowed** switch off.
+2. In Counter panel press **Read**. Expected: the count (a read-only tool: no OK needed).
+3. Press **+1**. Expected: "add(1) failed: counter-service.add is not allowed for Counter panel. Allow it in the Mod Manager".
+4. In the Mod Manager switch on Counter panel's **Allowed** for add. Press **+1** again. Expected: "add(1): 1" and the changed event.
+5. Press **Reset**. Expected: refused, "Counter panel does not list counter-service.reset in its manifest's "calls" ...".
+6. Open the Tools Manager. Counter service's tools show **MODS ON** on `get`, **ALLOWED** on `add` and `reset`. Click `add`: its details list "Counter panel: allowed" and "Roles test (as counter.add): refused until allowed in the Mod Manager". The recent calls show Counter panel's calls marked `(mod)`, the refused ones in red.
+7. Click `add`'s **ALLOWED** once: it shows **MODS OFF**. In Counter panel press **+1**. Expected: "Counter service's add is switched off for mods ...".
+8. Click Counter service's package switch (**MODS: DEFAULT**) once: every tool shows **MODS ON**. Press **Reset** in Counter panel. Expected: it works now ("reset(): 0"), though unlisted.
+9. Click the package switch three more times, back to **MODS: DEFAULT**. In Roles test press **use("counter")**, then **add(1)**. Expected: refused, "counter.add is not allowed for Roles test ...". Allow it in Roles test's **Calls** section and press **add(1)** again: it works.
+10. Quit the game. Start it again and open the Tools Manager: the switches and grants are as you left them.
+
 {% endraw %}

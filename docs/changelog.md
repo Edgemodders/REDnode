@@ -11,6 +11,14 @@ How to keep it:
 
 ## Unreleased
 
+**New**
+
+- Your say over which mods may call another mod's tools (#22): a package lists the tools it calls in its manifest (`"calls": ["voice.speak"]`), and you allow each in the Mod Manager's new **Calls** section. A call you have not allowed is refused at once with the reason, never a prompt in the middle of play. Read-only tools stay open to every mod. The Admin Tools pack's Tools Manager gets a **MODS** switch per tool and per package (on for any mod, allowed only, or off) and **Mods: off for new packages**; its recent calls show mods' calls too. Docs: https://edgemodders.github.io/REDnode/services.html#calls-from-mods-22-built
+
+**Changed**
+
+- A mod that calls another mod's `@tool` function that changes something (not `@readonly`) is now refused until it lists the call in `"calls"` and you allow it. Counter panel and Roles test show how.
+
 ## 0.65.3 (2026-11-15)
 
 For game version 2.5.

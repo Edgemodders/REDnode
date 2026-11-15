@@ -2,7 +2,9 @@
 // REDnode's MCP server, grouped by where it comes from: REDnode's own, then each mod's
 // @tool functions. A switch per tool and per group takes it away from every assistant at
 // once; the switches are kept across starts. Also: which assistants have connected, and
-// their recent calls of mods' tools.
+// their recent calls of mods' tools. #22: a second switch per tool and per package, MODS, for
+// calls from other packages: ON (any package), ALLOWED (only packages that list it in their
+// "calls" and that the player allowed in the Mod Manager) or OFF.
 // Part of the Admin Tools pack. Uses window.rednode.tools, which the host answers only
 // for a package the player allowed the "admin" permission; until then the details pane
 // says so.
@@ -54,6 +56,33 @@ function sw(on, onClick, title) {
   return b;
 }
 
+// #22: the MODS switch. A tool goes on -> allowed -> off -> on; a package also has its default.
+const MOD_LABEL = { on: 'MODS ON', allowed: 'ALLOWED', off: 'MODS OFF' };
+const MOD_NEXT = { on: 'allowed', allowed: 'off', off: 'on' };
+const MOD_TIP = {
+  on: 'Mods: any package may call it',
+  allowed: 'Mods: only packages you allowed in the Mod Manager (their "calls")',
+  off: 'Mods: no package may call it',
+};
+const MOD_DETAIL = {
+  on: 'any package may call it',
+  allowed: 'only packages you allowed in the Mod Manager (their "calls")',
+  off: 'no package may call it',
+};
+function modsPill(mode, onClick, title) {
+  const b = el('button', `mods ${mode ?? 'none'}`, mode ? MOD_LABEL[mode] : '');
+  if (!mode) {
+    b.disabled = true;
+    return b;
+  }
+  b.title = `${title ?? MOD_TIP[mode]}. Click for: ${MOD_TIP[MOD_NEXT[mode]].replace('Mods: ', '')}`;
+  b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    onClick(MOD_NEXT[mode]);
+  });
+  return b;
+}
+
 function matches(t) {
   if (!search) return true;
   const q = search.toLowerCase();
@@ -76,6 +105,20 @@ function render() {
     head.append(sw(allOn, (v) => set('group', g.id, v), allOn ? `Switch every ${g.name} tool off` : `Switch every ${g.name} tool on`));
     head.append(el('span', '', g.name));
     head.append(el('span', 'count', `${g.tools.length} tool${g.tools.length === 1 ? '' : 's'}${g.off ? ' · off' : ''}`));
+    // The package's own MODS switch: every tool of it at once. Its default is each tool's own.
+    if (!g.builtin && g.tools.some((t) => t.mods)) {
+      const shown = g.mods ?? 'default';
+      const pill = el('button', `mods ${g.mods ?? ''}`, g.mods ? MOD_LABEL[g.mods] : 'MODS: DEFAULT');
+      pill.title = g.mods
+        ? `${MOD_TIP[g.mods]}, for every ${g.name} tool. Click for the next`
+        : `Every ${g.name} tool has its default for mods (read-only ones on, the rest allowed only). Click to set them all`;
+      pill.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const next = { default: 'on', on: 'allowed', allowed: 'off', off: null }[shown];
+        set('mods-group', g.id, next);
+      });
+      head.append(pill);
+    }
     list.append(head);
     for (const t of tools) {
       const off = t.off || g.off;
@@ -83,6 +126,7 @@ function render() {
       row.append(sw(!off, (v) => set('tool', t.key, v), off ? 'Switched off: no assistant sees it' : 'On: assistants see it'));
       row.append(el('span', 'tname', t.name));
       row.append(el('span', `mode ${t.readonly ? 'reads' : t.asks ? 'asks' : ''}`, t.readonly ? 'READS' : t.asks ? 'ASKS FIRST' : 'ACTS'));
+      row.append(modsPill(t.mods, (next) => set('mods-tool', t.key, next)));
       row.append(el('span', 'what', t.description.split('\n')[0]));
       row.addEventListener('click', () => {
         current = t.key;
@@ -99,6 +143,7 @@ function render() {
   if (data.mcp.enabled) server.append('MCP server ', el('b', '', `on, port ${data.mcp.port}`), data.mcp.external ? '' : ' (packages only: the desktop switch is off in the launcher)');
   else server.append('MCP server ', el('b', 'off', 'off'), ': switch it on in the launcher\'s settings');
   $('newoff').toggleAttribute('checked', !!data.newOff);
+  $('modsnewoff').toggleAttribute('checked', !!data.modsNewOff);
 
   renderDetails();
   const who = $('who');
@@ -114,7 +159,7 @@ function render() {
   if (!data.recent.length) calls.append('None yet.');
   for (const c of data.recent) {
     const line = el('div', c.ok ? '' : 'bad');
-    line.textContent = `${new Date(c.at).toLocaleTimeString()} ${c.assistant}: ${c.tool} ${c.ok ? '✓' : '✕'} ${c.ms} ms${c.detail ? ` · ${c.detail}` : ''}`;
+    line.textContent = `${new Date(c.at).toLocaleTimeString()} ${c.assistant}${c.kind === 'mod' ? ' (mod)' : ''}: ${c.tool} ${c.ok ? '✓' : '✕'} ${c.ms} ms${c.detail ? ` · ${c.detail}` : ''}`;
     calls.append(line);
   }
 }
@@ -140,6 +185,24 @@ function renderDetails() {
     }
   } else box.append(el('div', 'mono', 'No parameters.'));
   if (KEY_TOOLS.has(t.key)) box.append(el('div', 'warn', 'Off, this takes the game API away from every assistant, REDagent included.'));
+  // #22: calls from other packages.
+  if (t.mods) {
+    const def = t.mods === t.modsDefault && !t.modsSet;
+    box.append(el('div', 'mono', `Mods: ${MOD_DETAIL[t.mods]}${def ? ' (the default)' : t.modsSet ? '' : ` (set for all of ${t.group.name})`}`));
+    const callers = el('div', 'callers');
+    if (!t.callers.length) callers.append(el('div', 'no', 'No installed package lists it in its "calls".'));
+    for (const c of t.callers) {
+      const state = t.mods === 'on' ? 'may call it' : t.mods === 'off' ? 'refused (switched off)' : c.granted ? 'allowed' : 'refused until allowed in the Mod Manager';
+      callers.append(el('div', c.granted || t.mods === 'on' ? '' : 'no', `${c.name}${c.as !== `${t.group.id}.${t.title}` ? ` (as ${c.as})` : ''}: ${state}`));
+    }
+    box.append(callers);
+    if (t.modsSet) {
+      const back = document.createElement('rn-button');
+      back.textContent = `Back to ${t.group.mods ? `${t.group.name}'s` : 'the default'}`;
+      back.addEventListener('click', () => set('mods-tool', t.key, null));
+      box.append(back);
+    }
+  }
 }
 
 async function refresh() {
@@ -152,6 +215,7 @@ async function refresh() {
 }
 
 $('newoff').addEventListener('change', (e) => set('new-off', null, e.detail.checked));
+$('modsnewoff').addEventListener('change', (e) => set('mods-new-off', null, e.detail.checked));
 $('search').addEventListener('input', (e) => {
   search = $('search').value ?? '';
   render();
