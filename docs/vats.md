@@ -261,6 +261,32 @@ App 0.3.0, on REDnode 0.64.0, game 2.5, Codeware. Every line now also goes to `r
 
 Claude then reads the `[vats-spike]` lines in `rednode-mods.log`.
 
+### Spike test: round 2 results
+
+2026-11-14, by the owner, dev PC, game 2.5, REDnode 0.64.0, app 0.3.0, all 11 steps (step 7 last). Numbers from `rednode-mods.log`.
+
+| Step | Result |
+|---|---|
+| 2 List components | A Dogtown resident: 139 components, 21 meshes, every one an `entGarmentSkinnedMeshComponent` but the hair's shadow and `AppearanceProxyMesh`. Names carry the slot prefix and a number: body `t0_000_ma__c_base_full9394`, head in three meshes (`h0_032_ma_c__young528`, `...8366`, `...4166`), eyebrows `heb_`, hair `hh_`, headwear `h1_` (phones, balaclava), outer top `t2_`, gloves `g1_`, trousers `l1_`, shoes `s1_`, add-ons `i1_`, `a0_`. 60 ms |
+| 3 to 5 Outline | Sent to each head mesh, the trousers, the body and the whole NPC, colours 2, 3 and 5, about 90 ms a send. What showed is the owner's to note (open) |
+| 6 and 8 Frame (camera) | **Passed**: the view 0.0 degrees off the body's middle at once and after 1 s, so the game does not write over the camera's local orientation. A 1.70 m body 7.6 m away: field of view 51 to 15.8 (80 %), 20.8 at 60 %. About 1.4 s a press. Whether the crosshair and aim follow the turned view is open |
+| 7 Frame (turn V) | **Half**: `Teleport` took the yaw (-2.4) and not the pitch (-7.1): the view stayed 7.2 degrees high, so at a 13.4 degree field of view the body was out of frame ("pitched up a little", the owner). VATS turns the camera, not V |
+| Field of view | The game eases `SetFOV` over about a second: x2 asked 25.5 and read 49.5, then 31.5, then 25.5; Camera back read 24.3 on its way to 51 |
+| 9 The scanner | Holding the scanner eases the world's dilation through 0.47 to **0.03** (2.5; on 2.31 the scanner's slow motion was not found in it, so 2.5 changed it or a mod of the owner's does) and nudges the zoom to 1.00013. In menus the dilation reads 0 |
+| 9 Slow motion | 0.05 and 0.01 held while scanning: **VATS's reason wins** over the scanner's 0.03 (0.05 stayed 0.05); when its time ran out, the scanner's 0.03 came back. Both runs had **Keep V at normal speed** on; the run with it off is not in the log (open) |
+| 10 Only one part can be hit | **Passed**: with every shape but the left arm's off, torso shots showed no damage numbers, and the enemy then acted as if its left arm was wounded (the game's wounded-limb reaction). Whether torso shots passed through to what is behind is open. Aiming down sights read a dilation of 0.75 and a zoom of 1.7 (a perk or the weapon, unverified) |
+| 11 Switch off | Passed |
+
+Found: after a save load the app's Watch kept polling with no world, about two errors a second until the world came back; the next app update waits for it quietly.
+
+What it decides:
+
+| Question | Answer |
+|---|---|
+| V10 Framing | Turn the first-person camera's own local orientation and narrow the field of view; it holds. Turning V takes the yaw only. The field of view eases in over about a second |
+| V5 Slow motion against the scanner | VATS's own dilation reason holds while scanning, below or above the scanner's 0.03 |
+| Part 2 One part hit | Switching the other hit shapes off makes shots land only on the chosen part |
+
 ### Spike test: first run
 
 2026-11-14, by the owner, dev PC, game 2.5, REDnode 0.64.0. The app went from 0.2.0 to 0.2.3 during the run (each copied into the game while it ran; the host restarted the app on its own). The owner: after the fixes, every step worked as written. The app's lines went only to its window up to 0.2.3, so the numbers below are the ones the owner pasted; 0.2.4 also writes them to `rednode-mods.log`.
