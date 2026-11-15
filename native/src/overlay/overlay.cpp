@@ -97,6 +97,7 @@ void Update(uint64_t aFrame)
     detail::UpdateTrace();
     detail::UpdateInk(aFrame);
     detail::UpdatePins(aFrame);
+    detail::UpdateGamepad(aFrame);
 }
 
 uint64_t detail::NowMs()

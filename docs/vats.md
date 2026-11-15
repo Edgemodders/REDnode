@@ -210,6 +210,7 @@ Built on 2026-11-14: the **VATS spike** app (`packages/overlay/apps/vats-spike`,
 | Slow motion (V5) | `TimeSystem.SetTimeDilation` with a reason and a duration (2 to 30 s, a slider), so it always runs out on its own; **Keep V at normal speed** adds `SetIgnoreTimeDilationOnLocalPlayerZero`; **Normal** undoes both | V5 |
 | Watch | Twice a second, a line when the active dilation, the field of view or the zoom changes | What the scanner itself changes |
 | Exposure (V8) | Five points across each shape (its slot, and its capsule's radius to the camera's right, left, up and down). A point is behind the target's own body if the line from the camera passes through another of its shapes, each taken as a sphere of its capsule's radius at its slot (an approximation). The rest get a ray each from the camera (`GetActiveCameraWorldTransform`, `SyncRaycastByCollisionGroup` with `"Static"`), all sent at once so they share a frame; a hit more than 0.15 m short is the world in the way. **Chance on the labels** shows each part's share on its pin while Show parts is on | V8: do the shares match what the player sees, and what do 40 to 70 rays cost |
+| Right trigger VATS (round 3, from 0.4.0, REDnode 0.65.0) | The owner's design on a controller, held: with the switch on, the right trigger pressed while the scanner is up (the player state machine's `Vision` reads 1, Focus) frames what V looks at as **Frame (camera)** does, then every 150 ms finds the part under the crosshair (a ray against the shapes) and outlines the meshes worn there (head `h0_`, `heb_`, `hh_`, `h1_`; torso `t1_`, `t2_`; arms `g1_`, `a0_`; legs `l1_`, `s1_`) in **VATS colour** (1 first, to find green). Letting go of the trigger or the scanner takes the outline off and puts the camera back. The trigger comes from REDnode's new `input.onGamepad` (the plugin reads the controller with XInput) | The owner's play test of the whole loop; which colour is green; whether the game also does something with the right trigger while scanning (V9) |
 | Outline (V2, from 0.3.0) | **List components**: Codeware's `GetComponents()` on the target, each mesh component logged with its type and name. **Outline**: `entRenderHighlightEvent` (made with `api.$new`, sent with `QueueEvent`) with the typed `componentName` (empty: the whole NPC), the colour from a slider (the event's `outlineIndex`, 1 to 7), no fill; **Clear** sends it again with no outline | V2: can the game outline one part (the head, a garment) in red |
 | Frame (V10, from 0.3.0) | The body's middle, height and distance from its slots; the field of view that makes it fill a share of the screen's height (**Body fills**, 40 to 95 %). **Frame (camera)** turns the first-person camera's own local orientation (`SetLocalOrientation`, keeping what its parent adds); **Frame (turn V)** teleports V where V stands, facing the body, with yaw and pitch. Each reads the camera's forward direction after and logs how far the view is off the body's middle (the camera way at once and after 1 s, to see whether the game writes over it). **Camera back** restores the orientation, field of view and zoom | V10: which way turns the view, and whether it holds |
 | Only one part can be hit | `HitShapeUserDataBase.DisableHitShape` on the target's other shapes, `EnableHitShape` after 6 s (from 0.3.0 a slider, 3 to 30 s) | Part 2: can a shot be made to land on one part |
@@ -261,6 +262,23 @@ App 0.3.0, on REDnode 0.64.0, game 2.5, Codeware. Every line now also goes to `r
 
 Claude then reads the `[vats-spike]` lines in `rednode-mods.log`.
 
+### Spike test: round 3
+
+App 0.4.0 on **REDnode 0.65.0** (the plugin reads the controller), game 2.5, Codeware, a controller.
+
+| Step | Do | Expect, and what to note |
+|---|---|---|
+| 1 | Load a save. In the launcher, switch **VATS spike** on (or off and on); switch on **Right trigger VATS** | The log: "Right trigger VATS: on", and the plugin's log has "Gamepad: XInput loaded" and "controller connected" |
+| 2 | Leave F10. Without the scanner, press the right trigger once | The log: "the scanner is not up: nothing to do". Note whether the game did something with the trigger (fired) |
+| 3 | Hold the scanner, aim at an enemy who is not fighting yet, and hold the right trigger | The view frames the enemy; the part under the crosshair is outlined. Note the colour, and how fast it came |
+| 4 | Still holding both, move the crosshair over the head, the torso, the arms and the legs | The outline follows the part. Note how quickly it changes, and that arms and legs light both sides (gloves and trousers cover both) |
+| 5 | Let go of the right trigger | The outline goes and the camera is back as before |
+| 6 | Hold the trigger again while scanning, then let go of the scanner first | The same: off, camera back |
+| 7 | If the outline was not green: in F10, move **VATS colour** to 4, 6 or 7 and repeat step 3 | Note which number is green |
+| 8 | Switch the app off | Nothing stays outlined or turned |
+
+Claude then reads the `[vats-spike]` lines in `rednode-mods.log` and the plugin's `Gamepad:` lines.
+
 ### Spike test: round 2 results
 
 2026-11-14, by the owner, dev PC, game 2.5, REDnode 0.64.0, app 0.3.0, all 11 steps (step 7 last). Numbers from `rednode-mods.log`.
@@ -269,7 +287,7 @@ Claude then reads the `[vats-spike]` lines in `rednode-mods.log`.
 |---|---|
 | 2 List components | A Dogtown resident: 139 components, 21 meshes, every one an `entGarmentSkinnedMeshComponent` but the hair's shadow and `AppearanceProxyMesh`. Names carry the slot prefix and a number: body `t0_000_ma__c_base_full9394`, head in three meshes (`h0_032_ma_c__young528`, `...8366`, `...4166`), eyebrows `heb_`, hair `hh_`, headwear `h1_` (phones, balaclava), outer top `t2_`, gloves `g1_`, trousers `l1_`, shoes `s1_`, add-ons `i1_`, `a0_`. 60 ms |
 | 3 to 5 Outline | **Passed**: the game outlines one component on its own, visible without the scanner. Of the three `h0_` meshes the first (`...528`) was the head and the other two accessories worn on it. Colours 2, 5 and 3 (sent in that order) showed blue, white and red; which number is red is to confirm. Sent to the trousers, the body and the whole NPC too, about 90 ms a send. While scanning, the game's own red outline covers a hostile's whole body (the scanner's, not the spike's), so a red part outline would not stand out in VATS: its colour is the owner's to decide |
-| 6 and 8 Frame (camera) | **Passed**: the view 0.0 degrees off the body's middle at once and after 1 s, so the game does not write over the camera's local orientation. A 1.70 m body 7.6 m away: field of view 51 to 15.8 (80 %), 20.8 at 60 %. About 1.4 s a press. Whether the crosshair and aim follow the turned view is open |
+| 6 and 8 Frame (camera) | **Passed**: the view 0.0 degrees off the body's middle at once and after 1 s, so the game does not write over the camera's local orientation; shots fired with the view framed landed where aimed (the owner, retried the same day). A 1.70 m body 7.6 m away: field of view 51 to 15.8 (80 %), 20.8 at 60 %. About 1.4 s a press |
 | 7 Frame (turn V) | **Half**: `Teleport` took the yaw (-2.4) and not the pitch (-7.1): the view stayed 7.2 degrees high, so at a 13.4 degree field of view the body was out of frame ("pitched up a little", the owner). VATS turns the camera, not V |
 | Field of view | The game eases `SetFOV` over about a second: x2 asked 25.5 and read 49.5, then 31.5, then 25.5; Camera back read 24.3 on its way to 51 |
 | 9 The scanner | Holding the scanner eases the world's dilation through 0.47 to **0.03** (2.5; on 2.31 the scanner's slow motion was not found in it, so 2.5 changed it or a mod of the owner's does) and nudges the zoom to 1.00013. In menus the dilation reads 0 |

@@ -41,6 +41,8 @@ export { ink, InkMarkupError } from "./ink.js";
 export { quests, journal } from "./quests.js";
 export type { FactChange, JournalState, JournalEntry, JournalKind } from "./quests.js";
 export { quickhacks } from "./quickhacks.js";
+export { input } from "./input.js";
+export type { GamepadButton, GamepadState } from "./input.js";
 export type { QuickhackTarget, QuickhackUse, QuickhackFunctions, QuickhackDefine } from "./quickhacks.js";
 export { t, LocalText, languageTag, loc } from "./i18n.js";
 export type { Language, TextParams, Loc } from "./i18n.js";

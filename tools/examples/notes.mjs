@@ -442,13 +442,14 @@ export const NOTES = {
   'vats-spike': {
     group: 'tests',
     summary: 'Research for VATS: an enemy\'s body parts read and pinned where they are, the camera zoomed, the world slowed, what the crosshair is on, and only one body part left to hit.',
-    teaches: ['api global functions', 'api.$out', 'TargetingSystem', 'TimeSystem', 'gameCameraComponent', 'world.pin', 'ui.slider', 'ui.list'],
+    teaches: ['input.onGamepad', 'api global functions', 'api.$out', 'TargetingSystem', 'TimeSystem', 'gameCameraComponent', 'world.pin', 'ui.slider', 'ui.list'],
     how: [
       'Every NPC is hit through 15 hit shapes on its skeleton. The native `GetSlotTransform(slot, api.$out)` on its hit representation slot component (`GetHitRepresantationSlotComponent()`, the game\'s spelling) reads where each one is; the app groups them into six parts and pins each part at the middle of its slots, again a few times a second.',
       '**Zoom** halves or quarters the player\'s camera field of view (`GetFPPCameraComponent`, `SetFOV`); **Back** puts it back.',
       '**Slow motion** calls `TimeSystem.SetTimeDilation` with a reason and a duration, so it always runs out on its own, and can keep V at normal speed.',
       '**Exposure** casts a ray from the camera to five points on each part (`SyncRaycastByCollisionGroup`, every ray sent at once so they share a frame), and tests each against the target\'s own other shapes in plain maths, for a share of each part the camera sees.',
       '**Outline** puts the game\'s own outline on one of the target\'s components (`entRenderHighlightEvent` with a `componentName`; **List components** names them through Codeware). **Frame** turns the view onto the target and narrows the field of view until its body fills the screen, by the camera\'s own orientation or by turning V.',
+      '**Right trigger VATS** listens to the controller with `input.onGamepad`: holding the right trigger while the scanner is up (the player state machine\x27s `Vision`) frames the enemy and outlines the part under the crosshair, and letting go puts everything back.',
       '**Only one part can be hit** switches the target\'s other hit shapes off with `HitShapeUserDataBase.DisableHitShape` and back on after 6 seconds.',
     ],
     tryThis: ['Press Target, then Read slots, then switch on Show parts.', 'Press x2, then Back.'],

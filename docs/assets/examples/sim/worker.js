@@ -418,6 +418,11 @@ export const quickhacks = {
   defined: () => [...quickhackDefines].map((d) => ({ items: [...d.items], actions: [...d.actions] })),
   counts: async () => `defines ${[...quickhackDefines].reduce((n, d) => n + d.actions.length, 0)} (the preview has no enemies to scan)`,
 };
+// The controller: the preview has none, so nothing is ever pressed.
+export const input = {
+  onGamepad: () => () => {},
+  gamepad: () => ({ connected: false, buttons: [], pressed: [], released: [], lt: 0, rt: 0 }),
+};
 export const kernel = path(['kernel']);
 export const archives = path(['archives']);
 export const pkg = path(['pkg']);

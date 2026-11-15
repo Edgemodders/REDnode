@@ -27,7 +27,7 @@
 //                taken as a sphere of its capsule's radius at its slot: an approximation,
 //                since which way a capsule runs on its bone is unverified)
 
-import { api, game, ui, world } from 'rednode';
+import { api, game, input, ui, world } from 'rednode';
 
 // Each shape's capsule in npc_base.hitrepresentation: radius and height in metres.
 const SHAPES = {
@@ -396,6 +396,23 @@ const crosshair = () =>
     return `${what}; ${part}`;
   });
 
+const partOfSlot = (slot) => PARTS.find((x) => x.slots.includes(slot))?.part ?? null;
+
+// The shape a ray from the camera along its forward direction meets first: { part, slot } or null.
+async function crosshairPart(t) {
+  const [cam, { places }] = await Promise.all([cameraView(), readSlots(t)]);
+  let best = null;
+  for (const p of places) {
+    if (p.x === null) continue;
+    const along = dot(sub(p, cam.at), cam.forward);
+    if (along <= 0) continue;
+    const miss = len(sub(p, add(cam.at, cam.forward, along)));
+    const [radius, height] = SHAPES[p.slot];
+    if (miss <= Math.max(radius, height / 2) && (!best || along < best.along)) best = { slot: p.slot, along };
+  }
+  return best ? { part: partOfSlot(best.slot), slot: best.slot } : null;
+}
+
 async function partUnderCrosshair(t) {
   const [cam, { places }] = await Promise.all([cameraView(), readSlots(t)]);
   let best = null;
@@ -454,7 +471,17 @@ function watch(on) {
   watchTimer = null;
   lastWatch = '';
   if (on) {
-    watchTimer = setInterval(() => watchTick().catch((err) => say(`Watch FAILED: ${err?.message ?? err}`)), 500);
+    // While a save loads there is no world: wait quietly for it (one line, not two a second).
+    let waiting = false;
+    watchTimer = setInterval(() => {
+      if (!inWorld) {
+        if (!waiting) say('Watch: waiting for the world (a load)');
+        waiting = true;
+        return;
+      }
+      waiting = false;
+      watchTick().catch((err) => say(`Watch FAILED: ${err?.message ?? err}`));
+    }, 500);
     say('Watch: on (a line only when something changes)');
   } else say('Watch: off');
 }
@@ -617,6 +644,156 @@ const frameBack = () =>
     return `camera back: field of view reads ${fov.toFixed(1)}`;
   });
 
+// ---------- the trigger: VATS while scanning (round 3) ----------
+
+// Whether the game has a world (false while a save loads), kept from game.onState.
+let inWorld = true;
+game.state().then((s) => (inWorld = !!s.world)).catch(() => {});
+game.onState((s) => (inWorld = !!s.world));
+
+// The scanner is up when the player state machine's Vision is Focus (1).
+let psm = null;
+async function scanning() {
+  if (!psm) {
+    const v = await player();
+    const defs = await api.GetAllBlackboardDefs();
+    const def = await defs.$get('PlayerStateMachine');
+    const vision = await def.$get('Vision');
+    const boards = await api.GameInstance.GetBlackboardSystem(game.instance);
+    const board = await boards.GetLocalInstanced(await v.GetEntityID(), def);
+    if (!board) throw new Error('no player state machine blackboard');
+    psm = { board, vision };
+  }
+  try {
+    return (await psm.board.GetInt(psm.vision)) === 1;
+  } catch (err) {
+    psm = null; // a load made a new player: find the board again
+    throw err;
+  }
+}
+
+// The meshes worn on a part, by their names' prefixes (round 2). Gloves and trousers cover
+// both sides, so left and right outline the same meshes.
+const PART_PREFIXES = {
+  Head: ['h0_', 'heb_', 'hh_', 'h1_'],
+  Torso: ['t1_', 't2_'],
+  'Left arm': ['g1_', 'a0_'],
+  'Right arm': ['g1_', 'a0_'],
+  'Left leg': ['l1_', 's1_'],
+  'Right leg': ['l1_', 's1_'],
+};
+let meshesOf = { target: null, names: [] };
+async function meshNames(t) {
+  if (meshesOf.target === t) return meshesOf.names;
+  const list = (await t.GetComponents().catch(() => [])) ?? [];
+  const named = await Promise.all(list.map(async (c) => ({ type: c?.$type ?? '', name: c ? String((await c.GetName().catch(() => '')) || '') : '' })));
+  const names = named.filter((c) => /Mesh/i.test(c.type) && c.name && !/_shadow/.test(c.name)).map((c) => c.name);
+  meshesOf = { target: t, names };
+  return names;
+}
+const meshesFor = (names, part) => names.filter((n) => (PART_PREFIXES[part] ?? []).some((p) => n.startsWith(p)));
+
+let rtMode = false;
+let rtHeld = false;
+let vatsColour = 1; // the outline colour for VATS's part: green is to find (round 2 saw blue, white, red in 2, 5, 3)
+let vats = null; // { target, saved, part, lit: [names], timer }
+let vatsChain = Promise.resolve();
+const vatsStep = (fn) => (vatsChain = vatsChain.then(fn).catch((err) => say(`VATS FAILED: ${err?.message ?? err}`)));
+
+async function light(t, names, on) {
+  await Promise.all(names.map(async (name) => {
+    const evt = await api.$new('entRenderHighlightEvent', { outlineIndex: on ? vatsColour : 0, fillIndex: 0, seeThroughWalls: false, opacity: on ? 1 : 0, componentName: name });
+    await t.QueueEvent(evt);
+  }));
+}
+
+async function enterVats() {
+  if (vats) return;
+  const started = performance.now();
+  if (!(await scanning())) {
+    say('VATS: right trigger, but the scanner is not up: nothing to do');
+    return;
+  }
+  const v = await player();
+  const targeting = await api.GameInstance.GetTargetingSystem(game.instance);
+  const t = await targeting.GetLookAtObject(v, false, false);
+  if (!t) {
+    say('VATS: the scanner is up but V looks at nothing');
+    return;
+  }
+  const cam = await camera();
+  const { dir, dist, height } = await bodyView(t);
+  const cams = await api.GameInstance.GetCameraSystem(game.instance);
+  const r = await cams.GetActiveCameraWorldTransform(api.$out);
+  const world = r?.out?.transform?.orientation;
+  const local = await cam.GetLocalOrientation();
+  if (!world || !local) throw new Error('no camera orientation');
+  const saved = { local, fov: await cam.GetFOV(), zoom: await cam.GetZoom() };
+  const parent = qmul(world, qinv(local));
+  await cam.SetLocalOrientation(qmul(qinv(parent), facing(dir).q));
+  await cam.SetFOV(fovFor(height, dist));
+  const names = await meshNames(t);
+  vats = { target: t, saved, part: null, lit: [], timer: null, names };
+  say(`VATS on: ${t.$type} "${(await t.GetDisplayName()) || 'no name'}", ${dist.toFixed(1)} m, field of view ${saved.fov.toFixed(1)} -> ${fovFor(height, dist).toFixed(1)}, ${names.length} meshes (${(performance.now() - started).toFixed(0)} ms)`);
+  let busy = false;
+  vats.timer = setInterval(() => {
+    if (busy || !vats) return;
+    busy = true;
+    vatsStep(tickVats).finally(() => (busy = false));
+  }, 150);
+}
+
+async function tickVats() {
+  if (!vats) return;
+  if (!(await scanning())) {
+    await leaveVats('the scanner was let go');
+    return;
+  }
+  const hit = await crosshairPart(vats.target);
+  const part = hit?.part ?? null;
+  if (part === vats.part) return;
+  const want = part ? meshesFor(vats.names, part) : [];
+  const off = vats.lit.filter((n) => !want.includes(n));
+  const on = want.filter((n) => !vats.lit.includes(n));
+  await Promise.all([light(vats.target, off, false), light(vats.target, on, true)]);
+  vats.part = part;
+  vats.lit = want;
+  say(`VATS: crosshair on ${part ? `the ${part} (${hit.slot}): ${want.length ? want.join(', ') : 'no mesh worn there to outline'}` : 'no part'}`);
+}
+
+async function leaveVats(why) {
+  if (!vats) return;
+  const was = vats;
+  vats = null;
+  clearInterval(was.timer);
+  await light(was.target, was.lit, false).catch(() => {});
+  const cam = await camera();
+  await cam.SetLocalOrientation(was.saved.local);
+  await cam.SetFOV(was.saved.fov);
+  await cam.SetZoom(was.saved.zoom);
+  say(`VATS off (${why}): camera back`);
+}
+
+input.onGamepad((pad) => {
+  if (!rtMode) return;
+  if (!rtHeld && pad.rt >= 0.6) {
+    rtHeld = true;
+    vatsStep(enterVats);
+  } else if (rtHeld && pad.rt <= 0.3) {
+    rtHeld = false;
+    vatsStep(() => leaveVats('the right trigger was let go'));
+  }
+});
+
+function rightTriggerMode(on) {
+  rtMode = on;
+  say(on ? 'Right trigger VATS: on. Hold the scanner, aim at an enemy, hold the right trigger' : 'Right trigger VATS: off');
+  if (!on) {
+    rtHeld = false;
+    vatsStep(() => leaveVats('switched off'));
+  }
+}
+
 // ---------- the window ----------
 
 ui.window({
@@ -658,6 +835,10 @@ ui.window({
     ui.toggle('Watch the dilation and the camera', (on) => watch(on)),
     ui.heading('Exposure (V8)'),
     ui.row(ui.button('Exposure', exposureOnce), ui.toggle('Chance on the labels', (on) => (exposureLabels = on))),
+    ui.heading('Right trigger VATS (round 3)'),
+    ui.text('With this on: hold the scanner, aim at an enemy, hold the right trigger. The view frames them and the part under the crosshair is outlined; let go of the trigger (or the scanner) to end it.', { tone: 'dim' }),
+    ui.toggle('Right trigger VATS', (on) => rightTriggerMode(on)),
+    ui.slider('VATS colour', (v) => (vatsColour = Math.round(v)), { min: 1, max: 7, step: 1, value: vatsColour }),
     ui.heading('Outline (V2)'),
     ui.row(ui.button('List components', listComponents), ui.button('Outline', outline, { variant: 'ghost' }), ui.button('Clear', clearOutline, { variant: 'ghost' })),
     componentBox,

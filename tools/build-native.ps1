@@ -45,6 +45,8 @@ if ($LASTEXITCODE) { throw 'Fault watch unit tests failed.' }
 if ($LASTEXITCODE) { throw 'Opus state unit tests failed.' }
 & (Join-Path $build "$Config\REDnode_pins_tests.exe")
 if ($LASTEXITCODE) { throw 'World pins unit tests failed.' }
+& (Join-Path $build "$Config\REDnode_gamepad_tests.exe")
+if ($LASTEXITCODE) { throw 'Gamepad unit tests failed.' }
 & (Join-Path $build "$Config\REDnode_capture_tests.exe")
 if ($LASTEXITCODE) { throw 'Capture unit tests failed.' }
 & (Join-Path $build "$Config\REDswap_table_tests.exe")

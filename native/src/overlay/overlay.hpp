@@ -192,6 +192,9 @@ bool IsAudioMethod(const std::string& aMethod);
 std::string Audio(const std::string& aMethod, const json::Value& aParams, std::string& aError);
 void UpdateAudio();               // game thread, each frame: menu pauses, ended sounds
 void SetAudioFront(bool aFront);  // any thread: the game window came to or left the front
+// gamepad.cpp: the controller read with XInput each frame, changes sent as "gamepad" game events.
+void UpdateGamepad(uint64_t aFrame); // game thread, each frame
+void SetGamepadFront(bool aFront);   // any thread: out of the front, nothing counts as held
 void StopAudio();
 void ClearRefs();
 // faults.cpp: logs the first faults while a risky game call runs (faults.watch, game thread).
