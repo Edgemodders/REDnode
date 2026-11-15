@@ -127,6 +127,31 @@ Neither can trace the true outline of an arm or a leg, since the body is one mes
 
 **Recommendation: B first, with A as a spike.** B reuses what world pins already do and puts all six parts on screen soonest. The scanner's own outline of the whole enemy stays as it is. If A's spike shows bone-attached shapes are cheap and look right, VATS can move its highlights into the engine and keep REDnode's labels.
 
+## A VATS tab in the scanner's panel
+
+The owner's idea, 2026-11-14, which would replace the callouts: while scanning, the panel on the right has two tabs, **Data** and **Hacking**. Add a **VATS** tab after Data, listing the scanned enemy's body parts with their hit chances.
+
+What the game has (read from the 2.5 type list and `basegameplayguiwidgetsscanningscandetails.inkwidget`, read only):
+
+| Piece | What it is |
+|---|---|
+| The panel | `scannerDetailsGameController`, a script class: `GetAvailablesTabs()`, `SetTab(tab)`, `RefreshLayout()`, `UpdateTabBottomLine()`, `OnScannerTabChangeEvent`, `currentTab`, `scannedObject` |
+| Its tabs | The script enum `ScannerDetailTab`: `Data` 0, `Hacking` 1, `TwinTone` 2. TwinTone is the vehicle paint tab (2.1), shown only when scanning a car (`ShouldDisplayTwintoneTab`) |
+| The header | `tabsHolder` > `tabs`: `tab01`, `space01`, `tab02`, `space02`, `tab03`, each tab with an `a` and a `b` state; bottom lines for two tabs (`twoTabs01`, `twoTabs02`) and for three (`threeTabs01` to `03`) |
+| The bodies | `scannerCountainer` (Data), `quickhackContainer` (Hacking), `twintoneContainer` (TwinTone) |
+
+So the panel already has a three-tab layout, and for an NPC its third slot is always empty. A new enum member cannot be added from redscript, but VATS can take the TwinTone slot whenever the scanned object is an NPC:
+
+| Step | How (redscript, wrapping `scannerDetailsGameController`) |
+|---|---|
+| Show the tab | `GetAvailablesTabs` adds `TwinTone` for an NPC while VATS is on |
+| Call it VATS | Set the third tab's label text to "VATS" (and back to TwinTone for a car) |
+| After Data | Move `tab03` (and a spacer) to sit after `tab01` in `tabs`, and give `GetAvailablesTabs` the order Data, VATS, Hacking, so the Switch Tab key cycles in that order (unverified that the cycle follows the array) |
+| Its body | For an NPC, hide the TwinTone body's own widgets in `twintoneContainer` and fill it with a list: each part's name and its hit chance |
+| The numbers | Kept by a small script class with a static setter (`VATSPanel.SetPart(name, chance)`), which the Node mod calls through `api` after each exposure read; the panel redraws from it |
+
+Unverified: everything in the right column (no script has run yet); whether the header's layout gives three tabs room at every resolution; whether the Switch Tab key reaches a third tab on an NPC. It needs redscript, so it lives in the VATS mod's scripts (EDGEhack's, or VATS's own), not in the spike app. Spike V13.
+
 ## Picking a part
 
 | Where | How |
@@ -180,6 +205,7 @@ Unverified: the slots' orientation (which axis a capsule runs along), the collis
 | **V10 Framing** | Can VATS turn the view onto an enemy and frame the whole body, then put the camera back exactly? | Turn the view (the player's orientation, or the camera's own rotation: which one works is the question) and set the field of view from the body's height and distance (from the slots); keep the field of view and zoom from before to restore |
 | **V11 One enemy, several parts** | Can one enemy take VATS quickhacks on several parts, started in VATS and uploading on after it? | Start two VATS hacks on one target in VATS, leave VATS, watch both upload and land; try the same hack on two parts, and the queue perk. Check that the part recorded at the start reaches `onLand` |
 | **V12 The upload icon on a part** | Does the game's upload bar move to the slot named in `UploadProgramProgressEvent.slotName`? | Start a quickhack, find where the event is sent (EDGEhack's scripts can wrap it) and set `slotName` to `LeftArm`; see where the bar shows. If not, REDnode's pin on the slot with the `QuickHackUpload` stat pool's value |
+| **V13 A VATS tab** | Can the scanner panel show a third tab, VATS, after Data for an NPC, with the parts and hit chances in its body? | A redscript wrap of `scannerDetailsGameController` (above), first only showing the TwinTone slot for an NPC with the label "VATS", then the order, then the body filled from a script setter called through `api`. The UI Workbench's Inspect tab can confirm the header's widgets live while scanning |
 | **V8 Exposure** (not a priority) | Can each part's exposure be measured from the camera, against the world and the NPC's own body, cheaply enough? | Read the slots' transforms (`GetTargetSlotTransform`), place points on the capsules, cast rays against the world with `SyncRaycastByCollisionGroup`, test them against the other capsules in the mod; compare with where shots land |
 
 V1 and V3 decide whether the first build goes ahead as drawn here. V5 and V7 decide the rest of the play. V8 waits until those pass. V9 and V10 are the controller design's.
