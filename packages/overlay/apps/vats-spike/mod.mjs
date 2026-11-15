@@ -707,7 +707,86 @@ const idOf = async (t) => JSON.stringify(await t.GetEntityID().catch(() => null)
 
 let rtMode = false;
 let rtHeld = false;
-let vatsNormalSpeed = true; // V (and V's camera) left out of the slow motion while VATS is on
+// How VATS zooms. SetFOV eases over about a second of world time, so under the scanner's slow
+// motion (0.03) it crawled (round 3's first try). Leaving V out of the slow motion would be a
+// free Sandevistan (the owner), so V's time is never touched. The game's own scanner zoom runs
+// through V's animation (the zoom states send AnimFeature_Zoom), at normal speed; the camera's
+// zoom and its overrides may follow the same path. The overrides are eased by the app on real
+// time. Which way holds and how fast is round 3's question.
+const ZOOM_WAYS = {
+  zoomOverride: 'the zoom override (zoomOverrideWeight and zoomOverrideValue)',
+  fovOverride: 'the field of view override (fovOverrideWeight and fovOverrideValue)',
+  setZoom: 'SetZoom',
+  setFov: 'SetFOV (eased by the game in world time)',
+};
+let zoomWay = 'zoomOverride';
+const EASE_MS = 300;
+const EASE_STEPS = 10;
+
+// The zoom that makes a field of view of aFrom look like aTo.
+const zoomFor = (aFrom, aTo) => Math.tan((aFrom * Math.PI) / 360) / Math.tan((aTo * Math.PI) / 360);
+
+// Steps from 0 to 1 on real time (Node's timers), smoothed at both ends.
+async function ease(fn) {
+  for (let i = 1; i <= EASE_STEPS; i++) {
+    const k = i / EASE_STEPS;
+    await fn(k * k * (3 - 2 * k));
+    if (i < EASE_STEPS) await new Promise((r) => setTimeout(r, EASE_MS / EASE_STEPS));
+  }
+}
+
+async function zoomIn(cam, saved, fov) {
+  const started = performance.now();
+  const z = zoomFor(saved.fov, fov);
+  if (saved.way === 'setFov') await cam.SetFOV(fov);
+  else if (saved.way === 'setZoom') await ease((k) => cam.SetZoom(saved.zoom + (z - saved.zoom) * k));
+  else if (saved.way === 'zoomOverride') {
+    await cam.$set('zoomOverrideValue', 1);
+    await cam.$set('zoomOverrideWeight', 1);
+    await ease((k) => cam.$set('zoomOverrideValue', 1 + (z - 1) * k));
+  } else {
+    await cam.$set('fovOverrideValue', saved.fov);
+    await cam.$set('fovOverrideWeight', 1);
+    await ease((k) => cam.$set('fovOverrideValue', saved.fov + (fov - saved.fov) * k));
+  }
+  say(`  zoom: ${saved.way === 'setFov' ? 'asked' : `eased in ${(performance.now() - started).toFixed(0)} ms`}, zoom ${z.toFixed(2)} for a field of view of ${fov.toFixed(1)}`);
+  // Whether it held: what the camera reads after a quarter, a half and one second.
+  const at0 = performance.now();
+  for (const at of [250, 500, 1000]) {
+    setTimeout(async () => {
+      if (!vats || vats.saved !== saved) return;
+      const [f, zz, zw, zv, fw, fv] = await Promise.all([
+        cam.GetFOV(), cam.GetZoom(),
+        cam.$get('zoomOverrideWeight'), cam.$get('zoomOverrideValue'), cam.$get('fovOverrideWeight'), cam.$get('fovOverrideValue'),
+      ].map((p) => p.catch(() => null)));
+      const n = (x) => (typeof x === 'number' ? x.toFixed(2) : '?');
+      say(`  after ${((performance.now() - at0) / 1000).toFixed(2)} s: field of view ${n(f)}, zoom ${n(zz)}, zoom override ${n(zw)} x ${n(zv)}, field of view override ${n(fw)} x ${n(fv)}`);
+    }, at);
+  }
+}
+
+async function zoomOut(cam, saved) {
+  if (saved.way === 'setFov') await cam.SetFOV(saved.fov);
+  else if (saved.way === 'setZoom') {
+    const from = await cam.GetZoom();
+    await ease((k) => cam.SetZoom(from + (saved.zoom - from) * k));
+  } else if (saved.way === 'zoomOverride') {
+    const from = Number(await cam.$get('zoomOverrideValue')) || 1;
+    await ease((k) => cam.$set('zoomOverrideValue', from + (1 - from) * k));
+    await cam.$set('zoomOverrideWeight', 0);
+  } else {
+    const from = Number(await cam.$get('fovOverrideValue')) || saved.fov;
+    await ease((k) => cam.$set('fovOverrideValue', from + (saved.fov - from) * k));
+    await cam.$set('fovOverrideWeight', 0);
+  }
+}
+
+function chooseZoom(way) {
+  zoomWay = way;
+  zoomChoice.set({ text: `VATS zooms by ${ZOOM_WAYS[way]}` });
+  say(`VATS zoom: ${ZOOM_WAYS[way]}`);
+}
+const zoomChoice = ui.text(`VATS zooms by ${ZOOM_WAYS[zoomWay]}`, { tone: 'dim' });
 let vatsColour = 1; // the outline colour for VATS's part: green is to find (round 2 saw blue, white, red in 2, 5, 3)
 let vats = null; // { target, saved, part, lit: [names], timer }
 let vatsChain = Promise.resolve();
@@ -741,31 +820,14 @@ async function enterVats() {
   const world = r?.out?.transform?.orientation;
   const local = await cam.GetLocalOrientation();
   if (!world || !local) throw new Error('no camera orientation');
-  const saved = { local, fov: await cam.GetFOV(), zoom: await cam.GetZoom(), normalSpeed: false };
-  // The game eases the field of view over about a second of game time, so under the scanner's
-  // slow motion the zoom crawls. V's camera is V's: leaving V out of the slow motion should
-  // let it ease at normal speed (round 3's first try, 2026-11-14).
-  if (vatsNormalSpeed) {
-    const ts = await api.GameInstance.GetTimeSystem(game.instance);
-    await ts.SetIgnoreTimeDilationOnLocalPlayerZero(true);
-    saved.normalSpeed = true;
-  }
+  const saved = { local, fov: await cam.GetFOV(), zoom: await cam.GetZoom(), way: zoomWay };
   const parent = qmul(world, qinv(local));
   await cam.SetLocalOrientation(qmul(qinv(parent), facing(dir).q));
   const fov = fovFor(height, dist);
-  await cam.SetFOV(fov);
   const names = await meshNames(t);
   vats = { target: t, id: await idOf(t), saved, part: null, lit: [], timer: null, names, v, targeting };
-  say(`VATS on: ${t.$type} "${(await t.GetDisplayName()) || 'no name'}", ${dist.toFixed(1)} m, field of view ${saved.fov.toFixed(1)} -> ${fov.toFixed(1)}, ${names.length} meshes${saved.normalSpeed ? ', V at normal speed' : ''} (${(performance.now() - started).toFixed(0)} ms)`);
-  // How fast the zoom eases in: the field of view after a quarter, a half and one second.
-  const zoomStarted = performance.now();
-  for (const at of [250, 500, 1000]) {
-    setTimeout(async () => {
-      if (!vats) return;
-      const now = await cam.GetFOV().catch(() => null);
-      if (now !== null) say(`  zoom after ${((performance.now() - zoomStarted) / 1000).toFixed(2)} s: field of view ${now.toFixed(1)} (asked ${fov.toFixed(1)})`);
-    }, at);
-  }
+  say(`VATS on: ${t.$type} "${(await t.GetDisplayName()) || 'no name'}", ${dist.toFixed(1)} m, field of view ${saved.fov.toFixed(1)} -> ${fov.toFixed(1)} by ${ZOOM_WAYS[zoomWay]}, ${names.length} meshes (${(performance.now() - started).toFixed(0)} ms)`);
+  await zoomIn(cam, saved, fov);
   let busy = false;
   vats.timer = setInterval(() => {
     if (busy || !vats) return;
@@ -814,12 +876,7 @@ async function leaveVats(why) {
   await light(was.target, was.lit, false).catch(() => {});
   const cam = await camera();
   await cam.SetLocalOrientation(was.saved.local);
-  await cam.SetFOV(was.saved.fov);
-  await cam.SetZoom(was.saved.zoom);
-  if (was.saved.normalSpeed) {
-    const ts = await api.GameInstance.GetTimeSystem(game.instance);
-    await ts.RestorePreviousIgnoreTimeDilationOnLocalPlayerZero().catch(() => {});
-  }
+  await zoomOut(cam, was.saved);
   say(`VATS off (${why}): camera back`);
 }
 
@@ -888,7 +945,13 @@ ui.window({
     ui.text('With this on: hold the scanner, aim at an enemy, hold the right trigger. The view frames them and the part under the crosshair is outlined; let go of the trigger (or the scanner) to end it.', { tone: 'dim' }),
     ui.toggle('Right trigger VATS', (on) => rightTriggerMode(on)),
     ui.slider('VATS colour', (v) => (vatsColour = Math.round(v)), { min: 1, max: 7, step: 1, value: vatsColour }),
-    ui.toggle('Camera at normal speed', (on) => (vatsNormalSpeed = on), { checked: true }),
+    zoomChoice,
+    ui.row(
+      ui.button('Zoom override', () => chooseZoom('zoomOverride'), { variant: 'ghost' }),
+      ui.button('FOV override', () => chooseZoom('fovOverride'), { variant: 'ghost' }),
+      ui.button('SetZoom', () => chooseZoom('setZoom'), { variant: 'ghost' }),
+      ui.button('SetFOV', () => chooseZoom('setFov'), { variant: 'ghost' }),
+    ),
     ui.heading('Outline (V2)'),
     ui.row(ui.button('List components', listComponents), ui.button('Outline', outline, { variant: 'ghost' }), ui.button('Clear', clearOutline, { variant: 'ghost' })),
     componentBox,
