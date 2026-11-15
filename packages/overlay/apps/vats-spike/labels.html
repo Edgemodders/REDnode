@@ -82,7 +82,11 @@
       end = null;
       return;
     }
-    const target = project(state.at, state.cam, state.fov);
+    // The game's own projection when the mod has it (X and Y from -1 to 1, Y up), else the page's.
+    const s = state.screen;
+    const target = s && s.z > 0
+      ? { x: (s.x * 0.5 + 0.5) * innerWidth, y: (0.5 - s.y * 0.5) * innerHeight }
+      : project(state.at, state.cam, state.fov);
     if (!target) {
       group.setAttribute('visibility', 'hidden');
       return;

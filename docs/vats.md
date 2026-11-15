@@ -340,7 +340,7 @@ Claude then reads the `[vats-spike]` lines in `rednode-mods.log` and the plugin'
 
 ### V14 and V15 test
 
-VATS spike 0.6.0 (REDnode 0.65.1). Save first: V14 leaves enemies hurt or angry.
+VATS spike 0.6.1 (REDnode 0.65.1), the overlay in passive mode (not F10's hidden mode). Save first: V14 leaves enemies hurt or angry.
 
 | Step | Do | Expect, and what to note |
 |---|---|---|
@@ -352,6 +352,8 @@ VATS spike 0.6.0 (REDnode 0.65.1). Save first: V14 leaves enemies hurt or angry.
 | 6 | Let go | The label goes |
 
 Claude then reads the `[vats-spike]` lines, including the game's `ProjectPoint` answers.
+
+**First try, 2026-11-14** (app 0.6.0): no label showed. The mod sent it about ten times a second for every lit part, and the page drew (the host sent 400 to 660 frames every 10 s), but the overlay was in F10's **hidden** mode from 21:47:15, which hides every REDnode page, HUD ones too: test in passive mode. (A real VATS label cannot vanish in hidden mode: the semi-native apps' design, or a native widget.) The game's `ProjectPoint` answers X and Y from -1 to 1, 0 at the centre, Y up, and follows the zoom (game API notes), so 0.6.1's page takes the game's projection rather than its own. Also found: with the VATS tab open the quickhack list and the cyberdeck's RAM vanished, because the game's `QuickhacksListGameController.IsPanelBlocked()` hides them for TwinTone; fixed in the VATS repo by a wrap (needs a game restart).
 
 ### Spike test: round 2 results
 

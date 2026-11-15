@@ -805,11 +805,14 @@ async function labelTick() {
   const found = slotReads.filter(Boolean);
   if (!found.length || !vats || vats.part !== part.part) return;
   const at = { x: found.reduce((a, p) => a + p.x, 0) / found.length, y: found.reduce((a, p) => a + p.y, 0) / found.length, z: found.reduce((a, p) => a + p.z, 0) / found.length };
-  channel.post({ type: 'vats-label', part: part.part, chance: lastChances.get(part.part) ?? null, at, cam: { at: cam.at, right: cam.right, up: cam.up, forward: cam.forward }, fov: vats.fov ?? vats.saved.fov });
-  // What the game's own ProjectPoint answers for the same point, once a second, to learn its form.
+  // The game's own projection (2026-11-14: X and Y from -1 to 1, 0 at the centre, Y up; it follows
+  // VATS's zoom). The page uses it, and its own projection only when this fails.
+  const p = await cams.ProjectPoint({ X: at.x, Y: at.y, Z: at.z, W: 1 }).catch(() => null);
+  const screen = p && typeof p.X === 'number' ? { x: p.X, y: p.Y, z: p.Z } : null;
+  if (!vats || vats.part !== part.part) return;
+  channel.post({ type: 'vats-label', part: part.part, chance: lastChances.get(part.part) ?? null, at, screen, cam: { at: cam.at, right: cam.right, up: cam.up, forward: cam.forward }, fov: vats.fov ?? vats.saved.fov });
   if (performance.now() - projectLoggedAt > 1000) {
     projectLoggedAt = performance.now();
-    const p = await cams.ProjectPoint({ X: at.x, Y: at.y, Z: at.z, W: 1 }).catch((err) => `failed: ${err?.message ?? err}`);
     say(`  Label: ${part.part} at ${at.x.toFixed(2)}, ${at.y.toFixed(2)}, ${at.z.toFixed(2)}; the game's ProjectPoint answers ${JSON.stringify(p)}`);
   }
 }
