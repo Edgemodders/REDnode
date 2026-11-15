@@ -834,6 +834,19 @@ let labelTimer = null;
 let labelBusy = false;
 let projectLoggedAt = 0;
 
+// The lit part on the game's own UI, under the scanned enemy's name (the VATS repo's
+// PartLine.reds; the owner, 2026-11-14). The overlay label stays behind a switch, off by default.
+let floatingLabel = false;
+let lineShown = { part: null, chance: null };
+function showPartLine(part) {
+  const chance = part ? lastChances.get(part) ?? null : null;
+  if (lineShown.part === part && lineShown.chance === chance) return;
+  lineShown = { part, chance };
+  panel()
+    .then((p) => p.SetCurrentPart(part ?? '', chance === null ? -1 : Math.round(chance)))
+    .catch(() => {});
+}
+
 function labelOff() {
   channel.post({ type: 'vats-label', off: true });
 }
@@ -870,7 +883,7 @@ async function labelTick() {
 function label(on) {
   if (labelTimer) clearInterval(labelTimer);
   labelTimer = null;
-  if (!on) {
+  if (!on || !floatingLabel) {
     labelOff();
     return;
   }
@@ -1071,6 +1084,7 @@ function feedVatsPanel() {
     .then(({ parts }) => {
       if (!vats || vats.target !== t) return false;
       for (const p of parts) if (p.chance !== null) lastChances.set(p.part, p.chance);
+      showPartLine(vats.part);
       return feedPanel(parts);
     })
     .catch(() => {})
@@ -1111,6 +1125,7 @@ async function tickVats() {
   if (part) sfx('vats-select');
   vats.part = part;
   if (!part) labelOff();
+  showPartLine(part);
   vats.lit = want;
   say(`VATS: crosshair on ${part ? `the ${part} (${hit.slot}): ${want.length ? want.join(', ') : 'no mesh worn there to outline'}` : 'no part'}`);
 }
@@ -1118,6 +1133,7 @@ async function tickVats() {
 async function leaveVats(why) {
   if (!vats) return;
   label(false);
+  showPartLine(null);
   const was = vats;
   vats = null;
   clearInterval(was.timer);
@@ -1226,6 +1242,7 @@ ui.window({
       ui.button('Hole', () => chooseWound('HOLE'), { variant: 'ghost' }),
     ),
     ui.row(...PARTS.map((p) => ui.button(`Cut ${p.part.toLowerCase()}`, () => dismember(p), { variant: 'ghost' }))),
+    ui.toggle('Floating label beside the body (V15)', (on) => (floatingLabel = on)),
     ui.toggle('Cut with reactions (V16)', (on) => (cutReactions = on), { checked: true }),
     ui.toggle('Bullets dismember (V\'s CanForceDismbember)', (on) => step(on ? 'Bullets dismember on' : 'Bullets dismember off', () => forceDismember(on))),
     ui.heading('Only one part can be hit (part 2)'),
