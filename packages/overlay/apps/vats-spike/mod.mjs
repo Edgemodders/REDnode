@@ -852,11 +852,35 @@ let vats = null; // { target, saved, part, lit: [names], timer }
 let vatsChain = Promise.resolve();
 const vatsStep = (fn) => (vatsChain = vatsChain.then(fn).catch((err) => say(`VATS FAILED: ${err?.message ?? err}`)));
 
-async function light(t, names, on) {
+// The fill (fillIndex) changed the outline's colour and filled nothing (the owner, 2026-11-14): the
+// game's own scripts never set it, its fills come from the vision mode code. Three more things to
+// try: see through walls (a fill may show only where the part is hidden), a stronger opacity, and
+// a pulse (the app sends the outline again with its opacity going up and down).
+let vatsSeeThrough = false;
+let vatsStrength = 1;
+let vatsPulse = false;
+
+async function light(t, names, on, opacity = vatsStrength) {
   await Promise.all(names.map(async (name) => {
-    const evt = await api.$new('entRenderHighlightEvent', { outlineIndex: on ? vatsColour : 0, fillIndex: on ? vatsFill : 0, seeThroughWalls: false, opacity: on ? 1 : 0, componentName: name });
+    const evt = await api.$new('entRenderHighlightEvent', { outlineIndex: on ? vatsColour : 0, fillIndex: on ? vatsFill : 0, seeThroughWalls: on && vatsSeeThrough, opacity: on ? opacity : 0, componentName: name });
     await t.QueueEvent(evt);
   }));
+}
+
+// About twice a second from 40 % to full strength, while a part is lit.
+let pulseTimer = null;
+let pulseBusy = false;
+function pulse(on) {
+  if (pulseTimer) clearInterval(pulseTimer);
+  pulseTimer = null;
+  if (!on) return;
+  const started = performance.now();
+  pulseTimer = setInterval(() => {
+    if (!vats || !vats.lit.length || pulseBusy) return;
+    pulseBusy = true;
+    const k = 0.7 + 0.3 * Math.cos(((performance.now() - started) / 500) * Math.PI);
+    light(vats.target, vats.lit, true, vatsStrength * k).catch(() => {}).finally(() => (pulseBusy = false));
+  }, 80);
 }
 
 async function enterVats() {
@@ -1024,6 +1048,14 @@ ui.window({
     ui.toggle('Right trigger VATS', (on) => rightTriggerMode(on)),
     ui.slider('VATS colour', (v) => (vatsColour = Math.round(v)), { min: 1, max: 7, step: 1, value: vatsColour }),
     ui.slider('VATS fill (0 none)', (v) => (vatsFill = Math.round(v)), { min: 0, max: 7, step: 1, value: vatsFill }),
+    ui.slider('Outline strength', (v) => (vatsStrength = v / 100), { min: 25, max: 400, step: 25, value: 100, unit: ' %' }),
+    ui.row(
+      ui.toggle('See through walls', (on) => (vatsSeeThrough = on)),
+      ui.toggle('Pulse', (on) => {
+        vatsPulse = on;
+        pulse(on);
+      }),
+    ),
     zoomChoice,
     ui.row(
       ui.button('Zoom override', () => chooseZoom('zoomOverride'), { variant: 'ghost' }),

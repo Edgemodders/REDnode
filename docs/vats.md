@@ -156,7 +156,7 @@ VATS is its own drop-in REDnode mod (the owner, 2026-11-14), needing REDnode onl
 
 ### V13 test
 
-VATS's scripts in `r6/scripts/VATS` (the VATS repo's `tools/deploy.ps1`), VATS spike 0.5.2 (0.5.0 with **VATS fill**, the highlight's `fillIndex` beside its outline, and VATS's two sounds), REDnode 0.65.1, game 2.5.
+VATS's scripts in `r6/scripts/VATS` (the VATS repo's `tools/deploy.ps1`), VATS spike 0.5.3 (0.5.0 with VATS's two sounds and ways to make the outline stand out: **VATS fill**, **See through walls**, **Outline strength**, **Pulse**), REDnode 0.65.1, game 2.5.
 
 | Step | Do | Expect, and what to note |
 |---|---|---|
@@ -166,7 +166,7 @@ VATS's scripts in `r6/scripts/VATS` (the VATS repo's `tools/deploy.ps1`), VATS s
 | 4 | Open the VATS tab | Six rows: HEAD, TORSO, LEFT ARM, RIGHT ARM, LEFT LEG, RIGHT LEG, each with `--` in a column of its own, clear of the panel's edges |
 | 5 | In F10, in VATS spike, press **Panel test values**; scan again and open VATS | 80%, 75%, 100%, 20%, 33%, 7% |
 | 6 | Switch on **Right trigger VATS**; hold the scanner, hold the right trigger on an enemy, open the VATS tab | The numbers change about once a second as you move. Move to another enemy: they go back to `--`, then fill again |
-| 6b | The outline can be faint (the owner, 2026-11-14): in F10 move **VATS fill** (0 is none) through 1 to 7, holding the right trigger on an enemy after each | Note which numbers fill the part, with what colour or pattern, and which makes the part stand out best together with the outline |
+| 6b | The outline can be faint (the owner, 2026-11-14). First try: **VATS fill** changed the outline's colour and filled nothing (the game's own scripts never set `fillIndex`; its fills come from the vision mode code). From 0.5.3 try, holding the right trigger on an enemy after each: **See through walls** on; **Outline strength** at 200 % and 400 %; **Pulse** on | Note which makes the part stand out, and whether see-through shows a fill where the part is hidden |
 | 6c | Hold the right trigger on an enemy, move the crosshair over the parts, let go; repeat | The zoom sound as VATS zooms in, the select sound each time a new part lights (the owner's sounds, in the VATS repo's `assets/sounds`). Note whether they play at once and at their normal speed under the slow motion |
 | 7 | Scan an NPC who cannot be hacked (a civilian) | Data, VATS |
 | 8 | Scan a car that is not yours | The game's own TwinTone tab, with its own name and paint options |
