@@ -485,6 +485,31 @@ async function partUnderCrosshair(t) {
 const DISMEMBER = { Head: 'HEAD', Torso: 'BODY', 'Left arm': 'LEFT_ARM', 'Right arm': 'RIGHT_ARM', 'Left leg': 'LEFT_LEG', 'Right leg': 'RIGHT_LEG' };
 let woundType = 'COARSE';
 
+// V16: VATS decides a cut itself (its quickhacks and perks, before any damage; the owner,
+// 2026-11-14), so the game's damage-based dismember chance stays out. What the game does after its
+// own cut (DamageManager's ProcessWoundsAndDismemberment) VATS does after its request: the part's
+// Dismembered status effect, the crippled bark, then hostility and V as the threat.
+let cutReactions = true;
+const CUT_EFFECT = { 'Left arm': 'BaseStatusEffect.DismemberedArmLeft', 'Right arm': 'BaseStatusEffect.DismemberedArmRight', 'Left leg': 'BaseStatusEffect.DismemberedLegLeft', 'Right leg': 'BaseStatusEffect.DismemberedLegRight' };
+const CUT_BARK = { 'Left leg': 'vo_enemy_reaction_crippled_leg', 'Right leg': 'vo_enemy_reaction_crippled_leg' }; // the rest: crippled arm, as the game
+
+async function reactToCut(t, part) {
+  const v = await player();
+  const done = [];
+  const effect = CUT_EFFECT[part];
+  if (effect) {
+    await api.$static('StatusEffectHelper', 'ApplyStatusEffect;GameObjectTweakDBIDEntityID', t, effect, await v.GetEntityID());
+    done.push(effect);
+  }
+  const bark = CUT_BARK[part] ?? 'vo_enemy_reaction_crippled_arm';
+  await api.$static('gameObject', 'PlayVoiceOver;GameObjectCNameCNameFloatEntityIDBool', t, bark, 'Scripts:VATS');
+  done.push(bark);
+  const hostile = await api.$static('AIActionHelper', 'TryChangingAttitudeToHostile', t, v).catch((err) => `failed: ${err?.message ?? err}`);
+  await api.$static('TargetTrackingExtension', 'InjectThreat;ScriptedPuppetEntity', t, v);
+  done.push(`hostile: ${hostile}`, 'V injected as the threat');
+  return done;
+}
+
 const dismember = (part) =>
   step(`Dismember ${part.part}`, async () => {
     const t = needTarget();
@@ -492,6 +517,10 @@ const dismember = (part) =>
     const at = partsOf(places).find((x) => x.part === part.part)?.at;
     const pos = at ? { X: at.x, Y: at.y, Z: at.z, W: 1 } : { X: 0, Y: 0, Z: 0, W: 0 };
     await api.gameDismembermentComponent.RequestDismemberment(t, DISMEMBER[part.part], woundType, pos, false, '', 0);
+    if (cutReactions) {
+      const done = await reactToCut(t, part.part).catch((err) => [`reactions failed: ${err?.message ?? err}`]);
+      say(`  Reactions: ${done.join(', ')}`);
+    }
     setTimeout(async () => {
       const dead = await t.IsDead().catch(() => null);
       say(`  Dismember ${part.part}: after 1 s the target is ${dead === null ? 'not readable' : dead ? 'dead' : 'alive'}`);
@@ -1197,6 +1226,7 @@ ui.window({
       ui.button('Hole', () => chooseWound('HOLE'), { variant: 'ghost' }),
     ),
     ui.row(...PARTS.map((p) => ui.button(`Cut ${p.part.toLowerCase()}`, () => dismember(p), { variant: 'ghost' }))),
+    ui.toggle('Cut with reactions (V16)', (on) => (cutReactions = on), { checked: true }),
     ui.toggle('Bullets dismember (V\'s CanForceDismbember)', (on) => step(on ? 'Bullets dismember on' : 'Bullets dismember off', () => forceDismember(on))),
     ui.heading('Only one part can be hit (part 2)'),
     ui.slider('Seconds before the shapes come back', (v) => (onlySeconds = Math.round(v)), { min: 3, max: 30, step: 1, value: onlySeconds, unit: ' s' }),

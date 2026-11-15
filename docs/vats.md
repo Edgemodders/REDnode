@@ -234,6 +234,7 @@ Unverified: the slots' orientation (which axis a capsule runs along), the collis
 | **V13 A VATS tab** | Can the scanner panel show a third tab, VATS, after Data for an NPC, with the parts and hit chances in its body? | A redscript wrap of `scannerDetailsGameController` (above), first only showing the TwinTone slot for an NPC with the label "VATS", then the order, then the body filled from a script setter called through `api`. The UI Workbench's Inspect tab can confirm the header's widgets live while scanning |
 | **V14 Dismember a part** | Can VATS take off the chosen part, by a quickhack or a bullet, and does a living enemy keep going? | The game's own `gameDismembermentComponent.RequestDismemberment(npc, part, wound, position, critical)`, as its `ForceDismembermentEffector` calls it, from the spike app (**Cut** buttons, wound **Coarse**, **Clean** or **Hole**). Bullets: the game dismembers the hit part only when the shot kills or downs (its `DismembermentConditions`), unless the attack carries `hitFlag.ForceDismember`; with the other hit shapes off, a killing shot lands on the chosen part |
 | **V15 The floating label** | Can the lit part's name and chance float beside the body, fixed on screen, with a line that bends at a joint and follows the part? | A HUD page of the spike's own over the whole screen (`labels.html`), fed by the mod about ten times a second with the part's place and the camera; the page projects the point and eases the line's end. The game's `ProjectPoint` is logged beside it once a second, to learn its form (no game script calls it) |
+| **V16 Reactions to VATS's cut** | Can VATS cut first (its own decision) and still get the game's reactions: pain, voice, combat, the AI's limb-loss behaviour? | After the request, the game's own follow-ups from `ProcessWoundsAndDismemberment`: the `Dismembered<zone>` status effect, the crippled bark, hostility and V as the threat; the Pain hit reaction (it needs a hit) to find |
 | **V8 Exposure** (not a priority) | Can each part's exposure be measured from the camera, against the world and the NPC's own body, cheaply enough? | Read the slots' transforms (`GetTargetSlotTransform`), place points on the capsules, cast rays against the world with `SyncRaycastByCollisionGroup`, test them against the other capsules in the mod; compare with where shots land |
 
 V1 and V3 decide whether the first build goes ahead as drawn here. V5 and V7 decide the rest of the play. V8 waits until those pass. V9 and V10 are the controller design's.
@@ -340,7 +341,7 @@ Claude then reads the `[vats-spike]` lines in `rednode-mods.log` and the plugin'
 
 ### V14 and V15 test
 
-VATS spike 0.6.2 (REDnode 0.65.1), the overlay in passive mode (not F10's hidden mode). Save first: V14 leaves enemies hurt or angry.
+VATS spike 0.6.3 (REDnode 0.65.1), the overlay in passive mode (not F10's hidden mode). Save first: V14 leaves enemies hurt or angry.
 
 | Step | Do | Expect, and what to note |
 |---|---|---|
@@ -352,6 +353,7 @@ VATS spike 0.6.2 (REDnode 0.65.1), the overlay in passive mode (not F10's hidden
 | 6 | Let go | The label goes |
 | 7 | Switch on **Bullets dismember (V's CanForceDismbember)** (the log reads the stat as 1). Get into a fight with one enemy, press **Left arm** under "Only one part can be hit" with the seconds at 15, and shoot | The arm comes off through the game's own hit: note the pain reaction, voice lines and what the enemy does after. Note whether a first shot from stealth does it (the game's code says only in combat) |
 | 8 | Switch it off | The stat reads 0 |
+| 9 | With **Cut with reactions** on (V16), **Cut left arm** on an enemy who is not fighting, then **Cut right leg** on another | Note whether each screams, turns on V and fights, and how it moves after (an arm gone, a leg gone). The log lists what was applied |
 
 Claude then reads the `[vats-spike]` lines, including the game's `ProjectPoint` answers.
 
@@ -363,6 +365,8 @@ Claude then reads the `[vats-spike]` lines, including the game's `ProjectPoint` 
 | Quickhacks | A VATS quickhack (made with EDGEhack) that is itself a hostile act, so the target reacts and the trace starts as with any quickhack, and whose landing takes the part off: the game's `ForceDismembermentEffector` (fixed part per record) or VATS's own request with the chosen part from `onLand`. A damage effect in the same hack would add the hit reaction | The quickhack's own reactions; whether a pain reaction and voice come with the cut is to see |
 
 V14b's switch is in 0.6.2 (step 7 above).
+
+**The owner's rule, 2026-11-14:** for VATS quickhacks and VATS perks the cut comes **before** any damage: VATS's own code decides it, so the game's damage-based dismember chance (incoming damage, the perks) must not apply. VATS still needs the game's reactions. The game's `DamageManager.ProcessWoundsAndDismemberment` shows them after its own cut: the request, `NotifyAboutDismembermentInstigated` (for V's perks), the status effect `BaseStatusEffect.Dismembered<zone>` (`DismemberedArmLeft`, `ArmRight`, `LegLeft`, `LegRight`, `HandLeft`, `HandRight` in TweakDB, each with stat changes), a bark (`vo_enemy_reaction_crippled_arm`, or `_leg` for a leg), and a Pain hit reaction. **V16** (app 0.6.3, **Cut with reactions**, on by default): after its request VATS applies the status effect, plays the bark, makes the target hostile (`AIActionHelper.TryChangingAttitudeToHostile`) and injects V as its threat (`TargetTrackingExtension.InjectThreat`). The Pain hit reaction needs a hit and is not there yet: what the status effect and combat bring on their own is the test.
 
 **First try, 2026-11-14** (app 0.6.0): no label showed. The mod sent it about ten times a second for every lit part, and the page drew (the host sent 400 to 660 frames every 10 s), but the overlay was in F10's **hidden** mode from 21:47:15, which hides every REDnode page, HUD ones too: test in passive mode. (A real VATS label cannot vanish in hidden mode: the semi-native apps' design, or a native widget.) The game's `ProjectPoint` answers X and Y from -1 to 1, 0 at the centre, Y up, and follows the zoom (game API notes), so 0.6.1's page takes the game's projection rather than its own. Also found: with the VATS tab open the quickhack list and the cyberdeck's RAM vanished, because the game's `QuickhacksListGameController.IsPanelBlocked()` hides them for TwinTone; fixed in the VATS repo by a wrap (needs a game restart).
 
