@@ -27,7 +27,7 @@
 //                taken as a sphere of its capsule's radius at its slot: an approximation,
 //                since which way a capsule runs on its bone is unverified)
 
-import { api, game, input, ui, world } from 'rednode';
+import { api, audio, game, input, ui, world } from 'rednode';
 
 // Each shape's capsule in npc_base.hitrepresentation: radius and height in metres.
 const SHAPES = {
@@ -749,6 +749,18 @@ const meshesFor = (names, part) =>
 // An entity's id as text, to tell two references to the same enemy from two enemies.
 const idOf = async (t) => JSON.stringify(await t.GetEntityID().catch(() => null));
 
+// VATS's sounds (the owner's, kept in the VATS repo's assets/sounds; its tools/deploy.ps1 copies
+// them into this app's sounds folder in the game). REDnode's own audio plays them in real time, so
+// the scanner's slow motion does not slow them; they follow the game's sound effects volume.
+const sfxMissing = new Set();
+function sfx(name) {
+  audio.play(`sounds/${name}.mp3`, { category: 'sfx' }).catch((err) => {
+    if (sfxMissing.has(name)) return;
+    sfxMissing.add(name);
+    say(`Sound ${name}: ${err?.message ?? err} (the VATS repo's tools/deploy.ps1 copies the sounds in)`);
+  });
+}
+
 let rtMode = false;
 let rtHeld = false;
 // How VATS zooms. SetFOV eases over about a second of world time, so under the scanner's slow
@@ -875,6 +887,7 @@ async function enterVats() {
   const names = await meshNames(t);
   vats = { target: t, id: await idOf(t), saved, part: null, lit: [], timer: null, names, v, targeting };
   say(`VATS on: ${t.$type} "${(await t.GetDisplayName()) || 'no name'}", ${dist.toFixed(1)} m, field of view ${saved.fov.toFixed(1)} -> ${fov.toFixed(1)} by ${ZOOM_WAYS[zoomWay]}, ${names.length} meshes (${(performance.now() - started).toFixed(0)} ms)`);
+  sfx('vats-zoom');
   await zoomIn(cam, saved, fov);
   let busy = false;
   vats.timer = setInterval(() => {
@@ -927,6 +940,7 @@ async function tickVats() {
   const off = vats.lit.filter((n) => !want.includes(n));
   const on = want.filter((n) => !vats.lit.includes(n));
   await Promise.all([light(vats.target, off, false), light(vats.target, on, true)]);
+  if (part) sfx('vats-select');
   vats.part = part;
   vats.lit = want;
   say(`VATS: crosshair on ${part ? `the ${part} (${hit.slot}): ${want.length ? want.join(', ') : 'no mesh worn there to outline'}` : 'no part'}`);
