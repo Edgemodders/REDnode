@@ -1248,7 +1248,8 @@ Until 0.65.1 a build took EDGEhack's server from the EDGEhack repo beside this o
 |---|---|
 | Dev host, mock game, 2026-11-15, by Claude, REDnode 0.65.3 | **Pass**, 9 checks of `askShared`'s `replace` (scratchpad `keyrep/check.mjs`): a first ask saves a key, a plain ask answers it at once, `replace` asks again with the saved key's last 4 and Replace, refuses an empty box, saves the new key, and Deny keeps it |
 | Packaged host, mock game, 2026-11-15, by Claude | **Pass**: EDGEhack's 8 checks and EDGEmat's 4 (14 tools listed, `mat_templates` 386 surfaces after a 40 s library build, `mat_microblends`), both on the shared REDbridge |
-| In the game, by the owner, laptop | Waiting |
+| In the game, 2026-11-15, by the owner, laptop, REDnode 0.65.2, REDagent 0.4.1 | **Pass**, steps 1 to 3 (before step 4 existed): EDGEmat 0.3.2 and EDGEhack 0.1.2 started in about 0.8 s, both `using REDnode's REDbridge`, one REDbridge 0.12.1 start (EDGEdeck's copy); `hack_find`, `hack_describe` (Overheat, 6 tiers; the catalog took 66 s on the laptop) and `mat_microblends`. The first question failed until REDagent's **Allowed** switch (the `mcp` permission) was on: a newly installed REDagent starts without it |
+| In the game, by the owner, laptop, REDnode 0.65.3, REDagent 0.4.4 | Step 4 (Replace the key): waiting |
 
 ## World pins WP3: the Pins window (#43)
 
