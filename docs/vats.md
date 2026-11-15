@@ -268,7 +268,7 @@ Claude then reads the `[vats-spike]` lines in `rednode-mods.log`.
 | Step | Result |
 |---|---|
 | 2 List components | A Dogtown resident: 139 components, 21 meshes, every one an `entGarmentSkinnedMeshComponent` but the hair's shadow and `AppearanceProxyMesh`. Names carry the slot prefix and a number: body `t0_000_ma__c_base_full9394`, head in three meshes (`h0_032_ma_c__young528`, `...8366`, `...4166`), eyebrows `heb_`, hair `hh_`, headwear `h1_` (phones, balaclava), outer top `t2_`, gloves `g1_`, trousers `l1_`, shoes `s1_`, add-ons `i1_`, `a0_`. 60 ms |
-| 3 to 5 Outline | Sent to each head mesh, the trousers, the body and the whole NPC, colours 2, 3 and 5, about 90 ms a send. What showed is the owner's to note (open) |
+| 3 to 5 Outline | **Passed**: the game outlines one component on its own, visible without the scanner. Of the three `h0_` meshes the first (`...528`) was the head and the other two accessories worn on it. Colours 2, 5 and 3 (sent in that order) showed blue, white and red; which number is red is to confirm. Sent to the trousers, the body and the whole NPC too, about 90 ms a send. While scanning, the game's own red outline covers a hostile's whole body (the scanner's, not the spike's), so a red part outline would not stand out in VATS: its colour is the owner's to decide |
 | 6 and 8 Frame (camera) | **Passed**: the view 0.0 degrees off the body's middle at once and after 1 s, so the game does not write over the camera's local orientation. A 1.70 m body 7.6 m away: field of view 51 to 15.8 (80 %), 20.8 at 60 %. About 1.4 s a press. Whether the crosshair and aim follow the turned view is open |
 | 7 Frame (turn V) | **Half**: `Teleport` took the yaw (-2.4) and not the pitch (-7.1): the view stayed 7.2 degrees high, so at a 13.4 degree field of view the body was out of frame ("pitched up a little", the owner). VATS turns the camera, not V |
 | Field of view | The game eases `SetFOV` over about a second: x2 asked 25.5 and read 49.5, then 31.5, then 25.5; Camera back read 24.3 on its way to 51 |
@@ -286,6 +286,7 @@ What it decides:
 | V10 Framing | Turn the first-person camera's own local orientation and narrow the field of view; it holds. Turning V takes the yaw only. The field of view eases in over about a second |
 | V5 Slow motion against the scanner | VATS's own dilation reason holds while scanning, below or above the scanner's 0.03 |
 | Part 2 One part hit | Switching the other hit shapes off makes shots land only on the chosen part |
+| V2 The game's outline on a part | Works on one mesh at a time, without the scanner. A part is the meshes worn there, picked by their name's prefix: head `h0_` (all of them, with what is worn on it), `heb_`, `hh_`, `h1_`; torso the tops `t1_`, `t2_`; arms `g1_`, `a0_`; legs `l1_`, `s1_`. The body `t0_` is one mesh for every part, and tops cover the arms too, so a bare arm or a shirt's sleeve cannot be outlined apart from the rest (a shape on the bone, or REDnode's drawn outline, for those) |
 
 ### Spike test: first run
 
