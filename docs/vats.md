@@ -264,11 +264,13 @@ Claude then reads the `[vats-spike]` lines in `rednode-mods.log`.
 
 ### Spike test: round 3
 
-App 0.4.0 on **REDnode 0.65.0** (the plugin reads the controller), game 2.5, Codeware, a controller.
+App 0.4.0 on **REDnode 0.65.1** (the plugin reads the controller: Xbox pads through XInput, and from 0.65.1 Sony pads from their HID reports), game 2.5, Codeware, a controller.
+
+First try, 2026-11-14 on 0.65.0 with a DualSense over USB: nothing happened. The plugin log had "XInput loaded" and no controller: a DualSense is no XInput pad, and with the game's own DualSense support Steam Input does not stand in for one. 0.65.1 reads Sony pads from their HID input reports; a probe run beside the game (which holds the pad) opened it shared and parsed 1,251 reports in 5 s (USB, report 0x01, 64 bytes, 250 a second), so the game does not keep it to itself.
 
 | Step | Do | Expect, and what to note |
 |---|---|---|
-| 1 | Load a save. In the launcher, switch **VATS spike** on (or off and on); switch on **Right trigger VATS** | The log: "Right trigger VATS: on", and the plugin's log has "Gamepad: XInput loaded" and "controller connected" |
+| 1 | Load a save. In the launcher, switch **VATS spike** on (or off and on); switch on **Right trigger VATS** | The log: "Right trigger VATS: on", and the plugin's log has "Gamepad: reading DualSense (product 0CE6, 64-byte reports)" |
 | 2 | Leave F10. Without the scanner, press the right trigger once | The log: "the scanner is not up: nothing to do". Note whether the game did something with the trigger (fired) |
 | 3 | Hold the scanner, aim at an enemy who is not fighting yet, and hold the right trigger | The view frames the enemy; the part under the crosshair is outlined. Note the colour, and how fast it came |
 | 4 | Still holding both, move the crosshair over the head, the torso, the arms and the legs | The outline follows the part. Note how quickly it changes, and that arms and legs light both sides (gloves and trousers cover both) |

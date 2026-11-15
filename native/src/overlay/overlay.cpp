@@ -112,6 +112,7 @@ void ClearGameRefs()
 
 void Stop()
 {
+    detail::StopGamepad();
     detail::UninstallInput();
     detail::UninstallCompositor();
     detail::StopAudio();
