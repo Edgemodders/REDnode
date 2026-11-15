@@ -161,9 +161,9 @@ VATS's scripts in `r6/scripts/VATS` (the VATS repo's `tools/deploy.ps1`), VATS s
 | Step | Do | Expect, and what to note |
 |---|---|---|
 | 1 | Start the game and load a save | No VATS line in `r6/logs/redscript_rCURRENT.log` errors (Claude reads it after) |
-| 2 | Scan an NPC who can be hacked | The panel's tabs read **Data, VATS, Hacking**. Note whether the header fits three, and how the bottom line under the open tab looks |
-| 3 | Press Switch Tab a few times | Data, VATS, Hacking, Data. Note anything odd |
-| 4 | Open the VATS tab | Six rows: HEAD, TORSO, LEFT ARM, RIGHT ARM, LEFT LEG, RIGHT LEG, each with `--` |
+| 2 | Scan an NPC who can be hacked | The panel's tabs read **Data, Hacking, VATS** (VATS last since the first run). Note whether each header lights over its own body, and how the bottom line under the open tab looks |
+| 3 | Press Switch Tab a few times | Data, Hacking, VATS, Data. Note anything odd |
+| 4 | Open the VATS tab | Six rows: HEAD, TORSO, LEFT ARM, RIGHT ARM, LEFT LEG, RIGHT LEG, each with `--` in a column of its own, clear of the panel's edges |
 | 5 | In F10, in VATS spike, press **Panel test values**; scan again and open VATS | 80%, 75%, 100%, 20%, 33%, 7% |
 | 6 | Switch on **Right trigger VATS**; hold the scanner, hold the right trigger on an enemy, open the VATS tab | The numbers change about once a second as you move. Move to another enemy: they go back to `--`, then fill again |
 | 6b | The outline can be faint (the owner, 2026-11-14): in F10 move **VATS fill** (0 is none) through 1 to 7, holding the right trigger on an enemy after each | Note which numbers fill the part, with what colour or pattern, and which makes the part stand out best together with the outline |
@@ -173,6 +173,8 @@ VATS's scripts in `r6/scripts/VATS` (the VATS repo's `tools/deploy.ps1`), VATS s
 | 9 | Scan a device (a camera, a vending machine) | Data, and Hacking where the game has it; no VATS |
 
 Claude then reads `redscript_rCURRENT.log` and the `[vats-spike]` lines in `rednode-mods.log`.
+
+**First run, 2026-11-14** (the owner, dev PC, two screenshots): the VATS tab showed, with the six parts and their chances fed by the spike app (100, 90, 30, 100, 60, 100). With its header moved after Data, the bodies were crossed: the Hacking body (the quickhack's description) opened under the VATS header, and VATS's list under the Hacking header; the bottom lines were off; the list touched the panel's edges. Cause (from the screenshots): the game's tab animations find the headers by place, not by name. Fixed in the VATS repo the same day: the headers stay in the game's order, VATS last (Data, Hacking, VATS), and the game's own three-tab bottom lines apply once both extra tabs are counted; the list has a margin and the chances their own column. Steps 2 to 4 above are for the retest.
 
 ## Picking a part
 
