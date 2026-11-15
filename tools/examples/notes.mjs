@@ -481,6 +481,17 @@ export const NOTES = {
     ],
     tryThis: ['Watch a line arrive every two seconds.', 'Scroll the list up: it stays put while lines arrive; scroll back down and it follows again.', 'Press Clear.'],
   },
+  'controller-test': {
+    group: 'mods',
+    summary: 'A Node mod that shows what REDnode reads from the controller: the buttons held, both triggers, and which buttons have been seen.',
+    teaches: ['input.onGamepad', 'ui.progress', 'ui.list'],
+    how: [
+      'input.onGamepad calls the mod with the controller\'s state each time it changes: the buttons held, the ones pressed and released with this change, and the triggers from 0 to 1.',
+      'REDnode\'s plugin reads Xbox pads through XInput and Sony pads (DualSense, DualShock 4) from their own reports, only while the game is in front. It only reads, so the game still gets every button.',
+    ],
+    tryThis: ['Press each button until the window says every button is seen.', 'Squeeze each trigger slowly and watch its bar.'],
+    preview: 'The preview has no controller, so the window waits for one.',
+  },
   'views-mod': {
     group: 'mods',
     summary: 'A Node mod window with buttons in its title bar and two views, swapped in place with win.set.',

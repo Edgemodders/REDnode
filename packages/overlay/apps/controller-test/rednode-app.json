@@ -1,0 +1,9 @@
+{
+  "id": "controller-test",
+  "name": "Controller test",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "Shows what REDnode reads from your controller (input.onGamepad): connected or not, the buttons held, both triggers, and which buttons have been seen. Xbox pads through XInput, Sony pads from their own reports. Each press goes to the Mod log.",
+  "main": "mod.mjs",
+  "open": true
+}
