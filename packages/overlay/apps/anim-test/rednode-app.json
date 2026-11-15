@@ -1,7 +1,7 @@
 {
   "id": "anim-test",
   "name": "Animation test",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "author": "Edgemodders",
   "description": "#39's spike: spawns a person beside V (the Trauma Team medic), gives them a workspot component and plays the prologue's medic workspot or a gameplay one on them two ways, jumps to an animation by name, reads the workspot state and stops it. Through api and world only. Switching it off removes what it spawned.",
   "main": "mod.mjs",

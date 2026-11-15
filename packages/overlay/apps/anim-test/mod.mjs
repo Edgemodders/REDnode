@@ -100,21 +100,73 @@ const spawnPerson = () =>
 
 // ---- 2. Play ----------------------------------------------------------------------
 
+// Round 2 (0.3.0): how long the person stays in the workspot, logged by a watcher, and Keep it
+// looping, which plays it again the same way each time it ends (a quest workspot plays once:
+// its sequence does not loop, the scene repeats it).
+let looping = false;
+let lastPlay = null; // () => Promise<void>, the last way played
+let watch = null;
+
+function watchWorkspot(person, label) {
+  if (watch) clearInterval(watch.timer);
+  const w = { started: performance.now(), person: person.id.hash, timer: null, busy: false };
+  watch = w;
+  w.timer = setInterval(async () => {
+    if (w.busy) return;
+    w.busy = true;
+    try {
+      const p = person && (await world.entity(person.id).catch(() => null));
+      if (!p) return void clearInterval(w.timer);
+      const ws = await system();
+      if (await ws.IsActorInWorkspot(p)) return;
+      say(`  ${label}: left the workspot after ${((performance.now() - w.started) / 1000).toFixed(1)} s`);
+      if (looping && lastPlay) {
+        await lastPlay();
+        w.started = performance.now();
+        say(`  ${label}: played again (Keep it looping)`);
+      } else clearInterval(w.timer);
+    } finally {
+      w.busy = false;
+    }
+  }, 250);
+}
+
 const playSelf = (where) =>
   step(`PlayInDeviceSimple on itself, ${where}`, async () => {
     const ws = await system();
     const p = await personRef();
-    await ws.PlayInDeviceSimple(p, p, false, 'workspot', '', '', 0.3, where, api.$null);
+    lastPlay = async () => ws.PlayInDeviceSimple(await personRef(), await personRef(), false, 'workspot', '', '', 0.3, where, api.$null);
+    await lastPlay();
     await wait(800);
+    watchWorkspot(person, short(person.workspot));
     return `called; in a workspot after 0.8 s: ${await ws.IsActorInWorkspot(p)}`;
+  });
+
+// The quest clips, kept loaded through Codeware's resource depot while this app runs, so a play
+// need not wait for them (the T pose before each quest idle, unverified as the cause).
+const QUEST_ANIMS = 'base\\animations\\quest_custom\\q001\\q001_00c_rescuing_girl\\q001_00c_trauma_arrives\\q001_00c_trauma_arrives_male_average.anims';
+const kept = [];
+const loadClips = () =>
+  step('Load the quest clips', async () => {
+    const depot = await api.GameInstance.GetResourceDepot();
+    if (!depot) throw new Error('no resource depot (needs Codeware)');
+    const token = await depot.LoadResource(QUEST_ANIMS);
+    const started = performance.now();
+    for (let i = 0; i < 200 && !(await token.IsFinished()); i++) await wait(50);
+    const res = await token.GetResource().catch(() => null);
+    kept.push(token, res);
+    const failed = await token.IsFailed().catch(() => '?');
+    return `${short(QUEST_ANIMS)}: ${res ? 'loaded' : 'NOT loaded'} after ${((performance.now() - started) / 1000).toFixed(1)} s (failed ${failed}); kept while the app runs`;
   });
 
 const playNpc = () =>
   step('PlayNpcInWorkspot on itself', async () => {
     const ws = await system();
     const p = await personRef();
-    await ws.PlayNpcInWorkspot(p, p, p, 'workspot', '', 0.3, '');
+    lastPlay = async () => ws.PlayNpcInWorkspot(await personRef(), await personRef(), await personRef(), 'workspot', '', 0.3, '');
+    await lastPlay();
     await wait(800);
+    watchWorkspot(person, short(person.workspot));
     return `called; in a workspot after 0.8 s: ${await ws.IsActorInWorkspot(p)}`;
   });
 
@@ -226,6 +278,8 @@ ui.window({
     ui.toggle('Hold still (a hold command)', (on) => (hold = on)),
     ui.row(ui.button('Spawn the person', spawnPerson)),
     ui.heading('2. Play'),
+    ui.row(ui.button('Load the quest clips', loadClips, { variant: 'ghost' })),
+    ui.toggle('Keep it looping (play again each time it ends)', (on) => (looping = on)),
     ui.row(
       ui.button('Play here', () => playSelf('DontPlayAtResourcePosition')),
       ui.button('Play at the workspot\'s place', () => playSelf('PlayAtResourcePosition'), { variant: 'ghost' }),
@@ -261,4 +315,4 @@ async function checkWorld() {
 }
 await checkWorld();
 setInterval(checkWorld, 5000);
-say('Animation test 0.2.1 ready');
+say('Animation test 0.3.0 ready');
