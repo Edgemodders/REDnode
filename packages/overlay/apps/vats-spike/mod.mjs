@@ -27,7 +27,7 @@
 //                taken as a sphere of its capsule's radius at its slot: an approximation,
 //                since which way a capsule runs on its bone is unverified)
 
-import { api, audio, game, input, ui, world } from 'rednode';
+import { api, audio, channel, game, input, ui, world } from 'rednode';
 
 // Each shape's capsule in npc_base.hitrepresentation: radius and height in metres.
 const SHAPES = {
@@ -477,6 +477,33 @@ async function partUnderCrosshair(t) {
   return 'no slots to test';
 }
 
+// ---------- V14: dismember a part ----------
+
+// The game's own request (gameDismembermentComponent.RequestDismemberment, a public static script
+// function), as its ForceDismembermentEffector calls it: on a living NPC, a part other than the head
+// should come off and leave it alive (unverified).
+const DISMEMBER = { Head: 'HEAD', Torso: 'BODY', 'Left arm': 'LEFT_ARM', 'Right arm': 'RIGHT_ARM', 'Left leg': 'LEFT_LEG', 'Right leg': 'RIGHT_LEG' };
+let woundType = 'COARSE';
+
+const dismember = (part) =>
+  step(`Dismember ${part.part}`, async () => {
+    const t = needTarget();
+    const { places } = await readSlots(t);
+    const at = partsOf(places).find((x) => x.part === part.part)?.at;
+    const pos = at ? { X: at.x, Y: at.y, Z: at.z, W: 1 } : { X: 0, Y: 0, Z: 0, W: 0 };
+    await api.gameDismembermentComponent.RequestDismemberment(t, DISMEMBER[part.part], woundType, pos, false, '', 0);
+    setTimeout(async () => {
+      const dead = await t.IsDead().catch(() => null);
+      say(`  Dismember ${part.part}: after 1 s the target is ${dead === null ? 'not readable' : dead ? 'dead' : 'alive'}`);
+    }, 1000);
+    return `${DISMEMBER[part.part]}, ${woundType} wound, requested: note whether the part comes off and how it looks`;
+  });
+
+function chooseWound(type) {
+  woundType = type;
+  say(`Wound type: ${type}`);
+}
+
 // ---------- part 2: only one part can be hit ----------
 
 let onlySeconds = 6;
@@ -746,6 +773,61 @@ const meshesFor = (names, part) =>
     return !side || !/^(Left|Right) /.test(part) || part.startsWith(side);
   });
 
+// ---------- V15: the floating label for the lit part ----------
+
+// The package's own HUD page (labels.html, the whole screen, never taking input) draws the part's
+// name and chance, fixed on the screen, with a line from it to the part. The mod sends it the
+// part's place and the camera about ten times a second; the page projects the point itself and
+// eases the line's far end towards it.
+const lastChances = new Map(); // part -> chance, from the latest exposure
+let labelTimer = null;
+let labelBusy = false;
+let projectLoggedAt = 0;
+
+function labelOff() {
+  channel.post({ type: 'vats-label', off: true });
+}
+
+async function labelTick() {
+  if (!vats || !vats.part) return;
+  const part = PARTS.find((p) => p.part === vats.part);
+  const t = vats.target;
+  const cams = await api.GameInstance.GetCameraSystem(game.instance);
+  const [cam, slotReads] = await Promise.all([
+    cameraView(),
+    Promise.all(part.slots.map(async (slot) => {
+      const component = await slotComponent(t);
+      const r = await component.GetSlotTransform(slot, api.$out);
+      const p = r?.out?.worldTransformOut?.Position;
+      return r?.result && p ? { x: fixed(p.x), y: fixed(p.y), z: fixed(p.z) } : null;
+    })),
+  ]);
+  const found = slotReads.filter(Boolean);
+  if (!found.length || !vats || vats.part !== part.part) return;
+  const at = { x: found.reduce((a, p) => a + p.x, 0) / found.length, y: found.reduce((a, p) => a + p.y, 0) / found.length, z: found.reduce((a, p) => a + p.z, 0) / found.length };
+  channel.post({ type: 'vats-label', part: part.part, chance: lastChances.get(part.part) ?? null, at, cam: { at: cam.at, right: cam.right, up: cam.up, forward: cam.forward }, fov: vats.fov ?? vats.saved.fov });
+  // What the game's own ProjectPoint answers for the same point, once a second, to learn its form.
+  if (performance.now() - projectLoggedAt > 1000) {
+    projectLoggedAt = performance.now();
+    const p = await cams.ProjectPoint({ X: at.x, Y: at.y, Z: at.z, W: 1 }).catch((err) => `failed: ${err?.message ?? err}`);
+    say(`  Label: ${part.part} at ${at.x.toFixed(2)}, ${at.y.toFixed(2)}, ${at.z.toFixed(2)}; the game's ProjectPoint answers ${JSON.stringify(p)}`);
+  }
+}
+
+function label(on) {
+  if (labelTimer) clearInterval(labelTimer);
+  labelTimer = null;
+  if (!on) {
+    labelOff();
+    return;
+  }
+  labelTimer = setInterval(() => {
+    if (labelBusy) return;
+    labelBusy = true;
+    labelTick().catch(() => {}).finally(() => (labelBusy = false));
+  }, 100);
+}
+
 // An entity's id as text, to tell two references to the same enemy from two enemies.
 const idOf = async (t) => JSON.stringify(await t.GetEntityID().catch(() => null));
 
@@ -913,6 +995,10 @@ async function enterVats() {
   say(`VATS on: ${t.$type} "${(await t.GetDisplayName()) || 'no name'}", ${dist.toFixed(1)} m, field of view ${saved.fov.toFixed(1)} -> ${fov.toFixed(1)} by ${ZOOM_WAYS[zoomWay]}, ${names.length} meshes (${(performance.now() - started).toFixed(0)} ms)`);
   sfx('vats-zoom');
   await zoomIn(cam, saved, fov);
+  if (vats && vats.saved === saved) {
+    vats.fov = fov; // the view's field of view now, for the label's projection
+    label(true);
+  }
   let busy = false;
   vats.timer = setInterval(() => {
     if (busy || !vats) return;
@@ -929,7 +1015,11 @@ function feedVatsPanel() {
   panelAt = performance.now();
   const t = vats.target;
   exposure(t)
-    .then(({ parts }) => (vats && vats.target === t ? feedPanel(parts) : false))
+    .then(({ parts }) => {
+      if (!vats || vats.target !== t) return false;
+      for (const p of parts) if (p.chance !== null) lastChances.set(p.part, p.chance);
+      return feedPanel(parts);
+    })
     .catch(() => {})
     .finally(() => (panelBusy = false));
 }
@@ -953,6 +1043,7 @@ async function tickVats() {
       vats.part = null;
       vats.lit = [];
       panelAt = 0; // the new enemy's chances at the next tick
+      lastChances.clear();
       if (panelSystem) panelSystem.ClearParts().catch(() => {});
       say(`VATS: now on ${look.$type} "${(await look.GetDisplayName().catch(() => '')) || 'no name'}", ${vats.names.length} meshes`);
     }
@@ -966,12 +1057,14 @@ async function tickVats() {
   await Promise.all([light(vats.target, off, false), light(vats.target, on, true)]);
   if (part) sfx('vats-select');
   vats.part = part;
+  if (!part) labelOff();
   vats.lit = want;
   say(`VATS: crosshair on ${part ? `the ${part} (${hit.slot}): ${want.length ? want.join(', ') : 'no mesh worn there to outline'}` : 'no part'}`);
 }
 
 async function leaveVats(why) {
   if (!vats) return;
+  label(false);
   const was = vats;
   vats = null;
   clearInterval(was.timer);
@@ -1073,6 +1166,13 @@ ui.window({
     ui.heading('Frame (V10)'),
     ui.slider('Body fills', (v) => (fill = v / 100), { min: 40, max: 95, step: 5, value: fill * 100, unit: ' %' }),
     ui.row(ui.button('Frame (camera)', frameCamera), ui.button('Frame (turn V)', frameTurnV, { variant: 'ghost' }), ui.button('Camera back', frameBack, { variant: 'ghost' })),
+    ui.heading('Dismember (V14)'),
+    ui.row(
+      ui.button('Coarse', () => chooseWound('COARSE'), { variant: 'ghost' }),
+      ui.button('Clean', () => chooseWound('CLEAN'), { variant: 'ghost' }),
+      ui.button('Hole', () => chooseWound('HOLE'), { variant: 'ghost' }),
+    ),
+    ui.row(...PARTS.map((p) => ui.button(`Cut ${p.part.toLowerCase()}`, () => dismember(p), { variant: 'ghost' }))),
     ui.heading('Only one part can be hit (part 2)'),
     ui.slider('Seconds before the shapes come back', (v) => (onlySeconds = Math.round(v)), { min: 3, max: 30, step: 1, value: onlySeconds, unit: ' s' }),
     ui.row(...PARTS.map((p) => ui.button(p.part, () => onlyPart(p), { variant: 'ghost' }))),

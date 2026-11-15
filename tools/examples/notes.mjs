@@ -450,6 +450,7 @@ export const NOTES = {
       '**Exposure** casts a ray from the camera to five points on each part (`SyncRaycastByCollisionGroup`, every ray sent at once so they share a frame), and tests each against the target\'s own other shapes in plain maths, for a share of each part the camera sees.',
       '**Outline** puts the game\'s own outline on one of the target\'s components (`entRenderHighlightEvent` with a `componentName`; **List components** names them through Codeware). **Frame** turns the view onto the target and narrows the field of view until its body fills the screen, by the camera\'s own orientation or by turning V.',
       '**Right trigger VATS** listens to the controller with `input.onGamepad`: holding the right trigger while the scanner is up (the player state machine\x27s `Vision`) frames the enemy and outlines the part under the crosshair, and letting go puts everything back.',
+      '**Cut** asks the game to take a part off (`gameDismembermentComponent.RequestDismemberment`), and a HUD page of its own (`labels.html`, fed over `channel`) floats the lit part\'s name and chance beside the body with a line that follows it.',
       '**Only one part can be hit** switches the target\'s other hit shapes off with `HitShapeUserDataBase.DisableHitShape` and back on after 6 seconds.',
     ],
     tryThis: ['Press Target, then Read slots, then switch on Show parts.', 'Press x2, then Back.'],

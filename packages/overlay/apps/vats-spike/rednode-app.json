@@ -1,9 +1,20 @@
 {
   "id": "vats-spike",
   "name": "VATS spike",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "author": "Edgemodders",
-  "description": "Research for VATS (docs/vats.md): reads an enemy's 15 body part slots and pins its six parts, zooms the camera, slows the world, says what the crosshair is on, measures how much of each part the camera sees, and lets only one body part be hit for a moment. Logs what each call answered and how long it took.",
+  "description": "Research for VATS (docs/vats.md): reads an enemy's 15 body part slots and pins its six parts, zooms the camera, slows the world, says what the crosshair is on, measures how much of each part the camera sees, lets only one body part be hit for a moment, cuts a part off (V14), and draws a floating label for the lit part (V15, labels.html, a HUD page over the whole screen). Logs what each call answered and how long it took.",
+  "entry": "labels.html",
   "main": "mod.mjs",
+  "kind": "hud",
+  "fill": "screen",
+  "width": 1920,
+  "height": 1080,
+  "hideWith": [
+    "menu",
+    "photo-mode",
+    "scene",
+    "main-menu"
+  ],
   "open": false
 }

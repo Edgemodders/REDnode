@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VATS labels</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<!-- Lets the page import the rednode package by name, like a Node mod does. -->
+<script type="importmap">{ "imports": { "rednode": "rednode://sdk/index.js" } }</script>
+<style>
+  /* The whole game view, see-through: only the label and its line are drawn. */
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  svg { position: fixed; inset: 0; width: 100vw; height: 100vh; }
+  .name { font: 600 30px "Rajdhani", "Bahnschrift", "Segoe UI", sans-serif; letter-spacing: 1px; text-transform: uppercase; }
+  .chance { font: 600 30px "Rajdhani", "Bahnschrift", "Segoe UI", sans-serif; }
+  .ink { fill: #5ff58f; }
+  .line { stroke: #5ff58f; stroke-width: 2.5; fill: none; }
+  .glow { filter: drop-shadow(0 0 4px rgba(95, 245, 143, 0.65)); }
+</style>
+</head>
+<body>
+<svg id="view" aria-hidden="true">
+  <g id="label" class="glow" visibility="hidden">
+    <text id="name" class="name ink"></text>
+    <text id="chance" class="chance ink"></text>
+    <polyline id="line" class="line" points=""></polyline>
+  </g>
+</svg>
+<script type="module">
+  // VATS's floating label (spike V15, docs/vats.md): the lit part's name and hit chance, fixed on
+  // the screen off to its side (above it for the head), with a line under the text that runs
+  // towards the body, then bends at a joint and follows the part as it moves.
+  //
+  // The Node mod (mod.mjs) sends { type: 'vats-label', part, chance, at, cam, fov } about ten times
+  // a second, or { off: true }. This page projects the part's world point with the camera it is
+  // given (the field of view taken as vertical, as REDnode's world pins found) and eases the line's
+  // far end towards it each frame.
+  import { channel } from 'rednode';
+
+  const $ = (id) => document.getElementById(id);
+  const group = $('label');
+  const nameEl = $('name');
+  const chanceEl = $('chance');
+  const lineEl = $('line');
+
+  let state = null; // the last message
+  let side = null; // 'left', 'right' or 'above', kept while the same part stays lit
+  let anchor = null; // where the text sits, kept likewise
+  let shownPart = null;
+  let end = null; // where the line's far end is drawn now (eased)
+
+  const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+  const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+
+  // A world point to page pixels, or null behind the camera.
+  function project(p, cam, fovDeg) {
+    const d = sub(p, cam.at);
+    const z = dot(d, cam.forward);
+    if (z <= 0.05) return null;
+    const w = innerWidth;
+    const h = innerHeight;
+    const t = Math.tan((fovDeg * Math.PI) / 360);
+    const x = dot(d, cam.right) / z / (t * (w / h));
+    const y = dot(d, cam.up) / z / t;
+    return { x: (x * 0.5 + 0.5) * w, y: (0.5 - y * 0.5) * h };
+  }
+
+  // Where the text sits: fixed on the screen, by the part.
+  const ROW = { Head: 0.2, Torso: 0.44, 'Left arm': 0.38, 'Right arm': 0.38, 'Left leg': 0.62, 'Right leg': 0.62 };
+  function place(part, onScreen) {
+    const w = innerWidth;
+    const h = innerHeight;
+    if (part === 'Head') return { side: 'above', x: w * 0.5, y: h * ROW.Head };
+    const left = onScreen ? onScreen.x < w * 0.5 : part.startsWith('Left');
+    return { side: left ? 'left' : 'right', x: left ? w * 0.27 : w * 0.73, y: h * (ROW[part] ?? 0.45) };
+  }
+
+  function draw() {
+    requestAnimationFrame(draw);
+    if (!state || state.off) {
+      group.setAttribute('visibility', 'hidden');
+      shownPart = null;
+      end = null;
+      return;
+    }
+    const target = project(state.at, state.cam, state.fov);
+    if (!target) {
+      group.setAttribute('visibility', 'hidden');
+      return;
+    }
+    // The text's place is chosen when a part lights (by which side of the screen it is on) and
+    // kept while it stays lit, so the text holds still and only the line's far end moves.
+    if (state.part !== shownPart) {
+      shownPart = state.part;
+      anchor = place(state.part, target);
+      side = anchor.side;
+      end = null;
+    }
+
+    nameEl.textContent = state.part;
+    chanceEl.textContent = state.chance === null || state.chance === undefined ? '--' : `${Math.round(state.chance)}%`;
+    const nameW = nameEl.getComputedTextLength();
+    const chanceW = chanceEl.getComputedTextLength();
+    const gap = 14;
+    const textW = nameW + gap + chanceW;
+
+    // The text block and the underline's start and joint.
+    let x0;
+    let lineStart;
+    let joint;
+    const baseline = anchor.y;
+    const under = baseline + 8;
+    if (side === 'above') {
+      x0 = anchor.x - textW / 2;
+      lineStart = { x: x0, y: under };
+      joint = { x: x0 + textW, y: under };
+    } else if (side === 'left') {
+      x0 = anchor.x - textW; // the text ends at the anchor, the line goes on towards the body
+      lineStart = { x: x0, y: under };
+      joint = { x: anchor.x + 40, y: under };
+    } else {
+      x0 = anchor.x; // the text starts at the anchor, the line starts towards the body
+      lineStart = { x: x0 + textW, y: under };
+      joint = { x: anchor.x - 40, y: under };
+    }
+    nameEl.setAttribute('x', x0);
+    nameEl.setAttribute('y', baseline);
+    chanceEl.setAttribute('x', x0 + nameW + gap);
+    chanceEl.setAttribute('y', baseline);
+
+    // The far end eases towards the part, so ten updates a second still move smoothly.
+    end = end ? { x: end.x + (target.x - end.x) * 0.25, y: end.y + (target.y - end.y) * 0.25 } : target;
+    lineEl.setAttribute('points', [lineStart, joint, end].map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
+    group.setAttribute('visibility', 'visible');
+  }
+
+  channel.on((msg) => {
+    if (msg?.type === 'vats-label') state = msg;
+  });
+  requestAnimationFrame(draw);
+</script>
+</body>
+</html>

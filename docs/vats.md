@@ -212,6 +212,8 @@ The owner's idea, 2026-11-14, not a priority yet: each part's hit chance follows
 
 The spike's first run (2026-11-14): exposure read right side-on, with 54 rays in 205 ms (above, "Spike test: first run").
 
+Legs (the owner, 2026-11-14): both legs light together, because trousers (`l1_`) and shoes (`s1_`) are single meshes for both legs; arm meshes often name their side (`_l`, `_r`, `left`, `right`), leg meshes seen so far do not. The game's outline cannot single out one leg on such meshes; the floating label (V15) names it, and a shape on the bone or a drawn outline could single it out later.
+
 Unverified: the slots' orientation (which axis a capsule runs along), the collision groups for moving things, and whether the game's own bullets agree with the capsules (they hit the same hit shapes, so they should).
 
 ## Spikes
@@ -230,6 +232,8 @@ Unverified: the slots' orientation (which axis a capsule runs along), the collis
 | **V11 One enemy, several parts** | Can one enemy take VATS quickhacks on several parts, started in VATS and uploading on after it? | Start two VATS hacks on one target in VATS, leave VATS, watch both upload and land; try the same hack on two parts, and the queue perk. Check that the part recorded at the start reaches `onLand` |
 | **V12 The upload icon on a part** | Does the game's upload bar move to the slot named in `UploadProgramProgressEvent.slotName`? | Start a quickhack, find where the event is sent (EDGEhack's scripts can wrap it) and set `slotName` to `LeftArm`; see where the bar shows. If not, REDnode's pin on the slot with the `QuickHackUpload` stat pool's value |
 | **V13 A VATS tab** | Can the scanner panel show a third tab, VATS, after Data for an NPC, with the parts and hit chances in its body? | A redscript wrap of `scannerDetailsGameController` (above), first only showing the TwinTone slot for an NPC with the label "VATS", then the order, then the body filled from a script setter called through `api`. The UI Workbench's Inspect tab can confirm the header's widgets live while scanning |
+| **V14 Dismember a part** | Can VATS take off the chosen part, by a quickhack or a bullet, and does a living enemy keep going? | The game's own `gameDismembermentComponent.RequestDismemberment(npc, part, wound, position, critical)`, as its `ForceDismembermentEffector` calls it, from the spike app (**Cut** buttons, wound **Coarse**, **Clean** or **Hole**). Bullets: the game dismembers the hit part only when the shot kills or downs (its `DismembermentConditions`), unless the attack carries `hitFlag.ForceDismember`; with the other hit shapes off, a killing shot lands on the chosen part |
+| **V15 The floating label** | Can the lit part's name and chance float beside the body, fixed on screen, with a line that bends at a joint and follows the part? | A HUD page of the spike's own over the whole screen (`labels.html`), fed by the mod about ten times a second with the part's place and the camera; the page projects the point and eases the line's end. The game's `ProjectPoint` is logged beside it once a second, to learn its form (no game script calls it) |
 | **V8 Exposure** (not a priority) | Can each part's exposure be measured from the camera, against the world and the NPC's own body, cheaply enough? | Read the slots' transforms (`GetTargetSlotTransform`), place points on the capsules, cast rays against the world with `SyncRaycastByCollisionGroup`, test them against the other capsules in the mod; compare with where shots land |
 
 V1 and V3 decide whether the first build goes ahead as drawn here. V5 and V7 decide the rest of the play. V8 waits until those pass. V9 and V10 are the controller design's.
@@ -333,6 +337,21 @@ Quick try on 0.65.1, 2026-11-14 (app 0.4.0): the trigger worked, the view framed
 | 8 | Switch the app off | Nothing stays outlined or turned |
 
 Claude then reads the `[vats-spike]` lines in `rednode-mods.log` and the plugin's `Gamepad:` lines.
+
+### V14 and V15 test
+
+VATS spike 0.6.0 (REDnode 0.65.1). Save first: V14 leaves enemies hurt or angry.
+
+| Step | Do | Expect, and what to note |
+|---|---|---|
+| 1 | In F10, switch VATS spike off and on. Look at an enemy who is not fighting, press **Target** | Target logged |
+| 2 | Press **Cut left arm** (wound **Coarse**), leave F10 | Note whether the arm comes off, how it looks, and whether the enemy lives (the log says after 1 s) and what it does next |
+| 3 | On other enemies: **Cut left leg**, **Cut right leg**, then **Clean** and **Hole** with an arm | Note each: does a legless enemy crawl, do the wound types differ |
+| 4 | **Cut head** and **Cut torso** on two more | Note whether they die and how |
+| 5 | Switch on **Right trigger VATS**; hold the scanner and the right trigger on an enemy, and move the crosshair over the parts | A green label off to the side (above for the head) with the part's name and chance, a line under it running towards the body that bends and follows the part. Note whether the text stays still, whether the line keeps up, and whether the line's end lands on the part (it may be off if the camera's field of view is not what the page assumes) |
+| 6 | Let go | The label goes |
+
+Claude then reads the `[vats-spike]` lines, including the game's `ProjectPoint` answers.
 
 ### Spike test: round 2 results
 
