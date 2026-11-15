@@ -2,39 +2,38 @@
 // Through `api` and `world` only, no REDnode change. Each button is one step; every call, its
 // answer and its time go to the log, and what shows on screen is for the player to say.
 //
-//   1 Person   spawns a character beside V (the Trauma Team medic by default), holding still or not
-//   2 Device   spawns a box at the person's place carrying a workspot component
-//              (workWorkspotResourceComponent named "workspot") that names the workspot file
-//   3 Play     puts the person in the device's workspot, two ways: PlayInDeviceSimple (the device
-//              way, with the component named as the actor's or the device's data), or
-//              PlayNpcInWorkspot (V as the master, the box as the reference)
-//   4 Jump     SendJumpToAnimEnt to one animation by name, and the animation's length from the
-//              person's animation controller (whether its set is loaded on that rig)
-//   5 State    IsActorInWorkspot and the extended info (active, entering, exiting, sync anim)
-//   6 Stop     a fast exit, or StopNpcInWorkspot; then remove everything
+//   1 Person   spawns a character beside V (the Trauma Team medic by default) carrying a workspot
+//              component (workWorkspotResourceComponent named "workspot") that names the chosen
+//              workspot file. The workspot system takes only game objects as its device, so the
+//              person is their own device (0.1.0 put the component on a box, a bare entity, and
+//              every call was refused). Choosing another workspot means spawning the person again.
+//   2 Play     PlayInDeviceSimple(person, person, ...) at the workspot's place or where the person
+//              stands, or PlayNpcInWorkspot(person, person, person, ...)
+//   3 Jump     SendJumpToAnimEnt to one animation by name, and the animation's length from the
+//              person's animation controller (-1: not loaded on that rig)
+//   4 State    IsActorInWorkspot, IsWorkspotEnabled and the extended info's flags
+//   5 Stop     a fast exit, or StopNpcInWorkspot; then remove everything
 //
 // The answers decide #39's call (A2): whether a quest's workspot plays outside its scene on a
-// spawned person, what the device needs, and what a failure looks like.
+// spawned person, what it needs, and what a failure looks like.
 
 import { api, game, kernel, ui, world } from 'rednode';
 
 const PEOPLE = ['Character.trauma_team_paramedic', 'Character.mws_hey_07_trauma_medic_01', 'Character.mws_pac_06_trauma_medic_01'];
 const Q001 = 'base\\workspots\\quest\\main_quests\\prologue\\q001\\q001_00c_rescuing_girl\\';
-// The medics' quest workspots (male rig), then a gameplay one as the control.
+// A gameplay workspot as the control, then the medics' quest workspots (male rig).
 const WORKSPOTS = [
+  ['Arms crossed (gameplay)', 'base\\workspots\\common\\ground\\generic__stand_ground_arms_crossed__stand_around__02.workspot', 'stand__2h_on_sides__01'],
   ['Medic 1', `${Q001}q001_00c_trauma_arrives___med_01_idle__01.workspot`, 'q001_00c_trauma_arrives___med_1_idle__01'],
   ['Medic 2', `${Q001}q001_00c_trauma_arrives___med_02_idle__01.workspot`, 'q001_00c_trauma_arrives___med_2_idle__01'],
   ['Soldier 1', `${Q001}q001_00c_trauma_arrives___soldier_01_idle__01.workspot`, 'q001_00c_trauma_arrives___soldier_1_idle__01'],
-  ['Arms crossed (gameplay)', 'base\\workspots\\common\\ground\\generic__stand_ground_arms_crossed__stand_around__02.workspot', 'stand__2h_on_sides__01'],
 ];
-const BOX = 'base\\environment\\decoration\\containers\\packaging\\cardboard_box\\cardboard_box_a_closed.mesh';
 
 let record = PEOPLE[0];
 let hold = false;
 let workspot = WORKSPOTS[0][1];
 let anim = WORKSPOTS[0][2];
-let person = null; // { id, at }
-let device = null; // { id }
+let person = null; // { id, at, workspot }
 let busy = '';
 
 const requires = ui.text('Checking requirements...', { tone: 'dim' });
@@ -70,77 +69,58 @@ async function inFront(metres) {
 }
 
 const system = () => api.GameInstance.GetWorkspotSystem(game.instance);
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function personRef() {
-  if (!person) throw new Error('Spawn a person first (1)');
+  if (!person) throw new Error('Spawn the person first (1)');
   const e = await world.entity(person.id);
   if (!e) throw new Error('The person is not in the world');
   return e;
 }
-async function deviceRef() {
-  if (!device) throw new Error('Make a device first (2)');
-  const e = await world.entity(device.id);
-  if (!e) throw new Error('The device is not in the world');
-  return e;
-}
+const short = (path) => path.split('\\').pop();
 
-// ---- 1. Person --------------------------------------------------------------------
+// ---- 1. Person, carrying the workspot ----------------------------------------------
 
 const spawnPerson = () =>
-  step(`Spawn ${record}${hold ? ', holding' : ', not holding'}`, async () => {
+  step(`Spawn ${record}${hold ? ', holding' : ', not holding'}, with ${short(workspot)}`, async () => {
     if (person) await world.remove(person.id).catch(() => false);
+    person = null;
     const at = await inFront(3);
-    const { id, entity } = await world.spawn({ record, ...at, npc: { hold, friendly: true } });
-    person = { id, at };
+    const component = await api.$new('workWorkspotResourceComponent', { name: 'workspot', workspotResource: workspot });
+    const { id, entity } = await world.spawn({ record, ...at, npc: { hold, friendly: true }, components: [component] });
+    person = { id, at, workspot };
     if (!entity) return `${id.hash}, not in the world after 10 s`;
     const look = await entity.GetCurrentAppearanceName().catch(() => '?');
-    const body = await entity.GetBodyType?.().catch(() => null);
-    const gender = await entity.GetResolvedGenderName?.().catch(() => null);
-    return `${id.hash}, appearance ${look}${gender ? `, gender ${gender}` : ''}${body ? `, body ${body}` : ''}`;
-  });
-
-// ---- 2. Device --------------------------------------------------------------------
-
-const makeDevice = () =>
-  step(`Device for ${workspot.split('\\').pop()}`, async () => {
-    if (!person) throw new Error('Spawn a person first (1)');
-    if (device) await world.remove(device.id).catch(() => false);
-    const component = await api.$new('workWorkspotResourceComponent', { name: 'workspot', workspotResource: workspot });
-    const { id, entity } = await world.spawn({ mesh: BOX, position: person.at.position, yaw: person.at.yaw, components: [component] });
-    device = { id };
-    if (!entity) return `${id.hash}, not in the world after 10 s`;
     const comp = await entity.FindComponentByName('workspot').catch((e) => `error ${e.message}`);
-    return `${id.hash} at the person's place; its "workspot" component ${comp ? 'found' : 'NOT found'}`;
+    return `${id.hash}, appearance ${look}; its "workspot" component ${comp ? 'found' : 'NOT found'}`;
   });
 
-// ---- 3. Play ----------------------------------------------------------------------
+// ---- 2. Play ----------------------------------------------------------------------
 
-const playDevice = (asActorData) =>
-  step(`PlayInDeviceSimple (component as ${asActorData ? 'actor' : 'device'} data)`, async () => {
+const playSelf = (where) =>
+  step(`PlayInDeviceSimple on itself, ${where}`, async () => {
     const ws = await system();
-    const [p, d] = [await personRef(), await deviceRef()];
-    await ws.PlayInDeviceSimple(d, p, false, asActorData ? 'workspot' : '', asActorData ? '' : 'workspot', '', 0.3, 'PlayAtResourcePosition', api.$null);
-    await new Promise((r) => setTimeout(r, 600));
-    return `called; in a workspot after 0.6 s: ${await ws.IsActorInWorkspot(p)}`;
+    const p = await personRef();
+    await ws.PlayInDeviceSimple(p, p, false, 'workspot', '', '', 0.3, where, api.$null);
+    await wait(800);
+    return `called; in a workspot after 0.8 s: ${await ws.IsActorInWorkspot(p)}`;
   });
 
 const playNpc = () =>
-  step('PlayNpcInWorkspot (V master, box reference)', async () => {
+  step('PlayNpcInWorkspot on itself', async () => {
     const ws = await system();
-    const [p, d] = [await personRef(), await deviceRef()];
-    const v = await api.GetPlayer(game.instance);
-    await ws.PlayNpcInWorkspot(p, v, d, 'workspot', '', 0.3, '');
-    await new Promise((r) => setTimeout(r, 600));
-    return `called; in a workspot after 0.6 s: ${await ws.IsActorInWorkspot(p)}`;
+    const p = await personRef();
+    await ws.PlayNpcInWorkspot(p, p, p, 'workspot', '', 0.3, '');
+    await wait(800);
+    return `called; in a workspot after 0.8 s: ${await ws.IsActorInWorkspot(p)}`;
   });
 
-// ---- 4. Jump ----------------------------------------------------------------------
+// ---- 3. Jump ----------------------------------------------------------------------
 
 const jump = () =>
   step(`Jump to ${anim}`, async () => {
-    if (!anim.trim()) throw new Error('No animation name for this workspot: type one');
+    if (!anim.trim()) throw new Error('No animation name: type one');
     const ws = await system();
-    const p = await personRef();
-    await ws.SendJumpToAnimEnt(p, anim.trim(), false);
+    await ws.SendJumpToAnimEnt(await personRef(), anim.trim(), false);
     return 'called';
   });
 
@@ -150,32 +130,35 @@ const duration = () =>
     const ctrl = await p.GetAnimationControllerComponent();
     if (!ctrl) return 'no animation controller';
     const s = await ctrl.GetAnimationDuration(anim.trim());
-    return `${s} s${s > 0 ? ' (its set is loaded on this rig)' : ' (0: not loaded, or not on this rig)'}`;
+    return `${s} s${s > 0 ? ' (loaded on this rig)' : ' (not loaded, or not on this rig)'}`;
   });
 
-// ---- 5. State ---------------------------------------------------------------------
+// ---- 4. State ---------------------------------------------------------------------
 
 const state = () =>
   step('State', async () => {
     const ws = await system();
     const p = await personRef();
     const inWs = await ws.IsActorInWorkspot(p);
-    const info = await ws.GetExtendedInfo(p).catch(() => null);
-    const flags = info
-      ? ['isActive', 'entering', 'exiting', 'playingSyncAnim', 'inReaction', 'inMotion'].map((k) => `${k} ${info[k] ?? '?'}`).join(', ')
-      : 'no extended info';
     const enabled = await ws.IsWorkspotEnabled(p).catch(() => '?');
+    const info = await ws.GetExtendedInfo(p).catch(() => null);
+    let flags = 'no extended info';
+    if (info) {
+      const keys = ['isActive', 'entering', 'exiting', 'playingSyncAnim', 'inReaction', 'inMotion'];
+      const values = await Promise.all(keys.map((k) => info.$get(k).catch(() => '?')));
+      flags = keys.map((k, i) => `${k} ${values[i]}`).join(', ');
+    }
     return `in a workspot ${inWs}, enabled ${enabled}; ${flags}`;
   });
 
-// ---- 6. Stop ----------------------------------------------------------------------
+// ---- 5. Stop ----------------------------------------------------------------------
 
 const fastExit = () =>
   step('Fast exit', async () => {
     const ws = await system();
     const p = await personRef();
     await ws.SendFastExitSignal(p, { X: 0, Y: 0, Z: 0 }, false, true, false, false);
-    await new Promise((r) => setTimeout(r, 1500));
+    await wait(1500);
     return `in a workspot after 1.5 s: ${await ws.IsActorInWorkspot(p)}`;
   });
 
@@ -184,7 +167,7 @@ const stop = () =>
     const ws = await system();
     const p = await personRef();
     await ws.StopNpcInWorkspot(p);
-    await new Promise((r) => setTimeout(r, 500));
+    await wait(500);
     return `in a workspot after 0.5 s: ${await ws.IsActorInWorkspot(p)}`;
   });
 
@@ -193,7 +176,6 @@ const removeAll = () =>
     let n = 0;
     for (const s of world.spawned()) if (await world.remove(s.id).catch(() => false)) n += 1;
     person = null;
-    device = null;
     return `${n} removed`;
   });
 
@@ -207,7 +189,7 @@ function pick([name, path, a]) {
   anim = a;
   wsInput.set({ value: path });
   animInput.set({ value: a });
-  chosen.set({ text: `Workspot: ${name}${a ? '' : ' (no animation name: Jump does not apply)'}` });
+  chosen.set({ text: `Workspot: ${name}. Spawn the person again to give it to them.` });
 }
 
 ui.window({
@@ -220,33 +202,35 @@ ui.window({
   closable: true,
   children: [
     requires,
-    ui.heading('1. Person'),
+    ui.heading('1. Person, carrying the workspot'),
+    chosen,
+    ui.row(...WORKSPOTS.map((w) => ui.button(w[0], () => pick(w), { variant: 'ghost' }))),
+    wsInput,
     recordInput,
     ui.row(
       ...PEOPLE.map((r, i) =>
-        ui.button(`Medic ${i + 1}`, () => {
-          record = r;
-          recordInput.set({ value: r });
-        }, { variant: 'ghost' }),
+        ui.button(
+          `Medic ${i + 1}`,
+          () => {
+            record = r;
+            recordInput.set({ value: r });
+          },
+          { variant: 'ghost' },
+        ),
       ),
     ),
     ui.toggle('Hold still (a hold command)', (on) => (hold = on)),
     ui.row(ui.button('Spawn the person', spawnPerson)),
-    ui.heading('2. Device'),
-    chosen,
-    ui.row(...WORKSPOTS.map((w) => ui.button(w[0], () => pick(w), { variant: 'ghost' }))),
-    wsInput,
-    ui.row(ui.button('Make the device', makeDevice)),
-    ui.heading('3. Play'),
+    ui.heading('2. Play'),
     ui.row(
-      ui.button('Play: device, actor data', () => playDevice(true)),
-      ui.button('Play: device, device data', () => playDevice(false), { variant: 'ghost' }),
+      ui.button('Play here', () => playSelf('DontPlayAtResourcePosition')),
+      ui.button('Play at the workspot\'s place', () => playSelf('PlayAtResourcePosition'), { variant: 'ghost' }),
       ui.button('Play: NPC way', playNpc, { variant: 'ghost' }),
     ),
-    ui.heading('4. Jump'),
+    ui.heading('3. Jump'),
     animInput,
     ui.row(ui.button('Jump to it', jump), ui.button('Its length', duration, { variant: 'ghost' })),
-    ui.heading('5 and 6. State, stop'),
+    ui.heading('4 and 5. State, stop'),
     ui.row(
       ui.button('State', state),
       ui.button('Fast exit', fastExit, { variant: 'ghost' }),
@@ -273,4 +257,4 @@ async function checkWorld() {
 }
 await checkWorld();
 setInterval(checkWorld, 5000);
-say('Animation test ready');
+say('Animation test 0.2.0 ready');
