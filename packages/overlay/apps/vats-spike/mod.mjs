@@ -255,7 +255,51 @@ const exposureOnce = () =>
     const t = needTarget();
     const { parts, ms, casts } = await exposure(t);
     for (const p of parts) say(`  ${p.part}: ${p.chance === null ? 'no slots' : `${p.chance}% (${p.seen} of ${p.total} points seen, ${p.body} behind its own body, ${p.world} behind the world)`}`);
-    return `${casts} ray casts in ${ms.toFixed(1)} ms`;
+    const fed = await feedPanel(parts);
+    return `${casts} ray casts in ${ms.toFixed(1)} ms${fed ? '; sent to the VATS tab' : ''}`;
+  });
+
+// ---------- V13: VATS's tab in the scanner's panel ----------
+
+// The VATS repo's scripts/VATS/Panel.reds keeps the six chances in VATS.VATSPanelSystem and draws
+// them in the scanner panel's VATS tab. Found again after a load (a new system).
+let panelSystem = null;
+let panelMissing = false;
+async function panel() {
+  if (panelSystem) return panelSystem;
+  const systems = await api.GameInstance.GetScriptableSystemsContainer(game.instance);
+  panelSystem = await systems.Get('VATS.VATSPanelSystem');
+  if (!panelSystem) throw new Error("no VATS.VATSPanelSystem: deploy the VATS repo's scripts (tools/deploy.ps1)");
+  return panelSystem;
+}
+
+// Each part's chance (null for no slots) to the tab. False when the scripts are not there.
+async function feedPanel(parts) {
+  try {
+    const p = await panel();
+    await Promise.all(parts.map((x) => p.SetPart(x.part, x.chance === null || x.chance === undefined ? -1 : Math.round(x.chance))));
+    panelMissing = false;
+    return true;
+  } catch (err) {
+    panelSystem = null;
+    if (!panelMissing) say(`VATS tab: ${err?.message ?? err}`);
+    panelMissing = true;
+    return false;
+  }
+}
+
+const panelTest = () =>
+  step('Panel test values', async () => {
+    const values = [80, 75, 100, 20, 33, 7];
+    const p = await panel();
+    await Promise.all(PARTS.map((x, i) => p.SetPart(x.part, values[i])));
+    return 'sent 80, 75, 100, 20, 33 and 7: scan an NPC and switch to the VATS tab';
+  });
+
+const panelClear = () =>
+  step('Panel clear', async () => {
+    await (await panel()).ClearParts();
+    return 'every part back to --';
   });
 
 let exposureLabels = false;
@@ -836,8 +880,22 @@ async function enterVats() {
   }, 150);
 }
 
+let panelBusy = false;
+let panelAt = 0;
+function feedVatsPanel() {
+  if (!vats || panelBusy || performance.now() - panelAt < 1000) return;
+  panelBusy = true;
+  panelAt = performance.now();
+  const t = vats.target;
+  exposure(t)
+    .then(({ parts }) => (vats && vats.target === t ? feedPanel(parts) : false))
+    .catch(() => {})
+    .finally(() => (panelBusy = false));
+}
+
 async function tickVats() {
   if (!vats) return;
+  feedVatsPanel();
   if (!(await scanning())) {
     await leaveVats('the scanner was let go');
     return;
@@ -853,6 +911,8 @@ async function tickVats() {
       vats.names = await meshNames(look);
       vats.part = null;
       vats.lit = [];
+      panelAt = 0; // the new enemy's chances at the next tick
+      if (panelSystem) panelSystem.ClearParts().catch(() => {});
       say(`VATS: now on ${look.$type} "${(await look.GetDisplayName().catch(() => '')) || 'no name'}", ${vats.names.length} meshes`);
     }
   }
@@ -952,6 +1012,9 @@ ui.window({
       ui.button('SetZoom', () => chooseZoom('setZoom'), { variant: 'ghost' }),
       ui.button('SetFOV', () => chooseZoom('setFov'), { variant: 'ghost' }),
     ),
+    ui.heading('VATS tab (V13)'),
+    ui.text('Needs the VATS repo\'s scripts in the game. Exposure sends its numbers; right trigger VATS sends them about once a second.', { tone: 'dim' }),
+    ui.row(ui.button('Panel test values', panelTest), ui.button('Panel clear', panelClear, { variant: 'ghost' })),
     ui.heading('Outline (V2)'),
     ui.row(ui.button('List components', listComponents), ui.button('Outline', outline, { variant: 'ghost' }), ui.button('Clear', clearOutline, { variant: 'ghost' })),
     componentBox,

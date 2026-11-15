@@ -150,7 +150,27 @@ So the panel already has a three-tab layout, and for an NPC its third slot is al
 | Its body | For an NPC, hide the TwinTone body's own widgets in `twintoneContainer` and fill it with a list: each part's name and its hit chance |
 | The numbers | Kept by a small script class with a static setter (`VATSPanel.SetPart(name, chance)`), which the Node mod calls through `api` after each exposure read; the panel redraws from it |
 
-Unverified: everything in the right column (no script has run yet); whether the header's layout gives three tabs room at every resolution; whether the Switch Tab key reaches a third tab on an NPC. It needs redscript, so it lives in the VATS mod's scripts (EDGEhack's, or VATS's own), not in the spike app. Spike V13.
+Unverified: everything in the right column (no script has run yet); whether the header's layout gives three tabs room at every resolution. The game's own panel script (read from game 2.5's scripts, not kept) shows Switch Tab cycling through `GetAvailablesTabs()` in its order, and that vanilla never shows three tabs: Data, then Hacking **or** TwinTone. Spike V13.
+
+VATS is its own drop-in REDnode mod (the owner, 2026-11-14), needing REDnode only; its quickhacks are made with EDGEhack, which it does not need to run. Its repo is [Edgemodders/VATS](https://github.com/Edgemodders/VATS): the design in its `docs/design.md`, and V13's script in `scripts/VATS/Panel.reds` (compile-checked against 2.5's scripts alone and beside Codeware, no other installed mod touches the panel). The spike app 0.5.0 feeds it: **Panel test values**, **Exposure**, and right trigger VATS about once a second.
+
+### V13 test
+
+VATS's scripts in `r6/scripts/VATS` (the VATS repo's `tools/deploy.ps1`), VATS spike 0.5.0, REDnode 0.65.1, game 2.5.
+
+| Step | Do | Expect, and what to note |
+|---|---|---|
+| 1 | Start the game and load a save | No VATS line in `r6/logs/redscript_rCURRENT.log` errors (Claude reads it after) |
+| 2 | Scan an NPC who can be hacked | The panel's tabs read **Data, VATS, Hacking**. Note whether the header fits three, and how the bottom line under the open tab looks |
+| 3 | Press Switch Tab a few times | Data, VATS, Hacking, Data. Note anything odd |
+| 4 | Open the VATS tab | Six rows: HEAD, TORSO, LEFT ARM, RIGHT ARM, LEFT LEG, RIGHT LEG, each with `--` |
+| 5 | In F10, in VATS spike, press **Panel test values**; scan again and open VATS | 80%, 75%, 100%, 20%, 33%, 7% |
+| 6 | Switch on **Right trigger VATS**; hold the scanner, hold the right trigger on an enemy, open the VATS tab | The numbers change about once a second as you move. Move to another enemy: they go back to `--`, then fill again |
+| 7 | Scan an NPC who cannot be hacked (a civilian) | Data, VATS |
+| 8 | Scan a car that is not yours | The game's own TwinTone tab, with its own name and paint options |
+| 9 | Scan a device (a camera, a vending machine) | Data, and Hacking where the game has it; no VATS |
+
+Claude then reads `redscript_rCURRENT.log` and the `[vats-spike]` lines in `rednode-mods.log`.
 
 ## Picking a part
 
