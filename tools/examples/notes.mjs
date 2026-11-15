@@ -482,6 +482,18 @@ export const NOTES = {
     tryThis: ['Press Spawn the person, Arms crossed (gameplay), Make the device, then Play: device, actor data.', 'Then Medic 1, Make the device and Play again.'],
     preview: 'The preview\'s game has no workspot system, so the Play buttons log a failure here: the app is meant for the game.',
   },
+  'nodes-test': {
+    group: 'tests',
+    summary: 'Find out what the camera looks at in the world: buildings, street furniture, decals and lights, each with the sector and node it comes from; outline one, hide it for the session (#24\'s spike).',
+    teaches: ['world.nodeRegistry', 'world.pick', 'world.node', 'world.highlight', 'world.setVisible', 'kernel.bridge'],
+    how: [
+      'The world node registry records each sector as it loads, so press **Start** and then load a save. **State** says how many nodes it knows.',
+      '**Pick** casts a ray along the camera\'s view: every node whose box it crosses, nearest first, with its class, sector, index, and whether its box holds the point the collision ray hit. With the bridge permission, sectors and resources are named through REDbridge.',
+      '**Outline** and **Hide** act on the chosen node; switching the app off shows again what it hid.',
+    ],
+    tryThis: ['Press Start, load a save, aim at a wall, then Pick and Outline.'],
+    preview: 'The preview\'s game has no world nodes, so the buttons log a failure here: the app is meant for the game.',
+  },
   'list-mod': {
     group: 'mods',
     summary: 'A Node mod window built around a scrolling list: a live log that keeps its newest lines.',

@@ -97,6 +97,7 @@ void Update(uint64_t aFrame)
     detail::UpdateTrace();
     detail::UpdateInk(aFrame);
     detail::UpdatePins(aFrame);
+    detail::UpdateWorldNodes();
     detail::UpdateGamepad(aFrame);
 }
 
@@ -117,6 +118,7 @@ void Stop()
     detail::UninstallCompositor();
     detail::StopAudio();
     detail::StopTrace();
+    detail::StopWorldNodes();
     detail::StopOpus();
     detail::StopLink();
     detail::StopHost();

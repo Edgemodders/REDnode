@@ -50,6 +50,7 @@ mkdirSync(target, { recursive: true });
 
 cpSync(join(plugin, 'REDnode.dll'), join(target, 'REDnode.dll'));
 cpSync(join(plugin, 'Scripts'), join(target, 'Scripts'), { recursive: true });
+cpSync(join(repo, 'native', 'redswap', 'LICENSE-RedHotTools.txt'), join(target, 'LICENSE-RedHotTools.txt'));
 cpSync(join(plugin, 'host'), join(target, 'host'), { recursive: true });
 cpSync(redswap, swapTarget, { recursive: true });
 
@@ -84,6 +85,8 @@ writeFileSync(
     'In REDnode.dll:',
     '  RED4ext.SDK (MIT), https://github.com/WopsS/RED4ext.SDK',
     '  miniaudio 0.11.25 (public domain or MIT No Attribution), https://github.com/mackron/miniaudio',
+    '  The world node registry, ported from RED Hot Tools (MIT, Copyright (c) 2022 Pavel Siberx),',
+    '  https://github.com/psiberx/cp2077-red-hot-tools; its license is in LICENSE-RedHotTools.txt',
     '',
     'In red4ext/plugins/REDswap/REDswap.dll:',
     '  RED4ext.SDK (MIT), as above',

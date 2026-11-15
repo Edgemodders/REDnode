@@ -54,6 +54,7 @@ add_library(REDnode SHARED
   src/overlay/inkread.cpp
   src/overlay/pins.cpp
   src/overlay/gamepad.cpp
+  src/overlay/worldnodes.cpp
 )
 target_link_libraries(REDnode PRIVATE RED4ext::SDK d3d12 d3dcompiler)
 target_include_directories(REDnode SYSTEM PRIVATE ${miniaudio_SOURCE_DIR})
@@ -73,6 +74,8 @@ add_custom_command(
   COMMAND ${CMAKE_COMMAND} -E make_directory "${REDNODE_STAGE_DIR}/Scripts"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:REDnode>" "${REDNODE_STAGE_DIR}/"
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/scripts" "${REDNODE_STAGE_DIR}/Scripts"
+  # The world node registry (#24, worldnodes.cpp) is ported from RED Hot Tools (MIT): its license goes with the plugin.
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/redswap/LICENSE-RedHotTools.txt" "${REDNODE_STAGE_DIR}/"
 )
 
 # REDswap: swaps archives into the running game (docs/world.md, "H3"). Its own RED4ext

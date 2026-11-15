@@ -1732,6 +1732,49 @@ REDnode 0.66.0 (any since 0.58.0), Codeware, game 2.5, the Animation test copied
 
 What the answers decide is in "What A1 decides" above; A2, the call, is built from them.
 
+## World node registry (#24)
+
+Asked for by EDGEbuilder in [#24](https://github.com/Edgemodders/REDnode/issues/24) for its world inspector: hover or click anything the game placed and see what it is and which sector and node it comes from, outline it, hide it for the session, list what is streamed in near the camera, and have the world stream around EDGEbuilder's camera. Entities are covered by `world.near` and `world.files`; static nodes (most buildings, street furniture, decals, lights, foliage) are not: nothing in the game API names the node a click hit, and on 2.5 a sector keeps a node's path only as a hash. RED Hot Tools solves it with hooks on sector loading and node-instance setup (its `WorldNodeRegistry`, MIT) but has no 2.5 build.
+
+**Agreed with the owner on 2026-11-15:** a spike first, S24, with EDGEbuilder's first needs (`world.pick`, `world.highlight`, `world.setVisible`), then the rest after its test.
+
+| Phase | What |
+|---|---|
+| **S24 Spike** (built, REDnode 0.66.0) | RED Hot Tools' registry ported into the plugin (`native/src/overlay/worldnodes.cpp`), started on demand; `world.pick` in bounds mode with the static collision cast beside it, `world.node`, `world.highlight`, `world.setVisible`; the World nodes test app |
+| **N2** (after S24's test) | `world.nodes({ at, radius, kinds })`, `world.lookup(text)` (a node reference or hash), `world.observer(point)` (the world streaming around a point), `world.near({ at })`, MCP tools, entities in `highlight` and `setVisible`, the physics hit mapped to its node (RED Hot Tools' `GetPhysicsTraceObject`), and whether the hooks start with the game rather than on demand |
+
+### S24: built (REDnode 0.66.0)
+
+| Part | How |
+|---|---|
+| The registry | Hooks, through RED4ext and the address list's hashes (the same names in 2.31 and 2.5, all present in 2.5's list): `StreamingSector_OnReady` (a sector loaded: every node setup is copied, with its sector's path hash, its instance and node indices, its node's class, its place, orientation and scale, its global and proxy node ids and the interior flag), `StreamingSector_dtor` (forgotten), `WorldNodeInstance_Initialize` (a live instance tied to its setup, held by a weak handle) and `WorldNodeInstance_Attach` (a hidden node hidden again, on the game thread) |
+| Started on demand | `world.nodeRegistry()` and the first `world.pick` attach the hooks; sectors that load from then on are recorded, so a save loads after it. Players who never use it run none of it |
+| The 2.5 layout | RED4ext.SDK's 2.5 types grew `worldStreamingSector` by 8 bytes between 0x40 and 0xA0, so the node buffer RED Hot Tools reads at +0x40 might be at +0x48. The 2.5 exe's `StreamingSector_OnReady` (static reading, `dumpbin`) passes the sector plus 0x40 to a function and reads `localInplaceResource` at 0xA8, as the 2.5 SDK says, so +0x40 is likely. The plugin checks both at the first sectors (the setups' size a whole number of 0x90 setups, the node array within its capacity, each of the first 16 setups' node the one its index names) and logs the place that holds. The other layouts (the setup, the node instances, the render proxies) keep their sizes in the 2.5 SDK; their field offsets are RED Hot Tools' for 2.31, unverified on 2.5. Every read of game memory is in a `__try` function, so a wrong offset answers an error and counts a fault instead of crashing |
+| Ids | `"0x<sector path hash>:<instance index>"`: the same each time the sector loads, which is what EDGEbuilder stores (sector, index, hash), and what REDbridge reads in the same sector outside the game |
+| `world.pick` | Bounds mode: every recorded node near the ray whose box (the node's own box, from its `GetBoundingBox`, by its setup's scale, orientation and place) the ray crosses, nearest first, only attached instances unless `all`. Default ray: the camera's. With `physics` (default) the static collision is cast too (as world pins do), and each hit says whether its box holds that point. Boxes are worked out the first time a pick needs them and kept |
+| `world.highlight` | The game's outline (`RenderProxy_SetHighlightParams` and the scanning state) on the node instance's render proxies, read by class as RED Hot Tools does: meshes, decals, bent meshes, destruction, instanced meshes, foliage, terrain, lights, particles |
+| `world.setVisible` | `WorldNodeInstance_SetVisibility` and the render proxies' visibility, as RED Hot Tools does; the id is kept on a hidden list, so the node is hidden again when it streams back in |
+| Clean-up | The host keeps what each package hid or outlined; when it stops, its hidden nodes show again and its outlines go |
+| Licence | RED Hot Tools' MIT licence ships beside the plugin as `LICENSE-RedHotTools.txt`, and in THIRD-PARTY-NOTICES.txt |
+
+Checked outside the game: the plugin builds and its tests pass; the host's path (the calls, the per-package lists, the show-again when the package stops) in the mock game with a stand-in plugin (scratchpad `n24/`, 7 checks and the clean-up). The registry itself needs the game.
+
+### S24 test
+
+REDnode 0.66.0, game 2.5, REDbridge found (the Mod Manager's **Get REDbridge**, for names). Outdoors in the city, outside combat.
+
+1. In the Mod Manager switch on **World nodes test** and its **Allowed** (the `bridge` permission, for names). Press **Start**. Expected: "hooks sectorReady, sectorGone, nodeInitialize, nodeAttach".
+2. Load a save (any, in the city). Open the overlay and press **State**. Expected: "Buffer at 0x40" (or 0x48), thousands of nodes, live above 0, faults 0, bad 0, hide and outline yes.
+3. Close the overlay, aim V's crosshair at a building wall or a bench about 10 m away, press F10, and **Pick**. Expected: a list of nodes with their classes and sectors; one says HOLDS THE HIT; the physics hit about where you aimed.
+4. **Outline**. Expected: the chosen object outlined. Say what is outlined (the right object, a whole building block, nothing).
+5. **See-through, filled**, then **Outline off**. Expected: a filled outline seen through walls, then none.
+6. **Hide**. Expected: the object vanishes (its collision may stay). **Again by id**: it says HIDDEN.
+7. **Show all hidden**. Expected: it comes back.
+8. Pick a decal (graffiti or a poster) and a street lamp in turn, **Choose** the right line if it is not chosen, then **Outline** and **Hide** each. Say which work.
+9. **Hide** one object, then switch the app off in the Mod Manager. Expected: the object comes back.
+10. Switch it on again, **Start**, **20 picks (timing)**. Expected: a median and worst time in the game.
+11. Quit the game. Claude reads the plugin log's `World nodes:` lines (where each hook went, where the buffer was found) and the host log.
+
 ## World pins (#43): plan
 
 Drafted on 2026-11-10 from EDGEfab's request #43 and **agreed with the owner the same day**, every recommendation below. Then, in the order agreed the same day: #42, #39, #22, #24.

@@ -138,6 +138,118 @@ export interface EntityFiles {
   files: string[];
 }
 
+/**
+ * A node of the world (#24): something a sector placed, a building, a piece of street
+ * furniture, a decal, a light, as the world node registry recorded it when its sector loaded.
+ * Experimental (S24, the spike): the layouts it reads are RED Hot Tools' for game 2.31, checked
+ * at run time on 2.5.
+ */
+export interface WorldNode {
+  /** `"0x<sector path hash>:<instance index>"`: the same each time its sector loads. */
+  id: string;
+  /** The node's class, such as `"worldInstancedMeshNode"` or `"worldStaticDecalNode"`. */
+  kind: string;
+  /** Its live instance's class, or null when it is not streamed in. */
+  instanceKind: string | null;
+  /** The sector's path hash ("0x..."); REDbridge names it from its hash. */
+  sector: string;
+  /** Its place among the sector's node instances, and how many there are. */
+  instance: number;
+  instanceCount: number;
+  /** The node's index in the sector's node list, and how many nodes the sector has. */
+  index: number;
+  nodeCount: number;
+  /** Its global node id ("0x..."), when it has one. */
+  nodeId: string | null;
+  proxyId: string | null;
+  interior: boolean;
+  position: [number, number, number];
+  /** A quaternion: i, j, k, r. */
+  orientation: [number, number, number, number];
+  scale: [number, number, number];
+  /** Its box in the world, or null when the node gives none. */
+  bounds: { min: [number, number, number]; max: [number, number, number] } | null;
+  /** The resource it shows (a mesh, a material...), as a path hash, or null. */
+  resource: string | null;
+  /** Its mesh appearance, when it has one. */
+  appearance: string | null;
+  /** Streamed in now (it has a live instance). */
+  streamed: boolean;
+  attached: boolean | null;
+  visible: boolean | null;
+  /** Hidden for the session by {@link world.setVisible}. */
+  hidden: boolean;
+  /** For {@link world.pick}: metres along the ray to where it enters the node's box. */
+  distance?: number;
+  /** For {@link world.pick} with a physics hit: whether the node's box holds that point. */
+  holdsHit?: boolean;
+}
+
+/** Options for {@link world.pick}. */
+export interface PickOptions {
+  /** Where the ray starts. Default: the camera. */
+  from?: WorldPoint;
+  /** Which way it goes. Default: where the camera looks. */
+  dir?: WorldPoint;
+  /** How far, in metres. Default 50. */
+  max?: number;
+  /** How many hits to answer, nearest first. Default 20. */
+  limit?: number;
+  /** Only these node classes, such as `["worldMeshNode", "worldInstancedMeshNode"]`. */
+  kinds?: string[];
+  /** Also nodes not streamed in now. Default `false`. */
+  all?: boolean;
+  /** Also cast against the static collision, so each hit says whether its box holds that point. Default `true`. */
+  physics?: boolean;
+}
+
+/** What {@link world.pick} answers. */
+export interface PickResult {
+  /** Every node whose box the ray crosses, nearest first. */
+  hits: WorldNode[];
+  /** How many crossed it, before `limit`. */
+  found: number;
+  /** Where the static collision cast hit, or null. */
+  physicsHit: { point: [number, number, number]; distance: number } | null;
+  /** How many nodes near the ray were looked at, and how long it took in the game. */
+  looked: number;
+  ms: number;
+}
+
+/** What {@link world.nodeRegistry} answers. */
+export interface NodeRegistryState {
+  /** The hooks attached. */
+  attached: string[];
+  /** Where the sector's node buffer was found ("0x40" or "0x48"), or null before the first sector. */
+  offset: string | null;
+  /** Sectors recorded, and those whose buffer did not check out. */
+  sectors: number;
+  badSectors: number;
+  /** Node setups recorded, and how many have a live instance now. */
+  setups: number;
+  instances: number;
+  /** Nodes hidden for the session. */
+  hidden: number;
+  /** Reads that faulted (a wrong offset): they answer errors, not crashes. */
+  faults: number;
+  /** Time spent recording sectors so far, in milliseconds. */
+  sectorMs: number;
+  canHide: boolean;
+  canHighlight: boolean;
+}
+
+/** How {@link world.highlight} outlines a node. Indices are the game's highlight colours. */
+export interface NodeHighlight {
+  /** The outline's colour index. Default 1. */
+  outline?: number;
+  /** The fill's colour index. Default 0 (none). */
+  fill?: number;
+  /** Seen through walls. Default `false`. */
+  seeThrough?: boolean;
+  /** Default 1. */
+  opacity?: number;
+}
+
 /** One of this package's spawns, as {@link world.spawned} lists them. */
 /**
  * How a pin looks (#43). Every field is optional; a pin starts from the HUD style, then from
@@ -671,6 +783,67 @@ export const world = {
       ...(options.uses ? { hashes: options.uses } : {}),
     })) as { entities: (Omit<NearEntity, "id"> & { id: string | null })[] };
     return r.entities.map((e) => ({ ...e, id: { hash: String(e.id ?? "0") } }));
+  },
+
+  /**
+   * Starts the world node registry (#24) if it is not running, and answers its state. Its hooks
+   * record each sector as it loads, so after the first start, load a save (or travel) for the
+   * sectors around V to be known. Experimental.
+   */
+  async nodeRegistry(): Promise<NodeRegistryState> {
+    await invoke("nodes.start", {});
+    return (await invoke("nodes.state", {})) as NodeRegistryState;
+  },
+
+  /**
+   * The world's nodes along a ray, nearest first: what the camera (or any ray) looks at,
+   * buildings, decals, lights and objects without collision included, each with the sector and
+   * node it comes from. Experimental (#24): starts the node registry on first use.
+   *
+   * @example
+   * ```ts
+   * const { hits } = await world.pick({ max: 30 });
+   * console.log(hits[0]?.kind, hits[0]?.id);
+   * ```
+   */
+  async pick(options: PickOptions = {}): Promise<PickResult> {
+    await invoke("nodes.start", {});
+    const v = (p?: WorldPoint) => (p ? [p.x, p.y, p.z] : undefined);
+    return (await invoke("nodes.pick", {
+      ...(options.from ? { from: v(options.from) } : {}),
+      ...(options.dir ? { dir: v(options.dir) } : {}),
+      max: options.max ?? 50,
+      limit: options.limit ?? 20,
+      ...(options.kinds ? { kinds: options.kinds } : {}),
+      all: !!options.all,
+      physics: options.physics !== false,
+    })) as PickResult;
+  },
+
+  /** One node again by its id, or null when its sector is not loaded. Experimental (#24). */
+  async node(id: string): Promise<WorldNode | null> {
+    return (await invoke("nodes.get", { id })) as WorldNode | null;
+  },
+
+  /**
+   * Outlines a node with the game's highlight, or takes it off with `null`. Cleared when your
+   * package stops. Experimental (#24): meshes, decals, foliage and terrain; answers `false`
+   * (with the reason as a warning) for kinds without a render proxy REDnode knows.
+   */
+  async highlight(id: string, style: NodeHighlight | null = {}): Promise<boolean> {
+    const r = (await invoke("nodes.highlight", { id, on: style !== null, ...(style ?? {}) })) as { done: boolean; why?: string };
+    if (!r.done && r.why) console.warn(`world.highlight ${id}: ${r.why}`);
+    return r.done;
+  },
+
+  /**
+   * Hides a node for the session, or shows it again. A hidden node that streams out and back in
+   * is hidden again. Everything your package hid shows again when it stops. Experimental (#24).
+   */
+  async setVisible(id: string, visible: boolean): Promise<boolean> {
+    const r = (await invoke("nodes.visible", { id, visible })) as { done: boolean; why?: string };
+    if (!r.done && r.why) console.warn(`world.setVisible ${id}: ${r.why}`);
+    return r.done;
   },
 
   /** The files an entity uses: its template and every resource its components name, as path hashes. Needs Codeware. */

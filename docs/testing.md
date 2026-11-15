@@ -1218,6 +1218,14 @@ REDagent needs its Anthropic key, as before.
 
 The 0.58.0 release ships EDGEmat 0.3.1 from npm, which ignores the shared REDbridge and starts its own. That combination was checked outside the game on 2026-11-05 with REDnode's variables set (scratchpad `e1/check-pin.cjs`, E1's 21 checks: tools listed, reads answered, ask flags). Raise the pin in `packages/overlay/package.json` once EDGEmat publishes a newer version.
 
+## World node registry: S24 (#24)
+
+REDnode's world node registry, ported from RED Hot Tools (REDnode 0.66.0): which sector and node a world object comes from, `world.pick`, `world.highlight`, `world.setVisible`, with the World nodes test app. Steps and what each should show: [docs/world.md, "S24 test"](world.md#s24-test).
+
+| Run | Result |
+|---|---|
+| Dev host, mock game, 2026-11-15, by Claude | The host's path passes (scratchpad `n24/`: the calls, the per-package lists, the show-again and outline clean-up when the package stops); the registry needs the game |
+
 ## Animations on a spawned character: A1 (#39)
 
 The Animation test app (`packages/overlay/apps/anim-test`, through `api` and `world` only) plays a workspot on a person REDnode spawned: the prologue's Trauma Team medic idles and a gameplay pose as the control. Steps and what each should show: [docs/world.md, "A1 test"](world.md#a1-test).

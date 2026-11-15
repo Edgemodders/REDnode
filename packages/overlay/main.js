@@ -1032,6 +1032,7 @@ function checkSolo() {
   checkTweaks();
   checkSpawns();
   for (const id of [...quickhackOwners]) if (!packageRunning(id)) releaseQuickhacks(id, 'the package stopped');
+  for (const id of [...nodeUsers.keys()]) if (!packageRunning(id)) worldNodesGone(id, 'the package stopped');
   checkSounds();
   checkInk();
   checkPins();
@@ -1905,6 +1906,9 @@ async function packageCallNow(id, method, params) {
   }
   if (method === 'archives.soundState') return bridgeCall('opus.state', { sounds: Array.isArray(params?.sounds) ? params.sounds : [] });
   if (method === 'world.scene') return readSceneFile(id ? apps.get(id) : null, params?.file);
+  // #24: the world node registry. Hidden and outlined nodes are kept per package, shown again and
+  // cleared when it stops (worldNodesGone).
+  if (typeof method === 'string' && method.startsWith('nodes.')) return nodesCall(id, method, params);
   // World pins (#43): drawn by the overlay, so they change nothing in the game.
   if (method === 'pins.add') return pinsHost.add(id ?? null, params);
   if (method === 'pins.remove') return pinsHost.remove(id ?? null, params?.id);
@@ -1934,6 +1938,38 @@ async function packageCallNow(id, method, params) {
   const result = await bridgeCall(method, params);
   if (method === 'rtti.call' && params?.class === 'REDnodeWorld') noteWorldCall(id, params, result);
   return result;
+}
+
+// #24: the nodes each package hid or outlined, by id ("0x<sector>:<instance>").
+const nodeUsers = new Map(); // package id -> { hidden: Set, outlined: Set }
+let nodesStarted = false;
+
+async function nodesCall(id, method, params) {
+  if (!['nodes.start', 'nodes.state', 'nodes.pick', 'nodes.get', 'nodes.highlight', 'nodes.visible'].includes(method)) {
+    throw new Error(`Unknown world node call ${method}`);
+  }
+  const result = await bridgeCall(method, params ?? {});
+  if (id && (method === 'nodes.visible' || method === 'nodes.highlight') && params?.id) {
+    const u = nodeUsers.get(id) ?? { hidden: new Set(), outlined: new Set() };
+    nodeUsers.set(id, u);
+    if (method === 'nodes.visible') (params.visible ? u.hidden.delete(params.id) : u.hidden.add(params.id));
+    else (params.on === false ? u.outlined.delete(params.id) : u.outlined.add(params.id));
+  }
+  if (method === 'nodes.start' && !nodesStarted) {
+    nodesStarted = true;
+    log(`World nodes: registry started by ${id ?? 'an assistant'}`);
+  }
+  return result;
+}
+
+// A package stopped: the nodes it hid show again, its outlines go.
+function worldNodesGone(id, why) {
+  const u = nodeUsers.get(id);
+  nodeUsers.delete(id);
+  if (!u || !connected || (!u.hidden.size && !u.outlined.size)) return;
+  for (const node of u.hidden) bridgeCall('nodes.visible', { id: node, visible: true }).catch(() => {});
+  for (const node of u.outlined) bridgeCall('nodes.highlight', { id: node, on: false }).catch(() => {});
+  log(`World nodes of ${id}: ${u.hidden.size} shown again, ${u.outlined.size} outline(s) cleared (${why})`);
 }
 
 // Packages that defined quickhack functions (#42), so the host can release them when they stop.
@@ -5779,6 +5815,7 @@ app.whenReady().then(() => {
       dropKeyAsks(id);
       removeSpawns(id, 'the mod stopped');
       releaseQuickhacks(id, 'the mod stopped');
+      worldNodesGone(id, 'the mod stopped');
       stopSounds(id);
       clearInk(id);
       pinsHost.gone(id, 'the mod stopped');

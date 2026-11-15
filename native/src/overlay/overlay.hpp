@@ -327,6 +327,13 @@ std::string InkRead(const std::string& aMethod, const json::Value& aParams, std:
 void ClearInkRead(); // game thread: forget the widget ids (the game is stopping)
 // ink.cpp: the ink driver (I2a): ink.apply, ink.clear and ink.state, on the game thread.
 bool IsInkMethod(const std::string& aMethod);
+// worldnodes.cpp: the world node registry (#24), ported from RED Hot Tools: nodes.start, nodes.state,
+// nodes.pick, nodes.get, nodes.highlight, nodes.visible, on the game thread. Its hooks attach at
+// nodes.start and record the sectors that load from then on.
+bool IsWorldNodesMethod(const std::string& aMethod);
+std::string WorldNodes(const std::string& aMethod, const json::Value& aParams, std::string& aError);
+void UpdateWorldNodes(); // game thread, each frame: hides again a hidden node that streamed in
+void StopWorldNodes();
 std::string Ink(const std::string& aMethod, const json::Value& aParams, std::string& aError);
 void UpdateInk(uint64_t aFrame); // game thread, each frame: builds again what the game removed
 void InkHostGone();             // any thread: the host left, and its packages' widgets go with it
