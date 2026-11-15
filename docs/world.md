@@ -1715,6 +1715,24 @@ The workspots offered, read with REDbridge from the game's files (2.5): the prol
 
 Checked in the mock game only for its start and window (the mock does not answer the workspot system).
 
+### A1 test: results
+
+Run on 2026-11-15 by the owner on the dev PC, REDnode 0.66.0, game 2.5, with Animation test 0.1.0 to 0.3.0 (fixed between runs).
+
+| Round | Found |
+|---|---|
+| 0.1.0 | Every play refused before the game saw it: the workspot system takes only game objects (`handle:gameObject`) as its device, master and reference, and REDnode's bare entity (the box) is an `entEntity`. State printed functions: an object's fields are read with `$get` |
+| 0.2.0 | The person carries the workspot component (given at spawn, as `world.spawn`'s `components`) and is their own device. **Every way plays**: `PlayInDeviceSimple(person, person, false, "workspot", ...)` at the workspot's place or where they stand, and `PlayNpcInWorkspot(person, person, person, "workspot", ...)`, on three Trauma Team records, with or without the hold command. The gameplay workspot (arms crossed): the medic takes a couple of steps and crosses his arms, looping; its idle is loaded on the rig (25.5 s). **A quest workspot plays outside its scene** (EDGEquest's question): medic 1, medic 2 and soldier 1 each show a brief T pose, then an armed stance with a rifle the person does not carry (the workspot spawns its own props, `ItemPolicy_SpawnItemOnIdleChange`), then the person stands normally again |
+| 0.3.0 | The quest workspot lasts 2.4 s from the call (`IsActorInWorkspot` false 1.6 s after the 0.8 s check), every time. Keeping `q001_00c_trauma_arrives_male_average.anims` loaded through Codeware's resource depot (loaded in 0.1 s) did not take the T pose away, on the same person or a fresh one: it is not the clips loading. Playing again each time it ends ("Keep it looping") shows a hitch and the T pose at every start |
+
+Read from the files with REDbridge: the quest medic workspot is one sequence (no loop, `loopInfinitely` false) holding the idle for a 6 s pause clip, and lists its clips under `finalAnimsets[0].animations.cinematics`, with no workspot rig; the gameplay one lists four animation sets and loops. Why the quest one lasts 2.4 s rather than 6 s, and where its T pose comes from, are open (unverified leads: the clips sit in the `cinematics` slot that scenes drive, and the workspot enters the clip with no transition animation, where the gameplay one walks in).
+
+**What A1 decides:**
+
+- A workspot plays on a person REDnode spawned when the person carries the workspot component and is the device. No separate device entity is needed (and a bare entity cannot be one).
+- Gameplay workspots work as they are: they loop and enter smoothly. `world.useWorkspot` can ship for them.
+- A quest workspot plays outside its scene, but once, briefly, with a T pose at its start, and it does not loop cleanly by playing it again. A quest's own clip shown well (looping, no T pose) needs more: most likely a workspot of REDnode's own around the clip (a looping sequence, the clips in the gameplay slot, an entry), written with REDbridge and swapped in with REDswap, or kept in a package's archive. That is a second spike, to agree with the owner.
+
 ### A1 test
 
 REDnode 0.66.0 (any since 0.58.0), Codeware, game 2.5, the Animation test copied into the apps folder. Stand V somewhere open and flat, outside combat.

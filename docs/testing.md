@@ -1233,6 +1233,7 @@ The Animation test app (`packages/overlay/apps/anim-test`, through `api` and `wo
 | Run | Result |
 |---|---|
 | Dev host, mock game, 2026-11-15, by Claude | Starts and builds its window; the workspot calls need the game |
+| In the game, 2026-11-15, by the owner, dev PC, REDnode 0.66.0, Animation test 0.1.0 to 0.3.0 | **Answered**: a workspot plays when the spawned person carries it and is the device (0.1.0's box, a bare entity, was refused); gameplay workspots loop and enter smoothly; the prologue's quest medic and soldier workspots play outside their scene but once (2.4 s), with a T pose at each start that keeping their clips loaded does not remove, and playing them again shows a hitch. Details in [docs/world.md, "A1 test: results"](world.md#a1-test-results) |
 
 ## Calls from mods (#22)
 
