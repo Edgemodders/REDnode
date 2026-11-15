@@ -22,6 +22,7 @@ How to keep it:
 
 **Changed**
 
+- EDGEmat's tools for in-game assistants now share REDnode's own REDbridge (https://github.com/Edgemodders/REDnode/issues/40), so one REDbridge runs while you play: REDnode carries EDGEmat 0.3.2 and EDGEhack 0.1.2's servers. `"edgematBridge": "own"` in the host's settings gives EDGEmat its own again.
 - The launcher's "more in the Mod Manager" line is gone: **Open**, beside the new filter, says in its tooltip how many more packages and new ones the Mod Manager has.
 - A package's name in the launcher is a link: a click switches it on if it is off, shows the windows you closed, or brings it from another space into this one.
 
