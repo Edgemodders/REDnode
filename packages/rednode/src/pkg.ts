@@ -80,6 +80,13 @@ export interface AskSharedOptions {
    * Once the player allows, delete the package's own copy.
    */
   offer?: string;
+  /**
+   * Ask the player for a new key even when one is saved, such as when the service refused the
+   * saved one or the player pressed a "change the key" button (REDnode 0.65.2). The window
+   * shows the saved key's last 4 characters and takes a new one; the new key replaces it for
+   * every EDGE tool on this PC. Denied, the saved key stays and the call answers `null`.
+   */
+  replace?: boolean;
 }
 
 /**

@@ -61,7 +61,7 @@ A REDnode package reads a shared key only when its manifest lists it and the pla
 | Call | Gives |
 |---|---|
 | `secrets.shared(service)` | The key, or `null` until the player allows the package, or while none is set. Never asks |
-| `secrets.askShared(service, { reason, offer })` | The key at once when the package is allowed and the key is set. Otherwise REDnode's own **Key request** window asks the player, and the call waits for the answer: the key, or `null` when the player denies, does not answer within 10 minutes, or the package stops |
+| `secrets.askShared(service, { reason, offer, replace })` | The key at once when the package is allowed and the key is set, unless `replace: true` (REDnode 0.65.3): then the window asks for a new key in place of the saved one (its last 4 shown), and Deny keeps the saved one. Otherwise REDnode's own **Key request** window asks the player, and the call waits for the answer: the key, or `null` when the player denies, does not answer within 10 minutes, or the package stops |
 
 The Key request window names the package and the service, shows `reason`, and:
 

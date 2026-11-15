@@ -30,7 +30,9 @@ function show(r) {
   $('reason').hidden = !r.reason;
   const what = $('what');
   what.replaceChildren();
-  if (r.offer && r.needsKey) {
+  if (r.replace) {
+    what.append(`Paste a new ${r.serviceName} key to replace your saved one (`, last4(r.saved ?? '????'), '). Every EDGE tool on this PC then uses the new key. Deny keeps the saved one.');
+  } else if (r.offer && r.needsKey) {
     what.append(`${r.package} kept its own ${r.serviceName} key (`, last4(r.offer.last4), '). Allow moves it to the shared store, so every EDGE tool on this PC uses it. Or paste another key below.');
   } else if (r.needsKey) {
     what.append(`No ${r.serviceName} key is saved yet. Paste yours: it is kept encrypted for your Windows user and shared with every EDGE tool on this PC.`);
@@ -42,7 +44,7 @@ function show(r) {
   $('key').value = '';
   if (r.prefix) $('key').setAttribute('title', `${r.serviceName} keys start with ${r.prefix}`);
   else $('key').removeAttribute('title');
-  $('allow').textContent = r.offer && r.needsKey ? 'Move and allow' : 'Allow';
+  $('allow').textContent = r.replace ? 'Replace' : r.offer && r.needsKey ? 'Move and allow' : 'Allow';
   setBusy(false);
 }
 

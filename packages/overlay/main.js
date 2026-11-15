@@ -3954,7 +3954,9 @@ async function sharedKey(id, op, service, options) {
   const offer = typeof o.offer === 'string' && o.offer.trim() ? o.offer.trim() : null;
   if (offer && k.checkKey(service, offer)) throw new Error(`The offered key does not look right: ${k.checkKey(service, offer)}`);
   const has = await k.promises.hasKey(service);
-  if (isGranted(id, permission) && has) return read();
+  // replace: a new key for a saved one, asked for even when the package may read it (0.65.2).
+  const replace = o.replace === true && has;
+  if (isGranted(id, permission) && has && !replace) return read();
   const saved = has ? (await k.promises.keyInfo(service)).last4 ?? null : null;
   // One request per package and service: a second ask waits for the same answer.
   const same = keyAsks.find((a) => a.id === id && a.service === service);
@@ -3963,11 +3965,11 @@ async function sharedKey(id, op, service, options) {
     const a = {
       aid: nextAid++, id, name: entry.manifest.name, service, serviceName: serviceName(service),
       reason: typeof o.reason === 'string' ? o.reason.slice(0, 300) : '',
-      offer, needsKey: !has, saved, granted: isGranted(id, permission), resolve, also: [],
+      offer: replace ? null : offer, needsKey: !has || replace, replace, saved, granted: isGranted(id, permission), resolve, also: [],
     };
     a.timer = setTimeout(() => finishAsk(a, null, 'no answer in 10 minutes'), ASK_MS);
     keyAsks.push(a);
-    log(`Keys: ${a.name} asks for the ${service} key${a.needsKey ? ' (not set)' : ''}${offer ? ', offering its own' : ''}`);
+    log(`Keys: ${a.name} asks for the ${service} key${replace ? ' (to replace the saved one)' : a.needsKey ? ' (not set)' : ''}${a.offer ? ', offering its own' : ''}`);
     showKeyAsk();
   });
 }
@@ -3977,7 +3979,7 @@ function keyAskView(a) {
   if (!a) return null;
   return {
     aid: a.aid, package: a.name, service: a.service, serviceName: a.serviceName, reason: a.reason,
-    needsKey: a.needsKey, saved: a.saved, granted: a.granted, offer: a.offer ? { last4: a.offer.slice(-4) } : null,
+    needsKey: a.needsKey, replace: !!a.replace, saved: a.saved, granted: a.granted, offer: a.offer ? { last4: a.offer.slice(-4) } : null,
     prefix: { anthropic: 'sk-ant-', openai: 'sk-' }[a.service] ?? null, waiting: keyAsks.length - 1,
   };
 }
