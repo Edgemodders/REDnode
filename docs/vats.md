@@ -156,7 +156,7 @@ VATS is its own drop-in REDnode mod (the owner, 2026-11-14), needing REDnode onl
 
 ### V13 test
 
-VATS's scripts in `r6/scripts/VATS` (the VATS repo's `tools/deploy.ps1`), VATS spike 0.5.0, REDnode 0.65.1, game 2.5.
+VATS's scripts in `r6/scripts/VATS` (the VATS repo's `tools/deploy.ps1`), VATS spike 0.5.1 (0.5.0 with **VATS fill**: the highlight's `fillIndex` beside its outline), REDnode 0.65.1, game 2.5.
 
 | Step | Do | Expect, and what to note |
 |---|---|---|
@@ -166,6 +166,7 @@ VATS's scripts in `r6/scripts/VATS` (the VATS repo's `tools/deploy.ps1`), VATS s
 | 4 | Open the VATS tab | Six rows: HEAD, TORSO, LEFT ARM, RIGHT ARM, LEFT LEG, RIGHT LEG, each with `--` |
 | 5 | In F10, in VATS spike, press **Panel test values**; scan again and open VATS | 80%, 75%, 100%, 20%, 33%, 7% |
 | 6 | Switch on **Right trigger VATS**; hold the scanner, hold the right trigger on an enemy, open the VATS tab | The numbers change about once a second as you move. Move to another enemy: they go back to `--`, then fill again |
+| 6b | The outline can be faint (the owner, 2026-11-14): in F10 move **VATS fill** (0 is none) through 1 to 7, holding the right trigger on an enemy after each | Note which numbers fill the part, with what colour or pattern, and which makes the part stand out best together with the outline |
 | 7 | Scan an NPC who cannot be hacked (a civilian) | Data, VATS |
 | 8 | Scan a car that is not yours | The game's own TwinTone tab, with its own name and paint options |
 | 9 | Scan a device (a camera, a vending machine) | Data, and Hacking where the game has it; no VATS |

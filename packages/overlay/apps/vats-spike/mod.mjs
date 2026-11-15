@@ -832,13 +832,17 @@ function chooseZoom(way) {
 }
 const zoomChoice = ui.text(`VATS zooms by ${ZOOM_WAYS[zoomWay]}`, { tone: 'dim' });
 let vatsColour = 1; // the outline colour for VATS's part: green is to find (round 2 saw blue, white, red in 2, 5, 3)
+// The highlight's fill (entRenderHighlightEvent's fillIndex) beside its outline, to make the part
+// stand out when the outline is faint (the owner, 2026-11-14). 0 is no fill; which number gives
+// which fill (colour, pattern) is for the test.
+let vatsFill = 0;
 let vats = null; // { target, saved, part, lit: [names], timer }
 let vatsChain = Promise.resolve();
 const vatsStep = (fn) => (vatsChain = vatsChain.then(fn).catch((err) => say(`VATS FAILED: ${err?.message ?? err}`)));
 
 async function light(t, names, on) {
   await Promise.all(names.map(async (name) => {
-    const evt = await api.$new('entRenderHighlightEvent', { outlineIndex: on ? vatsColour : 0, fillIndex: 0, seeThroughWalls: false, opacity: on ? 1 : 0, componentName: name });
+    const evt = await api.$new('entRenderHighlightEvent', { outlineIndex: on ? vatsColour : 0, fillIndex: on ? vatsFill : 0, seeThroughWalls: false, opacity: on ? 1 : 0, componentName: name });
     await t.QueueEvent(evt);
   }));
 }
@@ -1005,6 +1009,7 @@ ui.window({
     ui.text('With this on: hold the scanner, aim at an enemy, hold the right trigger. The view frames them and the part under the crosshair is outlined; let go of the trigger (or the scanner) to end it.', { tone: 'dim' }),
     ui.toggle('Right trigger VATS', (on) => rightTriggerMode(on)),
     ui.slider('VATS colour', (v) => (vatsColour = Math.round(v)), { min: 1, max: 7, step: 1, value: vatsColour }),
+    ui.slider('VATS fill (0 none)', (v) => (vatsFill = Math.round(v)), { min: 0, max: 7, step: 1, value: vatsFill }),
     zoomChoice,
     ui.row(
       ui.button('Zoom override', () => chooseZoom('zoomOverride'), { variant: 'ghost' }),
