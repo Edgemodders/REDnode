@@ -1673,7 +1673,7 @@ Also seen: the test's camera entity, spawned without the option, left the world 
 
 ## Animations on a spawned character (#39): plan
 
-Proposed on 2026-11-04, to agree with the owner. EDGEquest's request (not urgent: its Q8 H4 needs it) asks to play a game animation or a workspot on a character REDnode spawned beside V, such as the prologue's Trauma Team medics, and to tell started, finished or failed.
+Proposed on 2026-11-04; **agreed with the owner on 2026-11-15**, A1 first, the rest after its test. EDGEquest's request (not urgent: its Q8 H4 needs it) asks to play a game animation or a workspot on a character REDnode spawned beside V, such as the prologue's Trauma Team medics, and to tell started, finished or failed.
 
 **What the game offers** (read on 2026-11-04 from `gameapi/2.5/rtti.json` and, through REDbridge, the game's files):
 
@@ -1697,6 +1697,40 @@ Proposed on 2026-11-04, to agree with the owner. EDGEquest's request (not urgent
 **What A1 decides:** whether a quest's workspot plays outside its scene on an ordinary spawned NPC (EDGEquest's first question), whether the device needs more than the component (a sync slot, a navmesh), and what a failure looks like (wrong rig, missing set), for the answer `started` / `finished` / `failed` with a reason.
 
 **A2, the call** (after A1, shaped by it): `world.useWorkspot(id, { workspot, entry? })` and `world.stopWorkspot(id)` in the package, the device made and removed by REDnode, its state on `world.spawned()`; `world.playAnimation(id, { anim, set?, loop? })` only if A1 finds a way to play an animation that no workspot holds (else it is a workspot's `SendJumpToAnimEnt`, or a workspot REDnode makes for it: later, unverified); the MCP tool `world_animate` (asks first, as `world_spawn` does).
+
+### A1: built (Animation test 0.1.0)
+
+The **Animation test** app (`packages/overlay/apps/anim-test`), through `api` and `world` only, so no REDnode part changed for it; it runs on REDnode 0.58.0 or later with Codeware. Not in the player zip. Each button is one step and logs what it called, the answer and the time:
+
+| Step | Calls |
+|---|---|
+| 1 Person | `world.spawn({ record, npc: { hold, friendly: true } })`, 3 m in front of V, facing V. The record defaults to `Character.trauma_team_paramedic`, with two other medics as buttons; **Hold still** gives the hold command (off by default, since a hold is an AI command and a workspot may need the AI free) |
+| 2 Device | `world.spawn({ mesh: <a cardboard box>, components: [workWorkspotResourceComponent "workspot" naming the workspot] })` at the person's place; `FindComponentByName("workspot")` to see the component took |
+| 3 Play | `PlayInDeviceSimple(box, person, false, "workspot", "", "", 0.3, PlayAtResourcePosition, null)` (the component as the actor's data, as other mods do), the same with it as the device's data, or `PlayNpcInWorkspot(person, V, box, "workspot", "", 0.3, "")`; then `IsActorInWorkspot` after 0.6 s |
+| 4 Jump | `SendJumpToAnimEnt(person, anim, false)`, and `GetAnimationDuration(anim)` on the person's animation controller (above 0 when the set is loaded on that rig) |
+| 5 State | `IsActorInWorkspot`, `IsWorkspotEnabled`, `GetExtendedInfo` (active, entering, exiting, playing a sync animation, in a reaction, in motion) |
+| 6 Stop | `SendFastExitSignal` (slow exit if it fails) or `StopNpcInWorkspot`, then **Remove all** |
+
+The workspots offered, read with REDbridge from the game's files (2.5): the prologue's `q001_00c_trauma_arrives___med_01_idle__01.workspot`, `___med_02_idle__01` and `___soldier_01_idle__01`, each looping one animation (`q001_00c_trauma_arrives___med_1_idle__01`, `___med_2_idle__01`, `___soldier_1_idle__01`), and as a control a gameplay workspot, `base\workspots\common\ground\generic__stand_ground_arms_crossed__stand_around__02.workspot`, whose idle is `stand__2h_on_sides__01`. Any other `.workspot` path can be typed in.
+
+Checked in the mock game only for its start and window (the mock does not answer the workspot system).
+
+### A1 test
+
+REDnode 0.66.0 (any since 0.58.0), Codeware, game 2.5, the Animation test copied into the apps folder. Stand V somewhere open and flat, outside combat.
+
+1. In the Mod Manager switch on **Animation test** (it asks for no permission). Its requirements line says OK for Codeware and the world API.
+2. **Spawn the person** (the paramedic, Hold still off). Expected: a Trauma Team medic 3 m ahead, facing V; the log has the appearance (and the gender if the game answers it).
+3. Press **Arms crossed (gameplay)**, **Make the device**, then **Play: device, actor data**. Expected: a box at the medic's feet; the medic walks or slides into the workspot and stands with arms at the sides or crossed. Say what you see. The log's "in a workspot" should read true.
+4. **State**. Expected: in a workspot true, and its flags. **Jump to it** (stand__2h_on_sides__01), then **Its length**: a length above 0.
+5. **Fast exit**, then **State**. Expected: the medic leaves the pose; in a workspot false.
+6. Press **Medic 1**, **Make the device** (it replaces the box), **Play: device, actor data**. Expected, the question #39 asks: does the quest's medic idle play on this spawned medic outside its scene? Say what you see (the loop, a T-pose, nothing). Then **State**, **Its length** and **Jump to it**.
+7. If step 6 did nothing: **Stop**, then **Play: device, device data**, **State**; then **Stop**, **Play: NPC way**, **State**. Say which, if any, played.
+8. Switch **Hold still** on, **Spawn the person** again, **Make the device**, and the way that worked. Expected: whether the hold command stops the workspot.
+9. Press **Medic 2** and **Soldier 1** in turn, each with **Make the device** and the way that worked. Expected: each plays its own loop (or the same failure).
+10. **Remove all**, then switch the app off. Expected: the medic and the box gone.
+
+What the answers decide is in "What A1 decides" above; A2, the call, is built from them.
 
 ## World pins (#43): plan
 

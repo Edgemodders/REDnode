@@ -470,6 +470,18 @@ export const NOTES = {
     tryThis: ['Press Scan, then Re-attach. Type Legs in the slots field and press Off and on.', 'Press Spawn, then Mesh off and on.'],
     preview: 'Nothing changes on screen here: the preview\'s V wears a jacket, trousers and boots, and looks at a vendor, so the log shows the calls each button makes.',
   },
+  'anim-test': {
+    group: 'tests',
+    summary: 'Play a game animation on a person spawned beside V: a workspot device made on the spot, the prologue\'s Trauma Team medic idles or a gameplay pose, a jump to an animation by name, the workspot\'s state, and a stop (#39\'s spike).',
+    teaches: ['world.spawn', 'api.$new', 'api.GameInstance', 'WorkspotGameSystem', 'world.entity', 'ui.list'],
+    how: [
+      'A workspot plays "in a device": an entity carrying a `workWorkspotResourceComponent` that names the `.workspot` file. **Make the device** spawns a box with that component at the person\'s place (`api.$new` and `world.spawn`\'s `components`).',
+      '**Play** puts the person in it through `WorkspotGameSystem.PlayInDeviceSimple` (the component named as the actor\'s data or the device\'s) or `PlayNpcInWorkspot`. **Jump to it** asks for one animation by name; **Its length** asks the person\'s animation controller whether that animation is loaded on their rig.',
+      'Each step logs the call, its answer and its time, so the log says which way works for a quest\'s animation outside its scene.',
+    ],
+    tryThis: ['Press Spawn the person, Arms crossed (gameplay), Make the device, then Play: device, actor data.', 'Then Medic 1, Make the device and Play again.'],
+    preview: 'The preview\'s game has no workspot system, so the Play buttons log a failure here: the app is meant for the game.',
+  },
   'list-mod': {
     group: 'mods',
     summary: 'A Node mod window built around a scrolling list: a live log that keeps its newest lines.',

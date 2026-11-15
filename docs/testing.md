@@ -1218,6 +1218,14 @@ REDagent needs its Anthropic key, as before.
 
 The 0.58.0 release ships EDGEmat 0.3.1 from npm, which ignores the shared REDbridge and starts its own. That combination was checked outside the game on 2026-11-05 with REDnode's variables set (scratchpad `e1/check-pin.cjs`, E1's 21 checks: tools listed, reads answered, ask flags). Raise the pin in `packages/overlay/package.json` once EDGEmat publishes a newer version.
 
+## Animations on a spawned character: A1 (#39)
+
+The Animation test app (`packages/overlay/apps/anim-test`, through `api` and `world` only) plays a workspot on a person REDnode spawned: the prologue's Trauma Team medic idles and a gameplay pose as the control. Steps and what each should show: [docs/world.md, "A1 test"](world.md#a1-test).
+
+| Run | Result |
+|---|---|
+| Dev host, mock game, 2026-11-15, by Claude | Starts and builds its window; the workspot calls need the game |
+
 ## Calls from mods (#22)
 
 The player's say over which packages may call another package's tools (REDnode 0.66.0, Admin Tools 0.2.0): `"calls"` in a manifest, the Mod Manager's **Calls** section, the Tools Manager's **MODS** switch. Steps and what each should show: [docs/services.md, "Calls from mods test"](services.md#calls-from-mods-test).
