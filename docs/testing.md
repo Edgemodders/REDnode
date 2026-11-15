@@ -1220,10 +1220,10 @@ The 0.58.0 release ships EDGEmat 0.3.1 from npm, which ignores the shared REDbri
 
 ## The controller (0.65.1)
 
-Run on REDnode 0.65.2 or later. REDnode 0.65.0 reads Xbox pads through XInput; 0.65.1 adds Sony pads from their HID reports. Mods hear changes with `input.onGamepad` (`packages/rednode/src/input.ts`). The **Controller test** sample (`packages/overlay/apps/controller-test`) shows the state and logs each press to the Mod log. It only reads: the game still gets every button, so press them in the pause menu or standing still.
+Run on REDnode 0.65.2 or later. REDnode 0.65.0 reads Xbox pads through XInput; 0.65.1 adds Sony pads from their HID reports. Mods hear changes with `input.onGamepad` (`packages/rednode/src/input.ts`). The **Controller test** sample (`packages/overlay/apps/controller-test`) shows the state and logs each press to the Mod log. It only reads: the game still gets every button.
 
-1. In the launcher, switch on **Controller test** (its **Allowed** switch too, if the Mod Manager shows one). Expected: its window, "No controller heard yet".
-2. Close the overlay (F10) and press any button on the pad. Expected: "Controller connected." and the button in the list.
+1. Open the game's pause menu (Esc), then the overlay (F10), so the buttons only move the menu's selection (keep A off Load Game and Exit). In the launcher, switch on **Controller test** (its **Allowed** switch too, if the Mod Manager shows one). Expected: its window, "No controller heard yet". The overlay stays open for the whole test: REDnode reads the pad whenever the game is in front.
+2. Press any button on the pad. Expected: "Controller connected." at the top of the window, and the button in the list.
 3. Press every button once: A, B, X, Y, both bumpers, both stick clicks, the four D-pad directions, Start (Menu) and Back (View). Expected: "Every button seen."
 4. Squeeze each trigger slowly all the way, then let go. Expected: its bar climbs from 0 to 100 and back; "all the way in" and "let go" lines.
 5. Hold two buttons at once (for example LB and A). Expected: "Held: lb + a".
