@@ -19,17 +19,21 @@
 
 import { api, game, kernel, ui, world } from 'rednode';
 
-const PEOPLE = ['Character.trauma_team_paramedic', 'Character.mws_hey_07_trauma_medic_01', 'Character.mws_pac_06_trauma_medic_01'];
+const PEOPLE = [
+  ['Person: paramedic', 'Character.trauma_team_paramedic'],
+  ['Person: hey_07 medic', 'Character.mws_hey_07_trauma_medic_01'],
+  ['Person: pac_06 medic', 'Character.mws_pac_06_trauma_medic_01'],
+];
 const Q001 = 'base\\workspots\\quest\\main_quests\\prologue\\q001\\q001_00c_rescuing_girl\\';
 // A gameplay workspot as the control, then the medics' quest workspots (male rig).
 const WORKSPOTS = [
-  ['Arms crossed (gameplay)', 'base\\workspots\\common\\ground\\generic__stand_ground_arms_crossed__stand_around__02.workspot', 'stand__2h_on_sides__01'],
-  ['Medic 1', `${Q001}q001_00c_trauma_arrives___med_01_idle__01.workspot`, 'q001_00c_trauma_arrives___med_1_idle__01'],
-  ['Medic 2', `${Q001}q001_00c_trauma_arrives___med_02_idle__01.workspot`, 'q001_00c_trauma_arrives___med_2_idle__01'],
-  ['Soldier 1', `${Q001}q001_00c_trauma_arrives___soldier_01_idle__01.workspot`, 'q001_00c_trauma_arrives___soldier_1_idle__01'],
+  ['Pose: arms crossed (gameplay)', 'base\\workspots\\common\\ground\\generic__stand_ground_arms_crossed__stand_around__02.workspot', 'stand__2h_on_sides__01'],
+  ['Pose: quest medic 1', `${Q001}q001_00c_trauma_arrives___med_01_idle__01.workspot`, 'q001_00c_trauma_arrives___med_1_idle__01'],
+  ['Pose: quest medic 2', `${Q001}q001_00c_trauma_arrives___med_02_idle__01.workspot`, 'q001_00c_trauma_arrives___med_2_idle__01'],
+  ['Pose: quest soldier 1', `${Q001}q001_00c_trauma_arrives___soldier_01_idle__01.workspot`, 'q001_00c_trauma_arrives___soldier_1_idle__01'],
 ];
 
-let record = PEOPLE[0];
+let record = PEOPLE[0][1];
 let hold = false;
 let workspot = WORKSPOTS[0][1];
 let anim = WORKSPOTS[0][2];
@@ -37,7 +41,7 @@ let person = null; // { id, at, workspot }
 let busy = '';
 
 const requires = ui.text('Checking requirements...', { tone: 'dim' });
-const chosen = ui.text(`Workspot: ${WORKSPOTS[0][0]}`, { tone: 'dim' });
+const chosen = ui.text(`Chosen: ${WORKSPOTS[0][0]}`, { tone: 'accent' });
 const log = ui.list({ keep: 500 });
 
 function say(text) {
@@ -189,7 +193,7 @@ function pick([name, path, a]) {
   anim = a;
   wsInput.set({ value: path });
   animInput.set({ value: a });
-  chosen.set({ text: `Workspot: ${name}. Spawn the person again to give it to them.` });
+  chosen.set({ text: `Chosen: ${name}. Spawn the person again to give it to them.`, tone: 'accent' });
 }
 
 ui.window({
@@ -208,9 +212,9 @@ ui.window({
     wsInput,
     recordInput,
     ui.row(
-      ...PEOPLE.map((r, i) =>
+      ...PEOPLE.map(([label, r]) =>
         ui.button(
-          `Medic ${i + 1}`,
+          label,
           () => {
             record = r;
             recordInput.set({ value: r });
@@ -257,4 +261,4 @@ async function checkWorld() {
 }
 await checkWorld();
 setInterval(checkWorld, 5000);
-say('Animation test 0.2.0 ready');
+say('Animation test 0.2.1 ready');
