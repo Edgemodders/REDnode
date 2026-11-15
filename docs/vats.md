@@ -340,7 +340,7 @@ Claude then reads the `[vats-spike]` lines in `rednode-mods.log` and the plugin'
 
 ### V14 and V15 test
 
-VATS spike 0.6.1 (REDnode 0.65.1), the overlay in passive mode (not F10's hidden mode). Save first: V14 leaves enemies hurt or angry.
+VATS spike 0.6.2 (REDnode 0.65.1), the overlay in passive mode (not F10's hidden mode). Save first: V14 leaves enemies hurt or angry.
 
 | Step | Do | Expect, and what to note |
 |---|---|---|
@@ -350,8 +350,19 @@ VATS spike 0.6.1 (REDnode 0.65.1), the overlay in passive mode (not F10's hidden
 | 4 | **Cut head** and **Cut torso** on two more | Note whether they die and how |
 | 5 | Switch on **Right trigger VATS**; hold the scanner and the right trigger on an enemy, and move the crosshair over the parts | A green label off to the side (above for the head) with the part's name and chance, a line under it running towards the body that bends and follows the part. Note whether the text stays still, whether the line keeps up, and whether the line's end lands on the part (it may be off if the camera's field of view is not what the page assumes) |
 | 6 | Let go | The label goes |
+| 7 | Switch on **Bullets dismember (V's CanForceDismbember)** (the log reads the stat as 1). Get into a fight with one enemy, press **Left arm** under "Only one part can be hit" with the seconds at 15, and shoot | The arm comes off through the game's own hit: note the pain reaction, voice lines and what the enemy does after. Note whether a first shot from stealth does it (the game's code says only in combat) |
+| 8 | Switch it off | The stat reads 0 |
 
 Claude then reads the `[vats-spike]` lines, including the game's `ProjectPoint` answers.
+
+**V14 first run, 2026-11-14** (the owner): **Cut** takes each part off cleanly, but the enemy does not react: the direct request skips the game's hit (no damage, no hit event, no stimulus), so no pain animation, no voice, no combat. What VATS needs instead (V14b):
+
+| Way | How | What it brings |
+|---|---|---|
+| Bullets | While VATS is on, give V the game's own `CanForceDismbember` stat (`RPGManager.CreateStatModifier`, `StatsSystem.AddModifier`; taken off after). The game's `DamageManager` then flags V's ranged and melee hits `ForceDismember`, and with the other hit shapes off the hit lands on VATS's part | The whole hit pipeline: damage, the pain and hit reactions, voice, combat AI, the game's dismemberment and wound. Only in combat: out of combat the code flags a first shot a stealth hit instead (unverified in game) |
+| Quickhacks | A VATS quickhack (made with EDGEhack) that is itself a hostile act, so the target reacts and the trace starts as with any quickhack, and whose landing takes the part off: the game's `ForceDismembermentEffector` (fixed part per record) or VATS's own request with the chosen part from `onLand`. A damage effect in the same hack would add the hit reaction | The quickhack's own reactions; whether a pain reaction and voice come with the cut is to see |
+
+V14b's switch is in 0.6.2 (step 7 above).
 
 **First try, 2026-11-14** (app 0.6.0): no label showed. The mod sent it about ten times a second for every lit part, and the page drew (the host sent 400 to 660 frames every 10 s), but the overlay was in F10's **hidden** mode from 21:47:15, which hides every REDnode page, HUD ones too: test in passive mode. (A real VATS label cannot vanish in hidden mode: the semi-native apps' design, or a native widget.) The game's `ProjectPoint` answers X and Y from -1 to 1, 0 at the centre, Y up, and follows the zoom (game API notes), so 0.6.1's page takes the game's projection rather than its own. Also found: with the VATS tab open the quickhack list and the cyberdeck's RAM vanished, because the game's `QuickhacksListGameController.IsPanelBlocked()` hides them for TwinTone; fixed in the VATS repo by a wrap (needs a game restart).
 

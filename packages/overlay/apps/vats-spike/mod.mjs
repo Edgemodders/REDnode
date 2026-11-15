@@ -499,6 +499,27 @@ const dismember = (part) =>
     return `${DISMEMBER[part.part]}, ${woundType} wound, requested: note whether the part comes off and how it looks`;
   });
 
+// V14b: the direct request takes a part off but skips the hit (no pain, no voice, no combat; the
+// owner, 2026-11-14). The game's damage code gives V's ranged and melee hits the ForceDismember flag
+// while V has the CanForceDismbember stat (its spelling) and is in combat; a flagged hit dismembers
+// the hit part through the whole pipeline. With the other hit shapes off, that is VATS's part.
+let forceMod = null; // the stat modifier given to V, kept to take it off again
+
+async function forceDismember(on) {
+  const v = await player();
+  const statsId = await api.$call('Cast;EntityID;StatsObjectID', await v.GetEntityID());
+  const stats = await api.GameInstance.GetStatsSystem(game.instance);
+  if (on && !forceMod) {
+    forceMod = await api.gameRPGManager.CreateStatModifier('CanForceDismbember', 'Additive', 1);
+    await stats.AddModifier(statsId, forceMod);
+  } else if (!on && forceMod) {
+    await stats.RemoveModifier(statsId, forceMod);
+    forceMod = null;
+  }
+  const value = await stats.GetStatValue(statsId, 'CanForceDismbember');
+  say(`Bullets dismember: ${on ? 'on' : 'off'}; V's CanForceDismbember reads ${value}${on ? '. In combat, a ranged or melee hit takes the hit part off (out of combat a first shot counts as a stealth hit)' : ''}`);
+}
+
 function chooseWound(type) {
   woundType = type;
   say(`Wound type: ${type}`);
@@ -1176,6 +1197,7 @@ ui.window({
       ui.button('Hole', () => chooseWound('HOLE'), { variant: 'ghost' }),
     ),
     ui.row(...PARTS.map((p) => ui.button(`Cut ${p.part.toLowerCase()}`, () => dismember(p), { variant: 'ghost' }))),
+    ui.toggle('Bullets dismember (V\'s CanForceDismbember)', (on) => step(on ? 'Bullets dismember on' : 'Bullets dismember off', () => forceDismember(on))),
     ui.heading('Only one part can be hit (part 2)'),
     ui.slider('Seconds before the shapes come back', (v) => (onlySeconds = Math.round(v)), { min: 3, max: 30, step: 1, value: onlySeconds, unit: ' s' }),
     ui.row(...PARTS.map((p) => ui.button(p.part, () => onlyPart(p), { variant: 'ghost' }))),
