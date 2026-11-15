@@ -691,10 +691,23 @@ async function meshNames(t) {
   meshesOf = { target: t, names };
   return names;
 }
-const meshesFor = (names, part) => names.filter((n) => (PART_PREFIXES[part] ?? []).some((p) => n.startsWith(p)));
+// Many arm and hand meshes name their side at the end (nails_r, gloves__fingerless_l,
+// cyberarm_l1121, shoulders_left, full_ag_right7382; round 3's first try): the left arm takes
+// the left ones, the right arm the right ones, and both take a mesh that names no side.
+const sideOf = (name) => (/(_r|_right|right)\d*$/i.test(name) ? 'Right' : /(_l|_left|left)\d*$/i.test(name) ? 'Left' : null);
+const meshesFor = (names, part) =>
+  names.filter((n) => {
+    if (!(PART_PREFIXES[part] ?? []).some((p) => n.startsWith(p))) return false;
+    const side = sideOf(n);
+    return !side || !/^(Left|Right) /.test(part) || part.startsWith(side);
+  });
+
+// An entity's id as text, to tell two references to the same enemy from two enemies.
+const idOf = async (t) => JSON.stringify(await t.GetEntityID().catch(() => null));
 
 let rtMode = false;
 let rtHeld = false;
+let vatsNormalSpeed = true; // V (and V's camera) left out of the slow motion while VATS is on
 let vatsColour = 1; // the outline colour for VATS's part: green is to find (round 2 saw blue, white, red in 2, 5, 3)
 let vats = null; // { target, saved, part, lit: [names], timer }
 let vatsChain = Promise.resolve();
@@ -728,13 +741,31 @@ async function enterVats() {
   const world = r?.out?.transform?.orientation;
   const local = await cam.GetLocalOrientation();
   if (!world || !local) throw new Error('no camera orientation');
-  const saved = { local, fov: await cam.GetFOV(), zoom: await cam.GetZoom() };
+  const saved = { local, fov: await cam.GetFOV(), zoom: await cam.GetZoom(), normalSpeed: false };
+  // The game eases the field of view over about a second of game time, so under the scanner's
+  // slow motion the zoom crawls. V's camera is V's: leaving V out of the slow motion should
+  // let it ease at normal speed (round 3's first try, 2026-11-14).
+  if (vatsNormalSpeed) {
+    const ts = await api.GameInstance.GetTimeSystem(game.instance);
+    await ts.SetIgnoreTimeDilationOnLocalPlayerZero(true);
+    saved.normalSpeed = true;
+  }
   const parent = qmul(world, qinv(local));
   await cam.SetLocalOrientation(qmul(qinv(parent), facing(dir).q));
-  await cam.SetFOV(fovFor(height, dist));
+  const fov = fovFor(height, dist);
+  await cam.SetFOV(fov);
   const names = await meshNames(t);
-  vats = { target: t, saved, part: null, lit: [], timer: null, names };
-  say(`VATS on: ${t.$type} "${(await t.GetDisplayName()) || 'no name'}", ${dist.toFixed(1)} m, field of view ${saved.fov.toFixed(1)} -> ${fovFor(height, dist).toFixed(1)}, ${names.length} meshes (${(performance.now() - started).toFixed(0)} ms)`);
+  vats = { target: t, id: await idOf(t), saved, part: null, lit: [], timer: null, names, v, targeting };
+  say(`VATS on: ${t.$type} "${(await t.GetDisplayName()) || 'no name'}", ${dist.toFixed(1)} m, field of view ${saved.fov.toFixed(1)} -> ${fov.toFixed(1)}, ${names.length} meshes${saved.normalSpeed ? ', V at normal speed' : ''} (${(performance.now() - started).toFixed(0)} ms)`);
+  // How fast the zoom eases in: the field of view after a quarter, a half and one second.
+  const zoomStarted = performance.now();
+  for (const at of [250, 500, 1000]) {
+    setTimeout(async () => {
+      if (!vats) return;
+      const now = await cam.GetFOV().catch(() => null);
+      if (now !== null) say(`  zoom after ${((performance.now() - zoomStarted) / 1000).toFixed(2)} s: field of view ${now.toFixed(1)} (asked ${fov.toFixed(1)})`);
+    }, at);
+  }
   let busy = false;
   vats.timer = setInterval(() => {
     if (busy || !vats) return;
@@ -748,6 +779,20 @@ async function tickVats() {
   if (!(await scanning())) {
     await leaveVats('the scanner was let go');
     return;
+  }
+  // Another enemy under the crosshair: its parts from now on (the first one's outline off).
+  const look = await vats.targeting.GetLookAtObject(vats.v, false, false).catch(() => null);
+  if (look) {
+    const id = await idOf(look);
+    if (id && id !== vats.id) {
+      await light(vats.target, vats.lit, false).catch(() => {});
+      vats.target = look;
+      vats.id = id;
+      vats.names = await meshNames(look);
+      vats.part = null;
+      vats.lit = [];
+      say(`VATS: now on ${look.$type} "${(await look.GetDisplayName().catch(() => '')) || 'no name'}", ${vats.names.length} meshes`);
+    }
   }
   const hit = await crosshairPart(vats.target);
   const part = hit?.part ?? null;
@@ -771,6 +816,10 @@ async function leaveVats(why) {
   await cam.SetLocalOrientation(was.saved.local);
   await cam.SetFOV(was.saved.fov);
   await cam.SetZoom(was.saved.zoom);
+  if (was.saved.normalSpeed) {
+    const ts = await api.GameInstance.GetTimeSystem(game.instance);
+    await ts.RestorePreviousIgnoreTimeDilationOnLocalPlayerZero().catch(() => {});
+  }
   say(`VATS off (${why}): camera back`);
 }
 
@@ -839,6 +888,7 @@ ui.window({
     ui.text('With this on: hold the scanner, aim at an enemy, hold the right trigger. The view frames them and the part under the crosshair is outlined; let go of the trigger (or the scanner) to end it.', { tone: 'dim' }),
     ui.toggle('Right trigger VATS', (on) => rightTriggerMode(on)),
     ui.slider('VATS colour', (v) => (vatsColour = Math.round(v)), { min: 1, max: 7, step: 1, value: vatsColour }),
+    ui.toggle('Camera at normal speed', (on) => (vatsNormalSpeed = on), { checked: true }),
     ui.heading('Outline (V2)'),
     ui.row(ui.button('List components', listComponents), ui.button('Outline', outline, { variant: 'ghost' }), ui.button('Clear', clearOutline, { variant: 'ghost' })),
     componentBox,
