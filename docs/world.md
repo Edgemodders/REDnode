@@ -1744,6 +1744,10 @@ REDnode 0.66.8, Codeware, game 2.5, Animation test 0.4.0 (in the apps folder). S
 8. Switch the app off. Expected: the medic is gone.
 9. Optional, with Claude Code connected to the game: ask it to spawn a Trauma Team paramedic with the arms-crossed workspot and play it (`world_spawn` with `workspot`, then `world_animate`). Each call asks you first.
 
+### A2 test: results
+
+Run on 2026-11-16 by the owner on the laptop, REDnode 0.66.8 (an update zip over 0.65.3), Animation test 0.4.0, game 2.5: **steps 1 to 8 passed as written**. The gameplay pose started and looped from `world.useWorkspot` on a person spawned with `workspot`, `world.workspotState` answered, a change of workspot spawned the person again in place, stop and the package's stop gave everything back. Step 9 (the MCP route) was not run; its tools passed the mock check. Quest clips stay for #46's written workspot.
+
 ### A1 test: results
 
 Run on 2026-11-15 by the owner on the dev PC, REDnode 0.66.0, game 2.5, with Animation test 0.1.0 to 0.3.0 (fixed between runs).

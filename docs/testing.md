@@ -1243,6 +1243,7 @@ The Director spike (`packages/overlay/apps/director-spike`, REDnode 0.66.8, noth
 | Run | Result |
 |---|---|
 | Dev host, mock game, 2026-11-15, by Claude | **Pass**: 7 package checks and 7 MCP checks through a client (scratchpad `a2/`) |
+| Laptop, 2026-11-16, by the owner, REDnode 0.66.8 (update zip over 0.65.3), Animation test 0.4.0 | **Pass**: steps 1 to 8 as written (step 9, the MCP route, not run) |
 
 ## Animations on a spawned character: A1 (#39)
 
