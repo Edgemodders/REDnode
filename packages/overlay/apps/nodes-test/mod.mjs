@@ -75,9 +75,33 @@ async function describe(n) {
   }${n.hidden ? '  HIDDEN' : ''}`;
 }
 
+// The chosen node is shown in the world with a world pin at the foot of its box's centre,
+// labelled with its kind and the box's size, so the player sees what was picked (the outline
+// is not on game 2.5 yet).
+let marker = null;
+async function mark(n) {
+  if (marker !== null) await world.unpin(marker).catch(() => false);
+  marker = null;
+  if (!n?.bounds) return;
+  const { min, max } = n.bounds;
+  const size = [0, 1, 2].map((i) => (max[i] - min[i]).toFixed(1)).join(' x ');
+  marker = await world
+    .pin({
+      at: { x: (min[0] + max[0]) / 2, y: (min[1] + max[1]) / 2, z: min[2] },
+      title: n.kind.replace(/^world/, ''),
+      text: `${n.boundsFrom === 'mesh' ? 'box' : 'place'} ${size} m`,
+      style: { color: n.holdsHit ? '#5ef38c' : '#f3e600' },
+    })
+    .catch((err) => {
+      say(`  (no pin: ${err.message})`);
+      return null;
+    });
+}
+
 function choose(n) {
   chosen = n;
   target.set({ text: n ? `Chosen: ${n.kind} ${n.id}` : 'No node chosen.', tone: n ? 'accent' : 'dim' });
+  mark(n);
 }
 
 const start = (instances = true) =>

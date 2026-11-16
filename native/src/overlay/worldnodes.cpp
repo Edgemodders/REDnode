@@ -553,9 +553,22 @@ CResource* MeshOf(void* aInstance)
     auto known = g_meshField.find(key);
     if (known == g_meshField.end())
     {
-        // The first instance of the class: every candidate field checked carefully.
+        // Only the mesh node instance families keep a mesh handle in one field for every
+        // instance (0.66.3 trusted a GI space's +0xB8, which held a mesh in one instance and
+        // flags in the next, and the game crashed). For them, the first instance's fields are
+        // checked carefully to find it.
+        static const std::vector<CClass*> meshKinds = []() {
+            std::vector<CClass*> out;
+            for (const char* name : {"worldMeshNodeInstance", "worldInstancedMeshNodeInstance", "worldFoliageNodeInstance",
+                                     "worldTerrainMeshNodeInstance", "worldBendedMeshNodeInstance",
+                                     "worldStaticOccluderMeshNodeInstance", "worldInstancedDestructibleMeshNodeInstance"})
+                if (auto* c = CRTTISystem::Get()->GetClass(name))
+                    out.push_back(c);
+            return out;
+        }();
+        const bool meshKind = std::any_of(meshKinds.begin(), meshKinds.end(), [&](CClass* c) { return cls->IsA(c); });
         int found = -1;
-        if (Readable(static_cast<uint8_t*>(aInstance) + 0x90, 0xA8))
+        if (meshKind && Readable(static_cast<uint8_t*>(aInstance) + 0x90, 0xA8))
         {
             for (size_t off = 0x90; off <= 0x130 && found < 0; off += 8)
             {
@@ -574,8 +587,9 @@ CResource* MeshOf(void* aInstance)
         return nullptr;
     void* object = nullptr;
     std::memcpy(&object, static_cast<uint8_t*>(aInstance) + known->second, sizeof(object));
-    if (!object)
-        return nullptr;
+    const auto at = reinterpret_cast<uintptr_t>(object);
+    if (at < 0x10000 || at > 0x7FFFFFFEFFFF || (at & 7))
+        return nullptr; // not a pointer: never followed
     auto* type = static_cast<ISerializable*>(object)->GetType();
     return type && type->IsA(mesh) ? static_cast<CResource*>(object) : nullptr;
 }
