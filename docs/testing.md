@@ -1237,6 +1237,7 @@ The Director spike (`packages/overlay/apps/director-spike`, REDnode 0.66.8, noth
 | Outside the game, 2026-11-16, by Claude | The two workspots written from the game's own, read back and packed (scratchpad `s46/make.py`); the app starts in the mock host. The game run waits for A2's test |
 | Laptop, 2026-11-16, by the owner, Director spike 0.1.0 | **Fail at step 5**: build, swap and play worked (a brief T pose at the start), but jumps were unreliable and the actors left the workspot 40 to 80 s after each play: each clip played once and the next followed, then the fast exit. Fixed in 0.2.0 (clips loop until a jump, a jump by entry id, Watch 30 s) |
 | Laptop, 2026-11-16, by the owner, Director spike 0.2.0 | **Pass with open items**: clips hold until a jump; an `instant` jump blends smoothly at once (a non-instant one waits for the clip's end); timers on time and both actors in the same frame. Open: the quest clip stays in a T pose, a brief T pose at the first play, root motion moves nobody, and the full tree's own exits take over. Results in docs/world.md, "A written workspot: second run (0.2.0)" |
+| Round 3, Director spike 0.3.0 | Built 2026-11-16: six quest workspot variants on a third person and a spawn-wait-play; steps in docs/world.md, "A written workspot: round 3 test". Awaiting its run |
 
 ## Animations on a spawned character: A2 (#39)
 

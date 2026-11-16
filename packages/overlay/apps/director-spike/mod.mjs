@@ -14,6 +14,9 @@
 //   6 Timed    jumps on setTimeout at set times for both actors: how late each lands, in ms and
 //              in frames, and how far apart the two actors' jumps are
 //   7 Weather  reads what the script API offers (it has no call that sets the weather on 2.5)
+//   8 Quest    (0.3.0) why the quest clip stays in a T pose: one more person, Q, plays each of six
+//              workspots that differ by one thing from the game's own quest medic workspot
+//   9 Start    (0.3.0) whether the T pose at the first play goes when the person waits after spawning
 
 import { api, archives, game, kernel, pkg, ui, world } from 'rednode';
 import fs from 'node:fs';
@@ -33,6 +36,17 @@ const CLIPS = [
   ['D step off (root motion)', 'stand__2h_on_sides__01__to__walk_0__turn0__01'],
 ];
 const RECORD = 'Character.trauma_team_paramedic';
+const QUEST_WORKSPOT = 'base\\workspots\\quest\\main_quests\\prologue\\q001\\q001_00c_rescuing_girl\\q001_00c_trauma_arrives___med_01_idle__01.workspot';
+const QUEST_CLIP = CLIPS[2][1];
+// Round 3's quest variants: each differs from the one before it by one thing.
+const VARIANTS = [
+  ['game', "the game's own quest medic workspot, as it is (the control: A1 saw it play once after a T pose)"],
+  ['copy', "the game's quest workspot read and written back unchanged by REDbridge (our write path)"],
+  ['copyloop', 'that copy with its sequence looping (loopInfinitely on)'],
+  ['solo200', "ours from the arms-crossed tree, the quest clip only, its set alone at priority 200 as the game's quest workspot has it"],
+  ['solo128', 'the same at priority 128, as 0.2.0 gave the quest set'],
+  ['mixed200', "0.2.0's bare four clips with the quest set at priority 200"],
+];
 
 let which = 'bare';
 let snap = true; // instant: jump now, blended by the game; off waits for the clip's end
@@ -41,6 +55,7 @@ let loopClips = true;
 // The entry id of each clip's sequence, the same in both workspots (both count on from the game's idCounter).
 let entryIds = {};
 let actors = []; // [{ id, label }]
+let quest = null; // { id, label: 'Q', variant }
 let busy = '';
 
 const status = ui.text('Press Build, then Swap, then Spawn.', { tone: 'dim' });
@@ -68,10 +83,11 @@ const workspotPath = () => `${OURS}\\s46_${which}.workspot`;
 // ---- 1. Build ---------------------------------------------------------------------
 
 const cname = (v) => ({ $type: 'CName', $storage: 'string', $value: v });
-const animset = (p) => ({ $type: 'animAnimSetupEntry', animSet: { DepotPath: { $type: 'ResourcePath', $storage: 'string', $value: p }, Flags: 'Default' }, priority: p.includes('interactive_scene') ? 200 : 128, variableNames: [] });
+const animset = (p, questPriority = 128) => ({ $type: 'animAnimSetupEntry', animSet: { DepotPath: { $type: 'ResourcePath', $storage: 'string', $value: p }, Flags: 'Default' }, priority: p.includes('interactive_scene') ? 200 : p === QUEST ? questPriority : 128, variableNames: [] });
 const loading = (p) => ({ DepotPath: { $type: 'ResourcePath', $storage: 'string', $value: p }, Flags: 'Default' });
 
-function writeWorkspot(source, bare) {
+// clips: [label, clip] pairs; sets: the animation sets to list (bare only); questPriority: the quest set's.
+function writeWorkspot(source, bare, { clips = CLIPS, sets: only, questPriority = 128, ids = true } = {}) {
   const d = structuredClone(source);
   const tree = d.Data.RootChunk.workspotTree.Data;
   let entry = tree.idCounter;
@@ -79,7 +95,7 @@ function writeWorkspot(source, bare) {
   const nextEntry = () => ++entry;
   const nextHandle = () => String(++handle);
   const sequence = (clip) => {
-    entryIds[clip] = entry + 1;
+    if (ids) entryIds[clip] = entry + 1;
     return {
     HandleId: nextHandle(),
     Data: {
@@ -92,11 +108,11 @@ function writeWorkspot(source, bare) {
   };
   const root = tree.rootEntry.Data;
   const kept = bare ? root.list.filter((c) => c.Data.$type === 'workFastExit') : root.list;
-  root.list = [...CLIPS.map(([, clip]) => sequence(clip)), ...kept];
+  root.list = [...clips.map(([, clip]) => sequence(clip)), ...kept];
   tree.idCounter = entry + 1;
   const male = tree.finalAnimsets[0];
-  const sets = bare ? [IDLE_2H, IDLE_CROSSED, TRANSITIONS, QUEST] : [...male.animations.cinematics.map((x) => x.animSet.DepotPath.$value), QUEST];
-  male.animations.cinematics = sets.map(animset);
+  const sets = only ?? (bare ? [IDLE_2H, IDLE_CROSSED, TRANSITIONS, QUEST] : [...male.animations.cinematics.map((x) => x.animSet.DepotPath.$value), QUEST]);
+  male.animations.cinematics = sets.map((x) => animset(x, questPriority));
   male.loadingHandles = sets.map(loading);
   tree.finalAnimsets = [male];
   if (bare) tree.customTransitionAnims = [];
@@ -123,6 +139,29 @@ const build = () =>
       say(`  ${kind}: ${fs.statSync(out).size} bytes`);
     }
     fs.writeFileSync(path.join(work, 'entries.json'), JSON.stringify(entryIds));
+    // Round 3's quest variants ("game" is the game's own file, nothing to write).
+    const qraw = path.join(work, 'quest.workspot');
+    await b.call('archive.extract', { path: QUEST_WORKSPOT, outFile: qraw });
+    const qjson = path.join(work, 'quest.json');
+    await b.call('cr2w.fileToJson', { file: qraw, outFile: qjson });
+    const questSource = JSON.parse(fs.readFileSync(qjson, 'utf8'));
+    const copyLoop = structuredClone(questSource);
+    for (const c of copyLoop.Data.RootChunk.workspotTree.Data.rootEntry.Data.list) if (c.Data.$type === 'workSequence') c.Data.loopInfinitely = 1;
+    const questOnly = [[CLIPS[2][0], QUEST_CLIP]];
+    const variants = {
+      copy: questSource,
+      copyloop: copyLoop,
+      solo200: writeWorkspot(source, true, { clips: questOnly, sets: [QUEST], questPriority: 200, ids: false }),
+      solo128: writeWorkspot(source, true, { clips: questOnly, sets: [QUEST], questPriority: 128, ids: false }),
+      mixed200: writeWorkspot(source, true, { questPriority: 200, ids: false }),
+    };
+    for (const [name, doc] of Object.entries(variants)) {
+      const jf = path.join(work, `s46_q_${name}.json`);
+      fs.writeFileSync(jf, JSON.stringify(doc));
+      const out = path.join(tree, ...OURS.split('\\'), `s46_q_${name}.workspot`);
+      await b.call('cr2w.fromJson', { outFile: out, jsonFile: jf });
+    }
+    say(`  quest variants: ${Object.keys(variants).join(', ')} written`);
     say(`  entries: ${CLIPS.map(([label, clip]) => `${label[0]} ${entryIds[clip]}`).join(', ')}; clips ${loopClips ? 'loop until a jump' : 'play once and move on'}`);
     const packed = await b.call('project.pack', { dir: tree, outDir: path.join(work, 'packed'), modName: ARCHIVE });
     return `${packed.archive} (${packed.bytes} bytes, ${packed.files} files)`;
@@ -306,6 +345,56 @@ const weather = () =>
     return `rain intensity ${intensity}, type ${type}. The script API has no call that sets the weather on 2.5`;
   });
 
+// ---- 8. Quest variants -------------------------------------------------------------
+
+const variantPath = (name) => (name === 'game' ? QUEST_WORKSPOT : `${OURS}\\s46_q_${name}.workspot`);
+
+async function watchOne(id, seconds) {
+  const t0 = performance.now();
+  let last = '';
+  while (performance.now() - t0 < seconds * 1000) {
+    const st = await world.workspotState(id).catch(() => null);
+    const b = !st?.inWorkspot ? 'out' : `in${st.isActive ? '' : ' (not active)'}${st.entering ? ' entering' : ''}${st.exiting ? ' exiting' : ''}`;
+    if (b !== last) say(`    ${((performance.now() - t0) / 1000).toFixed(1)} s: Q ${b}`);
+    last = b;
+    await wait(500);
+  }
+}
+
+const tryVariant = (name) =>
+  step(`Quest variant ${name}`, async () => {
+    if (quest) await world.remove(quest.id).catch(() => false);
+    const { id } = await world.spawn({ record: RECORD, ...(await inFront(4.5, 0)), workspot: variantPath(name) });
+    quest = { id, label: 'Q', variant: name };
+    await wait(1500);
+    const r = await world.useWorkspot(id);
+    quest.id = r.id;
+    if (!r.started) return `not started: ${r.why}`;
+    await watchOne(r.id, 12);
+    return 'started; say what Q does: plays the medic idle, a T pose first, or a T pose that stays';
+  });
+
+// ---- 9. The first play's T pose -----------------------------------------------------
+
+const spawnWaitPlay = () =>
+  step(`Spawn, wait 10 s, then play (${which})`, async () => {
+    for (const a of actors) await world.remove(a.id).catch(() => false);
+    actors = [];
+    for (const [label, side] of [['A', -0.9], ['B', 0.9]]) {
+      const { id } = await world.spawn({ record: RECORD, ...(await inFront(3, side)), workspot: workspotPath() });
+      actors.push({ id, label });
+    }
+    say('  spawned; waiting 10 s');
+    await wait(10000);
+    const out = [];
+    for (const a of actors) {
+      const r = await world.useWorkspot(a.id);
+      a.id = r.id;
+      out.push(`${a.label} ${r.started ? 'started' : `not started: ${r.why}`}`);
+    }
+    return `${out.join('; ')}; say whether the T pose came again`;
+  });
+
 // ---- state and clean-up -----------------------------------------------------------
 
 const state = () =>
@@ -319,10 +408,12 @@ const removeAll = () =>
     let n = 0;
     for (const s of world.spawned()) if (await world.remove(s.id).catch(() => false)) n += 1;
     actors = [];
+    quest = null;
     return `${n} removed`;
   });
 world.onRespawn((before, after) => {
   for (const a of actors) if (a.id.hash === before.hash) a.id = after;
+  if (quest && quest.id.hash === before.hash) quest.id = after;
 });
 
 const chosen = ui.text('Workspot: bare (only the test clips)', { tone: 'accent' });
@@ -358,9 +449,15 @@ ui.window({
     ui.row(...CLIPS.slice(0, 3).map(([label, clip]) => ui.button(label, () => jump(label, clip), { variant: 'ghost' }))),
     ui.heading('5 and 6. Gap, root motion, timing'),
     ui.row(ui.button('Step off, then nothing', gap), ui.button('Timed run (8 s)', timed)),
+    ui.heading('8. Quest clip: one more person, Q, plays each variant'),
+    ui.row(...VARIANTS.slice(0, 3).map(([name]) => ui.button(name, () => tryVariant(name), { variant: 'ghost' }))),
+    ui.row(...VARIANTS.slice(3).map(([name]) => ui.button(name, () => tryVariant(name), { variant: 'ghost' }))),
+    ui.heading('9. The first play'),
+    ui.row(ui.button('Spawn, wait 10 s, then play', spawnWaitPlay, { variant: 'ghost' })),
     ui.heading('7. Weather'),
     ui.row(ui.button('Read the weather', weather, { variant: 'ghost' }), ui.button('Remove the actors', removeAll, { variant: 'ghost' })),
     log,
   ],
 });
-say('Director spike 0.2.1 ready');
+say('Director spike 0.3.0 ready');
+for (const [name, what] of VARIANTS) say(`  variant ${name}: ${what}`);

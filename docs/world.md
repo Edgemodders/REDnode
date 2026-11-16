@@ -1860,6 +1860,44 @@ Run on 2026-11-16 by the owner on the laptop, REDnode 0.66.8, Director spike 0.2
 
 What it decides for EDGEdir (#46): a written workspot per actor works as a track: write each clip as a sequence whose idle is the clip with `loopInfinitely` on, keep only the clips and a fast exit, start it with `world.useWorkspot`, and move between clips with an **instant** jump (by name or by entry id), timed from the package. Open: quest clips (C's T pose, as in A1), the T pose at the first play, and moving a person along a path (root motion is not applied: a walk needs the person moved, or the game's own walk).
 
+### A written workspot: round 3 (quest clips and the first play)
+
+Agreed with the owner on 2026-11-16 after the second run: one short round on the quest clip's T pose and the T pose at the first play, then a REDnode call that writes the workspot.
+
+What the game's own quest medic workspot (`q001_00c_trauma_arrives___med_01_idle__01.workspot`, read with REDbridge) has that 0.2.0's did not:
+
+| The game's quest workspot | 0.2.0's |
+|---|---|
+| One animation set, the quest one, at priority 200 | Four sets; the quest one at priority 128 |
+| The clip as the sequence's idle, with a `workPauseClip` of 2.5 s inside (flags 32) | The clip as the idle and as a `workAnimClip` (flags 2) |
+| `loopInfinitely` off | On |
+
+The quest clip's own file matches the gameplay ones (rig `man_base.rig`, compressed buffers, 71 joints), and A1 saw the game's quest workspot play after a T pose, so the clip can play on this person. REDbridge writes the game's quest workspot back byte for byte the same size (2,387 bytes).
+
+**Director spike 0.3.0** adds one more person, Q, 4.5 m ahead, and six workspots for it, each changing one thing:
+
+| Variant | What it is |
+|---|---|
+| game | The game's quest medic workspot as it is: the control |
+| copy | That workspot read and written back by REDbridge: our write path |
+| copyloop | The copy with its sequence looping |
+| solo200 | Ours, from the arms-crossed tree: the quest clip only, its set alone at priority 200 |
+| solo128 | The same at priority 128 |
+| mixed200 | 0.2.0's four clips with the quest set at priority 200 |
+
+Each button removes the last Q, spawns a new one with that workspot, waits 1.5 s, plays it and logs Q's state for 12 s. **Spawn, wait 10 s, then play** spawns the pair and waits before playing, to see whether the first play's T pose is the animation sets loading.
+
+### A written workspot: round 3 test
+
+REDnode 0.66.8, Director spike 0.3.0, REDbridge, game 2.5. Stand V somewhere open, outside combat.
+
+1. Switch on **Director spike (#46)** with both **Allowed** switches. Press **Build** (it now also says "quest variants: ... written"), then **Swap in**.
+2. Press **game**. Say what Q does: plays the medic idle, a T pose first and then the idle, or a T pose that stays.
+3. Do the same for **copy**, **copyloop**, **solo200**, **solo128** and **mixed200**, one at a time, waiting for each to finish (about 15 s).
+4. With **Use bare** chosen, press **Spawn, wait 10 s, then play**. Say whether the T pose comes at the play.
+5. Press **Play both** again on the same two. Say whether the T pose comes this time.
+6. Press **Remove the actors** and switch the app off.
+
 ## World node registry (#24)
 
 Asked for by EDGEbuilder in [#24](https://github.com/Edgemodders/REDnode/issues/24) for its world inspector: hover or click anything the game placed and see what it is and which sector and node it comes from, outline it, hide it for the session, list what is streamed in near the camera, and have the world stream around EDGEbuilder's camera. Entities are covered by `world.near` and `world.files`; static nodes (most buildings, street furniture, decals, lights, foliage) are not: nothing in the game API names the node a click hit, and on 2.5 a sector keeps a node's path only as a hash. RED Hot Tools solves it with hooks on sector loading and node-instance setup (its `WorldNodeRegistry`, MIT) but has no 2.5 build.
