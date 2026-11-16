@@ -1945,6 +1945,24 @@ REDnode 0.66.8, Director spike 0.4.0, REDbridge, game 2.5. Stand V somewhere ope
 4. Press **mixed-0**, then **mixed-new**. Q starts standing and jumps to the quest clip after 4 s. Say whether the quest clip plays.
 5. Press **Remove the actors** and switch the app off.
 
+### A written workspot: round 4 results
+
+Run on 2026-11-16 by the owner on the laptop, Director spike 0.4.0, every step.
+
+| Variant | Q did |
+|---|---|
+| copy, preloaded | A T pose first, then the medic idle, then standing (the copy does not loop) |
+| solo-keep | A T pose that stays |
+| solo-0 | A T pose that stays |
+| solo-quest | A brief T pose, then the medic idle, looping |
+| solo-new | A brief T pose, then the medic idle, looping |
+| mixed-0, mixed-new | A brief T pose, standing for 4 s, then the medic idle after the jump (reported for both together) |
+
+What it decides:
+
+- **The animation setup's hash is the cause of the quest clip's T pose**, as round 3's lead said: the engine finds a workspot's animation setup by it. Kept from the template, the person gets the template's sets; 0 does not work either; **a new hash made from the list of sets works**, as does one matching a setup with the same sets. A written workspot sets `finalAnimsets[].animations.hash` to FNV-1a 64 of its set paths, and then any animation set plays, quest clips too. (mixed-0 was reported with mixed-new; on its own it may differ from solo-0, unverified.)
+- **Loading the workspot file first does not remove the brief T pose** (Codeware's `ResourceDepot.LoadResource`, the token kept). Round 3 saw none on a second play by the same people, and the game's own quest workspot showed none, while REDbridge's copy of it with the same hash did: the T pose belongs to a file's first play, not to its setup or its loading. Open: whether a new person playing a file already played shows it. If not, a written workspot can be played once on its actor before the scene starts (a warm-up while it is out of view).
+
 ## World node registry (#24)
 
 Asked for by EDGEbuilder in [#24](https://github.com/Edgemodders/REDnode/issues/24) for its world inspector: hover or click anything the game placed and see what it is and which sector and node it comes from, outline it, hide it for the session, list what is streamed in near the camera, and have the world stream around EDGEbuilder's camera. Entities are covered by `world.near` and `world.files`; static nodes (most buildings, street furniture, decals, lights, foliage) are not: nothing in the game API names the node a click hit, and on 2.5 a sector keeps a node's path only as a hash. RED Hot Tools solves it with hooks on sector loading and node-instance setup (its `WorldNodeRegistry`, MIT) but has no 2.5 build.
