@@ -1,7 +1,7 @@
 {
   "id": "director-spike",
   "name": "Director spike (#46)",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "author": "Edgemodders",
   "description": "#46's spike for EDGEdir: writes two workspots of its own for one actor's clips through REDbridge (in its data folder, from the game's own files), swaps them in, plays them on two spawned people, jumps between clips blended or instant, lets a root-motion clip run out, times jumps on timers, and reads the weather. Asks for the bridge and archives permissions.",
   "main": "mod.mjs",

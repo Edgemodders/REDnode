@@ -484,8 +484,9 @@ const callJump = (name) =>
   step(`world.jumpWorkspot ${name}`, async () => {
     if (!callActors.length) throw new Error('Spawn first');
     const t = performance.now();
-    await Promise.all(callActors.map((a) => world.jumpWorkspot(a.id, name)));
-    return `both in ${(performance.now() - t).toFixed(0)} ms`;
+    const done = await Promise.all(callActors.map((a) => world.jumpWorkspot(a.id, name)));
+    const ms = (performance.now() - t).toFixed(0);
+    return done.every(Boolean) ? `all in ${ms} ms` : `${callActors.filter((_, i) => !done[i]).map((a) => a.label).join(', ')} not in the workspot: press Play first`;
   });
 
 const callNewPerson = () =>
@@ -569,5 +570,5 @@ ui.window({
     log,
   ],
 });
-say('Director spike 0.5.0 ready');
+say('Director spike 0.5.1 ready');
 for (const [name, what] of VARIANTS) say(`  variant ${name}: ${what}`);

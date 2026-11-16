@@ -1988,6 +1988,18 @@ REDnode 0.66.9, Director spike 0.5.0, REDbridge, game 2.5. Stand V somewhere ope
 5. Press **A new person, same file**. A third person spawns beside them with the same workspot and plays it. Say whether it shows a T pose: if not, a warm-up play per workspot file is enough.
 6. Press **Remove the actors** and switch the app off.
 
+### A written workspot: the call's test results
+
+Run on 2026-11-16 by the owner on the laptop, REDnode 0.66.9, Director spike 0.5.0. **Passed.**
+
+| Step | Found |
+|---|---|
+| Write and swap | The workspot, its four entries and the swap, in 29 s (REDbridge's start and the template's read included) |
+| Spawn, Play, jumps | The first try skipped **Play** (the log has no Play line), so the actors stood in their own idle and the jumps did nothing. After a respawn and Play: both started, and **worried** (the quest clip), **crossed** and **stand** each went at once, blended, the quest clip playing and looping. Jumps answer in about 70 ms for both |
+| A new person, same file | A brief T pose, then standing: **the first play's T pose comes once per person**, not per file (round 3: none on the same people's second play) |
+
+So a scene starts each actor's workspot once while the actor is out of view. `world.jumpWorkspot` answered as if it jumped when the person was not in the workspot; it now answers false then (Director spike 0.5.1 says "press Play first").
+
 ## World node registry (#24)
 
 Asked for by EDGEbuilder in [#24](https://github.com/Edgemodders/REDnode/issues/24) for its world inspector: hover or click anything the game placed and see what it is and which sector and node it comes from, outline it, hide it for the session, list what is streamed in near the camera, and have the world stream around EDGEbuilder's camera. Entities are covered by `world.near` and `world.files`; static nodes (most buildings, street furniture, decals, lights, foliage) are not: nothing in the game API names the node a click hit, and on 2.5 a sector keeps a node's path only as a hash. RED Hot Tools solves it with hooks on sector loading and node-instance setup (its `WorldNodeRegistry`, MIT) but has no 2.5 build.

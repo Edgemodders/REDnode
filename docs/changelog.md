@@ -19,7 +19,7 @@ How to keep it:
 
 - Workspots on a person you spawned (#39): `world.spawn({ record, workspot })` gives the person one of the game's poses or loops (a `.workspot` file), `world.useWorkspot(id)` plays it where they stand (another workspot spawns them again carrying it), `world.workspotState(id)` and `world.stopWorkspot(id)`. AI assistants get `workspot` on `world_spawn` and the `world_animate` tool, asking first. Gameplay workspots loop; a quest's plays once, briefly. Docs: https://edgemodders.github.io/REDnode/world.html#a2-built-rednode-0668
 
-- Your own workspots for a person's animations (#46, for EDGEdir): `world.writeWorkspot(name, { clips })` writes a workspot holding the clips you list (any animation set, quest clips too), each looping until you move on, and swaps it into the running game; spawn a person with it and move between clips with `world.jumpWorkspot(id, name)`, which goes at once with a smooth blend. Needs REDbridge and the `bridge` and `archives` permissions. Docs: https://edgemodders.github.io/REDnode/world.html#a-written-workspot-the-call-rednode-0669
+- Your own workspots for a person's animations (#46, for EDGEdir): `world.writeWorkspot(name, { clips })` writes a workspot holding the clips you list (any animation set, quest clips too), each looping until you move on, and swaps it into the running game; spawn a person with it and move between clips with `world.jumpWorkspot(id, name)`, which goes at once with a smooth blend (and answers false when the person is not in the workspot yet). Needs REDbridge and the `bridge` and `archives` permissions. Docs: https://edgemodders.github.io/REDnode/world.html#a-written-workspot-the-call-rednode-0669
 
 **Changed**
 

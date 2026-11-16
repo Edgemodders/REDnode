@@ -982,7 +982,8 @@ export const world = {
    * gave, an animation's name, or an entry id. `instant` (the default) goes at once, blended from
    * the current pose by the game; `instant: false` waits for the clip playing to reach its end,
    * which can be many seconds. Timing a scene's jumps from the package lands them in the same frame
-   * for every actor (the Director spike, #46).
+   * for every actor (the Director spike, #46). Answers false, and jumps nowhere, when the person is
+   * not in the world or not in a workspot yet: start it with {@link world.useWorkspot} first.
    *
    * @example
    * ```ts
@@ -994,6 +995,7 @@ export const world = {
     const person = await world.entity(idOf(id));
     if (!person) return false;
     const ws = (await api.GameInstance.GetWorkspotSystem(game.instance)) as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>;
+    if ((await ws.IsActorInWorkspot(person)) !== true) return false;
     const instant = options.instant !== false;
     const path = mine.get(hash)?.options.workspot;
     const known = typeof to === "string" && path ? writtenEntries(path)?.get(to) : undefined;
