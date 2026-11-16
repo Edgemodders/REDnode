@@ -1759,7 +1759,7 @@ Asked for by EDGEbuilder in [#24](https://github.com/Edgemodders/REDnode/issues/
 | Phase | What |
 |---|---|
 | **S24 Spike** (built, REDnode 0.66.0) | RED Hot Tools' registry ported into the plugin (`native/src/overlay/worldnodes.cpp`), started on demand; `world.pick` in bounds mode with the static collision cast beside it, `world.node`, `world.highlight`, `world.setVisible`; the World nodes test app |
-| **N2** (after S24's test) | `world.nodes({ at, radius, kinds })`, `world.lookup(text)` (a node reference or hash), `world.observer(point)` (the world streaming around a point), `world.near({ at })`, MCP tools, entities in `highlight` and `setVisible`, the physics hit mapped to its node (RED Hot Tools' `GetPhysicsTraceObject`), and whether the hooks start with the game rather than on demand |
+| **N2** (after S24's test) | `world.nodes({ at, radius, kinds })`, `world.lookup(text)` (a node reference or hash), `world.observer(point)` (the world streaming around a point), `world.near({ at })`, MCP tools, entities in `highlight` and `setVisible`, the physics hit mapped to its node (RED Hot Tools' `GetPhysicsTraceObject`), and whether the hooks start with the game rather than on demand; for EDGEbuilder's picker (the owner's idea, 2026-11-15: a list of object types with checkboxes, so a player who never wants decals never picks one), `world.nodeKinds()` (the node classes the registry has seen, with how many of each) and `exclude: [...]` on `world.pick` beside `kinds` |
 
 ### S24: built (REDnode 0.66.0)
 
