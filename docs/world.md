@@ -1842,6 +1842,24 @@ Why (from the workspot as written, unverified): each clip's sequence had `loopIn
 
 **0.2.0** writes each clip's sequence with `loopInfinitely` on (a switch, **Clips loop until a jump**, on by default; off writes them as 0.1.0 did), adds a second way to jump, by the sequence's entry id (`SendJumpCommandEnt`, switch **Jump by entry id**), logs each actor's state after a jump, and adds **Watch 30 s**, a line each time the actors' state changes. Its test is the same steps, with these between steps 4 and 5: press **Watch 30 s** and say whether the actors hold A; and step 5 is run twice, by name and then by entry id.
 
+### A written workspot: second run (0.2.0)
+
+Run on 2026-11-16 by the owner on the laptop, REDnode 0.66.8, Director spike 0.2.0 (clips loop until a jump), game 2.5, every step.
+
+| Question | Found |
+|---|---|
+| Hold | **Yes**: with `loopInfinitely` on, both actors stayed in clip A for the 30 s watch and in the workspot through every jump after |
+| Start | A brief T pose at the first play, with bare and with full |
+| Jump, `instant` false ("blend") | The jump waits for the clip playing to reach its end: B came about 20 s after the press (A, `stand__2h_on_sides__01`, is 25.5 s long), and the timed run's jumps all showed about 10 s late though each was sent on time. By name and by entry id behaved alike |
+| Jump, `instant` true ("snap") | **The one to use**: at once, and a smooth blend from the current pose (the game's inertialization), no T pose and no snap. The button's name was wrong: `instant` is "now", not "no blend" |
+| The quest clip (C) | A T pose that stays, by name and by entry id. Same rig (`man_base.rig`), same compressed buffer layout and joint count as the gameplay clips (checked with REDbridge), so the cause is not in the clip's format (open) |
+| Root motion (D, a step off into a walk) | 0.00 m moved at 3 and 6 s, still in the workspot: a workspot does not move the person by a clip's root motion (or the clip has none applied there); the actors paused and looped |
+| Timing | The timers fired 0 to 13 ms late, both actors' jumps in the same frame (0 ms apart), the game at about 41 frames a second on the laptop |
+| Full (the game's tree kept) | After the arms-crossed idle the actors walked a few steps away and were out of the workspot, and no jump worked after that: the game's own entries, reactions and exits take over. The bare tree is the base to write from |
+| Weather | Read only (first run) |
+
+What it decides for EDGEdir (#46): a written workspot per actor works as a track: write each clip as a sequence whose idle is the clip with `loopInfinitely` on, keep only the clips and a fast exit, start it with `world.useWorkspot`, and move between clips with an **instant** jump (by name or by entry id), timed from the package. Open: quest clips (C's T pose, as in A1), the T pose at the first play, and moving a person along a path (root motion is not applied: a walk needs the person moved, or the game's own walk).
+
 ## World node registry (#24)
 
 Asked for by EDGEbuilder in [#24](https://github.com/Edgemodders/REDnode/issues/24) for its world inspector: hover or click anything the game placed and see what it is and which sector and node it comes from, outline it, hide it for the session, list what is streamed in near the camera, and have the world stream around EDGEbuilder's camera. Entities are covered by `world.near` and `world.files`; static nodes (most buildings, street furniture, decals, lights, foliage) are not: nothing in the game API names the node a click hit, and on 2.5 a sector keeps a node's path only as a hash. RED Hot Tools solves it with hooks on sector loading and node-instance setup (its `WorldNodeRegistry`, MIT) but has no 2.5 build.

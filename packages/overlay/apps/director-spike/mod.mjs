@@ -35,7 +35,7 @@ const CLIPS = [
 const RECORD = 'Character.trauma_team_paramedic';
 
 let which = 'bare';
-let snap = false;
+let snap = true; // instant: jump now, blended by the game; off waits for the clip's end
 let byEntry = false;
 let loopClips = true;
 // The entry id of each clip's sequence, the same in both workspots (both count on from the game's idCounter).
@@ -204,7 +204,7 @@ async function jumpAll(clip) {
   return times;
 }
 const jump = (label, clip) =>
-  step(`Jump to ${label}${byEntry ? ' by entry' : ' by name'}${snap ? ' (snap)' : ''}`, async () => {
+  step(`Jump to ${label}${byEntry ? ' by entry' : ' by name'}${snap ? ' (instant)' : ' (at the clip end)'}`, async () => {
     const t = await jumpAll(clip);
     await wait(600);
     return `calls ${t.map((x) => x.toFixed(0)).join(' / ')} ms; after 0.6 s: ${await brief()}`;
@@ -353,7 +353,7 @@ ui.window({
     ui.heading('3. Two actors'),
     ui.row(ui.button('Spawn', spawn), ui.button('Play both', play), ui.button('State', state, { variant: 'ghost' }), ui.button('Watch 30 s', watch, { variant: 'ghost' })),
     ui.heading('4. Jumps'),
-    ui.toggle('Snap (instant) instead of blend', (on) => (snap = on)),
+    ui.toggle('Instant: jump now (off: wait for the clip playing to end)', (on) => (snap = on), { checked: true }),
     ui.toggle('Jump by entry id (SendJumpCommandEnt) instead of by clip name', (on) => (byEntry = on)),
     ui.row(...CLIPS.slice(0, 3).map(([label, clip]) => ui.button(label, () => jump(label, clip), { variant: 'ghost' }))),
     ui.heading('5 and 6. Gap, root motion, timing'),
@@ -363,4 +363,4 @@ ui.window({
     log,
   ],
 });
-say('Director spike 0.2.0 ready');
+say('Director spike 0.2.1 ready');
