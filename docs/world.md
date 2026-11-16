@@ -1826,6 +1826,22 @@ REDnode 0.66.8, Codeware, REDbridge found (the Mod Manager's **Get REDbridge**),
 9. Press **Use full**, **Spawn**, **Play both**, and repeat steps 4 and 5. Say what differs (a walk-in, the T pose).
 10. Press **Read the weather**, then **Remove the actors**, and switch the app off.
 
+### A written workspot: first run
+
+Run on 2026-11-16 by the owner on the laptop, REDnode 0.66.8, Director spike 0.1.0, game 2.5, steps 1 to 5 (the rest not reached).
+
+| Step | Found |
+|---|---|
+| Build | Both workspots written and packed through REDbridge in 23 s (the first REDbridge call of the session included) |
+| Swap | 75 ms through REDswap |
+| Spawn and Play | Both actors "started"; a brief T pose at the start |
+| Jumps | Unreliable: most presses changed nothing seen, or late. The workspot itself held: `isActive` true, our `s46_bare.workspot` |
+| End | 40 to 80 s after each Play both actors were out of the workspot, and the jumps after that did nothing |
+
+Why (from the workspot as written, unverified): each clip's sequence had `loopInfinitely` off, so a sequence played its clip once and the workspot moved on to the next sequence by itself (`disableAutoTransition` off): A, B, C, D, then the fast exit, which ends the workspot. The actors were already running through the clips on their own, so a jump to a clip often landed on what was already playing or about to, and once past the fast exit there was nothing to jump in.
+
+**0.2.0** writes each clip's sequence with `loopInfinitely` on (a switch, **Clips loop until a jump**, on by default; off writes them as 0.1.0 did), adds a second way to jump, by the sequence's entry id (`SendJumpCommandEnt`, switch **Jump by entry id**), logs each actor's state after a jump, and adds **Watch 30 s**, a line each time the actors' state changes. Its test is the same steps, with these between steps 4 and 5: press **Watch 30 s** and say whether the actors hold A; and step 5 is run twice, by name and then by entry id.
+
 ## World node registry (#24)
 
 Asked for by EDGEbuilder in [#24](https://github.com/Edgemodders/REDnode/issues/24) for its world inspector: hover or click anything the game placed and see what it is and which sector and node it comes from, outline it, hide it for the session, list what is streamed in near the camera, and have the world stream around EDGEbuilder's camera. Entities are covered by `world.near` and `world.files`; static nodes (most buildings, street furniture, decals, lights, foliage) are not: nothing in the game API names the node a click hit, and on 2.5 a sector keeps a node's path only as a hash. RED Hot Tools solves it with hooks on sector loading and node-instance setup (its `WorldNodeRegistry`, MIT) but has no 2.5 build.

@@ -1235,6 +1235,7 @@ The Director spike (`packages/overlay/apps/director-spike`, REDnode 0.66.8, noth
 | Run | Result |
 |---|---|
 | Outside the game, 2026-11-16, by Claude | The two workspots written from the game's own, read back and packed (scratchpad `s46/make.py`); the app starts in the mock host. The game run waits for A2's test |
+| Laptop, 2026-11-16, by the owner, Director spike 0.1.0 | **Fail at step 5**: build, swap and play worked (a brief T pose at the start), but jumps were unreliable and the actors left the workspot 40 to 80 s after each play: each clip played once and the next followed, then the fast exit. Fixed in 0.2.0 (clips loop until a jump, a jump by entry id, Watch 30 s) |
 
 ## Animations on a spawned character: A2 (#39)
 

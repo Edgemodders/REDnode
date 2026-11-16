@@ -36,6 +36,10 @@ const RECORD = 'Character.trauma_team_paramedic';
 
 let which = 'bare';
 let snap = false;
+let byEntry = false;
+let loopClips = true;
+// The entry id of each clip's sequence, the same in both workspots (both count on from the game's idCounter).
+let entryIds = {};
 let actors = []; // [{ id, label }]
 let busy = '';
 
@@ -74,15 +78,18 @@ function writeWorkspot(source, bare) {
   let handle = 100000;
   const nextEntry = () => ++entry;
   const nextHandle = () => String(++handle);
-  const sequence = (clip) => ({
+  const sequence = (clip) => {
+    entryIds[clip] = entry + 1;
+    return {
     HandleId: nextHandle(),
     Data: {
       $type: 'workSequence', category: 'Any', disableAutoTransition: 0, flags: 0,
       id: { $type: 'workWorkEntryId', id: nextEntry() },
-      idleAnim: cname(clip), loopInfinitely: 0, previousLoopInfinitely: 0,
+      idleAnim: cname(clip), loopInfinitely: loopClips ? 1 : 0, previousLoopInfinitely: 0,
       list: [{ HandleId: nextHandle(), Data: { $type: 'workAnimClip', animName: cname(clip), blendOutTime: 0.5, flags: 2, id: { $type: 'workWorkEntryId', id: nextEntry() } } }],
     },
-  });
+    };
+  };
   const root = tree.rootEntry.Data;
   const kept = bare ? root.list.filter((c) => c.Data.$type === 'workFastExit') : root.list;
   root.list = [...CLIPS.map(([, clip]) => sequence(clip)), ...kept];
@@ -115,6 +122,8 @@ const build = () =>
       await b.call('cr2w.fromJson', { outFile: out, jsonFile: jf });
       say(`  ${kind}: ${fs.statSync(out).size} bytes`);
     }
+    fs.writeFileSync(path.join(work, 'entries.json'), JSON.stringify(entryIds));
+    say(`  entries: ${CLIPS.map(([label, clip]) => `${label[0]} ${entryIds[clip]}`).join(', ')}; clips ${loopClips ? 'loop until a jump' : 'play once and move on'}`);
     const packed = await b.call('project.pack', { dir: tree, outDir: path.join(work, 'packed'), modName: ARCHIVE });
     return `${packed.archive} (${packed.bytes} bytes, ${packed.files} files)`;
   });
@@ -172,26 +181,60 @@ const play = () =>
 
 // ---- 4. Jumps ---------------------------------------------------------------------
 
+function entryOf(clip) {
+  if (!entryIds[clip]) {
+    const f = path.join(pkg.dataDir, 's46', 'entries.json');
+    if (fs.existsSync(f)) entryIds = JSON.parse(fs.readFileSync(f, 'utf8'));
+  }
+  if (!entryIds[clip]) throw new Error('Press Build first: the entry ids come from it');
+  return entryIds[clip];
+}
+const sendJump = (ws, e, clip) => (byEntry ? ws.SendJumpCommandEnt(e, entryOf(clip), snap) : ws.SendJumpToAnimEnt(e, clip, snap));
+
 async function jumpAll(clip) {
   const ws = await system();
   const ps = await people();
   const times = await Promise.all(
     ps.map(async (p) => {
       const t = performance.now();
-      await ws.SendJumpToAnimEnt(p.e, clip, snap);
+      await sendJump(ws, p.e, clip);
       return performance.now() - t;
     }),
   );
   return times;
 }
 const jump = (label, clip) =>
-  step(`Jump to ${label}${snap ? ' (snap)' : ''}`, async () => {
+  step(`Jump to ${label}${byEntry ? ' by entry' : ' by name'}${snap ? ' (snap)' : ''}`, async () => {
     const t = await jumpAll(clip);
     await wait(600);
-    const ws = await system();
-    const ps = await people();
-    const inWs = await Promise.all(ps.map((p) => ws.IsActorInWorkspot(p.e)));
-    return `calls ${t.map((x) => x.toFixed(0)).join(' / ')} ms; in a workspot after 0.6 s: ${inWs.join(', ')}`;
+    return `calls ${t.map((x) => x.toFixed(0)).join(' / ')} ms; after 0.6 s: ${await brief()}`;
+  });
+
+// One line per actor: in the workspot, active, entering or exiting.
+async function brief() {
+  const ps = await people();
+  const out = await Promise.all(
+    ps.map(async (p) => {
+      const s = await world.workspotState(p.id).catch(() => null);
+      if (!s?.inWorkspot) return `${p.label} out`;
+      return `${p.label} in${s.isActive ? '' : ' (not active)'}${s.entering ? ' entering' : ''}${s.exiting ? ' exiting' : ''}`;
+    }),
+  );
+  return out.join(', ');
+}
+
+// Watch both actors for 30 s, a line every 2 s: shows a clip running out, the next starting, or the workspot ending.
+const watch = () =>
+  step('Watch 30 s', async () => {
+    const t0 = performance.now();
+    let last = '';
+    for (let i = 0; i < 15; i++) {
+      const b = await brief();
+      if (b !== last) say(`  ${((performance.now() - t0) / 1000).toFixed(0)} s: ${b}`);
+      last = b;
+      await wait(2000);
+    }
+    return `last: ${last}`;
   });
 
 // ---- 5. Gap and root motion -------------------------------------------------------
@@ -235,7 +278,7 @@ const timed = () =>
               const each = [];
               await Promise.all(
                 ps.map(async (p) => {
-                  await ws.SendJumpToAnimEnt(p.e, clip, snap);
+                  await sendJump(ws, p.e, clip);
                   each.push(performance.now() - fired);
                 }),
               );
@@ -294,6 +337,7 @@ ui.window({
   children: [
     status,
     ui.heading('1 and 2. The workspots'),
+    ui.toggle('Clips loop until a jump (off: each plays once and the next follows, as 0.1.0 wrote them)', (on) => (loopClips = on), { checked: true }),
     ui.row(ui.button('Build', build), ui.button('Swap in', swap, { variant: 'ghost' })),
     chosen,
     ui.row(
@@ -307,9 +351,10 @@ ui.window({
       }, { variant: 'ghost' }),
     ),
     ui.heading('3. Two actors'),
-    ui.row(ui.button('Spawn', spawn), ui.button('Play both', play), ui.button('State', state, { variant: 'ghost' })),
+    ui.row(ui.button('Spawn', spawn), ui.button('Play both', play), ui.button('State', state, { variant: 'ghost' }), ui.button('Watch 30 s', watch, { variant: 'ghost' })),
     ui.heading('4. Jumps'),
     ui.toggle('Snap (instant) instead of blend', (on) => (snap = on)),
+    ui.toggle('Jump by entry id (SendJumpCommandEnt) instead of by clip name', (on) => (byEntry = on)),
     ui.row(...CLIPS.slice(0, 3).map(([label, clip]) => ui.button(label, () => jump(label, clip), { variant: 'ghost' }))),
     ui.heading('5 and 6. Gap, root motion, timing'),
     ui.row(ui.button('Step off, then nothing', gap), ui.button('Timed run (8 s)', timed)),
@@ -318,4 +363,4 @@ ui.window({
     log,
   ],
 });
-say('Director spike 0.1.0 ready');
+say('Director spike 0.2.0 ready');
