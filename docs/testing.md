@@ -1244,6 +1244,7 @@ The player's say over which packages may call another package's tools (REDnode 0
 | Run | Result |
 |---|---|
 | Dev host, mock game, 2026-11-15, by Claude, REDnode 0.66.0 | **Pass**: 15 calls over three runs (scratchpad `g22/run.sh`) and 19 checks of the two managers' data through DevTools (`g22/ui.mjs`); pictures of both managers looked right |
+| In the game, 2026-11-15, by the owner, dev PC, REDnode 0.66.7, Tools Manager 0.2.0 from a development folder (`packs/admin-tools/apps`, since EDGEdeck's Admin Tools files are hardlinks) | **Pass**, every step as written. The Mod log has each refusal with its reason (not allowed for Counter panel, not listed in its "calls", switched off for mods, not allowed for Roles test as `counter.add`), `get` open, `add` working once allowed, `reset` working with the package switch on, and the grants `call:counter-service.add` and `call:counter.add` kept in settings.json across a restart. #22 closed |
 
 ## The controller (0.65.1)
 

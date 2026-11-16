@@ -365,6 +365,8 @@ Checked in the mock game: scratchpad `g22/run.sh`, 15 calls over three runs with
 
 ## Calls from mods test
 
+**Passed in game on 2026-11-15** (dev PC, REDnode 0.66.7, Tools Manager 0.2.0 from a development folder): every step as written; #22 closed.
+
 REDnode 0.66.0, Admin Tools 0.2.0 (its Tools Manager), Counter service 0.3.0, Counter panel 0.3.0, Roles test 0.2.0. Load a save first.
 
 1. In the Mod Manager switch on **Counter service**, **Counter panel**, **Roles test** and **Tools Manager**, and the Tools Manager's **Allowed** (the `admin` permission). Open Counter panel's details: a **Calls** section lists "Calls Counter service's add", "A tool that needs your OK", its **Allowed** switch off.
