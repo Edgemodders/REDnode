@@ -186,6 +186,8 @@ export interface WorldNode {
   distance?: number;
   /** For {@link world.pick} with a physics hit: whether the node's box holds that point. */
   holdsHit?: boolean;
+  /** For {@link world.pick}: its box's volume in cubic metres. */
+  volume?: number;
 }
 
 /** Options for {@link world.pick}. */
@@ -204,6 +206,12 @@ export interface PickOptions {
   all?: boolean;
   /** Also cast against the static collision, so each hit says whether its box holds that point. Default `true`. */
   physics?: boolean;
+  /**
+   * `"fit"` (the default): with a collision hit, the nodes whose box holds the hit point first,
+   * the smallest box first (what was aimed at, rather than the road or terrain piece the ray
+   * starts inside), then the rest by distance. `"nearest"`: by distance only.
+   */
+  order?: "fit" | "nearest";
 }
 
 /** What {@link world.pick} answers. */
@@ -825,6 +833,7 @@ export const world = {
       ...(options.kinds ? { kinds: options.kinds } : {}),
       all: !!options.all,
       physics: options.physics !== false,
+      ...(options.order ? { order: options.order } : {}),
     })) as PickResult;
   },
 

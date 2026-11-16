@@ -951,7 +951,13 @@ std::string Pick(const json::Value& aParams, std::string& aError)
     {
         const void* setup;
         float t;
+        float volume;
+        bool holds;
     };
+    // "fit" (the default with a collision hit): the boxes that hold the hit point first, the
+    // smallest first, then the rest by distance. The ray often starts inside large boxes (a road,
+    // a terrain piece) that hold the hit too: by distance alone they came first (0.66.4's test).
+    const bool fit = StringOr(aParams, "order") != "nearest";
     std::vector<Hit> hits;
     size_t looked = 0;
     AcquireSRWLockExclusive(&g_lock);
@@ -975,19 +981,27 @@ std::string Pick(const json::Value& aParams, std::string& aError)
         const float t = RayBox(from, dir, d.min, d.max);
         if (t < 0 || t > max)
             continue;
-        hits.push_back({setup, t});
+        const bool holds = hit && point[0] >= d.min[0] - 0.05f && point[0] <= d.max[0] + 0.05f &&
+                           point[1] >= d.min[1] - 0.05f && point[1] <= d.max[1] + 0.05f && point[2] >= d.min[2] - 0.05f &&
+                           point[2] <= d.max[2] + 0.05f;
+        const float volume = (d.max[0] - d.min[0]) * (d.max[1] - d.min[1]) * (d.max[2] - d.min[2]);
+        hits.push_back({setup, t, volume, holds});
     }
-    std::sort(hits.begin(), hits.end(), [](const Hit& a, const Hit& b) { return a.t < b.t; });
+    std::sort(hits.begin(), hits.end(), [fit](const Hit& a, const Hit& b) {
+        if (fit && a.holds != b.holds)
+            return a.holds;
+        if (fit && a.holds)
+            return a.volume < b.volume;
+        return a.t < b.t;
+    });
     std::string list = "[";
     for (int i = 0; i < static_cast<int>(hits.size()) && i < limit; ++i)
     {
         auto& d = g_setups[hits[i].setup];
-        std::string extra = ",\"distance\":" + Num(hits[i].t);
+        std::string extra = ",\"distance\":" + Num(hits[i].t) + ",\"volume\":" + Num(hits[i].volume);
         if (hit)
         {
-            const bool holds = point[0] >= d.min[0] - 0.05f && point[0] <= d.max[0] + 0.05f && point[1] >= d.min[1] - 0.05f &&
-                               point[1] <= d.max[1] + 0.05f && point[2] >= d.min[2] - 0.05f && point[2] <= d.max[2] + 0.05f;
-            extra += std::string(",\"holdsHit\":") + (holds ? "true" : "false");
+            extra += std::string(",\"holdsHit\":") + (hits[i].holds ? "true" : "false");
         }
         list += (i ? "," : "") + NodeJson(hits[i].setup, d, extra.c_str());
     }

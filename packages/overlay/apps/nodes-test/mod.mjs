@@ -70,7 +70,7 @@ async function describe(n) {
   const res = n.resource ? (await nameOf(n.resource)) || n.resource : '';
   return `${n.kind} ${n.id}  sector ${sector.split('\\').pop()}  node ${n.index}/${n.nodeCount}, instance ${n.instance}/${n.instanceCount}${
     n.distance !== undefined ? `  at ${short(n.distance)} m` : ''
-  }  box from ${n.boundsFrom}${n.holdsHit ? '  HOLDS THE HIT' : ''}${res ? `  ${res.split('\\').pop()}` : ''}${n.appearance ? ` (${n.appearance})` : ''}${
+  }  box from ${n.boundsFrom}${n.volume !== undefined ? ` ${n.volume < 10 ? n.volume.toFixed(2) : Math.round(n.volume)} m3` : ''}${n.holdsHit ? '  HOLDS THE HIT' : ''}${res ? `  ${res.split('\\').pop()}` : ''}${n.appearance ? ` (${n.appearance})` : ''}${
     n.streamed ? `  attached ${n.attached}, visible ${n.visible}` : '  not streamed'
   }${n.hidden ? '  HIDDEN' : ''}`;
 }
@@ -131,7 +131,7 @@ const pick = () =>
     picked = r.hits;
     say(`  physics hit: ${r.physicsHit ? `${r.physicsHit.distance.toFixed(1)} m at ${r.physicsHit.point.map((c) => c.toFixed(1)).join(', ')}` : 'none'}`);
     for (const [i, n] of r.hits.entries()) say(`  ${i + 1}. ${await describe(n)}`);
-    choose(r.hits.find((n) => n.holdsHit) ?? r.hits[0] ?? null);
+    choose(r.hits[0] ?? null); // nearest fit: the smallest box that holds the hit
     return `${r.found} crossed, ${r.hits.length} shown; ${r.looked} looked at in ${r.ms} ms in the game`;
   });
 

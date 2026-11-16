@@ -1,7 +1,7 @@
 {
   "id": "nodes-test",
   "name": "World nodes test",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "author": "Edgemodders",
   "description": "#24's spike: starts REDnode's world node registry (ported from RED Hot Tools), picks the world's nodes along the camera's view with the sector and node each comes from, outlines the chosen one, hides it for the session and shows it again. With the bridge permission, sectors and resources are named through REDbridge. Switching it off shows again what it hid.",
   "main": "mod.mjs",
