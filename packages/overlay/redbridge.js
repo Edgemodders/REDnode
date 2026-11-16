@@ -97,6 +97,7 @@ const NOT_INSTALLED =
  * @param {() => string | null} host.gameDir      the game folder, for --game
  * @param {() => string | undefined} host.configured  a REDbridge path from the settings
  * @param {() => boolean} host.clean  the W3 test: only REDnode's own copy, only a per-user .NET
+ * @param {() => void} [host.changed]  REDbridge started or ended (the Mod Manager shows it)
  */
 function createRedbridge(host) {
   let child = null;
@@ -105,6 +106,7 @@ function createRedbridge(host) {
   const pending = new Map(); // id -> { resolve, reject, method }
   let idleTimer = null;
   let buffer = Buffer.alloc(0);
+  let handOver = false; // a newer copy is on disk: stop once no call waits, so the next call starts it
 
   function locate() {
     found = findRedbridge(host.configured(), host.clean());
@@ -135,7 +137,9 @@ function createRedbridge(host) {
       host.log(`REDbridge ended (code ${code})`);
       for (const [, p] of pending) p.reject(new Error(`REDbridge ended (code ${code}) before answering ${p.method}`));
       pending.clear();
+      host.changed?.();
     });
+    host.changed?.();
   }
 
   function onData(chunk) {
@@ -171,6 +175,11 @@ function createRedbridge(host) {
   function idle() {
     clearTimeout(idleTimer);
     if (pending.size) return;
+    if (handOver && child) {
+      host.log(`REDbridge ${found?.version ?? ''}: stopping it so the newer copy starts with the next call`.replace('  ', ' '));
+      stop();
+      return;
+    }
     idleTimer = setTimeout(() => {
       if (!pending.size && child) {
         host.log('REDbridge idle for 10 minutes; stopping it');
@@ -201,6 +210,7 @@ function createRedbridge(host) {
 
   function stop() {
     clearTimeout(idleTimer);
+    handOver = false;
     const proc = child;
     child = null;
     if (proc) {
@@ -215,6 +225,8 @@ function createRedbridge(host) {
    */
   function status() {
     const f = child ? found : locate();
+    // While one runs, the newest copy on disk can be a newer one (an update just fetched).
+    const disk = child ? findRedbridge(host.configured(), host.clean()) : f;
     const runtime = dotnet10(host.clean());
     return {
       found: !!f,
@@ -222,11 +234,30 @@ function createRedbridge(host) {
       version: f?.version ?? null,
       source: f?.source ?? null,
       running: !!child,
+      // The newest copy on disk, which the next start uses.
+      newest: disk ? { version: disk.version, source: disk.source } : null,
+      // Stopping once no call waits, so that newer copy takes over.
+      handingOver: !!child && handOver,
       dotnet: runtime ? (runtime.machine ? 'machine' : 'user') : null,
     };
   }
 
-  return { call, stop, status };
+  /**
+   * After an update: when the running copy is older than the newest on disk, stop it as
+   * soon as no call waits (now, if none does); the next call starts the newer one.
+   */
+  function useNewest() {
+    if (!child) return false;
+    const disk = findRedbridge(host.configured(), host.clean());
+    if (!disk || disk.exe === found?.exe || !disk.version || !found?.version) return false;
+    if (compareVersions(disk.version, found.version) <= 0) return false;
+    handOver = true;
+    host.log(`REDbridge ${disk.version} from ${disk.source} takes over from ${found.version} once no call waits (${pending.size} now)`);
+    idle();
+    return true;
+  }
+
+  return { call, stop, status, useNewest };
 }
 
 module.exports = { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED };

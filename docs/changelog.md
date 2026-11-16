@@ -28,6 +28,10 @@ How to keep it:
 - `world.useWorkspot`'s `entry` jumps at once (it waited for the clip playing to end, which can be many seconds), and takes an entry id or a name from `world.writeWorkspot` too.
 - A mod that calls another mod's `@tool` function that changes something (not `@readonly`) is now refused until it lists the call in `"calls"` and you allow it. Counter panel and Roles test show how.
 
+**Fixed**
+
+- **Update REDbridge** in the Mod Manager while REDbridge was running: the download finished, but the old version kept running and the button stayed, and pressing it again did nothing. The running REDbridge now stops as soon as no call waits, the next call starts the new one, and the update is no longer offered once it is downloaded.
+
 ## 0.65.3 (2026-11-15)
 
 For game version 2.5.

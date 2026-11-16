@@ -513,6 +513,7 @@ const redbridge = createRedbridge({
   gameDir: () => GAME_DIR,
   configured: () => settings.redbridge,
   clean: () => settings.bridgeTest === 'clean',
+  changed: () => notifyLauncher(),
 });
 // The same REDbridge for the MCP servers the host runs (#40, bridge-share.js), on a port and
 // token of its own, given to each in its environment.
@@ -652,11 +653,16 @@ function bridgeInfo() {
     bridgePeeked = true;
     latestBridge().catch((err) => log(`REDbridge: could not ask GitHub for the newest release: ${err.message}`));
   }
-  const newer = bridgeLatest && s.found && s.version && compareVersions(bridgeLatest.version, s.version) > 0;
+  // Compared with the newest copy on disk, not the running one: after an update the old
+  // copy runs until no call waits, and the update must not be offered again meanwhile.
+  const have = s.newest?.version ?? s.version;
+  const newer = bridgeLatest && s.found && have && compareVersions(bridgeLatest.version, have) > 0;
   return {
     ...s,
     latest: bridgeLatest ? { version: bridgeLatest.version, size: bridgeLatest.size } : null,
     update: newer ? bridgeLatest.version : null,
+    // A newer copy is on disk and takes over once the running one finishes its calls.
+    next: s.running && s.newest?.version && s.version && compareVersions(s.newest.version, s.version) > 0 ? s.newest : null,
     job: bridgeJob,
   };
 }
@@ -682,7 +688,8 @@ async function getRedbridge() {
   try {
     const rel = await latestBridge();
     const before = redbridge.status();
-    if (!before.found || (before.version && compareVersions(rel.version, before.version) > 0)) {
+    const have = before.newest?.version ?? before.version;
+    if (!before.found || (have && compareVersions(rel.version, have) > 0)) {
       bridgeProgress({ step: `Downloading REDbridge ${rel.version}`, version: rel.version, total: rel.size });
       await bridgeInstall.installRelease(rel, {
         log,
@@ -693,6 +700,9 @@ async function getRedbridge() {
       bridgeProgress({ step: 'Installing the .NET 10 runtime for this Windows user', received: 0, total: 0 });
       await bridgeInstall.installDotnet({ log });
     }
+    // A running older copy (REDnode's, EDGEdeck's or REDcode's) stops once no call waits,
+    // so the next call starts the new one.
+    redbridge.useNewest();
     // Older copies of REDnode's own go, unless REDbridge runs from one; then at the next start.
     if (!redbridge.status().running) bridgeInstall.removeOlder(rel.tag, log);
     bridgeJob = null;

@@ -122,6 +122,7 @@ function bridgeBlock(i) {
     return parts;
   }
   parts.push(el('div', 'perm dim', `REDbridge ${b.version ?? ''} from ${b.source}${b.running ? ', running' : ''}`));
+  if (b.next) parts.push(el('div', 'perm dim', `REDbridge ${b.next.version} from ${b.next.source} is ready: it takes over once the running one finishes its calls.`));
   if (!b.dotnet) {
     parts.push(el('div', 'perm err', 'It needs the .NET 10 runtime, which this PC does not have.'));
     parts.push(el('div', 'perm dim', 'Get REDbridge installs it for this Windows user, with the installer from Microsoft; no admin rights.'));
