@@ -1802,6 +1802,23 @@ REDnode 0.66.1 (built, awaiting the rerun of the S24 test):
 - `setVisible` uses only the game's `WorldNodeInstance_SetVisibility`. `highlight` answers that it is not on 2.5 yet: the first live instance of each class logs its vtable slots and the fields that point at objects, for a static check of the render proxies' places.
 - `WorldNode.interior` became `flags` (the raw 16 bits after the index); `NodeRegistryState.offset` became `layout`, `faults` became `refused`.
 
+### S24 test: results (REDnode 0.66.1 to 0.66.7)
+
+Run on 2026-11-15 by the owner on the dev PC, game 2.5, one build after another:
+
+| Build | Found | Fixed in the next |
+|---|---|---|
+| 0.66.1 | The layout was found (node index at setup+0x70, 19 bits, read after the game's OnReady; the dump's +0x80 held something else then), but the save load "hung" | The detours pass every argument register and the return value through (OnReady turned out to be the sector's PostLoad, which returns nothing: not the cause) |
+| 0.66.2 | Still "hung", with the sector hooks alone. A debugger attached to the running game (`cdbX64 -pv`) showed the sector hook in its setup loop, about 700 setups in several seconds out of 15,114 in one sector: two VirtualQuery calls per setup, milliseconds each in this game, while the game waited for the sector | VirtualQuery only for unknown memory: the layout candidates at the first sector, an instance class's fields the first time it is seen |
+| 0.66.3 | The load took normal time (1,000 sectors recorded in 117 ms, 100,000 instances set up). The first pick crashed: a GI space instance's +0xB8 held a mesh in the instance scanned and flags in the next | The mesh field is trusted only for the mesh node instance families; a value that cannot be a pointer is never followed |
+| 0.66.4 | Picks and hides worked; the pin showed what was chosen. The chosen node was often not the one aimed at: the ray starts inside a road's and terrain pieces' boxes, which hold the hit too. Hiding the bench worked; picks of a street lamp and a bin chose LOD stand-ins and terrain | Fit order (the smallest box holding the hit first); LOD stand-ins, occluders, collision, smart objects, GI spaces and shapes skipped unless `helpers`; entity nodes give their entity's id. The class lines located the render proxies at RED Hot Tools' places (one vtable at +0xC8 for meshes, +0xB0 decals, +0xE0 bent meshes), so the outline went on |
+| 0.66.6 | The outline worked, on a ground decal: decals had a made-up 1 m box, smaller than the bench's real one | Mesh boxes rank before made-up ones; decals get a box from their scale (unverified) |
+| 0.66.7 | **Passed**, steps 1 to 4, 6 and 7 (the owner; step 5, the street lamp, still to run): the bench was line 1 with the pin under it ("box from mesh", 2.57 m3, holds the hit), **Outline** and **See-through, filled** lit it, **Hide** hid it (the instance's visible flag off) and **Show all hidden** brought it back. The registry knew 1,215 sectors and 270,065 nodes; a pick takes about 25 ms on the game thread (20 picks: median 25.7 ms, worst 27.3 ms; the first pick after a load 0.4 to 0.8 s while boxes are worked out) | |
+
+The 0.66.7 log has the bench steps and the timing; the decal's outline and hide are in 0.66.6's log, and the owner reported the bin and the clean-up as written. Step 5 (the street lamp's entity id) is still to run.
+
+Still to do in N2: a pick on the game thread costs about 25 ms (a grid of the nodes by place would cut it), decal boxes from their scale are unverified, entities are reached by id but not hidden or outlined by `world.setVisible`/`world.highlight` yet, instanced meshes and foliage (one node, many copies) have one box for all, and the rest of N2's list.
+
 ### S24 test
 
 REDnode 0.66.1 (0.66.0 crashed at step 2, above), game 2.5, REDbridge found (the Mod Manager's **Get REDbridge**, for names). Outdoors in the city, outside combat. The outline (steps 4, 5, 8) is not on 2.5 yet: those steps say "not done" with the reason, which is expected.
