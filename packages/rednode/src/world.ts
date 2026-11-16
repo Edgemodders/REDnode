@@ -237,6 +237,9 @@ export interface NodeRegistryState {
   refused: number;
   /** Time spent recording sectors so far, in milliseconds. */
   sectorMs: number;
+  /** Sectors unloaded, and the time spent forgetting them. */
+  forgotten: number;
+  forgetMs: number;
   canHide: boolean;
   canHighlight: boolean;
 }
@@ -793,24 +796,26 @@ export const world = {
    * record each sector as it loads, so after the first start, load a save (or travel) for the
    * sectors around V to be known. Experimental.
    */
-  async nodeRegistry(): Promise<NodeRegistryState> {
-    await invoke("nodes.start", {});
+  async nodeRegistry(options: { instances?: boolean } = {}): Promise<NodeRegistryState> {
+    await invoke("nodes.start", options.instances === false ? { instances: false } : {});
     return (await invoke("nodes.state", {})) as NodeRegistryState;
   },
 
   /**
    * The world's nodes along a ray, nearest first: what the camera (or any ray) looks at,
    * buildings, decals, lights and objects without collision included, each with the sector and
-   * node it comes from. Experimental (#24): starts the node registry on first use.
+   * node it comes from. Experimental (#24): start the node registry first with
+   * {@link world.nodeRegistry}, then let the sectors around V load (a save load).
    *
    * @example
    * ```ts
+   * await world.nodeRegistry();
+   * // ... after a save loads
    * const { hits } = await world.pick({ max: 30 });
    * console.log(hits[0]?.kind, hits[0]?.id);
    * ```
    */
   async pick(options: PickOptions = {}): Promise<PickResult> {
-    await invoke("nodes.start", {});
     const v = (p?: WorldPoint) => (p ? [p.x, p.y, p.z] : undefined);
     return (await invoke("nodes.pick", {
       ...(options.from ? { from: v(options.from) } : {}),

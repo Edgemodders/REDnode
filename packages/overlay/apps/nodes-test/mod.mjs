@@ -80,16 +80,16 @@ function choose(n) {
   target.set({ text: n ? `Chosen: ${n.kind} ${n.id}` : 'No node chosen.', tone: n ? 'accent' : 'dim' });
 }
 
-const start = () =>
-  step('Start', async () => {
-    const s = await world.nodeRegistry();
+const start = (instances = true) =>
+  step(instances ? 'Start' : 'Start (sectors only)', async () => {
+    const s = await world.nodeRegistry({ instances });
     showState(s);
     return `hooks ${s.attached.join(', ') || 'none'}; layout ${s.layout ?? 'not found yet'}; ${s.sectors} sectors, ${s.setups} nodes`;
   });
 
 function showState(s) {
   state.set({
-    text: `Hooks: ${s.attached.join(', ') || 'none'}. Layout: ${s.layout ?? '?'}. Sectors ${s.sectors} (${s.badSectors} bad), nodes ${s.setups}, live ${s.instances}, hidden ${s.hidden}, refused reads ${s.refused}, ${s.sectorMs} ms recording. Hide ${s.canHide ? 'yes' : 'NO'}, outline ${s.canHighlight ? 'yes' : 'not yet'}.`,
+    text: `Hooks: ${s.attached.join(', ') || 'none'}. Layout: ${s.layout ?? '?'}. Sectors ${s.sectors} (${s.badSectors} bad, ${s.forgotten} unloaded), nodes ${s.setups}, live ${s.instances}, hidden ${s.hidden}, refused reads ${s.refused}, ${s.sectorMs} ms recording, ${s.forgetMs} ms unloading. Hide ${s.canHide ? 'yes' : 'NO'}, outline ${s.canHighlight ? 'yes' : 'not yet'}.`,
     tone: s.badSectors ? 'danger' : 'normal',
   });
 }
@@ -171,7 +171,11 @@ ui.window({
   closable: true,
   children: [
     state,
-    ui.row(ui.button('Start', start), ui.button('State', refresh, { variant: 'ghost' })),
+    ui.row(
+      ui.button('Start', () => start(true)),
+      ui.button('Start (sectors only)', () => start(false), { variant: 'ghost' }),
+      ui.button('State', refresh, { variant: 'ghost' }),
+    ),
     ui.heading('Pick (aim with the camera first, then F10)'),
     ui.slider('Reach (m)', (v) => (max = v), { min: 5, max: 200, step: 5, value: max }),
     ui.input({ placeholder: 'Only these kinds, comma separated (e.g. worldMeshNode, worldInstancedMeshNode)', onChange: (v) => (kinds = v), onSubmit: (v) => (kinds = v) }),

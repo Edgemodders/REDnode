@@ -91,10 +91,14 @@ constexpr size_t InstancePlace = 0x30;  // Vector4, then the orientation quatern
 constexpr size_t InstanceScale = 0x50;  // Vector3
 constexpr size_t InstanceState = 0x8C;  // 2.5 (0x88 in 2.31): bit 5 attached, bit 9 visible
 
-using SectorReady_t = void (*)(void*, uint64_t);
-using SectorDtor_t = void (*)(void*);
-using NodeInitialize_t = bool (*)(void*, void*, void*);
-using NodeAttach_t = bool (*)(void*, void*);
+// The hooked functions are passed all four argument registers and their own return value back,
+// whatever they really take and give (0.66.1 dropped OnReady's return value by recording after
+// it, and save loads hung on the loading screen).
+using Hooked_t = uint64_t (*)(void*, void*, void*, void*);
+using SectorReady_t = Hooked_t;
+using SectorDtor_t = Hooked_t;
+using NodeInitialize_t = Hooked_t;
+using NodeAttach_t = Hooked_t;
 using NodeVisibility_t = void (*)(void*, bool);
 
 SectorReady_t g_sectorReady = nullptr;
@@ -303,7 +307,13 @@ struct SetupData
 SRWLOCK g_lock = SRWLOCK_INIT;
 std::unordered_map<const void*, SetupData> g_setups;
 std::unordered_map<const void*, const void*> g_instanceSetup;
-std::unordered_map<const void*, WeakHandle<ISerializable>> g_setupInstance;
+struct InstanceRef
+{
+    const void* raw = nullptr;
+    WeakHandle<ISerializable> weak;
+};
+std::unordered_map<const void*, InstanceRef> g_setupInstance;
+std::atomic<size_t> g_hiddenCount{0}; // g_hidden's size, read without the lock
 std::unordered_map<std::string, const void*> g_byId;
 std::unordered_set<std::string> g_hidden;
 std::deque<const void*> g_attachedQueue;
@@ -314,6 +324,8 @@ std::atomic<uint64_t> g_badSectors{0};
 std::atomic<uint64_t> g_refused{0}; // reads refused by a memory check
 std::atomic<uint64_t> g_initialized{0};
 std::atomic<uint64_t> g_sectorMs10{0};
+std::atomic<uint64_t> g_forgetMs10{0};
+std::atomic<uint64_t> g_forgotten{0};
 
 void RecordSector(void* aSector)
 {
@@ -399,13 +411,18 @@ void RecordSector(void* aSector)
         g_setups[setup] = d;
     }
     ReleaseSRWLockExclusive(&g_lock);
-    ++g_sectors;
+    const uint64_t n = ++g_sectors;
     g_sectorMs10 += static_cast<uint64_t>(
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count() * 10);
+    if (n == 1 || n % 250 == 0)
+        Log("World nodes: %llu sectors recorded (%.0f ms), %llu forgotten (%.0f ms), %llu instances set up",
+            static_cast<unsigned long long>(n), g_sectorMs10.load() / 10.0, static_cast<unsigned long long>(g_forgotten.load()),
+            g_forgetMs10.load() / 10.0, static_cast<unsigned long long>(g_initialized.load()));
 }
 
 void ForgetSector(void* aSector)
 {
+    const auto started = std::chrono::steady_clock::now();
     const int which = g_layout.load();
     if (which < 0)
         return;
@@ -424,46 +441,59 @@ void ForgetSector(void* aSector)
         if (byId != g_byId.end() && byId->second == s)
             g_byId.erase(byId);
         g_setups.erase(it);
-        g_setupInstance.erase(s);
-    }
-    for (auto it = g_instanceSetup.begin(); it != g_instanceSetup.end();)
-    {
-        const auto* s = static_cast<const uint8_t*>(it->second);
-        it = (s >= begin && s < end) ? g_instanceSetup.erase(it) : std::next(it);
+        if (const auto inst = g_setupInstance.find(s); inst != g_setupInstance.end())
+        {
+            const auto back = g_instanceSetup.find(inst->second.raw);
+            if (back != g_instanceSetup.end() && back->second == s)
+                g_instanceSetup.erase(back);
+            g_setupInstance.erase(inst);
+        }
     }
     ReleaseSRWLockExclusive(&g_lock);
+    ++g_forgotten;
+    g_forgetMs10 += static_cast<uint64_t>(
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count() * 10);
 }
 
 // The sector is recorded after the game's own OnReady, so its setups are complete.
-void SectorReadyDetour(void* aSector, uint64_t a2)
+uint64_t SectorReadyDetour(void* aSector, void* a2, void* a3, void* a4)
 {
-    g_sectorReady(aSector, a2);
+    const uint64_t result = g_sectorReady(aSector, a2, a3, a4);
     RecordSector(aSector);
+    return result;
 }
-void SectorDtorDetour(void* aSector)
+uint64_t SectorDtorDetour(void* aSector, void* a2, void* a3, void* a4)
 {
     ForgetSector(aSector);
-    g_sectorDtor(aSector);
+    return g_sectorDtor(aSector, a2, a3, a4);
 }
-bool NodeInitializeDetour(void* aInstance, void* aSetup, void* a3)
+uint64_t NodeInitializeDetour(void* aInstance, void* aSetup, void* a3, void* a4)
 {
-    const bool result = g_nodeInitialize(aInstance, aSetup, a3);
-    ++g_initialized;
+    const uint64_t result = g_nodeInitialize(aInstance, aSetup, a3, a4);
+    if (const uint64_t n = ++g_initialized; n == 1 || n % 50000 == 0)
+        Log("World nodes: %llu node instances set up so far", static_cast<unsigned long long>(n));
+    AcquireSRWLockShared(&g_lock);
+    const bool known = g_setups.count(aSetup) != 0;
+    ReleaseSRWLockShared(&g_lock);
+    if (!known || !IsObject(aInstance))
+        return result;
+    WeakHandle<ISerializable> weak = static_cast<ISerializable*>(aInstance)->ref;
     AcquireSRWLockExclusive(&g_lock);
-    if (g_setups.count(aSetup) && IsObject(aInstance))
+    if (g_setups.count(aSetup))
     {
         g_instanceSetup[aInstance] = aSetup;
-        g_setupInstance[aSetup] = static_cast<ISerializable*>(aInstance)->ref;
+        g_setupInstance[aSetup] = InstanceRef{aInstance, std::move(weak)};
     }
     ReleaseSRWLockExclusive(&g_lock);
     return result;
 }
-bool NodeAttachDetour(void* aInstance, void* a2)
+uint64_t NodeAttachDetour(void* aInstance, void* a2, void* a3, void* a4)
 {
-    const bool result = g_nodeAttach(aInstance, a2);
+    const uint64_t result = g_nodeAttach(aInstance, a2, a3, a4);
+    if (g_hiddenCount.load(std::memory_order_relaxed) == 0)
+        return result;
     AcquireSRWLockExclusive(&g_lock);
-    if (!g_hidden.empty())
-        g_attachedQueue.push_back(aInstance);
+    g_attachedQueue.push_back(aInstance);
     ReleaseSRWLockExclusive(&g_lock);
     return result;
 }
@@ -473,7 +503,7 @@ bool NodeAttachDetour(void* aInstance, void* a2)
 Handle<ISerializable> InstanceOf(const void* aSetup)
 {
     const auto it = g_setupInstance.find(aSetup);
-    return it == g_setupInstance.end() ? Handle<ISerializable>{} : it->second.Lock();
+    return it == g_setupInstance.end() ? Handle<ISerializable>{} : it->second.weak.Lock();
 }
 
 int StateOf(const void* aInstance)
@@ -736,7 +766,7 @@ std::string StringOr(const json::Value& aParams, const char* aKey)
     return v && v->kind == Value::Kind::String ? v->text : std::string();
 }
 
-std::string Start(std::string& aError)
+std::string Start(bool aInstances, std::string& aError)
 {
     const auto* sdk = GetSdk();
     if (!sdk || !sdk->hooking)
@@ -761,6 +791,8 @@ std::string Start(std::string& aError)
     std::string missing;
     for (size_t i = 0; i < std::size(hooks); ++i)
     {
+        if (i >= 2 && !aInstances)
+            continue;
         if (!g_attached[i])
         {
             const uintptr_t at = Resolve(hooks[i].hash);
@@ -778,7 +810,7 @@ std::string Start(std::string& aError)
             attached += std::string(attached.size() > 1 ? "," : "") + JsonString(hooks[i].name);
     }
     attached += "]";
-    if (!g_attached[0] || !g_attached[2])
+    if (!g_attached[0] || (aInstances && !g_attached[2]))
     {
         aError = "the world node hooks could not be attached" + (missing.empty() ? std::string() : " (missing: " + missing + ")");
         return {};
@@ -793,7 +825,7 @@ std::string State()
     const size_t setups = g_setups.size();
     size_t live = 0;
     for (const auto& [s, w] : g_setupInstance)
-        live += w.Lock() ? 1 : 0;
+        live += w.weak.Lock() ? 1 : 0;
     const size_t hidden = g_hidden.size();
     ReleaseSRWLockShared(&g_lock);
     const int which = g_layout.load();
@@ -822,7 +854,8 @@ std::string State()
     out += ",\"setups\":" + std::to_string(setups) + ",\"instances\":" + std::to_string(live);
     out += ",\"initialized\":" + std::to_string(g_initialized.load());
     out += ",\"hidden\":" + std::to_string(hidden) + ",\"refused\":" + std::to_string(g_refused.load());
-    out += ",\"sectorMs\":" + Num(g_sectorMs10.load() / 10.0);
+    out += ",\"sectorMs\":" + Num(g_sectorMs10.load() / 10.0) + ",\"forgotten\":" + std::to_string(g_forgotten.load()) +
+           ",\"forgetMs\":" + Num(g_forgetMs10.load() / 10.0);
     out += std::string(",\"canHide\":") + (g_nodeVisibility ? "true" : "false");
     out += ",\"canHighlight\":false}";
     return out;
@@ -952,6 +985,7 @@ std::string Visible(const json::Value& aParams, std::string& aError)
         g_hidden.erase(id);
     else
         g_hidden.insert(id);
+    g_hiddenCount = g_hidden.size();
     const void* setup = SetupFor(id);
     auto instance = setup ? InstanceOf(setup) : Handle<ISerializable>{};
     ReleaseSRWLockExclusive(&g_lock);
@@ -973,7 +1007,10 @@ bool IsWorldNodesMethod(const std::string& aMethod)
 std::string WorldNodes(const std::string& aMethod, const json::Value& aParams, std::string& aError)
 {
     if (aMethod == "nodes.start")
-        return Start(aError);
+    {
+        const auto* v = aParams.Get("instances");
+        return Start(!(v && v->kind == Value::Kind::Bool && !v->boolean), aError);
+    }
     if (aMethod == "nodes.state")
         return State();
     if (!g_attached[0])
