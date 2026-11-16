@@ -17,6 +17,8 @@ How to keep it:
 
 - Experimental, for EDGEbuilder's world inspector (#24): `world.pick()` lists the world's nodes along the camera's view (buildings, street furniture, decals, lights), each with the sector and node it comes from; `world.setVisible()` hides one for the session (shown again when your mod stops); `world.highlight()`, the outline, is not on game 2.5 yet. A port of RED Hot Tools' world node registry to game 2.5, started only when a mod uses it. Docs: https://edgemodders.github.io/REDnode/world.html#world-node-registry-24
 
+- Workspots on a person you spawned (#39): `world.spawn({ record, workspot })` gives the person one of the game's poses or loops (a `.workspot` file), `world.useWorkspot(id)` plays it where they stand (another workspot spawns them again carrying it), `world.workspotState(id)` and `world.stopWorkspot(id)`. AI assistants get `workspot` on `world_spawn` and the `world_animate` tool, asking first. Gameplay workspots loop; a quest's plays once, briefly. Docs: https://edgemodders.github.io/REDnode/world.html#a2-built-rednode-0668
+
 **Changed**
 
 - A mod that calls another mod's `@tool` function that changes something (not `@readonly`) is now refused until it lists the call in `"calls"` and you allow it. Counter panel and Roles test show how.

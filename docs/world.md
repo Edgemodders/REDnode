@@ -1715,6 +1715,35 @@ The workspots offered, read with REDbridge from the game's files (2.5): the prol
 
 Checked in the mock game only for its start and window (the mock does not answer the workspot system).
 
+### A2: built (REDnode 0.66.8)
+
+Agreed with the owner on 2026-11-15 after A1: gameplay workspots ship first, quest clips get a second spike when EDGEquest's Q8 needs them.
+
+| Part | How |
+|---|---|
+| A person carries the workspot | `world.spawn({ record, workspot: "<.workspot path>" })` attaches a `workWorkspotResourceComponent` named `rednode_workspot`. A person with a workspot gets no hold command unless `npc: { hold: true }` asks. A swap's respawn keeps it (it is one of the spawn's options) |
+| `world.useWorkspot(id, { workspot?, at?, entry?, waitMs? })` | Plays it on the person, who is their own device (`PlayInDeviceSimple(person, person, ...)`), where they stand (`at: "here"`, the default) or at the workspot's place (`"workspot"`). Another `workspot` spawns the person again in the same place carrying it, and answers the new id (`world.onRespawn` hears it too). `entry` jumps to an animation by name once started. Answers `{ id, started, why? }`: not started after `waitMs` (2 s) says to check the path and the body (a male rig for a male workspot) |
+| `world.stopWorkspot(id, { fast? })` | A fast exit by default; `fast: false` lets the game stop it its own way |
+| `world.workspotState(id)` | `inWorkspot`, the workspot carried, and the extended info's flags (`isActive`, `entering`, `exiting`, `playingSyncAnim`, `inReaction`, `inMotion`) |
+| MCP | `world_spawn` takes `workspot`; `world_animate { id, action: play / stop / state, workspot?, at?, entry? }` for a person an assistant spawned, asking first, a new id when another workspot spawns the person again |
+| Quest workspots | Allowed, and documented as A1 found them: they play once, briefly, after a T pose |
+
+Checked in the mock game: scratchpad `a2/` (7 package checks through a stand-in plugin: the component given at spawn, play with a jump, another workspot spawning the person again and heard by `onRespawn`, the state, stop, a person without a workspot and a spawn of another package refused; and 7 MCP checks through a client: the tool listed with the ask flag, spawn with a workspot, play, another workspot, state, stop, a refusal). The Animation test 0.4.0 has an **A2** section for the game.
+
+### A2 test
+
+REDnode 0.66.8, Codeware, game 2.5, Animation test 0.4.0 (in the apps folder). Stand V somewhere open, outside combat.
+
+1. In the Mod Manager switch on **Animation test** (no permission). **Pose: arms crossed (gameplay)** is chosen.
+2. Press **A2 spawn**. Expected: the paramedic 3 m ahead, standing (no hold command).
+3. Press **A2 use**. Expected: "started"; the medic goes into the arms-crossed pose and loops it.
+4. Press **A2 state**. Expected: `inWorkspot` true, `isActive` true, the workspot's path.
+5. Press **Pose: quest medic 1**, then **A2 use the chosen pose**. Expected: "started; spawned again as <id>"; the medic is spawned again in the same place and plays the quest idle (once, after a T pose, as A1 found).
+6. Press **Pose: arms crossed (gameplay)**, then **A2 use the chosen pose**. Expected: spawned again, back in the looping pose.
+7. Press **A2 stop**. Expected: the medic leaves the pose.
+8. Switch the app off. Expected: the medic is gone.
+9. Optional, with Claude Code connected to the game: ask it to spawn a Trauma Team paramedic with the arms-crossed workspot and play it (`world_spawn` with `workspot`, then `world_animate`). Each call asks you first.
+
 ### A1 test: results
 
 Run on 2026-11-15 by the owner on the dev PC, REDnode 0.66.0, game 2.5, with Animation test 0.1.0 to 0.3.0 (fixed between runs).

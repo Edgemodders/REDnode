@@ -235,6 +235,45 @@ const removeAll = () =>
     return `${n} removed`;
   });
 
+// ---- A2: the call (REDnode 0.66.8) -----------------------------------------------------
+// world.spawn({ workspot }), world.useWorkspot, world.workspotState, world.stopWorkspot: what
+// rounds 1 to 3 did by hand, in the rednode package.
+
+let a2 = null; // the person's id
+
+const a2Spawn = () =>
+  step(`A2 spawn ${record} carrying ${short(workspot)}`, async () => {
+    if (a2) await world.remove(a2).catch(() => false);
+    const { id, entity } = await world.spawn({ record, ...(await inFront(3)), workspot });
+    a2 = id;
+    return `${id.hash}${entity ? '' : ', not in the world yet'}`;
+  });
+
+const a2Use = (withChosen) =>
+  step(withChosen ? `A2 useWorkspot with ${short(workspot)}` : 'A2 useWorkspot', async () => {
+    if (!a2) throw new Error('Press A2 spawn first');
+    const r = await world.useWorkspot(a2, withChosen ? { workspot } : {});
+    const was = a2.hash;
+    a2 = r.id;
+    return `${r.started ? 'started' : `not started: ${r.why}`}${r.id.hash !== was ? `; spawned again as ${r.id.hash}` : ''}`;
+  });
+
+const a2State = () =>
+  step('A2 workspotState', async () => {
+    if (!a2) throw new Error('Press A2 spawn first');
+    return JSON.stringify(await world.workspotState(a2));
+  });
+
+const a2Stop = () =>
+  step('A2 stopWorkspot', async () => {
+    if (!a2) throw new Error('Press A2 spawn first');
+    return `stopped: ${await world.stopWorkspot(a2)}`;
+  });
+
+world.onRespawn((before, after) => {
+  if (a2 && before.hash === a2.hash) a2 = after;
+});
+
 // ---- Window -----------------------------------------------------------------------
 
 const recordInput = ui.input({ value: record, placeholder: 'A Character record', onChange: (v) => (record = v.trim()), onSubmit: (v) => (record = v.trim()) });
@@ -288,6 +327,13 @@ ui.window({
     ui.heading('3. Jump'),
     animInput,
     ui.row(ui.button('Jump to it', jump), ui.button('Its length', duration, { variant: 'ghost' })),
+    ui.heading('A2: the call (world.useWorkspot)'),
+    ui.row(
+      ui.button('A2 spawn', a2Spawn),
+      ui.button('A2 use', () => a2Use(false)),
+      ui.button('A2 use the chosen pose', () => a2Use(true), { variant: 'ghost' }),
+    ),
+    ui.row(ui.button('A2 state', a2State, { variant: 'ghost' }), ui.button('A2 stop', a2Stop, { variant: 'ghost' })),
     ui.heading('4 and 5. State, stop'),
     ui.row(
       ui.button('State', state),
@@ -315,4 +361,4 @@ async function checkWorld() {
 }
 await checkWorld();
 setInterval(checkWorld, 5000);
-say('Animation test 0.3.0 ready');
+say('Animation test 0.4.0 ready');

@@ -2090,6 +2090,8 @@ async function spawnForAgent(o) {
       orientation = { i: 0, j: 0, k: Math.sin(half), r: Math.cos(half) };
     }
     const components = [];
+    // #39: a workspot the person carries, played with world_animate.
+    if (o.workspot) components.push(await call('rtti.new', { class: 'workWorkspotResourceComponent', props: { name: 'rednode_workspot', workspotResource: o.workspot } }));
     if (o.mesh) {
       const s = o.scale ?? { x: 1, y: 1, z: 1 };
       const props = { name: 'rednode_mesh', mesh: o.mesh, meshAppearance: o.meshAppearance ?? 'default', visualScale: { X: s.x, Y: s.y, Z: s.z } };
@@ -2121,14 +2123,80 @@ async function spawnForAgent(o) {
     if (entity && person) {
       // Stand still, friendly to V (as world.spawn does).
       const quiet = (p) => p.catch(() => null);
-      const ai = await quiet(call('rtti.call', { self: { $ref: entity.$ref }, fn: 'GetAIControllerComponent', args: [] }));
-      const hold = await quiet(call('rtti.new', { class: 'AIHoldPositionCommand', props: { duration: 86400 } }));
+      // No hold command for a person carrying a workspot: the workspot places them.
+      const ai = o.workspot ? null : await quiet(call('rtti.call', { self: { $ref: entity.$ref }, fn: 'GetAIControllerComponent', args: [] }));
+      const hold = ai ? await quiet(call('rtti.new', { class: 'AIHoldPositionCommand', props: { duration: 86400 } })) : null;
       if (ai && hold) await quiet(call('rtti.call', { self: { $ref: ai.$ref }, fn: 'SendCommand', args: [{ $ref: hold.$ref }] }));
       const agent = await quiet(call('rtti.call', { self: { $ref: entity.$ref }, fn: 'GetAttitudeAgent', args: [] }));
       const mine = await quiet(call('rtti.call', { self: { $ref: v.$ref }, fn: 'GetAttitudeAgent', args: [] }));
       if (agent && mine) await quiet(call('rtti.call', { self: { $ref: agent.$ref }, fn: 'SetAttitudeTowards', args: [{ $ref: mine.$ref }, 'AIA_Friendly'] }));
     }
     return { id: String(id.hash), inWorld: !!entity, position };
+  } finally {
+    if (refs.length) bridgeCall('rtti.release', { refs }).catch(() => {});
+  }
+}
+
+// #39: world_animate. A person an assistant spawned plays the workspot they carry (play), stops
+// it (stop) or says its state (state). Another workspot spawns them again in the same place
+// carrying it, as world.useWorkspot does.
+async function animateForAgent({ id, action = 'play', workspot, at, entry }) {
+  let hash = String(id ?? '');
+  const spawn = agentSpawns.get(hash);
+  if (!spawn) throw new Error('world_animate plays on a person an assistant spawned with world_spawn');
+  const refs = [];
+  const call = async (method, params) => {
+    const r = await bridgeCall(method, params);
+    if (r && typeof r === 'object' && typeof r.$ref === 'number') refs.push(r.$ref);
+    return r;
+  };
+  try {
+    if (action === 'play' && workspot && workspot !== spawn.options.workspot) {
+      const self = await call('rtti.call', { class: 'GameInstance', fn: 'FindEntityByID', args: [{}, { hash }] }).catch(() => null);
+      const p = self ? await call('rtti.call', { self: { $ref: self.$ref }, fn: 'GetWorldPosition', args: [] }).catch(() => null) : null;
+      const q = self ? await call('rtti.call', { self: { $ref: self.$ref }, fn: 'GetWorldOrientation', args: [] }).catch(() => null) : null;
+      await removeForAgent(hash);
+      const again = await spawnForAgent({
+        ...spawn.options,
+        workspot,
+        ...(p ? { position: { x: p.X, y: p.Y, z: p.Z } } : {}),
+        ...(q ? { orientation: { i: q.i, j: q.j, k: q.k, r: q.r } } : {}),
+      });
+      hash = again.id;
+    }
+    const options = agentSpawns.get(hash)?.options ?? {};
+    const person = await call('rtti.call', { class: 'GameInstance', fn: 'FindEntityByID', args: [{}, { hash }] }).catch(() => null);
+    if (!person?.$ref) return { id: hash, started: false, why: 'the person is not in the world' };
+    const ws = await call('rtti.call', { class: 'GameInstance', fn: 'GetWorkspotSystem', args: [{}] });
+    const on = (fn, args) => call('rtti.call', { self: { $ref: ws.$ref }, fn, args });
+    const me = { $ref: person.$ref };
+    if (action === 'state') {
+      const info = await on('GetExtendedInfo', [me]).catch(() => null);
+      const flag = async (k) => (info?.$ref ? (await call('rtti.get', { self: { $ref: info.$ref }, prop: k }).catch(() => false)) === true : false);
+      return {
+        id: hash,
+        inWorkspot: (await on('IsActorInWorkspot', [me])) === true,
+        workspot: options.workspot ?? null,
+        isActive: await flag('isActive'),
+        entering: await flag('entering'),
+        exiting: await flag('exiting'),
+      };
+    }
+    if (action === 'stop') {
+      await on('SendFastExitSignal', [me, { X: 0, Y: 0, Z: 0 }, false, true, false, false]);
+      return { id: hash, stopped: true };
+    }
+    if (!options.workspot) throw new Error('world_animate needs a workspot: pass one, or spawn the person with workspot');
+    await on('PlayInDeviceSimple', [me, me, false, 'rednode_workspot', '', '', 0.3, at === 'workspot' ? 'PlayAtResourcePosition' : 'DontPlayAtResourcePosition', { $null: true }]);
+    let started = false;
+    for (const until = Date.now() + 2000; !started && Date.now() < until; ) {
+      await new Promise((r) => setTimeout(r, 100));
+      started = (await on('IsActorInWorkspot', [me])) === true;
+    }
+    if (started && entry) await on('SendJumpToAnimEnt', [me, entry, false]);
+    return started
+      ? { id: hash, started }
+      : { id: hash, started, why: "the person did not enter the workspot: check its path, and that it fits the person's body" };
   } finally {
     if (refs.length) bridgeCall('rtti.release', { refs }).catch(() => {});
   }
@@ -5105,6 +5173,7 @@ function mcpHost() {
     worldSpawned: spawnedList,
     worldSpawn: spawnForAgent,
     worldRemove: removeForAgent,
+    worldAnimate: animateForAgent,
     worldLoad: loadSceneForAgent,
     worldUnload: unloadSceneForAgent,
     // #43: world pins dropped by assistants belong to no package.

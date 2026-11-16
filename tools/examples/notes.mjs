@@ -473,7 +473,7 @@ export const NOTES = {
   'anim-test': {
     group: 'tests',
     summary: 'Play a game animation on a person spawned beside V: a workspot device made on the spot, the prologue\'s Trauma Team medic idles or a gameplay pose, a jump to an animation by name, the workspot\'s state, and a stop (#39\'s spike).',
-    teaches: ['world.spawn', 'api.$new', 'api.GameInstance', 'WorkspotGameSystem', 'world.entity', 'ui.list'],
+    teaches: ['world.spawn', 'world.useWorkspot', 'world.workspotState', 'world.stopWorkspot', 'api.$new', 'api.GameInstance', 'WorkspotGameSystem', 'world.entity', 'ui.list'],
     how: [
       'A workspot plays "in a device": an entity carrying a `workWorkspotResourceComponent` that names the `.workspot` file. **Make the device** spawns a box with that component at the person\'s place (`api.$new` and `world.spawn`\'s `components`).',
       '**Play** puts the person in it through `WorkspotGameSystem.PlayInDeviceSimple` (the component named as the actor\'s data or the device\'s) or `PlayNpcInWorkspot`. **Jump to it** asks for one animation by name; **Its length** asks the person\'s animation controller whether that animation is loaded on their rig.',

@@ -62,6 +62,12 @@ export interface SpawnOptions {
   yaw?: number;
   /** Components to attach while the entity assembles, made with `api.$new`. */
   components?: GameRef[];
+  /**
+   * A workspot the person carries (#39): a `.workspot` depot path, played with
+   * {@link world.useWorkspot}. The game plays a workspot only in an entity that carries it, so it
+   * is given at spawn; a person with one does not get the hold command unless `npc.hold` asks.
+   */
+  workspot?: string;
   /** More tags for the entity, for your own bookkeeping. */
   tags?: string[];
   /**
@@ -275,6 +281,45 @@ export interface NodeHighlight {
   opacity?: number;
 }
 
+/** Options for {@link world.useWorkspot}. */
+export interface UseWorkspotOptions {
+  /**
+   * A `.workspot` depot path. When the person carries another one (or none), REDnode spawns them
+   * again in the same place carrying this one, and answers the new id ({@link world.onRespawn}
+   * hears it too).
+   */
+  workspot?: string;
+  /** `"here"` (the default): where the person stands. `"workspot"`: at the workspot's own place. */
+  at?: "here" | "workspot";
+  /** An animation in the workspot to jump to once it has started, by name. */
+  entry?: string;
+  /** How long to wait for the person to be in the workspot, in milliseconds. Default 2000. */
+  waitMs?: number;
+}
+
+/** What {@link world.useWorkspot} answers. */
+export interface WorkspotResult {
+  /** The person's id: a new one when REDnode spawned them again for another workspot. */
+  id: EntityId;
+  /** In the workspot within `waitMs`. */
+  started: boolean;
+  /** Why not, when it did not start. */
+  why?: string;
+}
+
+/** A person's workspot state, as {@link world.workspotState} reads it from the game's workspot system. */
+export interface WorkspotState {
+  inWorkspot: boolean;
+  /** The workspot the person carries, or null. */
+  workspot: string | null;
+  isActive: boolean;
+  entering: boolean;
+  exiting: boolean;
+  playingSyncAnim: boolean;
+  inReaction: boolean;
+  inMotion: boolean;
+}
+
 /** One of this package's spawns, as {@link world.spawned} lists them. */
 /**
  * How a pin looks (#43). Every field is optional; a pin starts from the HUD style, then from
@@ -435,6 +480,8 @@ async function pinSpawn(id: EntityId, options: SpawnOptions): Promise<number | u
 }
 
 // A bare entity with no components or appearances, for a mesh on its own (W1's World test).
+// The workspot component a person carries (#39), named so useWorkspot finds it.
+const WORKSPOT_COMPONENT = "rednode_workspot";
 const BARE_TEMPLATE = "base\\gameplay\\loot\\containers\\common_suitcases\\appearances\\suitcase_small_placeholder.ent";
 // How long a person holds their place, in seconds (H2c-a used an hour; unverified beyond it).
 const HOLD_SECONDS = 86400;
@@ -483,9 +530,9 @@ async function placeOf(id: EntityId): Promise<{ position: WorldPoint; orientatio
 
 // Removes the entity and spawns it again with the same options, where it is now (#27):
 // it loads its files anew.
-async function respawn(entry: SpawnedEntry): Promise<void> {
+async function respawn(entry: SpawnedEntry, changes: Partial<SpawnOptions> = {}): Promise<EntityId> {
   const place = await placeOf(entry.id);
-  const options: SpawnOptions = place ? { ...entry.options, ...place, yaw: undefined } : entry.options;
+  const options: SpawnOptions = { ...(place ? { ...entry.options, ...place, yaw: undefined } : entry.options), ...changes };
   await world.remove(entry.id).catch(() => false);
   const { id } = await world.spawn(options);
   const after = mine.get(id.hash);
@@ -495,6 +542,7 @@ async function respawn(entry: SpawnedEntry): Promise<void> {
     if (list) list.splice(list.indexOf(entry.id.hash), 1, id.hash);
   }
   for (const h of respawnHandlers) h(entry.id, id);
+  return id;
 }
 
 function isPerson(options: SpawnOptions): boolean {
@@ -507,7 +555,7 @@ function isPerson(options: SpawnOptions): boolean {
 async function settlePerson(entity: GameRef, options: SpawnOptions): Promise<void> {
   const want = typeof options.npc === "object" ? options.npc : {};
   const e = entity as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>;
-  if (want.hold !== false) {
+  if (want.hold === true || (want.hold !== false && !options.workspot)) {
     const ai = (await e.GetAIControllerComponent().catch(() => null)) as Record<string, (...a: unknown[]) => Promise<unknown>> | null;
     if (ai) await ai.SendCommand(await api.$new("AIHoldPositionCommand", { duration: HOLD_SECONDS })).catch(() => {});
   }
@@ -602,6 +650,9 @@ export const world = {
           visualScale: { X: s.x, Y: s.y, Z: s.z },
         })) as GameRef,
       );
+    }
+    if (options.workspot) {
+      components.push((await api.$new("workWorkspotResourceComponent", { name: WORKSPOT_COMPONENT, workspotResource: options.workspot })) as GameRef);
     }
     const template = options.template ?? (options.mesh ? BARE_TEMPLATE : undefined);
     const spec = await api.$new("DynamicEntitySpec", {
@@ -873,6 +924,86 @@ export const world = {
     const r = (await invoke("nodes.visible", { id, visible })) as { done: boolean; why?: string };
     if (!r.done && r.why) console.warn(`world.setVisible ${id}: ${r.why}`);
     return r.done;
+  },
+
+  /**
+   * Plays a workspot on a person this package spawned (#39): a pose or loop from the game's own
+   * workspots, such as `base\\workspots\\common\\ground\\generic__stand_ground_arms_crossed__stand_around__02.workspot`.
+   * The person carries the workspot (spawn them with `workspot`, or pass it here and REDnode spawns
+   * them again carrying it) and plays it in place. Gameplay workspots loop and walk in by
+   * themselves. A quest's workspot plays outside its scene too, but once, for a moment, after a
+   * T pose (A1's test): it is made for a scene to drive.
+   *
+   * @example
+   * ```ts
+   * const { id } = await world.spawn({ record: "Character.trauma_team_paramedic", ...here,
+   *   workspot: "base\\workspots\\common\\ground\\generic__stand_ground_arms_crossed__stand_around__02.workspot" });
+   * const r = await world.useWorkspot(id);
+   * if (!r.started) console.warn(r.why);
+   * // later
+   * await world.stopWorkspot(id);
+   * ```
+   */
+  async useWorkspot(id: EntityId | string, options: UseWorkspotOptions = {}): Promise<WorkspotResult> {
+    let entry = mine.get(idOf(id).hash);
+    if (!entry) throw new Error("world.useWorkspot plays on a person this package spawned with world.spawn");
+    if (options.workspot && options.workspot !== entry.options.workspot) {
+      const after = await respawn(entry, { workspot: options.workspot });
+      entry = mine.get(after.hash);
+      if (!entry) throw new Error("world.useWorkspot: the person was spawned again but is not in the world yet");
+    }
+    if (!entry.options.workspot) {
+      throw new Error("world.useWorkspot needs a workspot: spawn the person with workspot, or pass workspot here");
+    }
+    const person = await world.entity(entry.id);
+    if (!person) return { id: entry.id, started: false, why: "the person is not in the world" };
+    const ws = (await api.GameInstance.GetWorkspotSystem(game.instance)) as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>;
+    await ws.PlayInDeviceSimple(person, person, false, WORKSPOT_COMPONENT, "", "", 0.3,
+      options.at === "workspot" ? "PlayAtResourcePosition" : "DontPlayAtResourcePosition", api.$null);
+    const until = Date.now() + (options.waitMs ?? 2000);
+    let started = false;
+    while (!started && Date.now() < until) {
+      await new Promise((r) => setTimeout(r, 100));
+      started = (await ws.IsActorInWorkspot(person)) === true;
+    }
+    if (!started) {
+      return { id: entry.id, started, why: "the person did not enter the workspot: check its path, and that it fits the person's body (a male rig for a male workspot)" };
+    }
+    if (options.entry) await ws.SendJumpToAnimEnt(person, options.entry, false);
+    return { id: entry.id, started };
+  },
+
+  /**
+   * Ends a person's workspot. `fast` (the default) leaves it at once; `fast: false` lets the
+   * game stop it its own way.
+   */
+  async stopWorkspot(id: EntityId | string, options: { fast?: boolean } = {}): Promise<boolean> {
+    const person = await world.entity(idOf(id));
+    if (!person) return false;
+    const ws = (await api.GameInstance.GetWorkspotSystem(game.instance)) as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>;
+    if (options.fast === false) await ws.StopNpcInWorkspot(person);
+    else await ws.SendFastExitSignal(person, { X: 0, Y: 0, Z: 0 }, false, true, false, false);
+    return true;
+  },
+
+  /** A person's workspot state, read from the game's workspot system. */
+  async workspotState(id: EntityId | string): Promise<WorkspotState> {
+    const hash = idOf(id).hash;
+    const person = await world.entity(idOf(id));
+    if (!person) throw new Error("world.workspotState: the person is not in the world");
+    const ws = (await api.GameInstance.GetWorkspotSystem(game.instance)) as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>;
+    const info = (await ws.GetExtendedInfo(person).catch(() => null)) as { $get(p: string): Promise<unknown> } | null;
+    const flag = async (k: string) => (info ? (await info.$get(k).catch(() => false)) === true : false);
+    return {
+      inWorkspot: (await ws.IsActorInWorkspot(person)) === true,
+      workspot: mine.get(hash)?.options.workspot ?? null,
+      isActive: await flag("isActive"),
+      entering: await flag("entering"),
+      exiting: await flag("exiting"),
+      playingSyncAnim: await flag("playingSyncAnim"),
+      inReaction: await flag("inReaction"),
+      inMotion: await flag("inMotion"),
+    };
   },
 
   /** The files an entity uses: its template and every resource its components name, as path hashes. Needs Codeware. */
