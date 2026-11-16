@@ -38,10 +38,14 @@
 //   - A node instance's place (+0x30), orientation (+0x40), scale (+0x50) and node (+0x60) are as
 //     RED Hot Tools has them (2.5's WorldNodeInstance_Initialize copies them there); its state
 //     bits moved from +0x88 to +0x8C (attached bit 5, visible bit 9).
-//   - The game's crash handler takes a fault before __try does, so nothing here relies on __try:
-//     every pointer is checked with VirtualQuery before it is read, and an object's class is asked
-//     for only once it passes the engine's own check (an ISerializable's weak self handle at +0x08
-//     points back at it).
+//   - The game's crash handler takes a fault before __try does, so nothing here relies on __try.
+//     Unknown memory (the layout candidates at the first sector, an instance class's fields the
+//     first time it is seen) is checked with VirtualQuery before it is read, and an unknown object's
+//     class is asked for only once it passes the engine's own check (an ISerializable's weak self
+//     handle at +0x08 points back at it). Known memory (the game's own buffers once the layout has
+//     checked out, its node and instance objects) is read directly: VirtualQuery costs milliseconds
+//     in this game, and the game waits for each sector to be recorded (0.66.2, with a check per
+//     setup, held a save load for minutes).
 //   - Boxes come from the node instance's mesh (a CMesh handle found among its fields, checked as
 //     above, and the mesh's RTTI "boundingBox") rather than worldNode's virtual GetBoundingBox,
 //     whose slot (0x108 in 2.31) is unverified on 2.5. A node with no mesh gets a 1 m box at its
@@ -250,20 +254,29 @@ uint32_t IndexOf(const uint8_t* aSetup, const Layout& aL)
 
 // Reads the buffer as aL says and checks it: sizes in range, the blocks readable, and each of the
 // first 16 setups' node the node its index names.
-bool ReadBuffer(const void* aSector, const Layout& aL, BufferView& aOut)
+bool ReadBuffer(const void* aSector, const Layout& aL, BufferView& aOut, bool aCareful)
 {
+    // aCareful (finding the layout): every read is checked with VirtualQuery. Once a layout has
+    // checked out, the sector's buffer is the game's own and is read directly: VirtualQuery
+    // costs milliseconds in this game, and the game waits for each sector (0.66.2 took minutes).
     const auto* base = static_cast<const uint8_t*>(aSector) + aL.buffer;
-    uint32_t nodeCap = 0;
-    if (!Read(base, aOut.setups) || !Read(base + 0x08, aOut.setupBytes) || !Read(base + aL.nodes, aOut.nodes) ||
-        !Read(base + aL.nodes + 0x08, nodeCap) || !Read(base + aL.nodes + 0x0C, aOut.nodeCount))
+    if (aCareful && !Readable(base, aL.nodes + 0x10))
         return false;
+    uint32_t nodeCap = 0;
+    std::memcpy(&aOut.setups, base, sizeof(aOut.setups));
+    std::memcpy(&aOut.setupBytes, base + 0x08, sizeof(aOut.setupBytes));
+    std::memcpy(&aOut.nodes, base + aL.nodes, sizeof(aOut.nodes));
+    std::memcpy(&nodeCap, base + aL.nodes + 0x08, sizeof(nodeCap));
+    std::memcpy(&aOut.nodeCount, base + aL.nodes + 0x0C, sizeof(aOut.nodeCount));
     if (aOut.setupBytes % SetupSize != 0 || aOut.setupBytes / SetupSize > 2000000 || aOut.nodeCount > nodeCap ||
         aOut.nodeCount > 2000000)
         return false;
     const uint32_t count = aOut.setupBytes / static_cast<uint32_t>(SetupSize);
     if (!count)
         return true;
-    if (!aOut.nodeCount || !Readable(aOut.setups, aOut.setupBytes) || !Readable(aOut.nodes, aOut.nodeCount * 0x10ull))
+    if (!aOut.nodeCount || !aOut.setups || !aOut.nodes)
+        return false;
+    if (aCareful && (!Readable(aOut.setups, aOut.setupBytes) || !Readable(aOut.nodes, aOut.nodeCount * 0x10ull)))
         return false;
     const uint32_t check = count < 16 ? count : 16;
     for (uint32_t i = 0; i < check; ++i)
@@ -318,6 +331,7 @@ std::unordered_map<std::string, const void*> g_byId;
 std::unordered_set<std::string> g_hidden;
 std::deque<const void*> g_attachedQueue;
 std::unordered_set<uint64_t> g_classesLogged;
+std::unordered_map<const void*, std::pair<const uint8_t*, const uint8_t*>> g_sectorRanges; // sector -> its setups
 
 std::atomic<uint64_t> g_sectors{0};
 std::atomic<uint64_t> g_badSectors{0};
@@ -337,7 +351,7 @@ void RecordSector(void* aSector)
         for (int i = 0; i < static_cast<int>(std::size(Candidates)); ++i)
         {
             BufferView t;
-            if (ReadBuffer(aSector, Candidates[i], t) && t.setupBytes)
+            if (ReadBuffer(aSector, Candidates[i], t, true) && t.setupBytes)
             {
                 int expected = -1;
                 if (g_layout.compare_exchange_strong(expected, i))
@@ -359,19 +373,24 @@ void RecordSector(void* aSector)
         }
     }
     const Layout& layout = Candidates[which];
-    if (!ReadBuffer(aSector, layout, v))
+    if (!ReadBuffer(aSector, layout, v, false))
     {
         if (++g_badSectors <= 5)
             Log("World nodes: a sector's node buffer did not check out with the layout found");
         return;
     }
-    uint64_t sectorHash = 0;
-    if (!Read(&reinterpret_cast<CResource*>(aSector)->path.hash, sectorHash))
-        return;
+    const uint64_t sectorHash = reinterpret_cast<CResource*>(aSector)->path.hash;
     const uint32_t count = v.setupBytes / static_cast<uint32_t>(SetupSize);
     std::vector<std::pair<const void*, SetupData>> found;
     found.reserve(count);
-    std::unordered_map<const void*, uint64_t> types; // many setups share a node
+    // Each node's class, once per node in the node list (the game's own handles).
+    std::vector<uint64_t> types(v.nodeCount, 0);
+    for (uint32_t k = 0; k < v.nodeCount; ++k)
+    {
+        auto* node = *reinterpret_cast<ISerializable* const*>(v.nodes + k * 0x10);
+        if (auto* type = node ? node->GetType() : nullptr)
+            types[k] = type->GetName().hash;
+    }
     for (uint32_t i = 0; i < count; ++i)
     {
         const uint8_t* s = v.setups + i * SetupSize; // the whole block was checked readable
@@ -395,13 +414,7 @@ void RecordSector(void* aSector)
         d.instance = i;
         d.instanceCount = count;
         d.nodeCount = v.nodeCount;
-        if (const auto t2 = types.find(d.node); t2 != types.end())
-            d.nodeType = t2->second;
-        else
-        {
-            auto* type = TypeOf(d.node);
-            d.nodeType = types[d.node] = type ? type->GetName().hash : 0;
-        }
+        d.nodeType = d.index < v.nodeCount ? types[d.index] : 0;
         found.emplace_back(s, d);
     }
     AcquireSRWLockExclusive(&g_lock);
@@ -410,6 +423,7 @@ void RecordSector(void* aSector)
         g_byId[IdOf(d.sector, d.instance)] = setup;
         g_setups[setup] = d;
     }
+    g_sectorRanges[aSector] = {v.setups, v.setups + v.setupBytes};
     ReleaseSRWLockExclusive(&g_lock);
     const uint64_t n = ++g_sectors;
     g_sectorMs10 += static_cast<uint64_t>(
@@ -423,15 +437,16 @@ void RecordSector(void* aSector)
 void ForgetSector(void* aSector)
 {
     const auto started = std::chrono::steady_clock::now();
-    const int which = g_layout.load();
-    if (which < 0)
-        return;
-    BufferView v;
-    if (!ReadBuffer(aSector, Candidates[which], v) || !v.setupBytes)
-        return;
-    const uint8_t* begin = v.setups;
-    const uint8_t* end = v.setups + v.setupBytes;
     AcquireSRWLockExclusive(&g_lock);
+    const auto range = g_sectorRanges.find(aSector);
+    if (range == g_sectorRanges.end())
+    {
+        ReleaseSRWLockExclusive(&g_lock);
+        return;
+    }
+    const uint8_t* begin = range->second.first;
+    const uint8_t* end = range->second.second;
+    g_sectorRanges.erase(range);
     for (const uint8_t* s = begin; s < end; s += SetupSize)
     {
         const auto it = g_setups.find(s);
@@ -475,7 +490,7 @@ uint64_t NodeInitializeDetour(void* aInstance, void* aSetup, void* a3, void* a4)
     AcquireSRWLockShared(&g_lock);
     const bool known = g_setups.count(aSetup) != 0;
     ReleaseSRWLockShared(&g_lock);
-    if (!known || !IsObject(aInstance))
+    if (!known || !aInstance)
         return result;
     WeakHandle<ISerializable> weak = static_cast<ISerializable*>(aInstance)->ref;
     AcquireSRWLockExclusive(&g_lock);
@@ -509,11 +524,7 @@ Handle<ISerializable> InstanceOf(const void* aSetup)
 int StateOf(const void* aInstance)
 {
     uint16_t bits = 0;
-    if (!Read(static_cast<const uint8_t*>(aInstance) + InstanceState, bits))
-    {
-        ++g_refused;
-        return -1;
-    }
+    std::memcpy(&bits, static_cast<const uint8_t*>(aInstance) + InstanceState, sizeof(bits));
     return ((bits >> 5) & 1) | (((bits >> 9) & 1) << 1);
 }
 
@@ -530,22 +541,43 @@ void Rotate(const float q[4], const float v[3], float out[3])
 
 // The mesh among a node instance's fields: a Handle whose object is a CMesh. Fields 0x90 to
 // 0x130, past the base instance (RED Hot Tools has the mesh at 0x98 to 0xB8 in each class).
+std::unordered_map<uint64_t, int> g_meshField; // instance class -> its mesh field's offset, or -1 (game thread)
+
 CResource* MeshOf(void* aInstance)
 {
     static CClass* const mesh = CRTTISystem::Get()->GetClass("CMesh");
-    if (!mesh || !Readable(static_cast<uint8_t*>(aInstance) + 0x90, 0xA8))
+    auto* cls = mesh ? static_cast<ISerializable*>(aInstance)->GetType() : nullptr;
+    if (!cls)
         return nullptr;
-    for (size_t off = 0x90; off <= 0x130; off += 8)
+    const uint64_t key = cls->GetName().hash;
+    auto known = g_meshField.find(key);
+    if (known == g_meshField.end())
     {
-        void* object = nullptr;
-        std::memcpy(&object, static_cast<uint8_t*>(aInstance) + off, sizeof(object));
-        if (!object)
-            continue;
-        auto* type = TypeOf(object);
-        if (type && type->IsA(mesh))
-            return static_cast<CResource*>(object);
+        // The first instance of the class: every candidate field checked carefully.
+        int found = -1;
+        if (Readable(static_cast<uint8_t*>(aInstance) + 0x90, 0xA8))
+        {
+            for (size_t off = 0x90; off <= 0x130 && found < 0; off += 8)
+            {
+                void* object = nullptr;
+                std::memcpy(&object, static_cast<uint8_t*>(aInstance) + off, sizeof(object));
+                auto* type = object ? TypeOf(object) : nullptr;
+                if (type && type->IsA(mesh))
+                    found = static_cast<int>(off);
+            }
+        }
+        known = g_meshField.emplace(key, found).first;
+        if (found >= 0)
+            Log("World nodes: %s keeps its mesh at +0x%x", CName(key).ToString(), found);
     }
-    return nullptr;
+    if (known->second < 0)
+        return nullptr;
+    void* object = nullptr;
+    std::memcpy(&object, static_cast<uint8_t*>(aInstance) + known->second, sizeof(object));
+    if (!object)
+        return nullptr;
+    auto* type = static_cast<ISerializable*>(object)->GetType();
+    return type && type->IsA(mesh) ? static_cast<CResource*>(object) : nullptr;
 }
 
 // The setup's box in the world: the mesh's box, scaled, turned and placed as the instance is;
@@ -562,19 +594,17 @@ void WorkOutBox(const void* aSetup, SetupData& d)
     if (instance)
     {
         float place[12];
-        if (Read(reinterpret_cast<uint8_t*>(instance.instance) + InstancePlace, place))
-        {
-            std::memcpy(pos, place, sizeof(pos));
-            std::memcpy(rot, place + 4, sizeof(rot));
-            std::memcpy(scale, place + 8, sizeof(scale));
-        }
+        std::memcpy(place, reinterpret_cast<uint8_t*>(instance.instance) + InstancePlace, sizeof(place));
+        std::memcpy(pos, place, sizeof(pos));
+        std::memcpy(rot, place + 4, sizeof(rot));
+        std::memcpy(scale, place + 8, sizeof(scale));
         static CClass* const meshClass = CRTTISystem::Get()->GetClass("CMesh");
         if (auto* mesh = MeshOf(instance.instance); mesh && meshClass)
         {
             if (auto* prop = meshClass->GetProperty("boundingBox"))
             {
                 float box[8];
-                if (Read(reinterpret_cast<uint8_t*>(mesh) + prop->valueOffset, box))
+                std::memcpy(box, reinterpret_cast<uint8_t*>(mesh) + prop->valueOffset, sizeof(box));
                 {
                     bool ok = true;
                     for (int i = 0; i < 3; ++i)
@@ -687,7 +717,9 @@ void ResourceOf(void* aNode, uint64_t aType, std::string& aResource, std::string
     {
         auto* prop = cls->GetProperty(name);
         uint64_t path = 0;
-        if (prop && Read(static_cast<uint8_t*>(aNode) + prop->valueOffset, path) && path)
+        if (prop)
+            std::memcpy(&path, static_cast<uint8_t*>(aNode) + prop->valueOffset, sizeof(path));
+        if (path)
         {
             aResource = Hex(path);
             break;
@@ -696,7 +728,8 @@ void ResourceOf(void* aNode, uint64_t aType, std::string& aResource, std::string
     if (auto* prop = cls->GetProperty("meshAppearance"))
     {
         uint64_t name = 0;
-        if (Read(static_cast<uint8_t*>(aNode) + prop->valueOffset, name) && name)
+        std::memcpy(&name, static_cast<uint8_t*>(aNode) + prop->valueOffset, sizeof(name));
+        if (name)
         {
             const char* s = CName(name).ToString();
             aAppearance = s ? s : Hex(name);
@@ -713,7 +746,7 @@ std::string NodeJson(const void* aSetup, SetupData& d, const char* aExtra)
     uint64_t instanceClass = 0;
     if (instance)
     {
-        if (auto* type = TypeOf(instance.instance))
+        if (auto* type = instance.instance->GetType())
             instanceClass = type->GetName().hash;
         LogInstanceClass(instance.instance, instanceClass, d.node);
     }
@@ -965,7 +998,7 @@ const void* SetupFor(const std::string& aId)
 
 bool ApplyVisible(void* aInstance, bool aVisible)
 {
-    if (!g_nodeVisibility || !IsObject(aInstance))
+    if (!g_nodeVisibility || !aInstance)
         return false;
     g_nodeVisibility(aInstance, aVisible);
     return true;
