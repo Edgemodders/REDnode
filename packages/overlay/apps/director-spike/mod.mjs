@@ -17,6 +17,11 @@
 //   8 Quest    (0.3.0) why the quest clip stays in a T pose: one more person, Q, plays each of six
 //              workspots that differ by one thing from the game's own quest medic workspot
 //   9 Start    (0.3.0) whether the T pose at the first play goes when the person waits after spawning
+//  10 Hash     (0.4.0) round 3 found the quest clip plays from the game's quest workspot but not from
+//              ours, written from the arms-crossed one. Ours kept that workspot's animation setup
+//              hash, so the lead is the engine reusing the arms-crossed setup (no quest set in it)
+//              by that hash. Six variants set the hash each way. And whether loading the workspot
+//              ahead (Codeware's ResourceDepot.LoadResource) removes the first play's T pose.
 
 import { api, archives, game, kernel, pkg, ui, world } from 'rednode';
 import fs from 'node:fs';
@@ -38,14 +43,18 @@ const CLIPS = [
 const RECORD = 'Character.trauma_team_paramedic';
 const QUEST_WORKSPOT = 'base\\workspots\\quest\\main_quests\\prologue\\q001\\q001_00c_rescuing_girl\\q001_00c_trauma_arrives___med_01_idle__01.workspot';
 const QUEST_CLIP = CLIPS[2][1];
-// Round 3's quest variants: each differs from the one before it by one thing.
+// The game's quest medic workspot's animation setup hash (its one set, the q001 quest set).
+const QUEST_HASH = '991092134768372540';
+// Round 4's variants: the quest clip in ours, with the animation setup's hash set each way.
 const VARIANTS = [
-  ['game', "the game's own quest medic workspot, as it is (the control: A1 saw it play once after a T pose)"],
-  ['copy', "the game's quest workspot read and written back unchanged by REDbridge (our write path)"],
-  ['copyloop', 'that copy with its sequence looping (loopInfinitely on)'],
-  ['solo200', "ours from the arms-crossed tree, the quest clip only, its set alone at priority 200 as the game's quest workspot has it"],
-  ['solo128', 'the same at priority 128, as 0.2.0 gave the quest set'],
-  ['mixed200', "0.2.0's bare four clips with the quest set at priority 200"],
+  ['game', "the game's own quest medic workspot, as it is (the control: round 3 saw it play, no T pose)"],
+  ['copy', "the game's quest workspot written back by REDbridge (round 3: a brief T pose, then it played)"],
+  ['solo-keep', "ours, the quest clip only, keeping the arms-crossed workspot's hash (round 3's solo200: a T pose that stays)"],
+  ['solo-0', 'the same with the hash 0'],
+  ['solo-quest', "the same with the game's quest workspot's hash (its setup has the same one set)"],
+  ['solo-new', 'the same with a new hash made from the list of sets'],
+  ['mixed-0', "0.2.0's four clips with the hash 0: say whether C, the quest clip, now plays after a jump"],
+  ['mixed-new', 'the four clips with a new hash made from the list of sets'],
 ];
 
 let which = 'bare';
@@ -82,12 +91,19 @@ const workspotPath = () => `${OURS}\\s46_${which}.workspot`;
 
 // ---- 1. Build ---------------------------------------------------------------------
 
+// FNV-1a 64 of a text, as a decimal string (WolvenKit JSON's Uint64).
+function fnv64(text) {
+  let h = 0xcbf29ce484222325n;
+  for (const b of Buffer.from(text, 'utf8')) h = BigInt.asUintN(64, (h ^ BigInt(b)) * 0x100000001b3n);
+  return h.toString();
+}
 const cname = (v) => ({ $type: 'CName', $storage: 'string', $value: v });
 const animset = (p, questPriority = 128) => ({ $type: 'animAnimSetupEntry', animSet: { DepotPath: { $type: 'ResourcePath', $storage: 'string', $value: p }, Flags: 'Default' }, priority: p.includes('interactive_scene') ? 200 : p === QUEST ? questPriority : 128, variableNames: [] });
 const loading = (p) => ({ DepotPath: { $type: 'ResourcePath', $storage: 'string', $value: p }, Flags: 'Default' });
 
 // clips: [label, clip] pairs; sets: the animation sets to list (bare only); questPriority: the quest set's.
-function writeWorkspot(source, bare, { clips = CLIPS, sets: only, questPriority = 128, ids = true } = {}) {
+// hash: 'keep' the template's animation setup hash, '0', or 'new' (FNV-1a 64 of the set paths), or a hash as text.
+function writeWorkspot(source, bare, { clips = CLIPS, sets: only, questPriority = 128, ids = true, hash = 'keep' } = {}) {
   const d = structuredClone(source);
   const tree = d.Data.RootChunk.workspotTree.Data;
   let entry = tree.idCounter;
@@ -113,6 +129,7 @@ function writeWorkspot(source, bare, { clips = CLIPS, sets: only, questPriority 
   const male = tree.finalAnimsets[0];
   const sets = only ?? (bare ? [IDLE_2H, IDLE_CROSSED, TRANSITIONS, QUEST] : [...male.animations.cinematics.map((x) => x.animSet.DepotPath.$value), QUEST]);
   male.animations.cinematics = sets.map((x) => animset(x, questPriority));
+  if (hash !== 'keep') male.animations.hash = hash === 'new' ? fnv64(sets.join('|')) : hash;
   male.loadingHandles = sets.map(loading);
   tree.finalAnimsets = [male];
   if (bare) tree.customTransitionAnims = [];
@@ -145,15 +162,18 @@ const build = () =>
     const qjson = path.join(work, 'quest.json');
     await b.call('cr2w.fileToJson', { file: qraw, outFile: qjson });
     const questSource = JSON.parse(fs.readFileSync(qjson, 'utf8'));
-    const copyLoop = structuredClone(questSource);
-    for (const c of copyLoop.Data.RootChunk.workspotTree.Data.rootEntry.Data.list) if (c.Data.$type === 'workSequence') c.Data.loopInfinitely = 1;
     const questOnly = [[CLIPS[2][0], QUEST_CLIP]];
+    const solo = (hash) => writeWorkspot(source, true, { clips: questOnly, sets: [QUEST], questPriority: 200, ids: false, hash });
     const variants = {
       copy: questSource,
-      copyloop: copyLoop,
-      solo200: writeWorkspot(source, true, { clips: questOnly, sets: [QUEST], questPriority: 200, ids: false }),
-      solo128: writeWorkspot(source, true, { clips: questOnly, sets: [QUEST], questPriority: 128, ids: false }),
-      mixed200: writeWorkspot(source, true, { questPriority: 200, ids: false }),
+      // The same file under another name, used only by the preload test, so nothing has loaded it before.
+      'copy-pre': questSource,
+      'solo-keep': solo('keep'),
+      'solo-0': solo('0'),
+      'solo-quest': solo(QUEST_HASH),
+      'solo-new': solo('new'),
+      'mixed-0': writeWorkspot(source, true, { questPriority: 200, ids: false, hash: '0' }),
+      'mixed-new': writeWorkspot(source, true, { questPriority: 200, ids: false, hash: 'new' }),
     };
     for (const [name, doc] of Object.entries(variants)) {
       const jf = path.join(work, `s46_q_${name}.json`);
@@ -361,17 +381,38 @@ async function watchOne(id, seconds) {
   }
 }
 
-const tryVariant = (name) =>
-  step(`Quest variant ${name}`, async () => {
+// Tokens of preloaded workspots, kept so the game keeps them loaded.
+const tokens = new Map();
+async function preload(file) {
+  const depot = await api.GameInstance.GetResourceDepot();
+  const token = await depot.LoadResource(file);
+  tokens.set(file, token);
+  const t0 = performance.now();
+  while (performance.now() - t0 < 5000) {
+    if (await token.IsFinished()) break;
+    await wait(100);
+  }
+  return `${(await token.IsLoaded()) ? 'loaded' : (await token.IsFailed()) ? 'failed' : 'not finished'} in ${(performance.now() - t0).toFixed(0)} ms`;
+}
+
+const tryVariant = (name, { preloaded = false } = {}) =>
+  step(`Quest variant ${name}${preloaded ? ', preloaded' : ''}`, async () => {
     if (quest) await world.remove(quest.id).catch(() => false);
+    if (preloaded) say(`  preload ${variantPath(name)}: ${await preload(variantPath(name))}`);
     const { id } = await world.spawn({ record: RECORD, ...(await inFront(4.5, 0)), workspot: variantPath(name) });
     quest = { id, label: 'Q', variant: name };
     await wait(1500);
     const r = await world.useWorkspot(id);
     quest.id = r.id;
     if (!r.started) return `not started: ${r.why}`;
+    if (name.startsWith('mixed')) {
+      await wait(4000);
+      const ws = await system();
+      await ws.SendJumpToAnimEnt(await world.entity(quest.id), QUEST_CLIP, true);
+      say('    4 s: jumped to C, the quest clip');
+    }
     await watchOne(r.id, 12);
-    return 'started; say what Q does: plays the medic idle, a T pose first, or a T pose that stays';
+    return name.startsWith('mixed') ? 'started in A, then C: say whether C plays' : 'started; say what Q does: plays the medic idle, a T pose first, or a T pose that stays';
   });
 
 // ---- 9. The first play's T pose -----------------------------------------------------
@@ -449,9 +490,10 @@ ui.window({
     ui.row(...CLIPS.slice(0, 3).map(([label, clip]) => ui.button(label, () => jump(label, clip), { variant: 'ghost' }))),
     ui.heading('5 and 6. Gap, root motion, timing'),
     ui.row(ui.button('Step off, then nothing', gap), ui.button('Timed run (8 s)', timed)),
-    ui.heading('8. Quest clip: one more person, Q, plays each variant'),
-    ui.row(...VARIANTS.slice(0, 3).map(([name]) => ui.button(name, () => tryVariant(name), { variant: 'ghost' }))),
-    ui.row(...VARIANTS.slice(3).map(([name]) => ui.button(name, () => tryVariant(name), { variant: 'ghost' }))),
+    ui.heading('8 and 10. Quest clip: one more person, Q, plays each variant'),
+    ui.row(...VARIANTS.slice(0, 4).map(([name]) => ui.button(name, () => tryVariant(name), { variant: 'ghost' }))),
+    ui.row(...VARIANTS.slice(4).map(([name]) => ui.button(name, () => tryVariant(name), { variant: 'ghost' }))),
+    ui.row(ui.button('copy, preloaded (its own file)', () => tryVariant('copy-pre', { preloaded: true }), { variant: 'ghost' })),
     ui.heading('9. The first play'),
     ui.row(ui.button('Spawn, wait 10 s, then play', spawnWaitPlay, { variant: 'ghost' })),
     ui.heading('7. Weather'),
@@ -459,5 +501,5 @@ ui.window({
     log,
   ],
 });
-say('Director spike 0.3.0 ready');
+say('Director spike 0.4.0 ready');
 for (const [name, what] of VARIANTS) say(`  variant ${name}: ${what}`);

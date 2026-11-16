@@ -1898,6 +1898,53 @@ REDnode 0.66.8, Director spike 0.3.0, REDbridge, game 2.5. Stand V somewhere ope
 5. Press **Play both** again on the same two. Say whether the T pose comes this time.
 6. Press **Remove the actors** and switch the app off.
 
+### A written workspot: round 3 results
+
+Run on 2026-11-16 by the owner on the laptop, Director spike 0.3.0, every step.
+
+| Variant | Q did |
+|---|---|
+| game | Played the medic idle, **no T pose** |
+| copy | A brief T pose, then the medic idle |
+| copyloop | A brief T pose, then the medic idle, looping |
+| solo200 | A T pose that stays |
+| solo128 | A T pose that stays |
+| mixed200 | A brief T pose, then standing (clip A) |
+| Spawn, wait 10 s, then play | A brief T pose, then standing: waiting after the spawn does not help |
+| Play both again on the same two | No T pose |
+
+What it shows:
+
+- **The quest clip plays from a workspot written by REDbridge** (copy, copyloop), so neither the write nor the loop is the cause. Priority is not either (solo200 and solo128 alike).
+- **It never plays from a workspot built on the arms-crossed one** (solo, mixed). Ours kept that workspot's animation setup `hash` (`16575116506810456289`) after changing its list of sets. The game's quest workspot has its own (`991092134768372540`), and the arms-crossed one's setup holds the two gameplay sets the A and B clips come from, but no quest set. The lead (unverified): **the engine finds a workspot's animation setup by that hash**, so ours got the arms-crossed setup: A and B play, the quest clip is not in it.
+- **The brief T pose comes at the first play of a workspot file that has not been used yet** (the game's file had no T pose, our copy of the same content had one; a second play on the same people had none; waiting after the spawn did not help): the workspot loads when it is first played, not when the person carrying it spawns (unverified).
+
+### A written workspot: round 4 (the hash and preloading)
+
+**Director spike 0.4.0** keeps round 3's controls and replaces its variants:
+
+| Variant | What it is |
+|---|---|
+| game, copy | Round 3's controls |
+| solo-keep | The quest clip in ours, keeping the arms-crossed hash (round 3's solo200) |
+| solo-0 | The same with the hash 0 |
+| solo-quest | The same with the game's quest workspot's hash (a setup with the same one set) |
+| solo-new | The same with a new hash, FNV-1a 64 of the list of set paths |
+| mixed-0, mixed-new | 0.2.0's four clips with the hash 0, or new: Q starts in A and jumps to C after 4 s |
+| copy, preloaded | The copy under its own file name, loaded first through Codeware's `ResourceDepot.LoadResource` (the token kept), then spawned and played |
+
+If solo-0 or solo-new plays, the writer sets that hash and every set works; if only solo-quest plays, the hash must match how the engine makes it (research). If the preloaded copy has no T pose, the writer's call preloads.
+
+### A written workspot: round 4 test
+
+REDnode 0.66.8, Director spike 0.4.0, REDbridge, game 2.5. Stand V somewhere open, outside combat. Start from a fresh game start if you can, so no variant file has been played before.
+
+1. Switch on **Director spike (#46)** with both **Allowed** switches. Press **Build**, then **Swap in**.
+2. Press **copy, preloaded (its own file)** first. Say whether Q shows a T pose before the medic idle.
+3. Press **solo-keep**, **solo-0**, **solo-quest** and **solo-new**, one at a time, waiting for each (about 15 s). For each, say: the medic idle, a brief T pose then the idle, or a T pose that stays.
+4. Press **mixed-0**, then **mixed-new**. Q starts standing and jumps to the quest clip after 4 s. Say whether the quest clip plays.
+5. Press **Remove the actors** and switch the app off.
+
 ## World node registry (#24)
 
 Asked for by EDGEbuilder in [#24](https://github.com/Edgemodders/REDnode/issues/24) for its world inspector: hover or click anything the game placed and see what it is and which sector and node it comes from, outline it, hide it for the session, list what is streamed in near the camera, and have the world stream around EDGEbuilder's camera. Entities are covered by `world.near` and `world.files`; static nodes (most buildings, street furniture, decals, lights, foliage) are not: nothing in the game API names the node a click hit, and on 2.5 a sector keeps a node's path only as a hash. RED Hot Tools solves it with hooks on sector loading and node-instance setup (its `WorldNodeRegistry`, MIT) but has no 2.5 build.
