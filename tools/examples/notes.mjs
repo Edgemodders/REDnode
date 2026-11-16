@@ -485,14 +485,15 @@ export const NOTES = {
   'director-spike': {
     group: 'tests',
     summary: 'Write a workspot of your own for one actor\'s animation clips, swap it into the running game, play it on two people, jump between clips and time the jumps (#46\'s spike, for EDGEdir).',
-    teaches: ['kernel.bridge', 'archives.reload', 'world.spawn', 'world.useWorkspot', 'world.workspotState', 'game.call', 'WorkspotGameSystem'],
+    teaches: ['kernel.bridge', 'archives.reload', 'world.spawn', 'world.useWorkspot', 'world.workspotState', 'world.setWeather', 'world.resetWeather', 'game.call', 'WorkspotGameSystem'],
     how: [
       '**Build** reads one of the game\'s workspots through REDbridge and writes two of its own into the app\'s data folder: each test clip becomes a sequence whose idle is the clip. **Swap in** loads them into the running game with REDswap.',
       'Two people carry the workspot from their spawn; **Play both** starts it, and the clip buttons jump both of them to a clip by name, blended or instant.',
       '**Timed run** fires jumps on timers and logs how late each lands, in milliseconds and frames.',
+      'Section 7 sets the weather and holds it (**Rain**, **Fog** by its preset record, **Sunny, at once**) and gives it back to the game\'s own cycle.',
     ],
-    tryThis: ['Press Build, Swap in, Spawn, Play both, then B arms crossed.'],
-    preview: 'The preview\'s game has no REDbridge or workspots, so the buttons log a failure here: the app is meant for the game.',
+    tryThis: ['Press Build, Swap in, Spawn, Play both, then B arms crossed.', 'Press Rain, then Read the weather.'],
+    preview: 'The preview\'s game has no REDbridge or workspots, so those buttons log a failure here; the weather buttons answer from a simulated sky.',
   },
   'nodes-test': {
     group: 'tests',

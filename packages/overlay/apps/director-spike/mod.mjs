@@ -13,7 +13,8 @@
 //   5 Gap      the step-off clip with root motion: where the actor is at 0, 3 and 6 s
 //   6 Timed    jumps on setTimeout at set times for both actors: how late each lands, in ms and
 //              in frames, and how far apart the two actors' jumps are
-//   7 Weather  reads what the script API offers (it has no call that sets the weather on 2.5)
+//   7 Weather  (0.6.0) world.weather, world.setWeather and world.resetWeather (REDnode 0.66.10): the
+//              state, held or the game's cycle, and every state the world has; rain, fog and sun
 //   8 Quest    (0.3.0) why the quest clip stays in a T pose: one more person, Q, plays each of six
 //              workspots that differ by one thing from the game's own quest medic workspot
 //   9 Start    (0.3.0) whether the T pose at the first play goes when the person waits after spawning
@@ -360,12 +361,25 @@ const timed = () =>
 // ---- 7. Weather -------------------------------------------------------------------
 
 const weather = () =>
-  step('Weather: what the script API reads', async () => {
-    const w = await api.GameInstance.GetWeatherSystem(game.instance);
-    if (!w) return 'no weather system';
-    const intensity = await w.GetRainIntensity().catch((e) => `error ${e.message}`);
-    const type = await w.GetRainIntensityType().catch((e) => `error ${e.message}`);
-    return `rain intensity ${intensity}, type ${type}. The script API has no call that sets the weather on 2.5`;
+  step('world.weather', async () => {
+    const w = await world.weather();
+    const sys = await api.GameInstance.GetWeatherSystem(game.instance);
+    const rain = sys ? await sys.GetRainIntensity().catch((e) => `error ${e.message}`) : 'no system';
+    say(`  states: ${w.states.join(', ')}`);
+    return `${w.state}, ${w.held ? `held by ${w.source}${w.by ? ` (${w.by})` : ''}` : `the game's cycle (last set by ${w.source})`}, priority ${w.priority}, rain ${rain}`;
+  });
+
+// (0.6.0) REDnode 0.66.10's weather calls: what a quest's weather node does.
+const setWeather = (state, blend) =>
+  step(`world.setWeather ${state} (${blend} s)`, async () => {
+    const r = await world.setWeather(state, { blend });
+    return `${r.applied ? 'applied' : 'not applied'}${r.changed ? '' : ', unchanged'}, was ${r.was}, ${r.held ? 'held' : 'not held'}`;
+  });
+
+const resetWeather = () =>
+  step('world.resetWeather', async () => {
+    const r = await world.resetWeather();
+    return `was ${r.was}; the game's cycle picks the next weather in its own time`;
   });
 
 // ---- 8. Quest variants -------------------------------------------------------------
@@ -565,10 +579,17 @@ ui.window({
     ui.heading('11. world.writeWorkspot (REDnode 0.66.9)'),
     ui.row(ui.button('Write and swap', callWrite), ui.button('Spawn two with it', callSpawn, { variant: 'ghost' }), ui.button('Play', callPlay, { variant: 'ghost' })),
     ui.row(...CALL_CLIPS.slice(0, 3).map((c) => ui.button(c.name, () => callJump(c.name), { variant: 'ghost' })), ui.button('A new person, same file', callNewPerson, { variant: 'ghost' })),
-    ui.heading('7. Weather'),
-    ui.row(ui.button('Read the weather', weather, { variant: 'ghost' }), ui.button('Remove the actors', removeAll, { variant: 'ghost' })),
+    ui.heading('7. Weather (REDnode 0.66.10)'),
+    ui.row(
+      ui.button('Read the weather', weather, { variant: 'ghost' }),
+      ui.button('Rain', () => setWeather('24h_weather_rain', 10)),
+      ui.button('Fog', () => setWeather('WeatherPresets.Fog', 10), { variant: 'ghost' }),
+      ui.button('Sunny, at once', () => setWeather('24h_weather_sunny', 0), { variant: 'ghost' }),
+      ui.button('Give it back', resetWeather, { variant: 'ghost' }),
+    ),
+    ui.row(ui.button('Remove the actors', removeAll, { variant: 'ghost' })),
     log,
   ],
 });
-say('Director spike 0.5.1 ready');
+say('Director spike 0.6.0 ready');
 for (const [name, what] of VARIANTS) say(`  variant ${name}: ${what}`);

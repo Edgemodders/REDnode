@@ -55,6 +55,7 @@ add_library(REDnode SHARED
   src/overlay/pins.cpp
   src/overlay/gamepad.cpp
   src/overlay/worldnodes.cpp
+  src/overlay/weather.cpp
 )
 target_link_libraries(REDnode PRIVATE RED4ext::SDK d3d12 d3dcompiler)
 target_include_directories(REDnode SYSTEM PRIVATE ${miniaudio_SOURCE_DIR})
@@ -139,6 +140,9 @@ target_compile_options(REDswap_table_tests PRIVATE /W4 /utf-8)
 
 add_executable(REDnode_pins_tests tests/pins_test.cpp)
 target_compile_options(REDnode_pins_tests PRIVATE /W4 /utf-8)
+
+add_executable(REDnode_weather_tests tests/weather_test.cpp)
+target_compile_options(REDnode_weather_tests PRIVATE /W4 /utf-8)
 
 add_executable(REDnode_gamepad_tests tests/gamepad_test.cpp)
 target_compile_options(REDnode_gamepad_tests PRIVATE /W4 /utf-8)

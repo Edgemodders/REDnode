@@ -1033,6 +1033,7 @@ function checkSolo() {
   checkSpawns();
   for (const id of [...quickhackOwners]) if (!packageRunning(id)) releaseQuickhacks(id, 'the package stopped');
   for (const id of [...nodeUsers.keys()]) if (!packageRunning(id)) worldNodesGone(id, 'the package stopped');
+  if (weatherHolder && !packageRunning(weatherHolder)) weatherGone(weatherHolder, 'the package stopped');
   checkSounds();
   checkInk();
   checkPins();
@@ -1650,6 +1651,7 @@ function onGameMessage(m) {
       const next = { menu: !!m.menu, photoMode: !!m.photoMode, scene: !!m.scene, mainMenu: !!m.mainMenu, world: !!m.world };
       const changed = JSON.stringify(next) !== JSON.stringify(uiState);
       onUiStateForSound(uiState, next);
+      if (next.world && !uiState.world) weatherAfterLoad();
       uiState = next;
       // A window hidden with the game's UI loses its texture in the game. Repaint every
       // window, so one that is shown again gets a frame even if its page is idle.
@@ -1909,6 +1911,8 @@ async function packageCallNow(id, method, params) {
   // #24: the world node registry. Hidden and outlined nodes are kept per package, shown again and
   // cleared when it stops (worldNodesGone).
   if (typeof method === 'string' && method.startsWith('nodes.')) return nodesCall(id, method, params);
+  // #46: the weather. A package's hold is given back to the game's cycle when it stops.
+  if (typeof method === 'string' && method.startsWith('weather.')) return weatherCall(id, method, params);
   // World pins (#43): drawn by the overlay, so they change nothing in the game.
   if (method === 'pins.add') return pinsHost.add(id ?? null, params);
   if (method === 'pins.remove') return pinsHost.remove(id ?? null, params?.id);
@@ -1970,6 +1974,58 @@ function worldNodesGone(id, why) {
   for (const node of u.hidden) bridgeCall('nodes.visible', { id: node, visible: true }).catch(() => {});
   for (const node of u.outlined) bridgeCall('nodes.highlight', { id: node, on: false }).catch(() => {});
   log(`World nodes of ${id}: ${u.hidden.size} shown again, ${u.outlined.size} outline(s) cleared (${why})`);
+}
+
+// #46: the package holding the weather through REDnode (the plugin sets it with the source
+// "REDnode"), or null. Given back to the game's cycle when it stops; a save load brings its own
+// weather, so the hold ends there too.
+let weatherHolder = null;
+let weatherSetAt = 0; // when a set last held the weather (Date.now())
+
+async function weatherCall(id, method, params) {
+  if (method === 'weather.set') {
+    const p = params ?? {};
+    const result = await bridgeCall('weather.set', { state: p.state, blend: p.blend, priority: p.priority, source: 'REDnode' });
+    if (result?.applied) {
+      if (weatherHolder !== (id ?? null)) log(`Weather: ${result.state} held by ${id ?? 'an assistant'}`);
+      weatherHolder = id ?? null;
+      weatherSetAt = Date.now();
+    }
+    return result;
+  }
+  if (method === 'weather.reset') {
+    const result = await bridgeCall('weather.reset', {});
+    weatherHolder = null;
+    return result;
+  }
+  if (method !== 'weather.state') throw new Error(`Unknown weather call ${method}`);
+  const state = await bridgeCall('weather.state', {});
+  return { ...state, by: state?.held && state.source === 'REDnode' ? weatherHolder : null };
+}
+
+function weatherGone(id, why) {
+  if (!id || weatherHolder !== id) return;
+  weatherHolder = null;
+  if (!connected || !uiState.world) return;
+  bridgeCall('weather.reset', {})
+    .then(() => log(`Weather of ${id} given back to the game's cycle (${why})`))
+    .catch((err) => log(`Weather of ${id}: the reset failed: ${err.message}`));
+}
+
+// V is in the world again (a load): the save brought its own weather. One that REDnode held
+// when the save was made would stay held for good, so it goes back to the game's cycle.
+// A set just before the host hears of the world (the plugin knew first) is current, not the
+// save's: a package's call can reach the plugin before its ui-state event reaches the host.
+function weatherAfterLoad() {
+  const at = Date.now();
+  const current = () => weatherSetAt >= at - 2000;
+  if (!current()) weatherHolder = null;
+  bridgeCall('weather.state', {})
+    .then((s) => {
+      if (!s?.held || s.source !== 'REDnode' || current()) return;
+      return bridgeCall('weather.reset', {}).then(() => log(`Weather: ${s.state} from a save held by REDnode, given back to the game's cycle`));
+    })
+    .catch(() => {});
 }
 
 // Packages that defined quickhack functions (#42), so the host can release them when they stop.
@@ -5174,6 +5230,8 @@ function mcpHost() {
     worldSpawn: spawnForAgent,
     worldRemove: removeForAgent,
     worldAnimate: animateForAgent,
+    // #46: the weather, held by no package when an assistant sets it.
+    weather: (method, params) => weatherCall(null, method, params),
     worldLoad: loadSceneForAgent,
     worldUnload: unloadSceneForAgent,
     // #43: world pins dropped by assistants belong to no package.
@@ -5885,6 +5943,7 @@ app.whenReady().then(() => {
       removeSpawns(id, 'the mod stopped');
       releaseQuickhacks(id, 'the mod stopped');
       worldNodesGone(id, 'the mod stopped');
+      weatherGone(id, 'the mod stopped');
       stopSounds(id);
       clearInk(id);
       pinsHost.gone(id, 'the mod stopped');

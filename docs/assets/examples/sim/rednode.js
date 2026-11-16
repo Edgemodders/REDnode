@@ -592,6 +592,10 @@ export function undoTweaks() {
 // ---------- the world ----------
 
 const worldListeners = new Map(); // event name -> Set
+// #46: the game's own weather states and presets (WeatherPresets records' name flats).
+const WEATHER_STATES = ['24h_weather_sunny', '24h_weather_light_clouds', '24h_weather_cloudy', '24h_weather_heavy_clouds', '24h_weather_fog', '24h_weather_rain', '24h_weather_toxic_rain', '24h_weather_pollution', '24h_weather_sandstorm'];
+const WEATHER_PRESETS = { 'WeatherPresets.Sunny': '24h_weather_sunny', 'WeatherPresets.Light_Clouds': '24h_weather_light_clouds', 'WeatherPresets.Cloudy': '24h_weather_cloudy', 'WeatherPresets.Heavy_Clouds': '24h_weather_heavy_clouds', 'WeatherPresets.Fog': '24h_weather_fog', 'WeatherPresets.Rain': '24h_weather_rain', 'WeatherPresets.ToxicRain': '24h_weather_toxic_rain', 'WeatherPresets.Pollution': '24h_weather_pollution', 'WeatherPresets.Sandstorm': '24h_weather_sandstorm' };
+const simWeather = { state: '24h_weather_light_clouds', held: false, source: 'RuntimeSystemWeather' };
 const entities = new Map();
 const pins = new Map();
 let nextPin = 1;
@@ -652,6 +656,28 @@ export const world = {
   },
   onRespawn() {
     return () => {}; // the simulated game swaps no archives
+  },
+  // #46: the weather, as the plugin answers it. The simulated game's cycle never moves on.
+  async weather() {
+    if (sim.mainMenu) throw new Error('V is not in the world');
+    return { state: simWeather.state, held: simWeather.held, source: simWeather.source, by: simWeather.held && simWeather.source === 'REDnode' ? 'this preview' : null, priority: 0, states: [...WEATHER_STATES] };
+  },
+  async setWeather(state, options = {}) {
+    if (sim.mainMenu) throw new Error('V is not in the world');
+    const name = String(state ?? '').startsWith('WeatherPresets.') ? WEATHER_PRESETS[state] : String(state ?? '');
+    if (!name) throw new Error(`world.setWeather: no weather preset ${state}`);
+    if (!WEATHER_STATES.includes(name)) throw new Error(`the world has no weather state "${name}"; it has ${WEATHER_STATES.join(', ')}`);
+    await nextFrame();
+    const was = simWeather.state;
+    const changed = !(was === name && simWeather.held && simWeather.source === 'REDnode');
+    Object.assign(simWeather, { state: name, held: true, source: 'REDnode', blend: options.blend ?? 5 });
+    return { applied: true, changed, state: name, was, held: true };
+  },
+  async resetWeather() {
+    if (sim.mainMenu) throw new Error('V is not in the world');
+    const was = simWeather.held ? 'held' : 'cycle';
+    simWeather.held = false;
+    return { held: false, was };
   },
   // What is near V: the simulated game has only what the preview spawned, 2 to 3 m away.
   async near(options = {}) {

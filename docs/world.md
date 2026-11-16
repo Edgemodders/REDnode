@@ -2000,6 +2000,48 @@ Run on 2026-11-16 by the owner on the laptop, REDnode 0.66.9, Director spike 0.5
 
 So a scene starts each actor's workspot once while the actor is out of view. `world.jumpWorkspot` answered as if it jumped when the person was not in the workspot; it now answers false then (Director spike 0.5.1 says "press Play first").
 
+### Weather (#46): the static reading
+
+Game 2.5 has no script call that sets the weather: `worldWeatherScriptInterface` (`GameInstance.GetWeatherSystem`) only reads the rain, and the exe has no `SetWeather` string other than the quest node's class name (2.31 had none either). Quests set it with the node `questPlayEnv_SetWeather`. A static reading of 2.5's exe (scratchpad `wx/`; no game code committed) found what that node does:
+
+| Part | What it is (2.5) |
+|---|---|
+| The node | `questPlayEnv_SetWeather`: `weatherID` (a `WeatherPresets` record) at +0x30, `source` (CName) +0x38, `blendTime` +0x40 (default 5 s), `priority` +0x48, `reset` +0x4C. Its run function is slot 0x108 of its vtable |
+| The run | Reads the weather system from the quest context (+0x1C8). With `reset`, it sets the system's flag at +0x8C to 1 and does nothing else. Otherwise it looks up the record's `name` flat (the state's name, `WeatherPresets.Rain` is `24h_weather_rain`) and calls the weather system's setter; when that answers true, it sets the flag to 0 |
+| The flag (+0x8C) | 1 when the system is made (the game's own weather cycle on), 0 while a quest holds the weather. Saved with the game |
+| The setter | `bool (system, state name, source name, blend seconds, priority)`. Finds the state by name among the world's states; the same state from the same source changes nothing (false). Then it stores the source (+0x98) and the priority (+0xA0, at most 7, passed on to the environment's blending) and blends to the state. The game's own cycle calls it with the source `RuntimeSystemWeather` and priority 0; a save load calls it too |
+| The system | `worldRuntimeSystemWeather`, the object the script interface keeps at +0x40 (its native `GetRainIntensity` reads +0x108 of it). The states are the world's `worldEnvironmentDefinition.weatherStates`, reached through the system's +0x60 and that object's +0x120; the current state's index is +0x90 (+0x88 while +0x84 is set) |
+| The states | The `WeatherPresets` records name 15: `24h_weather_sunny`, `_light_clouds`, `_cloudy`, `_heavy_clouds`, `_fog`, `_rain`, `_toxic_rain`, `_pollution`, `_sandstorm`, and quest ones (`q302_deep_blue`, `q302_light_rain`, `q302_squat_morning`, `q306_epilogue_cloudy_morning`, `q306_rainy_night`, `sa_courier_clouds`). Which of them a world has is read from the game |
+
+### Weather (#46): built (REDnode 0.66.10)
+
+Agreed with the owner on 2026-11-16 ("Yes please proceed", after the call's test). The plugin does what the quest node does, with nothing found by a byte pattern over the whole exe:
+
+| Part | Where |
+|---|---|
+| `weather.state`, `weather.set`, `weather.reset` | `native/src/overlay/weather.cpp`, on the game thread, refused while V is not in the world (`GetWeatherSystem` crashed the game at its start, #25). The setter's address and the flag's place come from the node's own run function (from an instance made through RTTI), read instruction by instruction (`weather.hpp`, unit test `native/tests/weather_test.cpp` on made-up code; on the real 2.5 exe it finds the setter at +0x97d1fc and the flag at +0x8C, scratchpad `wx/realcheck.cpp`). Every object on the way is checked by its class before it is used. Each set and reset is logged (`Weather: ...`) |
+| `world.weather()`, `world.setWeather(state, { blend, priority })`, `world.resetWeather()` | `packages/rednode/src/world.ts`. A state is a name from `world.weather().states` or a `WeatherPresets` record. No permission needed |
+| The host | `weatherCall` in main.js: sets come from the source `REDnode`, and the package holding the weather is kept. It is given back to the game's cycle when that package stops. When V comes into the world (a load), the save's own weather counts; one REDnode held when the save was made is given back (a set in the 2 s before is the package's, not the save's) |
+| Assistants | MCP `world_weather` (reads, no ask) and `world_weather_set` (a state or a preset, `blend`, or `reset: true`; asks first) |
+| The spike | Director spike 0.6.0: section 7 reads the weather, sets rain (10 s), fog (by its preset record, 10 s) and sunny at once, and gives it back |
+
+Unverified until the test: that the game's cycle leaves a held weather alone, how long a reset takes to show (the cycle moves on in its own time), what the priority changes, and whether a quest overrides REDnode's weather. Checked outside the game: the host with a stand-in plugin (scratchpad `wx/check`, 12 checks: sets name the source `REDnode`, a preset reaches the plugin as its state, unknown states and presets are refused, a quest's hold is left alone, the hold is given back at a hot reload and at a load) and the MCP tools (6 checks).
+
+### Weather (#46): test
+
+REDnode 0.66.10, Director spike 0.6.0, game 2.5. Stand V outside, in the open, at any time of day.
+
+1. Switch on **Director spike (#46)** in the Mod Manager (its **Allowed** switches are for the workspot steps; the weather needs none).
+2. Under **7. Weather**, press **Read the weather**. Expected: the state now, "the game's cycle", and the list of states in the log.
+3. Press **Rain**. Expected: "applied ... held", and over about 10 s the sky clouds over and it rains. Say how long it took.
+4. Press **Read the weather**. Expected: `24h_weather_rain`, held by REDnode (director-spike).
+5. Wait two or three in-game hours (the Pause menu's **Skip time**, or just play) and say whether it still rains: the game's own cycle must leave it alone.
+6. Press **Fog**. Expected: fog over about 10 s.
+7. Press **Sunny, at once**. Expected: a clear sky with no blend.
+8. Press **Give it back**, then **Read the weather**. Expected: "the game's cycle". Say whether the weather changes later on its own.
+9. Press **Rain** again, then switch the app off in the Mod Manager. Expected in the host log: "Weather of director-spike given back to the game's cycle".
+10. Optional: press **Rain**, make a save, load another save, then load that one. Expected: the rain from the save, given back to the game's cycle (a host log line says so).
+
 ## World node registry (#24)
 
 Asked for by EDGEbuilder in [#24](https://github.com/Edgemodders/REDnode/issues/24) for its world inspector: hover or click anything the game placed and see what it is and which sector and node it comes from, outline it, hide it for the session, list what is streamed in near the camera, and have the world stream around EDGEbuilder's camera. Entities are covered by `world.near` and `world.files`; static nodes (most buildings, street furniture, decals, lights, foliage) are not: nothing in the game API names the node a click hit, and on 2.5 a sector keeps a node's path only as a hash. RED Hot Tools solves it with hooks on sector loading and node-instance setup (its `WorldNodeRegistry`, MIT) but has no 2.5 build.

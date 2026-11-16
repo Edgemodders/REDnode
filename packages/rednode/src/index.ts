@@ -30,7 +30,7 @@ export { agent } from "./agent.js";
 export { service, use } from "./service.js";
 export type { ServiceInfo, ServiceCaller, ServiceCallOptions, ServiceHandle, ServiceDescription, FunctionDescriptor, ParamDescriptor, EventDescriptor, Schema } from "./service.js";
 export { world } from "./world.js";
-export type { EntityId, WorldPoint, WorldRotation, SpawnOptions, Spawned, EntityEventName, NearEntity, NearOptions, EntityFiles, SpawnedEntry, LoadResult, PinOptions, PinEntry, PinStyle, PinLabel, GoToResult, PinSetSaved, PinSetLoaded, WorldNode, PickOptions, PickResult, NodeRegistryState, NodeHighlight, UseWorkspotOptions, WorkspotResult, WorkspotState } from "./world.js";
+export type { EntityId, WorldPoint, WorldRotation, SpawnOptions, Spawned, EntityEventName, NearEntity, NearOptions, EntityFiles, SpawnedEntry, LoadResult, PinOptions, PinEntry, PinStyle, PinLabel, GoToResult, PinSetSaved, PinSetLoaded, WorldNode, PickOptions, PickResult, NodeRegistryState, NodeHighlight, UseWorkspotOptions, WorkspotResult, WorkspotState, WeatherState, SetWeatherOptions, SetWeatherResult } from "./world.js";
 export type { WorkspotClip, WriteWorkspotOptions, WorkspotEntry, WrittenWorkspot } from "./workspot.js";
 export type { Scene, SceneObject } from "./scene.js";
 export type { AgentAnswer, AskOptions, AgentRequest, AgentResult } from "./agent.js";

@@ -21,6 +21,8 @@ How to keep it:
 
 - Your own workspots for a person's animations (#46, for EDGEdir): `world.writeWorkspot(name, { clips })` writes a workspot holding the clips you list (any animation set, quest clips too), each looping until you move on, and swaps it into the running game; spawn a person with it and move between clips with `world.jumpWorkspot(id, name)`, which goes at once with a smooth blend (and answers false when the person is not in the workspot yet). Needs REDbridge and the `bridge` and `archives` permissions. Docs: https://edgemodders.github.io/REDnode/world.html#a-written-workspot-the-call-rednode-0669
 
+- Weather (#46, for EDGEdir): `world.setWeather("24h_weather_rain", { blend: 10 })` sets the weather and holds it, as a quest does, until `world.resetWeather()` gives it back to the game's own cycle; `world.weather()` reads the state, who holds it and every state the world has. A `WeatherPresets` record works too (`"WeatherPresets.Fog"`). Your mod's weather is given back when it stops, and a save made while REDnode held the weather does not stay stuck. AI assistants get `world_weather` and `world_weather_set` (which asks first). Game 2.5 has no script call for this; REDnode does what the game's quest weather node does. Docs: https://edgemodders.github.io/REDnode/world.html#weather-46-built-rednode-06610
+
 **Changed**
 
 - `world.useWorkspot`'s `entry` jumps at once (it waited for the clip playing to end, which can be many seconds), and takes an entry id or a name from `world.writeWorkspot` too.

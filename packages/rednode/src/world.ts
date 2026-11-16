@@ -11,6 +11,7 @@ import { game, type GameEvent } from "./game.js";
 import { readScene, type Scene, type ScenePlan, type SceneRead } from "./scene.js";
 import { writeWorkspot, writtenEntries, type WriteWorkspotOptions, type WrittenWorkspot } from "./workspot.js";
 import { cleanError, transport } from "./transport.js";
+import { tweakdb } from "./tweakdb.js";
 
 /** An entity's ID, as the game API passes it: its 64-bit hash as a string. */
 export interface EntityId {
@@ -322,6 +323,42 @@ export interface WorkspotState {
   playingSyncAnim: boolean;
   inReaction: boolean;
   inMotion: boolean;
+}
+
+/** The weather, as {@link world.weather} reads it (#46). */
+export interface WeatherState {
+  /** The weather state now, such as `"24h_weather_rain"`, or null when unknown. */
+  state: string | null;
+  /** True while something holds the weather: the game's own weather cycle waits until a reset. */
+  held: boolean;
+  /** Who set the weather last: a quest's name, `"REDnode"`, or the game's own cycle (`"RuntimeSystemWeather"`). */
+  source: string | null;
+  /** The package holding the weather through REDnode, when it is one. */
+  by?: string | null;
+  /** The priority it was set with, 0 to 7. */
+  priority: number;
+  /** Every weather state this world has, such as `"24h_weather_sunny"`, in the game's order. */
+  states: string[];
+}
+
+/** Options for {@link world.setWeather}. */
+export interface SetWeatherOptions {
+  /** Seconds the change takes. Default 5, as a quest's weather node. */
+  blend?: number;
+  /** 0 to 7, passed as a quest passes it. Default 0, as the game's own cycle. */
+  priority?: number;
+}
+
+/** What {@link world.setWeather} answers. */
+export interface SetWeatherResult {
+  /** True when the weather is now this state and held. */
+  applied: boolean;
+  /** False when it already was this state from REDnode. */
+  changed: boolean;
+  state: string;
+  /** The state before. */
+  was: string | null;
+  held: boolean;
 }
 
 /** One of this package's spawns, as {@link world.spawned} lists them. */
@@ -1032,6 +1069,56 @@ export const world = {
    */
   async writeWorkspot(name: string, options: WriteWorkspotOptions): Promise<WrittenWorkspot> {
     return writeWorkspot(name, options);
+  },
+
+  /**
+   * The weather now: its state, whether it is held, who set it, and every state the world has
+   * (#46).
+   *
+   * @example
+   * ```ts
+   * const { state, states } = await world.weather();
+   * ui.log(`${state} of ${states.join(", ")}`);
+   * ```
+   */
+  async weather(): Promise<WeatherState> {
+    return (await invoke("weather.state", {})) as WeatherState;
+  },
+
+  /**
+   * Sets the weather and holds it, as a quest's weather node does (#46): the game's own weather
+   * cycle waits until {@link world.resetWeather}, the package stops, a quest sets its own or a
+   * save loads. The state is one of {@link world.weather}'s `states`, or a `WeatherPresets`
+   * record (`"WeatherPresets.Rain"` is `"24h_weather_rain"`).
+   *
+   * A save loaded afterwards brings its own weather: set it again after a load if the package
+   * still wants it. A save made while REDnode holds the weather is given back to the game's cycle
+   * when it loads, unless a package holds the weather then.
+   *
+   * @example
+   * ```ts
+   * await world.setWeather("24h_weather_rain", { blend: 10 });
+   * // later
+   * await world.resetWeather();
+   * ```
+   */
+  async setWeather(state: string, options: SetWeatherOptions = {}): Promise<SetWeatherResult> {
+    let name = String(state ?? "").trim();
+    if (!name) throw new Error("world.setWeather needs a state, such as \"24h_weather_rain\"");
+    if (name.startsWith("WeatherPresets.")) {
+      const flat = await tweakdb.get(`${name}.name`).catch(() => null);
+      if (typeof flat !== "string" || !flat || flat === "None") throw new Error(`world.setWeather: no weather preset ${name}`);
+      name = flat;
+    }
+    return (await invoke("weather.set", { state: name, blend: options.blend, priority: options.priority })) as SetWeatherResult;
+  },
+
+  /**
+   * Gives the weather back to the game's own cycle (#46), as a quest's reset node does. The
+   * weather now stays until the cycle moves on in its own time.
+   */
+  async resetWeather(): Promise<{ held: false; was: "held" | "cycle" }> {
+    return (await invoke("weather.reset", {})) as { held: false; was: "held" | "cycle" };
   },
 
   /**

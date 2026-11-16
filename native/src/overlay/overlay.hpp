@@ -334,6 +334,10 @@ bool IsWorldNodesMethod(const std::string& aMethod);
 std::string WorldNodes(const std::string& aMethod, const json::Value& aParams, std::string& aError);
 void UpdateWorldNodes(); // game thread, each frame: hides again a hidden node that streamed in
 void StopWorldNodes();
+// weather.cpp: weather.state, weather.set and weather.reset (#46), on the game thread, what the
+// quest node questPlayEnv_SetWeather does.
+bool IsWeatherMethod(const std::string& aMethod);
+std::string Weather(const std::string& aMethod, const json::Value& aParams, std::string& aError);
 std::string Ink(const std::string& aMethod, const json::Value& aParams, std::string& aError);
 void UpdateInk(uint64_t aFrame); // game thread, each frame: builds again what the game removed
 void InkHostGone();             // any thread: the host left, and its packages' widgets go with it

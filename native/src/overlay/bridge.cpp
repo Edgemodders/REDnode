@@ -210,7 +210,8 @@ std::string Handle(const std::string& aJson, uint64_t aFrame)
     if (method == "audio.stopEvent")
         return AudioEvent(id, aJson, true);
     if (IsReflectMethod(method) || IsAudioMethod(method) || IsFaultsMethod(method) || IsOpusMethod(method) ||
-        IsTraceMethod(method) || IsInkMethod(method) || IsInkReadMethod(method) || IsWorldNodesMethod(method))
+        IsTraceMethod(method) || IsInkMethod(method) || IsInkReadMethod(method) || IsWorldNodesMethod(method) ||
+        IsWeatherMethod(method))
     {
         json::Value request;
         std::string error;
@@ -226,6 +227,7 @@ std::string Handle(const std::string& aJson, uint64_t aFrame)
                              : IsInkMethod(method)    ? Ink(method, given, error)
                              : IsInkReadMethod(method) ? InkRead(method, given, error)
                              : IsWorldNodesMethod(method) ? WorldNodes(method, given, error)
+                             : IsWeatherMethod(method) ? Weather(method, given, error)
                                                       : Reflect(method, given, error);
         if (!error.empty())
             return Error(id, error.c_str());
