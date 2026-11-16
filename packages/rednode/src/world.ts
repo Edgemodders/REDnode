@@ -188,6 +188,8 @@ export interface WorldNode {
   holdsHit?: boolean;
   /** For {@link world.pick}: its box's volume in cubic metres. */
   volume?: number;
+  /** For an entity or device node: its entity's id (`world.entity` reaches it). */
+  entity?: string;
 }
 
 /** Options for {@link world.pick}. */
@@ -212,6 +214,11 @@ export interface PickOptions {
    * starts inside), then the rest by distance. `"nearest"`: by distance only.
    */
   order?: "fit" | "nearest";
+  /**
+   * Also stand-ins and invisible helpers: distant LOD proxies (terrain, roads, prefabs,
+   * entities), occluders, collision, smart objects, GI spaces and shapes. Default `false`.
+   */
+  helpers?: boolean;
 }
 
 /** What {@link world.pick} answers. */
@@ -256,7 +263,7 @@ export interface NodeRegistryState {
 export interface NodeHighlight {
   /** The outline's colour index. Default 1. */
   outline?: number;
-  /** The fill's colour index. Default 0 (none). */
+  /** The fill's colour index, at least 1 (0 clears the highlight on 2.5). Default 1. */
   fill?: number;
   /** Seen through walls. Default `false`. */
   seeThrough?: boolean;
@@ -834,6 +841,7 @@ export const world = {
       all: !!options.all,
       physics: options.physics !== false,
       ...(options.order ? { order: options.order } : {}),
+      ...(options.helpers ? { helpers: true } : {}),
     })) as PickResult;
   },
 
@@ -844,8 +852,8 @@ export const world = {
 
   /**
    * Outlines a node with the game's highlight, or takes it off with `null`. Cleared when your
-   * package stops. Experimental (#24): not on game 2.5 yet (its render proxies' places are being
-   * checked), so it answers `false` with the reason as a warning.
+   * package stops. Experimental (#24): on game 2.5, meshes, decals and bent meshes; other kinds
+   * answer `false` with the reason as a warning.
    */
   async highlight(id: string, style: NodeHighlight | null = {}): Promise<boolean> {
     const r = (await invoke("nodes.highlight", { id, on: style !== null, ...(style ?? {}) })) as { done: boolean; why?: string };

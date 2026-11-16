@@ -19,6 +19,7 @@ import { kernel, ui, world } from 'rednode';
 let max = 50;
 let kinds = '';
 let all = false;
+let helpers = false;
 let picked = []; // the last pick's hits
 let chosen = null; // the node the buttons act on
 const hidden = new Set();
@@ -72,7 +73,7 @@ async function describe(n) {
     n.distance !== undefined ? `  at ${short(n.distance)} m` : ''
   }  box from ${n.boundsFrom}${n.volume !== undefined ? ` ${n.volume < 10 ? n.volume.toFixed(2) : Math.round(n.volume)} m3` : ''}${n.holdsHit ? '  HOLDS THE HIT' : ''}${res ? `  ${res.split('\\').pop()}` : ''}${n.appearance ? ` (${n.appearance})` : ''}${
     n.streamed ? `  attached ${n.attached}, visible ${n.visible}` : '  not streamed'
-  }${n.hidden ? '  HIDDEN' : ''}`;
+  }${n.hidden ? '  HIDDEN' : ''}${n.entity ? `  entity ${n.entity}` : ''}`;
 }
 
 // The chosen node is shown in the world with a world pin at the foot of its box's centre,
@@ -127,7 +128,7 @@ const refresh = () =>
 
 const pick = () =>
   step(`Pick (${max} m${kinds ? `, ${kinds}` : ''}${all ? ', all' : ''})`, async () => {
-    const r = await world.pick({ max, limit: 12, all, ...(kinds.trim() ? { kinds: kinds.split(',').map((k) => k.trim()) } : {}) });
+    const r = await world.pick({ max, limit: 12, all, helpers, ...(kinds.trim() ? { kinds: kinds.split(',').map((k) => k.trim()) } : {}) });
     picked = r.hits;
     say(`  physics hit: ${r.physicsHit ? `${r.physicsHit.distance.toFixed(1)} m at ${r.physicsHit.point.map((c) => c.toFixed(1)).join(', ')}` : 'none'}`);
     for (const [i, n] of r.hits.entries()) say(`  ${i + 1}. ${await describe(n)}`);
@@ -204,6 +205,7 @@ ui.window({
     ui.slider('Reach (m)', (v) => (max = v), { min: 5, max: 200, step: 5, value: max }),
     ui.input({ placeholder: 'Only these kinds, comma separated (e.g. worldMeshNode, worldInstancedMeshNode)', onChange: (v) => (kinds = v), onSubmit: (v) => (kinds = v) }),
     ui.toggle('Also nodes not streamed in', (on) => (all = on)),
+    ui.toggle('Also stand-ins and helpers (LOD proxies, occluders, collision)', (on) => (helpers = on)),
     ui.row(ui.button('Pick', pick), ui.button('20 picks (timing)', timing, { variant: 'ghost' })),
     ui.row(...[1, 2, 3, 4, 5, 6].map((i) => ui.button(`Choose ${i}`, () => pickNth(i - 1), { variant: 'ghost' }))),
     target,

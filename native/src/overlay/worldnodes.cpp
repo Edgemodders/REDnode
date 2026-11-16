@@ -86,6 +86,8 @@ constexpr uint32_t SectorDtorHash = 3420392384;     // StreamingSector_dtor
 constexpr uint32_t NodeInitializeHash = 624308217;  // WorldNodeInstance_Initialize
 constexpr uint32_t NodeAttachHash = 3515291207;     // WorldNodeInstance_Attach
 constexpr uint32_t NodeVisibilityHash = 2290487415; // WorldNodeInstance_SetVisibility (instance, bool)
+constexpr uint32_t ProxyHighlightHash = 1093803822;  // RenderProxy_SetHighlightParams (proxy, params*): bytes see-through, pattern, fill, outline
+constexpr uint32_t ProxyScanningHash = 2838044016;   // RenderProxy_SetScanningState (proxy, state): writes proxy+0x22
 
 constexpr size_t SetupSize = 0x90;
 constexpr size_t SetupNode = 0x50;
@@ -104,6 +106,19 @@ using SectorDtor_t = Hooked_t;
 using NodeInitialize_t = Hooked_t;
 using NodeAttach_t = Hooked_t;
 using NodeVisibility_t = void (*)(void*, bool);
+struct HighlightParams
+{
+    bool seeThroughWalls; // 00
+    uint8_t patternType;  // 01
+    uint8_t fillIndex;    // 02: 0 clears (2.5 takes another branch)
+    uint8_t outlineIndex; // 03
+    float opacity;        // 04
+    bool forced;          // 08
+};
+using ProxyHighlight_t = uint8_t (*)(void*, const HighlightParams*);
+using ProxyScanning_t = uint8_t (*)(void*, int8_t);
+ProxyHighlight_t g_proxyHighlight = nullptr;
+ProxyScanning_t g_proxyScanning = nullptr;
 
 SectorReady_t g_sectorReady = nullptr;
 SectorDtor_t g_sectorDtor = nullptr;
@@ -751,6 +766,76 @@ void ResourceOf(void* aNode, uint64_t aType, std::string& aResource, std::string
     }
 }
 
+// Stand-ins and invisible helpers a pick skips unless asked ("helpers": true): distant LOD
+// proxies (terrain, roads, prefabs, entities), occluders, collision, smart objects, GI spaces and
+// shapes. 0.66.4's test: they held the hit and came first, and hiding them changed nothing seen.
+bool IsHelper(uint64_t aType)
+{
+    static std::unordered_map<uint64_t, bool> known;
+    const auto it = known.find(aType);
+    if (it != known.end())
+        return it->second;
+    const std::string name = ClassName(aType);
+    bool helper = false;
+    for (const char* part : {"Proxy", "Occluder", "Collision", "SmartObject", "GISpace", "Shape", "AreaNode", "Navigation",
+                             "Trigger", "Marker", "Reflection", "Acoustic", "Sound", "Audio"})
+        helper = helper || name.find(part) != std::string::npos;
+    known.emplace(aType, helper);
+    return helper;
+}
+
+// An entity or device node's entity, by its entity id (the instance's +0xA0 handle on 2.5, as
+// RED Hot Tools has it; checked carefully, since it is read for a few pick results only).
+uint64_t EntityOf(void* aInstance)
+{
+    static CClass* const entityNode = CRTTISystem::Get()->GetClass("worldEntityNodeInstance");
+    static CClass* const entity = CRTTISystem::Get()->GetClass("entEntity");
+    auto* cls = static_cast<ISerializable*>(aInstance)->GetType();
+    if (!entityNode || !entity || !cls || !cls->IsA(entityNode))
+        return 0;
+    void* object = nullptr;
+    if (!Read(static_cast<uint8_t*>(aInstance) + 0xA0, object) || !object)
+        return 0;
+    auto* type = TypeOf(object);
+    if (!type || !type->IsA(entity))
+        return 0;
+    auto* prop = type->GetProperty("entityID");
+    uint64_t hash = 0;
+    if (!prop || !Read(static_cast<uint8_t*>(object) + prop->valueOffset, hash))
+        return 0;
+    return hash;
+}
+
+// A node instance's render proxy, where 2.5 keeps it for the kinds seen in the game (0.66.4's
+// class lines: the same render proxy vtable at RED Hot Tools' places): the mesh families and
+// instanced destructibles at +0xC8, decals at +0xB0, bent meshes at +0xE0. Null for other kinds.
+void* ProxyOf(void* aInstance)
+{
+    struct Kind
+    {
+        const char* cls;
+        size_t offset;
+    };
+    static const Kind kinds[] = {{"worldBendedMeshNodeInstance", 0xE0}, {"worldStaticDecalNodeInstance", 0xB0},
+                                 {"worldInstancedDestructibleMeshNodeInstance", 0xC8}, {"worldMeshNodeInstance", 0xC8}};
+    auto* cls = static_cast<ISerializable*>(aInstance)->GetType();
+    if (!cls)
+        return nullptr;
+    for (const auto& k : kinds)
+    {
+        auto* base = CRTTISystem::Get()->GetClass(k.cls);
+        if (!base || !cls->IsA(base))
+            continue;
+        void* proxy = nullptr;
+        void* vtable = nullptr;
+        if (!Read(static_cast<uint8_t*>(aInstance) + k.offset, proxy) || !proxy || !Readable(proxy, 0x30) ||
+            !Read(proxy, vtable) || !InImage(vtable))
+            return nullptr;
+        return proxy;
+    }
+    return nullptr;
+}
+
 std::string NodeJson(const void* aSetup, SetupData& d, const char* aExtra)
 {
     if (!d.boxDone)
@@ -784,6 +869,9 @@ std::string NodeJson(const void* aSetup, SetupData& d, const char* aExtra)
     out += ",\"attached\":" + std::string(state < 0 ? "null" : (state & 1) ? "true" : "false");
     out += ",\"visible\":" + std::string(state < 0 ? "null" : (state & 2) ? "true" : "false");
     out += std::string(",\"hidden\":") + (g_hidden.count(IdOf(d.sector, d.instance)) ? "true" : "false");
+    if (instance)
+        if (const uint64_t entity = EntityOf(instance.instance))
+            out += ",\"entity\":" + JsonString(std::to_string(entity));
     if (aExtra)
         out += aExtra;
     return out + "}";
@@ -834,6 +922,8 @@ std::string Start(bool aInstances, std::string& aError)
         {NodeAttachHash, reinterpret_cast<void*>(&NodeAttachDetour), reinterpret_cast<void**>(&g_nodeAttach), "nodeAttach"},
     };
     g_nodeVisibility = reinterpret_cast<NodeVisibility_t>(Resolve(NodeVisibilityHash));
+    g_proxyHighlight = reinterpret_cast<ProxyHighlight_t>(Resolve(ProxyHighlightHash));
+    g_proxyScanning = reinterpret_cast<ProxyScanning_t>(Resolve(ProxyScanningHash));
     std::string attached = "[";
     std::string missing;
     for (size_t i = 0; i < std::size(hooks); ++i)
@@ -904,7 +994,7 @@ std::string State()
     out += ",\"sectorMs\":" + Num(g_sectorMs10.load() / 10.0) + ",\"forgotten\":" + std::to_string(g_forgotten.load()) +
            ",\"forgetMs\":" + Num(g_forgetMs10.load() / 10.0);
     out += std::string(",\"canHide\":") + (g_nodeVisibility ? "true" : "false");
-    out += ",\"canHighlight\":false}";
+    out += std::string(",\"canHighlight\":") + (g_proxyHighlight ? "true" : "false") + "}";
     return out;
 }
 
@@ -958,6 +1048,7 @@ std::string Pick(const json::Value& aParams, std::string& aError)
     // smallest first, then the rest by distance. The ray often starts inside large boxes (a road,
     // a terrain piece) that hold the hit too: by distance alone they came first (0.66.4's test).
     const bool fit = StringOr(aParams, "order") != "nearest";
+    const bool helpers = BoolOr(aParams, "helpers", false);
     std::vector<Hit> hits;
     size_t looked = 0;
     AcquireSRWLockExclusive(&g_lock);
@@ -967,6 +1058,8 @@ std::string Pick(const json::Value& aParams, std::string& aError)
         if (dx * dx + dy * dy + dz * dz > (max + 300) * (max + 300))
             continue;
         if (!kinds.empty() && !kinds.count(ClassName(d.nodeType)))
+            continue;
+        if (!helpers && kinds.empty() && IsHelper(d.nodeType))
             continue;
         if (!all)
         {
@@ -1032,6 +1125,39 @@ bool ApplyVisible(void* aInstance, bool aVisible)
     return true;
 }
 
+std::string Highlight(const json::Value& aParams, std::string& aError)
+{
+    const std::string id = StringOr(aParams, "id");
+    if (!g_proxyHighlight)
+    {
+        aError = "this game version's address list lacks the render proxy's highlight";
+        return {};
+    }
+    const bool on = BoolOr(aParams, "on", true);
+    HighlightParams params{};
+    if (on)
+    {
+        params.seeThroughWalls = BoolOr(aParams, "seeThrough", false);
+        params.fillIndex = static_cast<uint8_t>(std::max(1.0, NumberOr(aParams, "fill", 1)));
+        params.outlineIndex = static_cast<uint8_t>(NumberOr(aParams, "outline", 1));
+        params.opacity = static_cast<float>(NumberOr(aParams, "opacity", 1));
+        params.forced = true;
+    }
+    AcquireSRWLockShared(&g_lock);
+    const void* setup = SetupFor(id);
+    auto instance = setup ? InstanceOf(setup) : Handle<ISerializable>{};
+    ReleaseSRWLockShared(&g_lock);
+    if (!instance)
+        return "{\"done\":false,\"why\":" + JsonString(setup ? "not streamed in" : "no such node now") + "}";
+    void* proxy = ProxyOf(instance.instance);
+    if (!proxy)
+        return "{\"done\":false,\"why\":\"no render proxy REDnode knows for this kind on game 2.5 (meshes, decals and bent meshes only)\"}";
+    g_proxyHighlight(proxy, &params);
+    if (g_proxyScanning)
+        g_proxyScanning(proxy, on ? 4 /* Complete */ : 0 /* Off */);
+    return "{\"done\":true}";
+}
+
 std::string Visible(const json::Value& aParams, std::string& aError)
 {
     const std::string id = StringOr(aParams, "id");
@@ -1090,7 +1216,7 @@ std::string WorldNodes(const std::string& aMethod, const json::Value& aParams, s
         return out;
     }
     if (aMethod == "nodes.highlight")
-        return "{\"done\":false,\"proxies\":0,\"why\":\"the outline is not on game 2.5 yet: its render proxies' places are being checked\"}";
+        return Highlight(aParams, aError);
     if (aMethod == "nodes.visible")
         return Visible(aParams, aError);
     aError = "Unknown method: " + aMethod;
