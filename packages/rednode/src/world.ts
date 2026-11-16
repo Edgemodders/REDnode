@@ -170,8 +170,12 @@ export interface WorldNode {
   scale: [number, number, number];
   /** Its box in the world. */
   bounds: { min: [number, number, number]; max: [number, number, number] };
-  /** `"mesh"`: from its mesh's box; `"place"`: a 1 m box at its place (no live instance, or no mesh). */
-  boundsFrom: "mesh" | "place";
+  /**
+   * `"mesh"`: from its mesh's box; `"scale"`: a decal's unit box scaled as it is (unverified);
+   * `"place"`: a 1 m box at its place (no live instance, or no mesh). In `"fit"` order, mesh
+   * boxes come before the others.
+   */
+  boundsFrom: "mesh" | "scale" | "place";
   /** The resource it shows (a mesh, a material...), as a path hash, or null. */
   resource: string | null;
   /** Its mesh appearance, when it has one. */

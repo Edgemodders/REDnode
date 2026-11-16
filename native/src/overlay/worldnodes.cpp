@@ -328,6 +328,7 @@ struct SetupData
     // The box in the world, worked out when a pick first needs it, from the live instance.
     bool boxDone = false;
     bool boxFromMesh = false;
+    bool boxFromScale = false; // a decal: a unit box scaled as the instance is (unverified)
     float min[3] = {};
     float max[3] = {};
 };
@@ -652,7 +653,14 @@ void WorkOutBox(const void* aSetup, SetupData& d)
             }
         }
     }
-    if (!d.boxFromMesh)
+    // A decal projects through a unit box scaled as its instance is (unverified): its own scale
+    // gives a box nearer the decal than a 1 m cube at its place, which ranked decals ahead of a
+    // bench they lie under (0.66.6's test).
+    static CClass* const decal = CRTTISystem::Get()->GetClass("worldStaticDecalNodeInstance");
+    d.boxFromScale = !d.boxFromMesh && instance && decal && instance.instance->GetType() &&
+                     instance.instance->GetType()->IsA(decal) && std::isfinite(scale[0]) && std::isfinite(scale[1]) &&
+                     std::isfinite(scale[2]) && std::fabs(scale[0]) < 500 && std::fabs(scale[1]) < 500 && std::fabs(scale[2]) < 500;
+    if (!d.boxFromMesh && !d.boxFromScale)
         for (float& s : scale)
             s = 1;
     for (int i = 0; i < 3; ++i)
@@ -862,7 +870,7 @@ std::string NodeJson(const void* aSetup, SetupData& d, const char* aExtra)
     out += ",\"flags\":" + std::to_string(d.flags);
     out += ",\"position\":" + Vec(d.pos, 3) + ",\"orientation\":" + Vec(d.rot, 4) + ",\"scale\":" + Vec(d.scale, 3);
     out += ",\"bounds\":{\"min\":" + Vec(d.min, 3) + ",\"max\":" + Vec(d.max, 3) + "}";
-    out += std::string(",\"boundsFrom\":") + (d.boxFromMesh ? "\"mesh\"" : "\"place\"");
+    out += std::string(",\"boundsFrom\":") + (d.boxFromMesh ? "\"mesh\"" : d.boxFromScale ? "\"scale\"" : "\"place\"");
     out += ",\"resource\":" + (resource.empty() ? std::string("null") : JsonString(resource));
     out += ",\"appearance\":" + (appearance.empty() ? std::string("null") : JsonString(appearance));
     out += std::string(",\"streamed\":") + (instance ? "true" : "false");
@@ -1043,6 +1051,7 @@ std::string Pick(const json::Value& aParams, std::string& aError)
         float t;
         float volume;
         bool holds;
+        bool real; // the box comes from the node's mesh
     };
     // "fit" (the default with a collision hit): the boxes that hold the hit point first, the
     // smallest first, then the rest by distance. The ray often starts inside large boxes (a road,
@@ -1078,11 +1087,13 @@ std::string Pick(const json::Value& aParams, std::string& aError)
                            point[1] >= d.min[1] - 0.05f && point[1] <= d.max[1] + 0.05f && point[2] >= d.min[2] - 0.05f &&
                            point[2] <= d.max[2] + 0.05f;
         const float volume = (d.max[0] - d.min[0]) * (d.max[1] - d.min[1]) * (d.max[2] - d.min[2]);
-        hits.push_back({setup, t, volume, holds});
+        hits.push_back({setup, t, volume, holds, d.boxFromMesh});
     }
     std::sort(hits.begin(), hits.end(), [fit](const Hit& a, const Hit& b) {
         if (fit && a.holds != b.holds)
             return a.holds;
+        if (fit && a.holds && a.real != b.real)
+            return a.real; // a mesh's own box before a box made up for a node without one
         if (fit && a.holds)
             return a.volume < b.volume;
         return a.t < b.t;
