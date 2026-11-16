@@ -15,7 +15,7 @@ How to keep it:
 
 - Your say over which mods may call another mod's tools (#22): a package lists the tools it calls in its manifest (`"calls": ["voice.speak"]`), and you allow each in the Mod Manager's new **Calls** section. A call you have not allowed is refused at once with the reason, never a prompt in the middle of play. Read-only tools stay open to every mod. The Admin Tools pack's Tools Manager gets a **MODS** switch per tool and per package (on for any mod, allowed only, or off) and **Mods: off for new packages**; its recent calls show mods' calls too. Docs: https://edgemodders.github.io/REDnode/services.html#calls-from-mods-22-built
 
-- Experimental, for EDGEbuilder's world inspector (#24): `world.pick()` lists the world's nodes along the camera's view (buildings, street furniture, decals, lights), each with the sector and node it comes from; `world.highlight()` outlines one and `world.setVisible()` hides it for the session (shown again when your mod stops). A port of RED Hot Tools' world node registry to game 2.5, started only when a mod uses it. Docs: https://edgemodders.github.io/REDnode/world.html#world-node-registry-24
+- Experimental, for EDGEbuilder's world inspector (#24): `world.pick()` lists the world's nodes along the camera's view (buildings, street furniture, decals, lights), each with the sector and node it comes from; `world.setVisible()` hides one for the session (shown again when your mod stops); `world.highlight()`, the outline, is not on game 2.5 yet. A port of RED Hot Tools' world node registry to game 2.5, started only when a mod uses it. Docs: https://edgemodders.github.io/REDnode/world.html#world-node-registry-24
 
 **Changed**
 

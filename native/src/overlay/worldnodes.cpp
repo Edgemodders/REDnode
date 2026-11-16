@@ -8,37 +8,47 @@
 //
 //   nodes.start {} -> {"attached":[...],"note"}
 //     Attaches the hooks (once). Sectors that load from then on are recorded: start it, then
-//     load a save so every sector around V loads again. The spike (S24) attaches only on this
-//     call, so players who never use it run none of it.
-//   nodes.state {} -> {"attached","offset","sectors","setups","instances","hidden","faults",...}
+//     load a save so every sector around V loads again. Attached only on this call, so players
+//     who never use it run none of it.
+//   nodes.state {} -> {"attached","layout","sectors","setups","instances","hidden","refused",...}
 //   nodes.pick {"from":[x,y,z]?,"dir":[x,y,z]?,"max":50,"limit":20,"kinds":[...]?,"all":false,
 //               "physics":true}
 //     -> {"hits":[node...],"physicsHit":{"point":[x,y,z],"distance":d}|null,"looked":n,"ms":t}
-//     Every recorded node whose box the ray crosses, nearest first (bounds mode): decals, lights
-//     and objects without collision too. Default ray: the camera's. With physics, the static
-//     collision hit is cast too and each hit says whether its box holds that point.
+//     Every recorded node whose box the ray crosses, nearest first (bounds mode). Default ray: the
+//     camera's. With physics, the static collision is cast too and each hit says whether its box
+//     holds that point.
 //   nodes.get {"id":"0x<sector>:<instance>"} -> node | null
-//   nodes.highlight {"id","on":true,"fill":0,"outline":1,"seeThrough":false,"opacity":1}
-//     -> {"done","proxies","why"?}: the game's outline on the node's render proxies
+//   nodes.highlight {...} -> {"done":false,"why"}: not on 2.5 yet (see below)
 //   nodes.visible {"id","visible":false} -> {"done","was","id"}: hides or shows the node for the
-//     session. A hidden node streamed in again is hidden again (on the game thread, after its
-//     attach); showing it takes it off that list even when it is not streamed in.
+//     session, through the game's own WorldNodeInstance_SetVisibility. A hidden node streamed in
+//     again is hidden again (on the game thread, after its attach).
 //
-// node: {"id","kind" (the node's class),"instanceKind","sector" (path hash),"instance",
-//        "instanceCount","index","nodeCount","nodeId","proxyId","interior","position",
-//        "orientation","scale","bounds":{"min","max"},"boundsFrom","resource","appearance",
-//        "attached","visible","distance"?,"holdsHit"?}
+// node: {"id","kind","instanceKind","sector","instance","instanceCount","index","nodeCount",
+//        "nodeId","proxyId","flags","position","orientation","scale","bounds","boundsFrom",
+//        "resource","appearance","streamed","attached","visible","hidden","distance"?,"holdsHit"?}
 // The id is the sector's path hash and the instance's index in it: the same for a node every
 // time its sector loads, so EDGEbuilder can store it (with REDbridge reading the same sector).
 //
-// What changed for 2.5, read from RED4ext.SDK's types: worldStreamingSector grew by 8 bytes
-// between 0x40 and 0xA0, so the node buffer RED Hot Tools reads at +0x40 may be at +0x48. The
-// first sectors are checked at both (the setups' count must match the buffer's size, and each
-// setup's node must be the node its index names); the place that holds is logged and used.
-// Every other layout (CompiledNodeInstanceSetupInfo, the node instances, the render proxies)
-// is the same size in the 2.5 SDK; their field offsets are RED Hot Tools' for 2.31, unverified
-// on 2.5. Every read of game memory is in a __try function with no C++ objects, so a wrong
-// offset answers with an error (and a "faults" count) instead of a crash.
+// Game 2.5 (0.66.1, from 0.66.0's crash and its dump, and a static reading of 2.5's code):
+//   - The sector's node buffer is still at +0x40, but its node list moved from buffer+0x28 to
+//     buffer+0x30 (8 new bytes after the setups' DataBuffer: the "pointer" 0x44 0.66.0 followed),
+//     and a setup's node index from a 16-bit field at +0x78 to +0x80 (the fields after +0x68 moved
+//     8 bytes). The layout is not assumed: the first sectors try each candidate place and keep the
+//     one where every setup's node is the node its index names, and log it.
+//   - A node instance's place (+0x30), orientation (+0x40), scale (+0x50) and node (+0x60) are as
+//     RED Hot Tools has them (2.5's WorldNodeInstance_Initialize copies them there); its state
+//     bits moved from +0x88 to +0x8C (attached bit 5, visible bit 9).
+//   - The game's crash handler takes a fault before __try does, so nothing here relies on __try:
+//     every pointer is checked with VirtualQuery before it is read, and an object's class is asked
+//     for only once it passes the engine's own check (an ISerializable's weak self handle at +0x08
+//     points back at it).
+//   - Boxes come from the node instance's mesh (a CMesh handle found among its fields, checked as
+//     above, and the mesh's RTTI "boundingBox") rather than worldNode's virtual GetBoundingBox,
+//     whose slot (0x108 in 2.31) is unverified on 2.5. A node with no mesh gets a 1 m box at its
+//     place (boundsFrom "place").
+//   - The outline needs the render proxies' offsets in each instance class, unverified on 2.5, so
+//     nodes.highlight answers why not; the first instance of each class logs its candidate fields
+//     and vtable slots for a static check.
 
 #include "jvalue.hpp"
 #include "overlay.hpp"
@@ -71,90 +81,104 @@ constexpr uint32_t SectorReadyHash = 3972601611;    // StreamingSector_OnReady
 constexpr uint32_t SectorDtorHash = 3420392384;     // StreamingSector_dtor
 constexpr uint32_t NodeInitializeHash = 624308217;  // WorldNodeInstance_Initialize
 constexpr uint32_t NodeAttachHash = 3515291207;     // WorldNodeInstance_Attach
-constexpr uint32_t NodeVisibilityHash = 2290487415; // WorldNodeInstance_SetVisibility
-constexpr uint32_t ProxyVisibilityHash = 1790971865; // RenderProxy_SetVisibility
-constexpr uint32_t ProxyHighlightHash = 1093803822; // RenderProxy_SetHighlightParams
-constexpr uint32_t ProxyScanningHash = 2838044016;  // RenderProxy_SetScanningState
+constexpr uint32_t NodeVisibilityHash = 2290487415; // WorldNodeInstance_SetVisibility (instance, bool)
 
-// RED Hot Tools' offsets (2.31), unverified on 2.5.
-constexpr size_t SetupSize = 0x90;      // CompiledNodeInstanceSetupInfo: same size in the 2.5 SDK
-constexpr size_t SetupNode = 0x50;      // worldNode*
-constexpr size_t SetupNodeId = 0x58;    // globalNodeID
-constexpr size_t SetupProxyId = 0x60;   // proxyNodeID
-constexpr size_t SetupIndex = 0x78;     // uint16 nodeIndex
-constexpr size_t SetupFlags = 0x7A;     // uint16, 0x40: interior
-constexpr size_t SetupScale = 0x20;     // Vector3
-constexpr size_t BufferNodes = 0x28;    // DynArray<Handle<worldNode>> after the setups' DataBuffer
-constexpr size_t InstanceState = 0x88;  // uint16: bit 5 attached, bit 9 visible
-constexpr size_t NodeBoundsVfunc = 0x108; // worldNode::GetBoundingBox(Box&), local space
+constexpr size_t SetupSize = 0x90;
+constexpr size_t SetupNode = 0x50;
+constexpr size_t SetupNodeId = 0x58;
+constexpr size_t SetupProxyId = 0x60;
+constexpr size_t InstancePlace = 0x30;  // Vector4, then the orientation quaternion at 0x40
+constexpr size_t InstanceScale = 0x50;  // Vector3
+constexpr size_t InstanceState = 0x8C;  // 2.5 (0x88 in 2.31): bit 5 attached, bit 9 visible
 
 using SectorReady_t = void (*)(void*, uint64_t);
 using SectorDtor_t = void (*)(void*);
 using NodeInitialize_t = bool (*)(void*, void*, void*);
 using NodeAttach_t = bool (*)(void*, void*);
 using NodeVisibility_t = void (*)(void*, bool);
-using ProxyVisibility_t = void (*)(void*, bool);
-struct HighlightParams
-{
-    bool seeThroughWalls; // 00
-    uint8_t patternType;  // 01
-    uint8_t fillIndex;    // 02
-    uint8_t outlineIndex; // 03
-    float opacity;        // 04
-    bool forced;          // 08
-};
-using ProxyHighlight_t = uint8_t (*)(void*, const HighlightParams&);
-using ProxyScanning_t = uint8_t (*)(void*, int8_t);
 
 SectorReady_t g_sectorReady = nullptr;
 SectorDtor_t g_sectorDtor = nullptr;
 NodeInitialize_t g_nodeInitialize = nullptr;
 NodeAttach_t g_nodeAttach = nullptr;
-void* g_places[5] = {}; // where each hook went, for Detach
-bool g_attached[5] = {};
+void* g_places[4] = {};
+bool g_attached[4] = {};
 NodeVisibility_t g_nodeVisibility = nullptr;
-ProxyVisibility_t g_proxyVisibility = nullptr;
-ProxyHighlight_t g_proxyHighlight = nullptr;
-ProxyScanning_t g_proxyScanning = nullptr;
 
-// What one setup says, copied when its sector loads.
-struct SetupData
+// ---- memory checks: VirtualQuery, since __try does not catch in this game ----
+
+bool Readable(const void* aAt, size_t aBytes)
 {
-    uint64_t sector = 0;
-    uint32_t instance = 0;
-    uint32_t instanceCount = 0;
-    uint32_t index = 0;
-    uint32_t nodeCount = 0;
-    void* node = nullptr;
-    uint64_t nodeType = 0; // the node's class name, as a CName hash
-    uint64_t nodeId = 0;
-    uint64_t proxyId = 0;
-    bool interior = false;
-    float pos[3] = {};
-    float rot[4] = {0, 0, 0, 1};
-    float scale[3] = {1, 1, 1};
-    // The world box, worked out the first time a pick needs it.
-    bool boxDone = false;
-    bool boxGood = false;
-    float min[3] = {};
-    float max[3] = {};
-};
+    const auto p = reinterpret_cast<uintptr_t>(aAt);
+    if (p < 0x10000 || p > 0x7FFFFFFEFFFF || aBytes == 0)
+        return false;
+    uintptr_t at = p;
+    const uintptr_t end = p + aBytes;
+    while (at < end)
+    {
+        MEMORY_BASIC_INFORMATION mbi{};
+        if (!VirtualQuery(reinterpret_cast<void*>(at), &mbi, sizeof(mbi)) || mbi.State != MEM_COMMIT)
+            return false;
+        const DWORD prot = mbi.Protect & 0xFF;
+        if ((mbi.Protect & (PAGE_GUARD | PAGE_NOACCESS)) || prot == PAGE_EXECUTE)
+            return false;
+        at = reinterpret_cast<uintptr_t>(mbi.BaseAddress) + mbi.RegionSize;
+    }
+    return true;
+}
 
-SRWLOCK g_lock = SRWLOCK_INIT;
-std::unordered_map<const void*, SetupData> g_setups;                      // setup* -> what it says
-std::unordered_map<const void*, const void*> g_instanceSetup;             // instance* -> setup*
-std::unordered_map<const void*, WeakHandle<ISerializable>> g_setupInstance; // setup* -> instance
-std::unordered_map<std::string, const void*> g_byId;                     // "0x<sector>:<i>" -> setup*
-std::unordered_set<std::string> g_hidden;                                 // ids hidden for the session
-std::deque<const void*> g_attachedQueue;                                  // instances to hide again
+bool InImage(const void* aAddress)
+{
+    static const auto range = []() {
+        const auto* base = reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
+        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
+        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(base + dos->e_lfanew);
+        return std::pair<const uint8_t*, const uint8_t*>(base, base + nt->OptionalHeader.SizeOfImage);
+    }();
+    const auto* p = static_cast<const uint8_t*>(aAddress);
+    return p >= range.first && p < range.second;
+}
 
-std::atomic<int> g_offset{-1}; // the node buffer's place in a sector: 0x40, 0x48, or -1 not yet
-std::atomic<uint64_t> g_sectors{0};
-std::atomic<uint64_t> g_badSectors{0};
-std::atomic<uint64_t> g_faults{0};
-std::atomic<uint64_t> g_initialized{0};
-std::atomic<uint64_t> g_sectorMs10{0}; // time spent recording sectors, in tenths of a ms
-std::string g_offsetNote;
+template<typename T>
+bool Read(const void* aAt, T& aOut)
+{
+    if (!Readable(aAt, sizeof(T)))
+        return false;
+    std::memcpy(&aOut, aAt, sizeof(T));
+    return true;
+}
+
+// An engine object: readable, a vtable in the exe, and its weak self handle (ISerializable +0x08)
+// pointing back at it. Only then is it safe to ask for its class.
+bool IsObject(const void* aObject)
+{
+    const void* vtable = nullptr;
+    const void* self = nullptr;
+    if (!Read(aObject, vtable) || !InImage(vtable))
+        return false;
+    if (!Read(static_cast<const uint8_t*>(aObject) + 0x08, self))
+        return false;
+    return self == aObject;
+}
+
+CClass* TypeOf(void* aObject)
+{
+    return IsObject(aObject) ? static_cast<ISerializable*>(aObject)->GetType() : nullptr;
+}
+
+uintptr_t Resolve(uint32_t aHash)
+{
+    using Resolve_t = uintptr_t (*)(uint32_t);
+    static const auto resolve = []() -> Resolve_t {
+        const auto red4ext = GetModuleHandleW(L"RED4ext.dll");
+        return red4ext ? reinterpret_cast<Resolve_t>(GetProcAddress(red4ext, "RED4ext_ResolveAddress")) : nullptr;
+    }();
+    return resolve ? resolve(aHash) : 0;
+}
+uint64_t Rva(const void* aAt)
+{
+    return reinterpret_cast<uintptr_t>(aAt) - reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+}
 
 std::string Hex(uint64_t aValue)
 {
@@ -187,304 +211,185 @@ std::string Vec(const float* aV, int aN)
     return out + "]";
 }
 
-uintptr_t Resolve(uint32_t aHash)
-{
-    using Resolve_t = uintptr_t (*)(uint32_t);
-    static const auto resolve = []() -> Resolve_t {
-        const auto red4ext = GetModuleHandleW(L"RED4ext.dll");
-        return red4ext ? reinterpret_cast<Resolve_t>(GetProcAddress(red4ext, "RED4ext_ResolveAddress")) : nullptr;
-    }();
-    return resolve ? resolve(aHash) : 0;
-}
+// ---- the layout, found at the first sectors ----
 
-bool InImage(const void* aAddress)
+struct Layout
 {
-    static const auto range = []() {
-        const auto* base = reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
-        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
-        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(base + dos->e_lfanew);
-        return std::pair<const uint8_t*, const uint8_t*>(base, base + nt->OptionalHeader.SizeOfImage);
-    }();
-    const auto* p = static_cast<const uint8_t*>(aAddress);
-    return p >= range.first && p < range.second;
-}
-
-// ---- guarded reads: no C++ objects in these ----
+    size_t buffer = 0;     // the node buffer in the sector
+    size_t nodes = 0;      // the node list in the buffer
+    size_t index = 0;      // the node index in a setup
+    bool wide = false;     // the index is the low 19 bits of a 32-bit field
+};
+// One candidate for each version seen: 2.5 first (from the dump), then RED Hot Tools' 2.31.
+constexpr Layout Candidates[] = {
+    {0x40, 0x30, 0x80, false},
+    {0x40, 0x30, 0x70, true},
+    {0x40, 0x28, 0x78, false},
+    {0x48, 0x30, 0x80, false},
+};
+std::atomic<int> g_layout{-1}; // index into Candidates
 
 struct BufferView
 {
-    const uint8_t* setups;
-    uint32_t setupBytes;
-    const uint8_t* nodes; // Handle<worldNode> entries, 0x10 each
-    uint32_t nodeCount;
-    uint32_t nodeCapacity;
+    const uint8_t* setups = nullptr;
+    uint32_t setupBytes = 0;
+    const uint8_t* nodes = nullptr; // Handle<worldNode> entries, 0x10 each
+    uint32_t nodeCount = 0;
 };
 
-// Reads the node buffer at aOffset in a sector, and checks it looks like one: the setups'
-// size a whole number of setups, the node array's size within its capacity, and the first
-// setups' nodes the very nodes their indices name. 1 good, 0 not this place, -1 a fault.
-int ReadBuffer(const void* aSector, size_t aOffset, BufferView* aOut)
+uint32_t IndexOf(const uint8_t* aSetup, const Layout& aL)
 {
-    __try
-    {
-        const auto* base = static_cast<const uint8_t*>(aSector) + aOffset;
-        BufferView v{};
-        v.setups = *reinterpret_cast<const uint8_t* const*>(base);
-        v.setupBytes = *reinterpret_cast<const uint32_t*>(base + 0x08);
-        v.nodes = *reinterpret_cast<const uint8_t* const*>(base + BufferNodes);
-        v.nodeCapacity = *reinterpret_cast<const uint32_t*>(base + BufferNodes + 0x08);
-        v.nodeCount = *reinterpret_cast<const uint32_t*>(base + BufferNodes + 0x0C);
-        if (v.setupBytes % SetupSize != 0 || v.setupBytes / SetupSize > 2000000)
-            return 0;
-        if (v.nodeCount > v.nodeCapacity || v.nodeCount > 2000000)
-            return 0;
-        const uint32_t count = v.setupBytes / static_cast<uint32_t>(SetupSize);
-        if (count && (!v.setups || !v.nodes))
-            return 0;
-        const uint32_t check = count < 16 ? count : 16;
-        for (uint32_t i = 0; i < check; ++i)
-        {
-            const uint8_t* s = v.setups + i * SetupSize;
-            const uint16_t index = *reinterpret_cast<const uint16_t*>(s + SetupIndex);
-            if (index >= v.nodeCount)
-                return 0;
-            const void* node = *reinterpret_cast<void* const*>(s + SetupNode);
-            const void* named = *reinterpret_cast<void* const*>(v.nodes + index * 0x10);
-            if (!node || node != named)
-                return 0;
-        }
-        *aOut = v;
-        return 1;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        return -1;
-    }
+    if (aL.wide)
+        return *reinterpret_cast<const uint32_t*>(aSetup + aL.index) & 0x7FFFF;
+    return *reinterpret_cast<const uint16_t*>(aSetup + aL.index);
 }
 
-// Copies one setup's fields. False on a fault.
-bool CopySetup(const uint8_t* aSetup, SetupData* aOut)
+// Reads the buffer as aL says and checks it: sizes in range, the blocks readable, and each of the
+// first 16 setups' node the node its index names.
+bool ReadBuffer(const void* aSector, const Layout& aL, BufferView& aOut)
 {
-    __try
-    {
-        const auto* pos = reinterpret_cast<const float*>(aSetup); // Transform: position (Vector4), orientation
-        aOut->pos[0] = pos[0];
-        aOut->pos[1] = pos[1];
-        aOut->pos[2] = pos[2];
-        for (int i = 0; i < 4; ++i)
-            aOut->rot[i] = pos[4 + i];
-        const auto* scale = reinterpret_cast<const float*>(aSetup + SetupScale);
-        for (int i = 0; i < 3; ++i)
-            aOut->scale[i] = scale[i];
-        aOut->node = *reinterpret_cast<void* const*>(aSetup + SetupNode);
-        aOut->nodeId = *reinterpret_cast<const uint64_t*>(aSetup + SetupNodeId);
-        aOut->proxyId = *reinterpret_cast<const uint64_t*>(aSetup + SetupProxyId);
-        aOut->index = *reinterpret_cast<const uint16_t*>(aSetup + SetupIndex);
-        aOut->interior = (*reinterpret_cast<const uint16_t*>(aSetup + SetupFlags) & 0x40) != 0;
-        return true;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
+    const auto* base = static_cast<const uint8_t*>(aSector) + aL.buffer;
+    uint32_t nodeCap = 0;
+    if (!Read(base, aOut.setups) || !Read(base + 0x08, aOut.setupBytes) || !Read(base + aL.nodes, aOut.nodes) ||
+        !Read(base + aL.nodes + 0x08, nodeCap) || !Read(base + aL.nodes + 0x0C, aOut.nodeCount))
         return false;
-    }
-}
-
-// An object's class name as a CName hash, through its vtable's GetType. 0 on a fault.
-uint64_t ClassOf(void* aObject)
-{
-    __try
+    if (aOut.setupBytes % SetupSize != 0 || aOut.setupBytes / SetupSize > 2000000 || aOut.nodeCount > nodeCap ||
+        aOut.nodeCount > 2000000)
+        return false;
+    const uint32_t count = aOut.setupBytes / static_cast<uint32_t>(SetupSize);
+    if (!count)
+        return true;
+    if (!aOut.nodeCount || !Readable(aOut.setups, aOut.setupBytes) || !Readable(aOut.nodes, aOut.nodeCount * 0x10ull))
+        return false;
+    const uint32_t check = count < 16 ? count : 16;
+    for (uint32_t i = 0; i < check; ++i)
     {
-        if (!aObject)
-            return 0;
-        auto* type = static_cast<ISerializable*>(aObject)->GetType();
-        return type ? type->GetName().hash : 0;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        return 0;
-    }
-}
-
-// The node's own box, in its local space. False when it faults or is no box.
-bool NodeBox(void* aNode, float aMin[3], float aMax[3])
-{
-    __try
-    {
-        alignas(16) float box[8] = {1, 0, 0, 0, -1, 0, 0, 0}; // Box: Min (Vector4), Max (Vector4)
-        auto** vtable = *reinterpret_cast<void***>(aNode);
-        auto fn = reinterpret_cast<void (*)(void*, float*)>(vtable[NodeBoundsVfunc / sizeof(void*)]);
-        if (!InImage(reinterpret_cast<void*>(fn)))
+        const uint8_t* s = aOut.setups + i * SetupSize;
+        const uint32_t index = IndexOf(s, aL);
+        if (index >= aOut.nodeCount)
             return false;
-        fn(aNode, box);
-        for (int i = 0; i < 3; ++i)
-        {
-            if (!std::isfinite(box[i]) || !std::isfinite(box[4 + i]) || box[i] > box[4 + i] || box[4 + i] - box[i] > 20000)
-                return false;
-            aMin[i] = box[i];
-            aMax[i] = box[4 + i];
-        }
-        return true;
+        const void* node = *reinterpret_cast<void* const*>(s + SetupNode);
+        const void* named = *reinterpret_cast<void* const*>(aOut.nodes + index * 0x10);
+        if (!node || node != named)
+            return false;
     }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        return false;
-    }
+    return true;
 }
 
-// The instance's state bits: 1 attached, 2 visible; -1 on a fault.
-int StateOf(const void* aInstance)
-{
-    __try
-    {
-        const uint16_t bits = *reinterpret_cast<const uint16_t*>(static_cast<const uint8_t*>(aInstance) + InstanceState);
-        return ((bits >> 5) & 1) | (((bits >> 9) & 1) << 1);
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        return -1;
-    }
-}
+// ---- what is recorded ----
 
-// A resource path hash (raRef or rRef: the path comes first) and a CName at given offsets.
-bool ReadU64(const void* aAt, uint64_t* aOut)
+struct SetupData
 {
-    __try
-    {
-        *aOut = *static_cast<const uint64_t*>(aAt);
-        return true;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        return false;
-    }
-}
+    uint64_t sector = 0;
+    uint32_t instance = 0;
+    uint32_t instanceCount = 0;
+    uint32_t index = 0;
+    uint32_t nodeCount = 0;
+    void* node = nullptr;
+    uint64_t nodeType = 0;
+    uint64_t nodeId = 0;
+    uint64_t proxyId = 0;
+    uint16_t flags = 0; // the 16 bits after the index (RED Hot Tools' interior flag is 0x40 there, unverified on 2.5)
+    float pos[3] = {};
+    float rot[4] = {0, 0, 0, 1};
+    float scale[3] = {1, 1, 1};
+    // The box in the world, worked out when a pick first needs it, from the live instance.
+    bool boxDone = false;
+    bool boxFromMesh = false;
+    float min[3] = {};
+    float max[3] = {};
+};
 
-// Up to 64 render proxies of an instance: one SharedPtr at aOffset, or a DynArray of them.
-int ProxiesOf(void* aInstance, size_t aOffset, bool aArray, void** aOut)
-{
-    __try
-    {
-        auto* at = static_cast<uint8_t*>(aInstance) + aOffset;
-        int n = 0;
-        if (!aArray)
-        {
-            void* p = *reinterpret_cast<void**>(at);
-            if (p && InImage(*reinterpret_cast<void**>(p)))
-                aOut[n++] = p;
-            return n;
-        }
-        auto* entries = *reinterpret_cast<uint8_t**>(at);
-        const uint32_t size = *reinterpret_cast<uint32_t*>(at + 0x0C);
-        const uint32_t cap = *reinterpret_cast<uint32_t*>(at + 0x08);
-        if (size > cap || size > 4096)
-            return -1;
-        for (uint32_t i = 0; i < size && n < 64; ++i)
-        {
-            void* p = *reinterpret_cast<void**>(entries + i * 0x10);
-            if (p && InImage(*reinterpret_cast<void**>(p)))
-                aOut[n++] = p;
-        }
-        return n;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        return -1;
-    }
-}
+SRWLOCK g_lock = SRWLOCK_INIT;
+std::unordered_map<const void*, SetupData> g_setups;
+std::unordered_map<const void*, const void*> g_instanceSetup;
+std::unordered_map<const void*, WeakHandle<ISerializable>> g_setupInstance;
+std::unordered_map<std::string, const void*> g_byId;
+std::unordered_set<std::string> g_hidden;
+std::deque<const void*> g_attachedQueue;
+std::unordered_set<uint64_t> g_classesLogged;
 
-bool CallNodeVisibility(void* aInstance, bool aVisible)
-{
-    __try
-    {
-        g_nodeVisibility(aInstance, aVisible);
-        return true;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        return false;
-    }
-}
-bool CallProxyVisibility(void* aProxy, bool aVisible)
-{
-    __try
-    {
-        g_proxyVisibility(aProxy, aVisible);
-        return true;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        return false;
-    }
-}
-bool CallProxyHighlight(void* aProxy, const HighlightParams* aParams, int8_t aScanning)
-{
-    __try
-    {
-        g_proxyHighlight(aProxy, *aParams);
-        if (g_proxyScanning)
-            g_proxyScanning(aProxy, aScanning);
-        return true;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        return false;
-    }
-}
-
-// ---- recording (streaming threads) ----
+std::atomic<uint64_t> g_sectors{0};
+std::atomic<uint64_t> g_badSectors{0};
+std::atomic<uint64_t> g_refused{0}; // reads refused by a memory check
+std::atomic<uint64_t> g_initialized{0};
+std::atomic<uint64_t> g_sectorMs10{0};
 
 void RecordSector(void* aSector)
 {
     const auto started = std::chrono::steady_clock::now();
-    BufferView v{};
-    int offset = g_offset.load();
-    if (offset < 0)
+    BufferView v;
+    int which = g_layout.load();
+    if (which < 0)
     {
-        // The first sectors decide where the buffer is: 0x40 (2.31) or 0x48 (2.5 grew the sector).
-        const int at40 = ReadBuffer(aSector, 0x40, &v);
-        const int at48 = at40 == 1 ? 0 : ReadBuffer(aSector, 0x48, &v);
-        if (at40 == 1 || at48 == 1)
+        for (int i = 0; i < static_cast<int>(std::size(Candidates)); ++i)
         {
-            offset = at40 == 1 ? 0x40 : 0x48;
-            int expected = -1;
-            if (g_offset.compare_exchange_strong(expected, offset))
-                Log("World nodes: the sector's node buffer is at +0x%x (checked against its setups)", offset);
-            else
-                offset = expected;
+            BufferView t;
+            if (ReadBuffer(aSector, Candidates[i], t) && t.setupBytes)
+            {
+                int expected = -1;
+                if (g_layout.compare_exchange_strong(expected, i))
+                {
+                    const auto& c = Candidates[i];
+                    Log("World nodes: layout found: node buffer at sector+0x%zx, node list at buffer+0x%zx, node index at "
+                        "setup+0x%zx%s",
+                        c.buffer, c.nodes, c.index, c.wide ? " (19 bits)" : " (16 bits)");
+                }
+                which = g_layout.load();
+                break;
+            }
         }
-        else
+        if (which < 0)
         {
-            if (at40 < 0 || at48 < 0)
-                ++g_faults;
             if (++g_badSectors <= 5)
-                Log("World nodes: a sector's node buffer was found at neither +0x40 (%d) nor +0x48 (%d)", at40, at48);
+                Log("World nodes: no known layout fits this sector's node buffer (sector at %p)", aSector);
             return;
         }
     }
-    if (ReadBuffer(aSector, static_cast<size_t>(offset), &v) != 1)
+    const Layout& layout = Candidates[which];
+    if (!ReadBuffer(aSector, layout, v))
     {
         if (++g_badSectors <= 5)
-            Log("World nodes: a sector's node buffer did not check out at +0x%x", offset);
+            Log("World nodes: a sector's node buffer did not check out with the layout found");
         return;
     }
-    const uint64_t sectorHash = reinterpret_cast<CResource*>(aSector)->path.hash;
+    uint64_t sectorHash = 0;
+    if (!Read(&reinterpret_cast<CResource*>(aSector)->path.hash, sectorHash))
+        return;
     const uint32_t count = v.setupBytes / static_cast<uint32_t>(SetupSize);
     std::vector<std::pair<const void*, SetupData>> found;
     found.reserve(count);
+    std::unordered_map<const void*, uint64_t> types; // many setups share a node
     for (uint32_t i = 0; i < count; ++i)
     {
-        const uint8_t* s = v.setups + i * SetupSize;
+        const uint8_t* s = v.setups + i * SetupSize; // the whole block was checked readable
         SetupData d;
-        if (!CopySetup(s, &d))
-        {
-            ++g_faults;
-            continue;
-        }
+        const auto* t = reinterpret_cast<const float*>(s);
+        d.pos[0] = t[0];
+        d.pos[1] = t[1];
+        d.pos[2] = t[2];
+        for (int k = 0; k < 4; ++k)
+            d.rot[k] = t[4 + k];
+        const auto* sc = reinterpret_cast<const float*>(s + 0x20);
+        for (int k = 0; k < 3; ++k)
+            d.scale[k] = sc[k];
+        d.node = *reinterpret_cast<void* const*>(s + SetupNode);
+        d.nodeId = *reinterpret_cast<const uint64_t*>(s + SetupNodeId);
+        d.proxyId = *reinterpret_cast<const uint64_t*>(s + SetupProxyId);
+        d.index = IndexOf(s, layout);
+        d.flags = layout.wide ? static_cast<uint16_t>(*reinterpret_cast<const uint32_t*>(s + layout.index) >> 19)
+                              : *reinterpret_cast<const uint16_t*>(s + layout.index + 2);
         d.sector = sectorHash;
         d.instance = i;
         d.instanceCount = count;
         d.nodeCount = v.nodeCount;
-        d.nodeType = ClassOf(d.node);
+        if (const auto t2 = types.find(d.node); t2 != types.end())
+            d.nodeType = t2->second;
+        else
+        {
+            auto* type = TypeOf(d.node);
+            d.nodeType = types[d.node] = type ? type->GetName().hash : 0;
+        }
         found.emplace_back(s, d);
     }
     AcquireSRWLockExclusive(&g_lock);
@@ -501,11 +406,11 @@ void RecordSector(void* aSector)
 
 void ForgetSector(void* aSector)
 {
-    const int offset = g_offset.load();
-    if (offset < 0)
+    const int which = g_layout.load();
+    if (which < 0)
         return;
-    BufferView v{};
-    if (ReadBuffer(aSector, static_cast<size_t>(offset), &v) != 1)
+    BufferView v;
+    if (!ReadBuffer(aSector, Candidates[which], v) || !v.setupBytes)
         return;
     const uint8_t* begin = v.setups;
     const uint8_t* end = v.setups + v.setupBytes;
@@ -529,10 +434,11 @@ void ForgetSector(void* aSector)
     ReleaseSRWLockExclusive(&g_lock);
 }
 
+// The sector is recorded after the game's own OnReady, so its setups are complete.
 void SectorReadyDetour(void* aSector, uint64_t a2)
 {
-    RecordSector(aSector);
     g_sectorReady(aSector, a2);
+    RecordSector(aSector);
 }
 void SectorDtorDetour(void* aSector)
 {
@@ -544,7 +450,7 @@ bool NodeInitializeDetour(void* aInstance, void* aSetup, void* a3)
     const bool result = g_nodeInitialize(aInstance, aSetup, a3);
     ++g_initialized;
     AcquireSRWLockExclusive(&g_lock);
-    if (g_setups.count(aSetup))
+    if (g_setups.count(aSetup) && IsObject(aInstance))
     {
         g_instanceSetup[aInstance] = aSetup;
         g_setupInstance[aSetup] = static_cast<ISerializable*>(aInstance)->ref;
@@ -557,21 +463,30 @@ bool NodeAttachDetour(void* aInstance, void* a2)
     const bool result = g_nodeAttach(aInstance, a2);
     AcquireSRWLockExclusive(&g_lock);
     if (!g_hidden.empty())
-        g_attachedQueue.push_back(aInstance); // hidden again on the game thread, if it is one of them
+        g_attachedQueue.push_back(aInstance);
     ReleaseSRWLockExclusive(&g_lock);
     return result;
 }
 
 // ---- answers (game thread) ----
 
-// The live instance of a setup, or null when it is not streamed in.
 Handle<ISerializable> InstanceOf(const void* aSetup)
 {
     const auto it = g_setupInstance.find(aSetup);
     return it == g_setupInstance.end() ? Handle<ISerializable>{} : it->second.Lock();
 }
 
-// Rotates v by the unit quaternion q (i, j, k, r).
+int StateOf(const void* aInstance)
+{
+    uint16_t bits = 0;
+    if (!Read(static_cast<const uint8_t*>(aInstance) + InstanceState, bits))
+    {
+        ++g_refused;
+        return -1;
+    }
+    return ((bits >> 5) & 1) | (((bits >> 9) & 1) << 1);
+}
+
 void Rotate(const float q[4], const float v[3], float out[3])
 {
     const float x = q[0], y = q[1], z = q[2], w = q[3];
@@ -583,13 +498,74 @@ void Rotate(const float q[4], const float v[3], float out[3])
     out[2] = v[2] + w * tz + (x * ty - y * tx);
 }
 
-// The setup's box in the world, from the node's local box, its scale, orientation and place.
-void WorkOutBox(SetupData& d)
+// The mesh among a node instance's fields: a Handle whose object is a CMesh. Fields 0x90 to
+// 0x130, past the base instance (RED Hot Tools has the mesh at 0x98 to 0xB8 in each class).
+CResource* MeshOf(void* aInstance)
+{
+    static CClass* const mesh = CRTTISystem::Get()->GetClass("CMesh");
+    if (!mesh || !Readable(static_cast<uint8_t*>(aInstance) + 0x90, 0xA8))
+        return nullptr;
+    for (size_t off = 0x90; off <= 0x130; off += 8)
+    {
+        void* object = nullptr;
+        std::memcpy(&object, static_cast<uint8_t*>(aInstance) + off, sizeof(object));
+        if (!object)
+            continue;
+        auto* type = TypeOf(object);
+        if (type && type->IsA(mesh))
+            return static_cast<CResource*>(object);
+    }
+    return nullptr;
+}
+
+// The setup's box in the world: the mesh's box, scaled, turned and placed as the instance is;
+// without a live instance or a mesh, a 1 m box at the setup's place.
+void WorkOutBox(const void* aSetup, SetupData& d)
 {
     d.boxDone = true;
-    float lmin[3], lmax[3];
-    if (!d.node || !NodeBox(d.node, lmin, lmax))
-        return;
+    d.boxFromMesh = false;
+    auto instance = InstanceOf(aSetup);
+    float lmin[3] = {-0.5f, -0.5f, -0.5f}, lmax[3] = {0.5f, 0.5f, 0.5f};
+    float pos[3] = {d.pos[0], d.pos[1], d.pos[2]};
+    float rot[4] = {d.rot[0], d.rot[1], d.rot[2], d.rot[3]};
+    float scale[3] = {1, 1, 1};
+    if (instance)
+    {
+        float place[12];
+        if (Read(reinterpret_cast<uint8_t*>(instance.instance) + InstancePlace, place))
+        {
+            std::memcpy(pos, place, sizeof(pos));
+            std::memcpy(rot, place + 4, sizeof(rot));
+            std::memcpy(scale, place + 8, sizeof(scale));
+        }
+        static CClass* const meshClass = CRTTISystem::Get()->GetClass("CMesh");
+        if (auto* mesh = MeshOf(instance.instance); mesh && meshClass)
+        {
+            if (auto* prop = meshClass->GetProperty("boundingBox"))
+            {
+                float box[8];
+                if (Read(reinterpret_cast<uint8_t*>(mesh) + prop->valueOffset, box))
+                {
+                    bool ok = true;
+                    for (int i = 0; i < 3; ++i)
+                        ok = ok && std::isfinite(box[i]) && std::isfinite(box[4 + i]) && box[i] <= box[4 + i] &&
+                             box[4 + i] - box[i] < 5000;
+                    if (ok)
+                    {
+                        for (int i = 0; i < 3; ++i)
+                        {
+                            lmin[i] = box[i];
+                            lmax[i] = box[4 + i];
+                        }
+                        d.boxFromMesh = true;
+                    }
+                }
+            }
+        }
+    }
+    if (!d.boxFromMesh)
+        for (float& s : scale)
+            s = 1;
     for (int i = 0; i < 3; ++i)
     {
         d.min[i] = INFINITY;
@@ -597,20 +573,18 @@ void WorkOutBox(SetupData& d)
     }
     for (int c = 0; c < 8; ++c)
     {
-        const float corner[3] = {((c & 1) ? lmax[0] : lmin[0]) * d.scale[0], ((c & 2) ? lmax[1] : lmin[1]) * d.scale[1],
-                                 ((c & 4) ? lmax[2] : lmin[2]) * d.scale[2]};
+        const float corner[3] = {((c & 1) ? lmax[0] : lmin[0]) * scale[0], ((c & 2) ? lmax[1] : lmin[1]) * scale[1],
+                                 ((c & 4) ? lmax[2] : lmin[2]) * scale[2]};
         float r[3];
-        Rotate(d.rot, corner, r);
+        Rotate(rot, corner, r);
         for (int i = 0; i < 3; ++i)
         {
-            d.min[i] = std::min(d.min[i], r[i] + d.pos[i]);
-            d.max[i] = std::max(d.max[i], r[i] + d.pos[i]);
+            d.min[i] = std::min(d.min[i], r[i] + pos[i]);
+            d.max[i] = std::max(d.max[i], r[i] + pos[i]);
         }
     }
-    d.boxGood = true;
 }
 
-// Where a ray enters a box (0 when it starts inside), or -1 when it misses.
 float RayBox(const float o[3], const float dir[3], const float mn[3], const float mx[3])
 {
     float t0 = 0, t1 = INFINITY;
@@ -642,20 +616,48 @@ std::string ClassName(uint64_t aHash)
     return s ? s : Hex(aHash);
 }
 
-// The node's resource and appearance, read through its class's RTTI properties.
+// For the static check of the outline's render proxies (N2): the first live instance of each
+// class logs its vtable's slots 0xF8 (UpdateVisibility in 2.31) and its fields from 0x90 to
+// 0x1E0 that point at objects with a vtable in the exe (render proxies are not ISerializables).
+void LogInstanceClass(void* aInstance, uint64_t aClass, void* aNode)
+{
+    if (!aClass || !g_classesLogged.insert(aClass).second)
+        return;
+    void** vtable = nullptr;
+    void* slot = nullptr;
+    if (!Read(aInstance, vtable) || !Read(reinterpret_cast<uint8_t*>(vtable) + 0xF8, slot))
+        return;
+    std::string fields;
+    for (size_t off = 0x90; off <= 0x1E0; off += 8)
+    {
+        void* object = nullptr;
+        void* vt = nullptr;
+        if (!Read(static_cast<uint8_t*>(aInstance) + off, object) || !object || !Read(object, vt) || !InImage(vt))
+            continue;
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), " +0x%zx:vt+0x%llx%s", off, static_cast<unsigned long long>(Rva(vt)),
+                      IsObject(object) ? "(object)" : "");
+        fields += buf;
+    }
+    void** nodeVtable = nullptr;
+    void* bounds = nullptr;
+    const bool nodeOk = Read(aNode, nodeVtable) && Read(reinterpret_cast<uint8_t*>(nodeVtable) + 0x108, bounds);
+    Log("World nodes: class %s: vtable +0x%llx, slot 0xF8 +0x%llx; node vtable +0x%llx, slot 0x108 +0x%llx; fields:%s",
+        ClassName(aClass).c_str(), static_cast<unsigned long long>(Rva(vtable)),
+        static_cast<unsigned long long>(Rva(slot)), nodeOk ? static_cast<unsigned long long>(Rva(nodeVtable)) : 0ull,
+        nodeOk ? static_cast<unsigned long long>(Rva(bounds)) : 0ull, fields.c_str());
+}
+
 void ResourceOf(void* aNode, uint64_t aType, std::string& aResource, std::string& aAppearance)
 {
-    auto* rtti = CRTTISystem::Get();
-    auto* cls = aType ? rtti->GetClass(CName(aType)) : nullptr;
+    auto* cls = aType ? CRTTISystem::Get()->GetClass(CName(aType)) : nullptr;
     if (!cls)
         return;
     for (const char* name : {"mesh", "meshRef", "material", "entityTemplate", "foliageResource", "particleSystem"})
     {
         auto* prop = cls->GetProperty(name);
-        if (!prop)
-            continue;
         uint64_t path = 0;
-        if (ReadU64(static_cast<uint8_t*>(aNode) + prop->valueOffset, &path) && path)
+        if (prop && Read(static_cast<uint8_t*>(aNode) + prop->valueOffset, path) && path)
         {
             aResource = Hex(path);
             break;
@@ -664,7 +666,7 @@ void ResourceOf(void* aNode, uint64_t aType, std::string& aResource, std::string
     if (auto* prop = cls->GetProperty("meshAppearance"))
     {
         uint64_t name = 0;
-        if (ReadU64(static_cast<uint8_t*>(aNode) + prop->valueOffset, &name) && name)
+        if (Read(static_cast<uint8_t*>(aNode) + prop->valueOffset, name) && name)
         {
             const char* s = CName(name).ToString();
             aAppearance = s ? s : Hex(name);
@@ -675,22 +677,30 @@ void ResourceOf(void* aNode, uint64_t aType, std::string& aResource, std::string
 std::string NodeJson(const void* aSetup, SetupData& d, const char* aExtra)
 {
     if (!d.boxDone)
-        WorkOutBox(d);
+        WorkOutBox(aSetup, d);
     auto instance = InstanceOf(aSetup);
     const int state = instance ? StateOf(instance.instance) : -1;
+    uint64_t instanceClass = 0;
+    if (instance)
+    {
+        if (auto* type = TypeOf(instance.instance))
+            instanceClass = type->GetName().hash;
+        LogInstanceClass(instance.instance, instanceClass, d.node);
+    }
     std::string resource, appearance;
     ResourceOf(d.node, d.nodeType, resource, appearance);
     std::string out = "{\"id\":" + JsonString(IdOf(d.sector, d.instance));
     out += ",\"kind\":" + JsonString(ClassName(d.nodeType));
-    out += ",\"instanceKind\":" + (instance ? JsonString(ClassName(ClassOf(instance.instance))) : std::string("null"));
+    out += ",\"instanceKind\":" + (instanceClass ? JsonString(ClassName(instanceClass)) : std::string("null"));
     out += ",\"sector\":" + JsonString(Hex(d.sector));
     out += ",\"instance\":" + std::to_string(d.instance) + ",\"instanceCount\":" + std::to_string(d.instanceCount);
     out += ",\"index\":" + std::to_string(d.index) + ",\"nodeCount\":" + std::to_string(d.nodeCount);
     out += ",\"nodeId\":" + (d.nodeId ? JsonString(Hex(d.nodeId)) : std::string("null"));
     out += ",\"proxyId\":" + (d.proxyId ? JsonString(Hex(d.proxyId)) : std::string("null"));
-    out += std::string(",\"interior\":") + (d.interior ? "true" : "false");
+    out += ",\"flags\":" + std::to_string(d.flags);
     out += ",\"position\":" + Vec(d.pos, 3) + ",\"orientation\":" + Vec(d.rot, 4) + ",\"scale\":" + Vec(d.scale, 3);
-    out += ",\"bounds\":" + (d.boxGood ? "{\"min\":" + Vec(d.min, 3) + ",\"max\":" + Vec(d.max, 3) + "}" : std::string("null"));
+    out += ",\"bounds\":{\"min\":" + Vec(d.min, 3) + ",\"max\":" + Vec(d.max, 3) + "}";
+    out += std::string(",\"boundsFrom\":") + (d.boxFromMesh ? "\"mesh\"" : "\"place\"");
     out += ",\"resource\":" + (resource.empty() ? std::string("null") : JsonString(resource));
     out += ",\"appearance\":" + (appearance.empty() ? std::string("null") : JsonString(appearance));
     out += std::string(",\"streamed\":") + (instance ? "true" : "false");
@@ -747,9 +757,6 @@ std::string Start(std::string& aError)
         {NodeAttachHash, reinterpret_cast<void*>(&NodeAttachDetour), reinterpret_cast<void**>(&g_nodeAttach), "nodeAttach"},
     };
     g_nodeVisibility = reinterpret_cast<NodeVisibility_t>(Resolve(NodeVisibilityHash));
-    g_proxyVisibility = reinterpret_cast<ProxyVisibility_t>(Resolve(ProxyVisibilityHash));
-    g_proxyHighlight = reinterpret_cast<ProxyHighlight_t>(Resolve(ProxyHighlightHash));
-    g_proxyScanning = reinterpret_cast<ProxyScanning_t>(Resolve(ProxyScanningHash));
     std::string attached = "[";
     std::string missing;
     for (size_t i = 0; i < std::size(hooks); ++i)
@@ -764,16 +771,13 @@ std::string Start(std::string& aError)
             }
             g_places[i] = reinterpret_cast<void*>(at);
             g_attached[i] = sdk->hooking->Attach(GetHandle(), g_places[i], hooks[i].detour, hooks[i].original);
-            Log("World nodes: %s hook at +0x%llx %s", hooks[i].name,
-                static_cast<unsigned long long>(at - reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))),
+            Log("World nodes: %s hook at +0x%llx %s", hooks[i].name, static_cast<unsigned long long>(Rva(g_places[i])),
                 g_attached[i] ? "attached" : "NOT attached");
         }
         if (g_attached[i])
             attached += std::string(attached.size() > 1 ? "," : "") + JsonString(hooks[i].name);
     }
     attached += "]";
-    if (!missing.empty())
-        Log("World nodes: the address list lacks %s", missing.c_str());
     if (!g_attached[0] || !g_attached[2])
     {
         aError = "the world node hooks could not be attached" + (missing.empty() ? std::string() : " (missing: " + missing + ")");
@@ -792,7 +796,7 @@ std::string State()
         live += w.Lock() ? 1 : 0;
     const size_t hidden = g_hidden.size();
     ReleaseSRWLockShared(&g_lock);
-    const int offset = g_offset.load();
+    const int which = g_layout.load();
     std::string out = "{\"attached\":[";
     const char* names[] = {"sectorReady", "sectorGone", "nodeInitialize", "nodeAttach"};
     bool first = true;
@@ -803,14 +807,24 @@ std::string State()
         out += std::string(first ? "" : ",") + JsonString(names[i]);
         first = false;
     }
-    out += "],\"offset\":" + (offset < 0 ? std::string("null") : JsonString(Hex(static_cast<uint64_t>(offset))));
+    out += "],\"layout\":";
+    if (which < 0)
+        out += "null";
+    else
+    {
+        const auto& c = Candidates[which];
+        char buf[160];
+        std::snprintf(buf, sizeof(buf), "\"buffer +0x%zx, nodes +0x%zx, index +0x%zx%s\"", c.buffer, c.nodes, c.index,
+                      c.wide ? " (19 bits)" : "");
+        out += buf;
+    }
     out += ",\"sectors\":" + std::to_string(g_sectors.load()) + ",\"badSectors\":" + std::to_string(g_badSectors.load());
     out += ",\"setups\":" + std::to_string(setups) + ",\"instances\":" + std::to_string(live);
     out += ",\"initialized\":" + std::to_string(g_initialized.load());
-    out += ",\"hidden\":" + std::to_string(hidden) + ",\"faults\":" + std::to_string(g_faults.load());
+    out += ",\"hidden\":" + std::to_string(hidden) + ",\"refused\":" + std::to_string(g_refused.load());
     out += ",\"sectorMs\":" + Num(g_sectorMs10.load() / 10.0);
     out += std::string(",\"canHide\":") + (g_nodeVisibility ? "true" : "false");
-    out += std::string(",\"canHighlight\":") + (g_proxyHighlight ? "true" : "false") + "}";
+    out += ",\"canHighlight\":false}";
     return out;
 }
 
@@ -860,22 +874,13 @@ std::string Pick(const json::Value& aParams, std::string& aError)
     };
     std::vector<Hit> hits;
     size_t looked = 0;
-    AcquireSRWLockExclusive(&g_lock); // exclusive: boxes are worked out and kept as they are needed
+    AcquireSRWLockExclusive(&g_lock);
     for (auto& [setup, d] : g_setups)
     {
-        // A quick cut first: a node placed far beyond the ray's reach needs no box (500 m covers the largest).
         const float dx = d.pos[0] - from[0], dy = d.pos[1] - from[1], dz = d.pos[2] - from[2];
-        if (dx * dx + dy * dy + dz * dz > (max + 500) * (max + 500))
+        if (dx * dx + dy * dy + dz * dz > (max + 300) * (max + 300))
             continue;
         if (!kinds.empty() && !kinds.count(ClassName(d.nodeType)))
-            continue;
-        ++looked;
-        if (!d.boxDone)
-            WorkOutBox(d);
-        if (!d.boxGood)
-            continue;
-        const float t = RayBox(from, dir, d.min, d.max);
-        if (t < 0 || t > max)
             continue;
         if (!all)
         {
@@ -884,6 +889,12 @@ std::string Pick(const json::Value& aParams, std::string& aError)
             if (state < 0 || !(state & 1))
                 continue;
         }
+        ++looked;
+        if (!d.boxDone)
+            WorkOutBox(setup, d);
+        const float t = RayBox(from, dir, d.min, d.max);
+        if (t < 0 || t > max)
+            continue;
         hits.push_back({setup, t});
     }
     std::sort(hits.begin(), hits.end(), [](const Hit& a, const Hit& b) { return a.t < b.t; });
@@ -913,93 +924,18 @@ std::string Pick(const json::Value& aParams, std::string& aError)
            ",\"ms\":" + Num(ms) + "}";
 }
 
-// The setup for an id, under the lock; null when its sector is not loaded.
 const void* SetupFor(const std::string& aId)
 {
     const auto it = g_byId.find(aId);
     return it == g_byId.end() ? nullptr : it->second;
 }
 
-// The render proxies of a node instance, by its class, as RED Hot Tools reads them.
-int RenderProxies(void* aInstance, void** aOut)
-{
-    struct Kind
-    {
-        const char* cls;
-        size_t offset;
-        bool array;
-    };
-    static const Kind kinds[] = {
-        {"worldMeshNodeInstance", 0xC8, false},       {"worldStaticDecalNodeInstance", 0xB0, false},
-        {"worldBendedMeshNodeInstance", 0xE0, false}, {"worldPhysicalDestructionNodeInstance", 0x1D8, false},
-        {"worldInstancedMeshNodeInstance", 0xE8, true}, {"worldFoliageNodeInstance", 0xF8, true},
-        {"worldTerrainMeshNodeInstance", 0xC0, true}, {"worldStaticLightNodeInstance", 0xB0, false},
-        {"worldStaticParticleNodeInstance", 0xB0, false},
-    };
-    auto* rtti = CRTTISystem::Get();
-    auto* type = static_cast<ISerializable*>(aInstance)->GetType();
-    for (const auto& k : kinds)
-    {
-        auto* cls = rtti->GetClass(k.cls);
-        if (cls && type && type->IsA(cls))
-            return ProxiesOf(aInstance, k.offset, k.array, aOut);
-    }
-    return -2; // a kind without render proxies here (an entity, a collision node...)
-}
-
-std::string Highlight(const json::Value& aParams, std::string& aError)
-{
-    const std::string id = StringOr(aParams, "id");
-    if (!g_proxyHighlight)
-    {
-        aError = "this game version's address list lacks the render proxy's highlight";
-        return {};
-    }
-    const bool on = BoolOr(aParams, "on", true);
-    HighlightParams params{};
-    if (on)
-    {
-        params.seeThroughWalls = BoolOr(aParams, "seeThrough", false);
-        params.fillIndex = static_cast<uint8_t>(NumberOr(aParams, "fill", 0));
-        params.outlineIndex = static_cast<uint8_t>(NumberOr(aParams, "outline", 1));
-        params.opacity = static_cast<float>(NumberOr(aParams, "opacity", 1));
-        params.forced = true;
-    }
-    AcquireSRWLockShared(&g_lock);
-    const void* setup = SetupFor(id);
-    auto instance = setup ? InstanceOf(setup) : Handle<ISerializable>{};
-    ReleaseSRWLockShared(&g_lock);
-    if (!instance)
-        return "{\"done\":false,\"proxies\":0,\"why\":" + JsonString(setup ? "not streamed in" : "no such node now") + "}";
-    void* proxies[64];
-    const int n = RenderProxies(instance.instance, proxies);
-    if (n == -2)
-        return "{\"done\":false,\"proxies\":0,\"why\":\"this kind of node has no render proxy REDnode knows\"}";
-    if (n < 0)
-    {
-        ++g_faults;
-        return "{\"done\":false,\"proxies\":0,\"why\":\"its render proxies could not be read\"}";
-    }
-    int done = 0;
-    for (int i = 0; i < n; ++i)
-        done += CallProxyHighlight(proxies[i], &params, on ? 4 /* Complete */ : 0 /* Off */) ? 1 : 0;
-    if (done < n)
-        g_faults += static_cast<uint64_t>(n - done);
-    return "{\"done\":" + std::string(done ? "true" : "false") + ",\"proxies\":" + std::to_string(done) +
-           (n == 0 ? ",\"why\":\"no render proxy\"" : "") + "}";
-}
-
-// Hides or shows a live instance as RED Hot Tools does: the node instance's own visibility,
-// then its render proxies'.
 bool ApplyVisible(void* aInstance, bool aVisible)
 {
-    bool ok = g_nodeVisibility ? CallNodeVisibility(aInstance, aVisible) : false;
-    void* proxies[64];
-    const int n = RenderProxies(aInstance, proxies);
-    if (n > 0 && g_proxyVisibility)
-        for (int i = 0; i < n; ++i)
-            ok = CallProxyVisibility(proxies[i], aVisible) && ok;
-    return ok;
+    if (!g_nodeVisibility || !IsObject(aInstance))
+        return false;
+    g_nodeVisibility(aInstance, aVisible);
+    return true;
 }
 
 std::string Visible(const json::Value& aParams, std::string& aError)
@@ -1024,8 +960,6 @@ std::string Visible(const json::Value& aParams, std::string& aError)
                JsonString(visible ? "not streamed in (off the hidden list)" : "not streamed in (hidden when it streams in)") + "}";
     const int state = StateOf(instance.instance);
     const bool ok = ApplyVisible(instance.instance, visible);
-    if (!ok)
-        ++g_faults;
     return "{\"done\":" + std::string(ok ? "true" : "false") + ",\"id\":" + JsonString(id) +
            ",\"was\":" + (state < 0 ? std::string("null") : (state & 2) ? "true" : "false") + "}";
 }
@@ -1058,14 +992,13 @@ std::string WorldNodes(const std::string& aMethod, const json::Value& aParams, s
         return out;
     }
     if (aMethod == "nodes.highlight")
-        return Highlight(aParams, aError);
+        return "{\"done\":false,\"proxies\":0,\"why\":\"the outline is not on game 2.5 yet: its render proxies' places are being checked\"}";
     if (aMethod == "nodes.visible")
         return Visible(aParams, aError);
     aError = "Unknown method: " + aMethod;
     return {};
 }
 
-// Game thread, each frame: a hidden node that streamed in again is hidden again.
 void UpdateWorldNodes()
 {
     if (!g_attached[3])

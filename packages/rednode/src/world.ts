@@ -162,13 +162,16 @@ export interface WorldNode {
   /** Its global node id ("0x..."), when it has one. */
   nodeId: string | null;
   proxyId: string | null;
-  interior: boolean;
+  /** The setup's 16 flag bits after its node index (raw; RED Hot Tools' interior flag is 0x40 there on 2.31, unverified on 2.5). */
+  flags: number;
   position: [number, number, number];
   /** A quaternion: i, j, k, r. */
   orientation: [number, number, number, number];
   scale: [number, number, number];
-  /** Its box in the world, or null when the node gives none. */
-  bounds: { min: [number, number, number]; max: [number, number, number] } | null;
+  /** Its box in the world. */
+  bounds: { min: [number, number, number]; max: [number, number, number] };
+  /** `"mesh"`: from its mesh's box; `"place"`: a 1 m box at its place (no live instance, or no mesh). */
+  boundsFrom: "mesh" | "place";
   /** The resource it shows (a mesh, a material...), as a path hash, or null. */
   resource: string | null;
   /** Its mesh appearance, when it has one. */
@@ -220,8 +223,8 @@ export interface PickResult {
 export interface NodeRegistryState {
   /** The hooks attached. */
   attached: string[];
-  /** Where the sector's node buffer was found ("0x40" or "0x48"), or null before the first sector. */
-  offset: string | null;
+  /** The node buffer's layout the first sectors matched, or null before one did. */
+  layout: string | null;
   /** Sectors recorded, and those whose buffer did not check out. */
   sectors: number;
   badSectors: number;
@@ -230,8 +233,8 @@ export interface NodeRegistryState {
   instances: number;
   /** Nodes hidden for the session. */
   hidden: number;
-  /** Reads that faulted (a wrong offset): they answer errors, not crashes. */
-  faults: number;
+  /** Reads refused by a memory check (a pointer that did not lead to readable memory). */
+  refused: number;
   /** Time spent recording sectors so far, in milliseconds. */
   sectorMs: number;
   canHide: boolean;
@@ -827,8 +830,8 @@ export const world = {
 
   /**
    * Outlines a node with the game's highlight, or takes it off with `null`. Cleared when your
-   * package stops. Experimental (#24): meshes, decals, foliage and terrain; answers `false`
-   * (with the reason as a warning) for kinds without a render proxy REDnode knows.
+   * package stops. Experimental (#24): not on game 2.5 yet (its render proxies' places are being
+   * checked), so it answers `false` with the reason as a warning.
    */
   async highlight(id: string, style: NodeHighlight | null = {}): Promise<boolean> {
     const r = (await invoke("nodes.highlight", { id, on: style !== null, ...(style ?? {}) })) as { done: boolean; why?: string };

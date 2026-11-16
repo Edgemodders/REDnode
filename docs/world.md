@@ -1777,9 +1777,34 @@ Asked for by EDGEbuilder in [#24](https://github.com/Edgemodders/REDnode/issues/
 
 Checked outside the game: the plugin builds and its tests pass; the host's path (the calls, the per-package lists, the show-again when the package stops) in the mock game with a stand-in plugin (scratchpad `n24/`, 7 checks and the clean-up). The registry itself needs the game.
 
+### S24 first run: a crash, and the 2.5 layout (REDnode 0.66.0)
+
+Run on 2026-11-15 by the owner on the dev PC. **Start** attached all four hooks; the save loaded with F9 crashed the game within a second. Every sector logged "found at neither +0x40 nor +0x48", then the game's crash report (`ReportQueue`, read with WinDbg's `cdbX64`) put the fault in REDnode's own buffer check, on a sector thread: it followed the node list's pointer at buffer+0x28 and read address 0x44. Its `__try` did not catch it: the game's crash handler takes the fault first, so in this game a guard must check memory before reading it.
+
+What the dump and a static reading of 2.5's code showed:
+
+| | RED Hot Tools (2.31) | Game 2.5 |
+|---|---|---|
+| The node buffer in a sector | +0x40 | +0x40 (the sector's 8 new bytes are inside the buffer) |
+| Setups (0x90 each) | buffer+0x00 | buffer+0x00 (a sector of 1,130 setups) |
+| The node list | buffer+0x28 | **buffer+0x30**; buffer+0x28 holds a small number (0x44 there) |
+| The node references | buffer+0x38 | buffer+0x40 |
+| A setup's node index | 16 bits at +0x78 | **+0x80** (the fields after +0x68 moved 8 bytes; +0x78 and +0x7C hold two distances, 150 and 187.5) |
+| A node instance's place, orientation, scale, node | +0x30, +0x40, +0x50, +0x60 | the same (2.5's WorldNodeInstance_Initialize copies them there) |
+| A node instance's state bits | +0x88 | **+0x8C** (Initialize and Attach set the same bits there) |
+| WorldNodeInstance_SetVisibility | (instance, visible) | the same: sets the visible bit at +0x8D and calls the instance's visibility controller |
+
+REDnode 0.66.1 (built, awaiting the rerun of the S24 test):
+
+- The layout is found, not assumed: at the first sector with setups, each candidate (2.5's, 2.31's, and two others) is checked, and the one where each of the first 16 setups' node is the node its index names is logged and used. A sector is recorded after the game's own OnReady.
+- Every pointer is checked with `VirtualQuery` before it is read; an object's class is asked for only when its weak self handle (+0x08) points back at it.
+- Boxes come from each instance's mesh (a CMesh handle among its fields, its RTTI `boundingBox`), not worldNode's virtual GetBoundingBox, whose slot is unverified on 2.5. Without a mesh: a 1 m box at the node's place (`boundsFrom: "place"`).
+- `setVisible` uses only the game's `WorldNodeInstance_SetVisibility`. `highlight` answers that it is not on 2.5 yet: the first live instance of each class logs its vtable slots and the fields that point at objects, for a static check of the render proxies' places.
+- `WorldNode.interior` became `flags` (the raw 16 bits after the index); `NodeRegistryState.offset` became `layout`, `faults` became `refused`.
+
 ### S24 test
 
-REDnode 0.66.0, game 2.5, REDbridge found (the Mod Manager's **Get REDbridge**, for names). Outdoors in the city, outside combat.
+REDnode 0.66.1 (0.66.0 crashed at step 2, above), game 2.5, REDbridge found (the Mod Manager's **Get REDbridge**, for names). Outdoors in the city, outside combat. The outline (steps 4, 5, 8) is not on 2.5 yet: those steps say "not done" with the reason, which is expected.
 
 1. In the Mod Manager switch on **World nodes test** and its **Allowed** (the `bridge` permission, for names). Press **Start**. Expected: "hooks sectorReady, sectorGone, nodeInitialize, nodeAttach".
 2. Load a save (any, in the city). Open the overlay and press **State**. Expected: "Buffer at 0x40" (or 0x48), thousands of nodes, live above 0, faults 0, bad 0, hide and outline yes.

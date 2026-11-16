@@ -70,7 +70,7 @@ async function describe(n) {
   const res = n.resource ? (await nameOf(n.resource)) || n.resource : '';
   return `${n.kind} ${n.id}  sector ${sector.split('\\').pop()}  node ${n.index}/${n.nodeCount}, instance ${n.instance}/${n.instanceCount}${
     n.distance !== undefined ? `  at ${short(n.distance)} m` : ''
-  }${n.holdsHit ? '  HOLDS THE HIT' : ''}${res ? `  ${res.split('\\').pop()}` : ''}${n.appearance ? ` (${n.appearance})` : ''}${
+  }  box from ${n.boundsFrom}${n.holdsHit ? '  HOLDS THE HIT' : ''}${res ? `  ${res.split('\\').pop()}` : ''}${n.appearance ? ` (${n.appearance})` : ''}${
     n.streamed ? `  attached ${n.attached}, visible ${n.visible}` : '  not streamed'
   }${n.hidden ? '  HIDDEN' : ''}`;
 }
@@ -84,13 +84,13 @@ const start = () =>
   step('Start', async () => {
     const s = await world.nodeRegistry();
     showState(s);
-    return `hooks ${s.attached.join(', ') || 'none'}; buffer at ${s.offset ?? 'not found yet'}; ${s.sectors} sectors, ${s.setups} nodes`;
+    return `hooks ${s.attached.join(', ') || 'none'}; layout ${s.layout ?? 'not found yet'}; ${s.sectors} sectors, ${s.setups} nodes`;
   });
 
 function showState(s) {
   state.set({
-    text: `Hooks: ${s.attached.join(', ') || 'none'}. Buffer at ${s.offset ?? '?'}. Sectors ${s.sectors} (${s.badSectors} bad), nodes ${s.setups}, live ${s.instances}, hidden ${s.hidden}, faults ${s.faults}, ${s.sectorMs} ms recording. Hide ${s.canHide ? 'yes' : 'NO'}, outline ${s.canHighlight ? 'yes' : 'NO'}.`,
-    tone: s.faults || s.badSectors ? 'danger' : 'normal',
+    text: `Hooks: ${s.attached.join(', ') || 'none'}. Layout: ${s.layout ?? '?'}. Sectors ${s.sectors} (${s.badSectors} bad), nodes ${s.setups}, live ${s.instances}, hidden ${s.hidden}, refused reads ${s.refused}, ${s.sectorMs} ms recording. Hide ${s.canHide ? 'yes' : 'NO'}, outline ${s.canHighlight ? 'yes' : 'not yet'}.`,
+    tone: s.badSectors ? 'danger' : 'normal',
   });
 }
 

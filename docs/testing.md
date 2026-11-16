@@ -1225,6 +1225,7 @@ REDnode's world node registry, ported from RED Hot Tools (REDnode 0.66.0): which
 | Run | Result |
 |---|---|
 | Dev host, mock game, 2026-11-15, by Claude | The host's path passes (scratchpad `n24/`: the calls, the per-package lists, the show-again and outline clean-up when the package stops); the registry needs the game |
+| In the game, 2026-11-15, by the owner, dev PC, REDnode 0.66.0 | **Fail** at step 2: the game crashed on loading a save. REDnode's buffer check read a 2.31 offset that is a small number on 2.5, and its `__try` did not catch the fault (the game's crash handler comes first). The 2.5 layout read from the crash dump and the exe; 0.66.1 finds it at run time and checks memory before reading. Details in [docs/world.md, "S24 first run"](world.md#s24-first-run-a-crash-and-the-25-layout-rednode-0660) |
 
 ## Animations on a spawned character: A1 (#39)
 
