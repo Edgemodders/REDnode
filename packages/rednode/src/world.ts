@@ -9,6 +9,7 @@
 import { api, invoke, type GameRef } from "./api.js";
 import { game, type GameEvent } from "./game.js";
 import { readScene, type Scene, type ScenePlan, type SceneRead } from "./scene.js";
+import { writeWorkspot, writtenEntries, type WriteWorkspotOptions, type WrittenWorkspot } from "./workspot.js";
 import { cleanError, transport } from "./transport.js";
 
 /** An entity's ID, as the game API passes it: its 64-bit hash as a string. */
@@ -291,8 +292,11 @@ export interface UseWorkspotOptions {
   workspot?: string;
   /** `"here"` (the default): where the person stands. `"workspot"`: at the workspot's own place. */
   at?: "here" | "workspot";
-  /** An animation in the workspot to jump to once it has started, by name. */
-  entry?: string;
+  /**
+   * An entry to jump to once the workspot has started: a name from {@link world.writeWorkspot}, an
+   * animation's name, or an entry id. The jump is instant, blended by the game.
+   */
+  entry?: string | number;
   /** How long to wait for the person to be in the workspot, in milliseconds. Default 2000. */
   waitMs?: number;
 }
@@ -969,8 +973,63 @@ export const world = {
     if (!started) {
       return { id: entry.id, started, why: "the person did not enter the workspot: check its path, and that it fits the person's body (a male rig for a male workspot)" };
     }
-    if (options.entry) await ws.SendJumpToAnimEnt(person, options.entry, false);
+    if (options.entry !== undefined) await world.jumpWorkspot(entry.id, options.entry);
     return { id: entry.id, started };
+  },
+
+  /**
+   * Moves a person in a workspot to another of its entries: a name {@link world.writeWorkspot}
+   * gave, an animation's name, or an entry id. `instant` (the default) goes at once, blended from
+   * the current pose by the game; `instant: false` waits for the clip playing to reach its end,
+   * which can be many seconds. Timing a scene's jumps from the package lands them in the same frame
+   * for every actor (the Director spike, #46).
+   *
+   * @example
+   * ```ts
+   * await world.jumpWorkspot(id, "arms_crossed");
+   * ```
+   */
+  async jumpWorkspot(id: EntityId | string, to: string | number, options: { instant?: boolean } = {}): Promise<boolean> {
+    const hash = idOf(id).hash;
+    const person = await world.entity(idOf(id));
+    if (!person) return false;
+    const ws = (await api.GameInstance.GetWorkspotSystem(game.instance)) as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>;
+    const instant = options.instant !== false;
+    const path = mine.get(hash)?.options.workspot;
+    const known = typeof to === "string" && path ? writtenEntries(path)?.get(to) : undefined;
+    if (typeof to === "number" || known) await ws.SendJumpCommandEnt(person, typeof to === "number" ? to : known!.entry, instant);
+    else await ws.SendJumpToAnimEnt(person, to, instant);
+    return true;
+  },
+
+  /**
+   * Writes a workspot of the package's own for one person's clips and swaps it into the running
+   * game, so a person spawned with it plays those clips: any animation set, quest clips too, each
+   * clip looping until {@link world.jumpWorkspot} moves on. Written through REDbridge from one of
+   * the game's workspots, on the player's PC, into the package's own archive
+   * (`zzz_rednode_ws_<package>.archive`, in its data folder) and swapped in with REDswap; writing
+   * the same name again replaces it. The package needs the `bridge` and `archives` permissions,
+   * and `"redbridge": ">=0.12"` in `requires`.
+   *
+   * A workspot file's first play shows the person's bind pose (a T pose) for a moment, while the
+   * game prepares it; a second play has none. Start each actor's workspot once while the actor is
+   * out of view, before the scene shows them (unverified for a new person on a file already played).
+   *
+   * @example
+   * ```ts
+   * const ws = await world.writeWorkspot("medic", {
+   *   clips: [
+   *     { set: "base\\animations\\npc\\generic_characters\\male_average\\interactive_scene\\generic_male_average__stand__2h_on_sides__01.anims", anim: "stand__2h_on_sides__01", name: "stand" },
+   *     { set: "base\\animations\\quest_custom\\q001\\q001_00c_rescuing_girl\\q001_00c_trauma_arrives\\q001_00c_trauma_arrives_male_average.anims", anim: "q001_00c_trauma_arrives___med_1_idle__01", name: "worried" },
+   *   ],
+   * });
+   * const { id } = await world.spawn({ record: "Character.trauma_team_paramedic", position, workspot: ws.path });
+   * await world.useWorkspot(id);
+   * await world.jumpWorkspot(id, "worried");
+   * ```
+   */
+  async writeWorkspot(name: string, options: WriteWorkspotOptions): Promise<WrittenWorkspot> {
+    return writeWorkspot(name, options);
   },
 
   /**

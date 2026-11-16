@@ -22,6 +22,9 @@
 //              hash, so the lead is the engine reusing the arms-crossed setup (no quest set in it)
 //              by that hash. Six variants set the hash each way. And whether loading the workspot
 //              ahead (Codeware's ResourceDepot.LoadResource) removes the first play's T pose.
+//  11 Call     (0.5.0) the rounds' recipe as REDnode's own call: world.writeWorkspot writes and
+//              swaps, world.jumpWorkspot moves between its clips by name; and whether a new person
+//              on a file already played shows the first play's T pose
 
 import { api, archives, game, kernel, pkg, ui, world } from 'rednode';
 import fs from 'node:fs';
@@ -436,6 +439,66 @@ const spawnWaitPlay = () =>
     return `${out.join('; ')}; say whether the T pose came again`;
   });
 
+// ---- 11. world.writeWorkspot ------------------------------------------------------
+
+let called = null; // what world.writeWorkspot answered
+let callActors = []; // [{ id, label }]
+const CALL_CLIPS = [
+  { set: IDLE_2H, anim: CLIPS[0][1], name: 'stand' },
+  { set: IDLE_CROSSED, anim: CLIPS[1][1], name: 'crossed' },
+  { set: QUEST, anim: QUEST_CLIP, name: 'worried' },
+  { set: TRANSITIONS, anim: CLIPS[3][1], name: 'step' },
+];
+
+const callWrite = () =>
+  step('world.writeWorkspot', async () => {
+    called = await world.writeWorkspot('director', { clips: CALL_CLIPS });
+    say(`  ${called.path}: ${called.entries.map((e) => `${e.name} ${e.entry}`).join(', ')}`);
+    return `${called.swap ? `swapped via ${called.swap.via}` : 'not swapped'} (${called.ms} ms)`;
+  });
+
+const callSpawn = () =>
+  step('Spawn two with it', async () => {
+    if (!called) throw new Error('Press Write and swap first');
+    for (const a of callActors) await world.remove(a.id).catch(() => false);
+    callActors = [];
+    for (const [label, side] of [['A', -0.9], ['B', 0.9]]) {
+      const { id } = await world.spawn({ record: RECORD, ...(await inFront(3, side)), workspot: called.path });
+      callActors.push({ id, label });
+    }
+    return `${callActors.length} actors`;
+  });
+
+const callPlay = () =>
+  step('Play', async () => {
+    const out = [];
+    for (const a of callActors) {
+      const r = await world.useWorkspot(a.id);
+      a.id = r.id;
+      out.push(`${a.label} ${r.started ? 'started' : `not started: ${r.why}`}`);
+    }
+    return out.join('; ');
+  });
+
+const callJump = (name) =>
+  step(`world.jumpWorkspot ${name}`, async () => {
+    if (!callActors.length) throw new Error('Spawn first');
+    const t = performance.now();
+    await Promise.all(callActors.map((a) => world.jumpWorkspot(a.id, name)));
+    return `both in ${(performance.now() - t).toFixed(0)} ms`;
+  });
+
+const callNewPerson = () =>
+  step('A new person, same file', async () => {
+    if (!called) throw new Error('Press Write and swap first');
+    const { id } = await world.spawn({ record: RECORD, ...(await inFront(4.5, 0)), workspot: called.path });
+    callActors.push({ id, label: 'C' });
+    await wait(1500);
+    const r = await world.useWorkspot(id);
+    callActors[callActors.length - 1].id = r.id;
+    return `${r.started ? 'started' : `not started: ${r.why}`}; say whether it showed a T pose`;
+  });
+
 // ---- state and clean-up -----------------------------------------------------------
 
 const state = () =>
@@ -449,12 +512,14 @@ const removeAll = () =>
     let n = 0;
     for (const s of world.spawned()) if (await world.remove(s.id).catch(() => false)) n += 1;
     actors = [];
+    callActors = [];
     quest = null;
     return `${n} removed`;
   });
 world.onRespawn((before, after) => {
   for (const a of actors) if (a.id.hash === before.hash) a.id = after;
   if (quest && quest.id.hash === before.hash) quest.id = after;
+  for (const a of callActors) if (a.id.hash === before.hash) a.id = after;
 });
 
 const chosen = ui.text('Workspot: bare (only the test clips)', { tone: 'accent' });
@@ -496,10 +561,13 @@ ui.window({
     ui.row(ui.button('copy, preloaded (its own file)', () => tryVariant('copy-pre', { preloaded: true }), { variant: 'ghost' })),
     ui.heading('9. The first play'),
     ui.row(ui.button('Spawn, wait 10 s, then play', spawnWaitPlay, { variant: 'ghost' })),
+    ui.heading('11. world.writeWorkspot (REDnode 0.66.9)'),
+    ui.row(ui.button('Write and swap', callWrite), ui.button('Spawn two with it', callSpawn, { variant: 'ghost' }), ui.button('Play', callPlay, { variant: 'ghost' })),
+    ui.row(...CALL_CLIPS.slice(0, 3).map((c) => ui.button(c.name, () => callJump(c.name), { variant: 'ghost' })), ui.button('A new person, same file', callNewPerson, { variant: 'ghost' })),
     ui.heading('7. Weather'),
     ui.row(ui.button('Read the weather', weather, { variant: 'ghost' }), ui.button('Remove the actors', removeAll, { variant: 'ghost' })),
     log,
   ],
 });
-say('Director spike 0.4.0 ready');
+say('Director spike 0.5.0 ready');
 for (const [name, what] of VARIANTS) say(`  variant ${name}: ${what}`);

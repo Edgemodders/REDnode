@@ -1963,6 +1963,31 @@ What it decides:
 - **The animation setup's hash is the cause of the quest clip's T pose**, as round 3's lead said: the engine finds a workspot's animation setup by it. Kept from the template, the person gets the template's sets; 0 does not work either; **a new hash made from the list of sets works**, as does one matching a setup with the same sets. A written workspot sets `finalAnimsets[].animations.hash` to FNV-1a 64 of its set paths, and then any animation set plays, quest clips too. (mixed-0 was reported with mixed-new; on its own it may differ from solo-0, unverified.)
 - **Loading the workspot file first does not remove the brief T pose** (Codeware's `ResourceDepot.LoadResource`, the token kept). Round 3 saw none on a second play by the same people, and the game's own quest workspot showed none, while REDbridge's copy of it with the same hash did: the T pose belongs to a file's first play, not to its setup or its loading. Open: whether a new person playing a file already played shows it. If not, a written workspot can be played once on its actor before the scene starts (a warm-up while it is out of view).
 
+### A written workspot: the call (REDnode 0.66.9)
+
+Agreed with the owner on 2026-11-16 after round 2: the spike's writer as a REDnode call, so EDGEdir does not write game files itself. Built the same day with the four rounds' recipe, in `packages/rednode/src/workspot.ts`:
+
+| Call | What it does |
+|---|---|
+| `world.writeWorkspot(name, { clips, rig?, swap? })` | Writes `rednode\workspots\<package>\<name>.workspot` through REDbridge from the game's arms-crossed workspot (read on the player's PC): one sequence per clip, its idle the clip, looping unless `loop: false`, a fast exit, one animation setup on `rig` (default `man_base.rig`) listing the clips' sets at priority 200, with a hash of its own (FNV-1a 64 of the rig and sets). Packs every workspot of the package into `zzz_rednode_ws_<package>.archive` in its data folder and swaps it in (`archives.reload`). Answers `path`, `entries` (name, anim, set, entry id), `archive`, `ms`, `swap` |
+| `world.jumpWorkspot(id, to, { instant? })` | To a name `writeWorkspot` gave (by entry id), an animation's name, or an entry id. Instant by default |
+| `world.useWorkspot(id, { entry })` | Now jumps instantly, and takes the same names and ids |
+
+Needs the `bridge` and `archives` permissions and REDbridge. Checked against the real REDbridge with a stand-in host (scratchpad `ws/check.mjs`, 18 checks): the tree read back has the sequences, ids, loops, sets, hash and handles; two workspots share one archive; a rewrite replaces one; bad names, no clips and a repeated name are refused.
+
+For EDGEdir's questions on #46: a workspot entry has no in or out point, speed or repeat count (`workAnimClip` has only the animation's name and a blend-out time; unverified for other entry types), so a clip cut short is a jump timed by the package, and speed is preview-only.
+
+### A written workspot: the call's test
+
+REDnode 0.66.9, Director spike 0.5.0, REDbridge, game 2.5. Stand V somewhere open, outside combat.
+
+1. Switch on **Director spike (#46)** with both **Allowed** switches.
+2. Under **11. world.writeWorkspot**, press **Write and swap**. Expected: the workspot's path, four entries (stand, crossed, worried, step) and "swapped".
+3. Press **Spawn two with it**, then **Play**. Say whether there is a brief T pose, then both standing.
+4. Press **worried** (the quest clip), **crossed**, then **stand**, a few seconds apart. Expected: each at once, blended, and the quest clip plays and loops.
+5. Press **A new person, same file**. A third person spawns beside them with the same workspot and plays it. Say whether it shows a T pose: if not, a warm-up play per workspot file is enough.
+6. Press **Remove the actors** and switch the app off.
+
 ## World node registry (#24)
 
 Asked for by EDGEbuilder in [#24](https://github.com/Edgemodders/REDnode/issues/24) for its world inspector: hover or click anything the game placed and see what it is and which sector and node it comes from, outline it, hide it for the session, list what is streamed in near the camera, and have the world stream around EDGEbuilder's camera. Entities are covered by `world.near` and `world.files`; static nodes (most buildings, street furniture, decals, lights, foliage) are not: nothing in the game API names the node a click hit, and on 2.5 a sector keeps a node's path only as a hash. RED Hot Tools solves it with hooks on sector loading and node-instance setup (its `WorldNodeRegistry`, MIT) but has no 2.5 build.
