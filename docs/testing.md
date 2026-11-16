@@ -1228,6 +1228,14 @@ REDnode's world node registry, ported from RED Hot Tools (REDnode 0.66.0): which
 | In the game, 2026-11-15, by the owner, dev PC, REDnode 0.66.0 | **Fail** at step 2: the game crashed on loading a save. REDnode's buffer check read a 2.31 offset that is a small number on 2.5, and its `__try` did not catch the fault (the game's crash handler comes first). The 2.5 layout read from the crash dump and the exe; 0.66.1 finds it at run time and checks memory before reading. Details in [docs/world.md, "S24 first run"](world.md#s24-first-run-a-crash-and-the-25-layout-rednode-0660) |
 | In the game, 2026-11-15, by the owner, dev PC, REDnode 0.66.1 to 0.66.7 | 0.66.1 to 0.66.6 found and fixed: slow loads (a memory check per setup), a crash on a GI space's field, the ray starting inside road and terrain boxes, LOD stand-ins, and decals with made-up boxes ranking first. **0.66.7: pass** for steps 1 to 4, 6 and 7: the bench picked first with its pin, outlined, hidden and shown again; a pick takes about 25 ms on the game thread. Step 5 not passed: the street lamp is an entity node, which picks cannot reach yet (N2). Details in [docs/world.md, "S24 test: results"](world.md#s24-test-results-rednode-0661-to-0667) |
 
+## A written workspot (#46)
+
+The Director spike (`packages/overlay/apps/director-spike`, REDnode 0.66.8, nothing in REDnode changed): two workspots written for one actor's clips through REDbridge and swapped in, played on two spawned people, jumps blended and instant, a root-motion clip left to run out, timed jumps, and the weather. Steps and what each should show: [docs/world.md, "A written workspot: test"](world.md#a-written-workspot-test).
+
+| Run | Result |
+|---|---|
+| Outside the game, 2026-11-16, by Claude | The two workspots written from the game's own, read back and packed (scratchpad `s46/make.py`); the app starts in the mock host. The game run waits for A2's test |
+
 ## Animations on a spawned character: A2 (#39)
 
 `world.spawn({ workspot })`, `world.useWorkspot`, `world.stopWorkspot`, `world.workspotState` and the MCP tool `world_animate` (REDnode 0.66.8), with the Animation test 0.4.0's A2 section. Steps and what each should show: [docs/world.md, "A2 test"](world.md#a2-test).

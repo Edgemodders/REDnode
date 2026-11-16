@@ -1,0 +1,321 @@
+// Director spike: #46 for EDGEdir (docs/world.md, "A written workspot (#46)"). Through REDbridge,
+// archives, api and world only, no REDnode change. Each button is one step; every call, its answer
+// and its time go to the log, and what shows on screen is for the player to say.
+//
+//   1 Build    reads the game's arms-crossed workspot through REDbridge and writes two of its own
+//              into this app's data folder: "full" (the game's entries, exits and reactions kept)
+//              and "bare" (only the test clips and a fast exit); each test clip is a sequence whose
+//              idle is the clip, holding the clip once. Packs them into zzz_rednode_s46.archive.
+//              Nothing from the game is in this package: it is all made on the player's PC.
+//   2 Swap     archives.reload of that archive (REDswap)
+//   3 Actors   two people beside V carrying the chosen workspot; Play puts both in it
+//   4 Jumps    SendJumpToAnimEnt to each clip, blended or instant ("snap")
+//   5 Gap      the step-off clip with root motion: where the actor is at 0, 3 and 6 s
+//   6 Timed    jumps on setTimeout at set times for both actors: how late each lands, in ms and
+//              in frames, and how far apart the two actors' jumps are
+//   7 Weather  reads what the script API offers (it has no call that sets the weather on 2.5)
+
+import { api, archives, game, kernel, pkg, ui, world } from 'rednode';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const GAME_WORKSPOT = 'base\\workspots\\common\\ground\\generic__stand_ground_arms_crossed__stand_around__02.workspot';
+const OURS = 'rednode\\spikes';
+const ARCHIVE = 'zzz_rednode_s46';
+const IDLE_2H = 'base\\animations\\npc\\generic_characters\\male_average\\interactive_scene\\generic_male_average__stand__2h_on_sides__01.anims';
+const IDLE_CROSSED = 'base\\animations\\npc\\generic_characters\\male_average\\interactive_scene\\generic_male_average__stand__arms_crossed_front__01.anims';
+const TRANSITIONS = 'base\\animations\\npc\\generic_characters\\male_average\\interactive_scene\\generic_average_male_transitions.anims';
+const QUEST = 'base\\animations\\quest_custom\\q001\\q001_00c_rescuing_girl\\q001_00c_trauma_arrives\\q001_00c_trauma_arrives_male_average.anims';
+const CLIPS = [
+  ['A standing', 'stand__2h_on_sides__01'],
+  ['B arms crossed', 'stand__arms_crossed_front__01'],
+  ['C quest medic', 'q001_00c_trauma_arrives___med_1_idle__01'],
+  ['D step off (root motion)', 'stand__2h_on_sides__01__to__walk_0__turn0__01'],
+];
+const RECORD = 'Character.trauma_team_paramedic';
+
+let which = 'bare';
+let snap = false;
+let actors = []; // [{ id, label }]
+let busy = '';
+
+const status = ui.text('Press Build, then Swap, then Spawn.', { tone: 'dim' });
+const log = ui.list({ keep: 800 });
+function say(text) {
+  log.push(`${new Date().toLocaleTimeString()}  ${text}`);
+  console.log(text);
+}
+async function step(label, fn) {
+  if (busy) return say(`${label}: not run, ${busy} is still running`);
+  busy = label;
+  const started = performance.now();
+  try {
+    const note = await fn();
+    say(`${label}: ${note ?? 'done'} (${(performance.now() - started).toFixed(0)} ms)`);
+  } catch (err) {
+    say(`${label} failed: ${err.message}`);
+  } finally {
+    busy = '';
+  }
+}
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const workspotPath = () => `${OURS}\\s46_${which}.workspot`;
+
+// ---- 1. Build ---------------------------------------------------------------------
+
+const cname = (v) => ({ $type: 'CName', $storage: 'string', $value: v });
+const animset = (p) => ({ $type: 'animAnimSetupEntry', animSet: { DepotPath: { $type: 'ResourcePath', $storage: 'string', $value: p }, Flags: 'Default' }, priority: p.includes('interactive_scene') ? 200 : 128, variableNames: [] });
+const loading = (p) => ({ DepotPath: { $type: 'ResourcePath', $storage: 'string', $value: p }, Flags: 'Default' });
+
+function writeWorkspot(source, bare) {
+  const d = structuredClone(source);
+  const tree = d.Data.RootChunk.workspotTree.Data;
+  let entry = tree.idCounter;
+  let handle = 100000;
+  const nextEntry = () => ++entry;
+  const nextHandle = () => String(++handle);
+  const sequence = (clip) => ({
+    HandleId: nextHandle(),
+    Data: {
+      $type: 'workSequence', category: 'Any', disableAutoTransition: 0, flags: 0,
+      id: { $type: 'workWorkEntryId', id: nextEntry() },
+      idleAnim: cname(clip), loopInfinitely: 0, previousLoopInfinitely: 0,
+      list: [{ HandleId: nextHandle(), Data: { $type: 'workAnimClip', animName: cname(clip), blendOutTime: 0.5, flags: 2, id: { $type: 'workWorkEntryId', id: nextEntry() } } }],
+    },
+  });
+  const root = tree.rootEntry.Data;
+  const kept = bare ? root.list.filter((c) => c.Data.$type === 'workFastExit') : root.list;
+  root.list = [...CLIPS.map(([, clip]) => sequence(clip)), ...kept];
+  tree.idCounter = entry + 1;
+  const male = tree.finalAnimsets[0];
+  const sets = bare ? [IDLE_2H, IDLE_CROSSED, TRANSITIONS, QUEST] : [...male.animations.cinematics.map((x) => x.animSet.DepotPath.$value), QUEST];
+  male.animations.cinematics = sets.map(animset);
+  male.loadingHandles = sets.map(loading);
+  tree.finalAnimsets = [male];
+  if (bare) tree.customTransitionAnims = [];
+  return d;
+}
+
+const build = () =>
+  step('Build the workspots', async () => {
+    const b = await kernel.bridge();
+    const work = path.join(pkg.dataDir, 's46');
+    const tree = path.join(work, 'archive');
+    fs.rmSync(work, { recursive: true, force: true });
+    fs.mkdirSync(path.join(tree, ...OURS.split('\\')), { recursive: true });
+    const raw = path.join(work, 'source.workspot');
+    await b.call('archive.extract', { path: GAME_WORKSPOT, outFile: raw });
+    const json = path.join(work, 'source.json');
+    await b.call('cr2w.fileToJson', { file: raw, outFile: json });
+    const source = JSON.parse(fs.readFileSync(json, 'utf8'));
+    for (const kind of ['full', 'bare']) {
+      const jf = path.join(work, `s46_${kind}.json`);
+      fs.writeFileSync(jf, JSON.stringify(writeWorkspot(source, kind === 'bare')));
+      const out = path.join(tree, ...OURS.split('\\'), `s46_${kind}.workspot`);
+      await b.call('cr2w.fromJson', { outFile: out, jsonFile: jf });
+      say(`  ${kind}: ${fs.statSync(out).size} bytes`);
+    }
+    const packed = await b.call('project.pack', { dir: tree, outDir: path.join(work, 'packed'), modName: ARCHIVE });
+    return `${packed.archive} (${packed.bytes} bytes, ${packed.files} files)`;
+  });
+
+// ---- 2. Swap ----------------------------------------------------------------------
+
+const swap = () =>
+  step('Swap in', async () => {
+    const file = path.join(pkg.dataDir, 's46', 'packed', `${ARCHIVE}.archive`);
+    if (!fs.existsSync(file)) throw new Error('Press Build first');
+    const r = await archives.reload([file]);
+    for (const f of r.failed ?? []) say(`  failed ${f.file}: ${f.why}`);
+    return `${r.reloaded?.length ?? 0} swapped in ${r.ms} ms${r.via ? ` via ${r.via}` : ''}`;
+  });
+
+// ---- 3. Actors ----------------------------------------------------------------------
+
+async function inFront(metres, side) {
+  const v = await api.GetPlayer(game.instance);
+  if (!v) throw new Error('No player: load a save first');
+  const p = await v.GetWorldPosition();
+  const f = await v.GetWorldForward();
+  const yaw = (Math.atan2(f.Y, f.X) * 180) / Math.PI + 90;
+  return { position: { x: p.X + f.X * metres + f.Y * side, y: p.Y + f.Y * metres - f.X * side, z: p.Z }, yaw };
+}
+
+const spawn = () =>
+  step(`Spawn two actors with ${which}`, async () => {
+    for (const a of actors) await world.remove(a.id).catch(() => false);
+    actors = [];
+    for (const [label, side] of [['A', -0.9], ['B', 0.9]]) {
+      const { id, entity } = await world.spawn({ record: RECORD, ...(await inFront(3, side)), workspot: workspotPath() });
+      actors.push({ id, label });
+      say(`  ${label} ${id.hash}${entity ? '' : ' not in the world yet'}`);
+    }
+    return `${actors.length} actors`;
+  });
+
+const people = async () => {
+  if (!actors.length) throw new Error('Spawn first');
+  return Promise.all(actors.map(async (a) => ({ ...a, e: await world.entity(a.id) })));
+};
+const system = () => api.GameInstance.GetWorkspotSystem(game.instance);
+
+const play = () =>
+  step('Play both', async () => {
+    const out = [];
+    for (const a of actors) {
+      const r = await world.useWorkspot(a.id);
+      a.id = r.id;
+      out.push(`${a.label} ${r.started ? 'started' : `not started: ${r.why}`}`);
+    }
+    return out.join('; ');
+  });
+
+// ---- 4. Jumps ---------------------------------------------------------------------
+
+async function jumpAll(clip) {
+  const ws = await system();
+  const ps = await people();
+  const times = await Promise.all(
+    ps.map(async (p) => {
+      const t = performance.now();
+      await ws.SendJumpToAnimEnt(p.e, clip, snap);
+      return performance.now() - t;
+    }),
+  );
+  return times;
+}
+const jump = (label, clip) =>
+  step(`Jump to ${label}${snap ? ' (snap)' : ''}`, async () => {
+    const t = await jumpAll(clip);
+    await wait(600);
+    const ws = await system();
+    const ps = await people();
+    const inWs = await Promise.all(ps.map((p) => ws.IsActorInWorkspot(p.e)));
+    return `calls ${t.map((x) => x.toFixed(0)).join(' / ')} ms; in a workspot after 0.6 s: ${inWs.join(', ')}`;
+  });
+
+// ---- 5. Gap and root motion -------------------------------------------------------
+
+const gap = () =>
+  step('Step off, then nothing', async () => {
+    const ps = await people();
+    const pos = async () => Promise.all(ps.map(async (p) => await p.e.GetWorldPosition()));
+    const at0 = await pos();
+    await jumpAll(CLIPS[3][1]);
+    const lines = [];
+    for (const s of [3, 6]) {
+      await wait(3000);
+      const now = await pos();
+      const ws = await system();
+      const inWs = await Promise.all(ps.map((p) => ws.IsActorInWorkspot(p.e)));
+      lines.push(`at ${s} s: ${now.map((p, i) => `${ps[i].label} moved ${Math.hypot(p.X - at0[i].X, p.Y - at0[i].Y).toFixed(2)} m, in workspot ${inWs[i]}`).join('; ')}`);
+    }
+    for (const l of lines) say(`  ${l}`);
+    return 'say what the actors do at the end of the clip: hold, loop, or leave';
+  });
+
+// ---- 6. Timed jumps ---------------------------------------------------------------
+
+const timed = () =>
+  step('Timed run (8 s)', async () => {
+    const plan = [
+      [0, CLIPS[0]], [2000, CLIPS[1]], [4000, CLIPS[2]], [6000, CLIPS[0]], [8000, CLIPS[1]],
+    ];
+    const ws = await system();
+    const ps = await people();
+    const f0 = (await game.call('game.info')).frame;
+    const t0 = performance.now() + 300;
+    const results = await Promise.all(
+      plan.map(
+        ([at, [label, clip]]) =>
+          new Promise((resolve) => {
+            setTimeout(async () => {
+              const fired = performance.now();
+              const frame = (await game.call('game.info')).frame;
+              const each = [];
+              await Promise.all(
+                ps.map(async (p) => {
+                  await ws.SendJumpToAnimEnt(p.e, clip, snap);
+                  each.push(performance.now() - fired);
+                }),
+              );
+              resolve({ at, label, late: fired - (t0 + at), frame: frame - f0, spread: Math.abs((each[0] ?? 0) - (each[1] ?? 0)), done: Math.max(...each) });
+            }, Math.max(0, t0 + at - performance.now()));
+          }),
+      ),
+    );
+    for (const r of results) {
+      say(`  ${(r.at / 1000).toFixed(0)} s ${r.label}: timer late ${r.late.toFixed(1)} ms, frame +${r.frame}, both jumps sent within ${r.done.toFixed(0)} ms, A and B apart ${r.spread.toFixed(0)} ms`);
+    }
+    const frames = results.map((r) => r.frame);
+    const fps = (frames[frames.length - 1] - frames[0]) / ((results[results.length - 1].at - results[0].at) / 1000);
+    return `about ${fps.toFixed(0)} frames a second; a jump lands when its call reaches the game thread`;
+  });
+
+// ---- 7. Weather -------------------------------------------------------------------
+
+const weather = () =>
+  step('Weather: what the script API reads', async () => {
+    const w = await api.GameInstance.GetWeatherSystem(game.instance);
+    if (!w) return 'no weather system';
+    const intensity = await w.GetRainIntensity().catch((e) => `error ${e.message}`);
+    const type = await w.GetRainIntensityType().catch((e) => `error ${e.message}`);
+    return `rain intensity ${intensity}, type ${type}. The script API has no call that sets the weather on 2.5`;
+  });
+
+// ---- state and clean-up -----------------------------------------------------------
+
+const state = () =>
+  step('State', async () => {
+    const out = [];
+    for (const a of actors) out.push(`${a.label} ${JSON.stringify(await world.workspotState(a.id))}`);
+    return out.join(' | ') || 'no actors';
+  });
+const removeAll = () =>
+  step('Remove the actors', async () => {
+    let n = 0;
+    for (const s of world.spawned()) if (await world.remove(s.id).catch(() => false)) n += 1;
+    actors = [];
+    return `${n} removed`;
+  });
+world.onRespawn((before, after) => {
+  for (const a of actors) if (a.id.hash === before.hash) a.id = after;
+});
+
+const chosen = ui.text('Workspot: bare (only the test clips)', { tone: 'accent' });
+ui.window({
+  title: 'Director spike (#46)',
+  anchor: 'left',
+  x: 40,
+  y: 60,
+  width: 700,
+  height: 880,
+  closable: true,
+  children: [
+    status,
+    ui.heading('1 and 2. The workspots'),
+    ui.row(ui.button('Build', build), ui.button('Swap in', swap, { variant: 'ghost' })),
+    chosen,
+    ui.row(
+      ui.button('Use bare', () => {
+        which = 'bare';
+        chosen.set({ text: 'Workspot: bare (only the test clips)' });
+      }, { variant: 'ghost' }),
+      ui.button('Use full', () => {
+        which = 'full';
+        chosen.set({ text: "Workspot: full (the game's entries and exits kept)" });
+      }, { variant: 'ghost' }),
+    ),
+    ui.heading('3. Two actors'),
+    ui.row(ui.button('Spawn', spawn), ui.button('Play both', play), ui.button('State', state, { variant: 'ghost' })),
+    ui.heading('4. Jumps'),
+    ui.toggle('Snap (instant) instead of blend', (on) => (snap = on)),
+    ui.row(...CLIPS.slice(0, 3).map(([label, clip]) => ui.button(label, () => jump(label, clip), { variant: 'ghost' }))),
+    ui.heading('5 and 6. Gap, root motion, timing'),
+    ui.row(ui.button('Step off, then nothing', gap), ui.button('Timed run (8 s)', timed)),
+    ui.heading('7. Weather'),
+    ui.row(ui.button('Read the weather', weather, { variant: 'ghost' }), ui.button('Remove the actors', removeAll, { variant: 'ghost' })),
+    log,
+  ],
+});
+say('Director spike 0.1.0 ready');

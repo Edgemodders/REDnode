@@ -1779,6 +1779,49 @@ REDnode 0.66.0 (any since 0.58.0), Codeware, game 2.5, the Animation test copied
 
 What the answers decide is in "What A1 decides" above; A2, the call, is built from them.
 
+## A written workspot (#46)
+
+Asked for by EDGEdir in [#46](https://github.com/Edgemodders/REDnode/issues/46) on 2026-11-16 (agreed with the owner): EDGEdir is a director tool, a timeline of NPC actors each playing a track of animation clips, and its route into the game is the second spike A1 named: a `.workspot` written for each actor that holds that actor's clips, played with `world.useWorkspot` and jumped through clip to clip. Taken the same day, after A2's test.
+
+**What the game's own workspot shows** (the arms-crossed one, read with REDbridge, game 2.5):
+
+| Fact | For a written workspot |
+|---|---|
+| The tree is `workSequence`s; a sequence's `idleAnim` is what the person loops while idle, and the `workAnimClip`s in it play once | A clip that should hold or loop is a sequence whose `idleAnim` is the clip |
+| The animation sets are listed under `finalAnimsets[].animations.cinematics`, the same slot the quest workspots use, with a rig (`man_base.rig`) and `loadingHandles` | The slot is not what gave the quest workspots their T pose (A1); the missing walk-in remains the lead (unverified) |
+| Walk-ins and walk-outs are `workEntryAnim`/`workExitAnim` entries, reactions `workReactionSequence`, turns `workLookAtDrivenTurn`, a `workFastExit` at the end; `customTransitionAnims` names a transition between two idles; `inertializationDurationEnter` 0.5 | The "bare" version keeps only the clips and the fast exit, to find the fields needed at the least |
+| The resource also holds a compiled graph (`rootNode`, `nodesToInit`) | Copied from the game's file as it is; whether a different set of clips needs it changed is part of the test |
+
+**The spike** (the **Director spike** app, `packages/overlay/apps/director-spike`, through REDbridge, archives, api and world only, no REDnode change):
+
+| Step | How |
+|---|---|
+| Build | Extracts the game's arms-crossed workspot through REDbridge, writes two workspots of its own into the app's data folder, and packs them into `zzz_rednode_s46.archive`: **full** (the game's tree kept, the test clips added) and **bare** (the test clips and the fast exit only). Each test clip is a sequence whose idle is the clip, holding the clip once. Nothing derived from the game is committed: the app makes it on the player's PC |
+| Clips | Four on the male rig, from four `.anims`: A `stand__2h_on_sides__01` (standing), B `stand__arms_crossed_front__01` (arms crossed), C `q001_00c_trauma_arrives___med_1_idle__01` (the prologue medic's quest clip, from `quest_custom`), D `stand__2h_on_sides__01__to__walk_0__turn0__01` (a step off, with root motion). Each name checked in its `.anims` with REDbridge |
+| Swap | `archives.reload` of the archive (REDswap) |
+| Actors | Two paramedics beside V carrying the chosen workspot (`world.spawn({ workspot })`), played with `world.useWorkspot` |
+| Jumps | `SendJumpToAnimEnt` to A, B or C on both actors, blended or instant (Snap) |
+| Gap and root motion | D on both, then nothing: how far each moved at 3 and 6 s, and whether they are still in the workspot |
+| Timing | Jumps on `setTimeout` at 0, 2, 4, 6 and 8 s for both actors: each timer's lateness, the frame it fired on, and how far apart the two actors' jumps went out |
+| Weather | Reads what the script API offers: on 2.5, `worldWeatherScriptInterface` only reads (rain intensity and type, listeners), and RED4ext's address list names no weather function, so setting it is research (the engine's weather system by static reading, or a quest node) |
+
+The two workspots were written, read back and packed outside the game the same day (scratchpad `s46/make.py`, the same steps the app takes): full 12,641 bytes, bare 3,866 bytes, both read back by REDbridge.
+
+### A written workspot: test
+
+REDnode 0.66.8, Codeware, REDbridge found (the Mod Manager's **Get REDbridge**), game 2.5. Stand V somewhere open, outside combat.
+
+1. Copy the Director spike into the apps folder. In the Mod Manager switch it on, with both its **Allowed** switches (bridge and archives).
+2. Press **Build**. Expected: "full" and "bare" with their sizes, and the archive's path.
+3. Press **Swap in**. Expected: "1 swapped ... via redswap".
+4. **Use bare** is chosen. Press **Spawn**, then **Play both**. Expected: two paramedics, both "started", standing in clip A with no walk-in. Say whether there is a T pose.
+5. Press **B arms crossed**, then **C quest medic**, then **A standing**. Say whether each change blends or snaps, and whether C (the quest clip) plays and holds, with or without a T pose.
+6. Switch **Snap** on and press **B**, then **A**. Say how it differs.
+7. Switch Snap off. Press **Step off, then nothing**. Say what the actors do at the end of the step: hold the last pose, loop it, or leave the workspot. The log has how far they moved.
+8. Press **Timed run (8 s)**. Say whether the two actors change together. The log has each jump's lateness.
+9. Press **Use full**, **Spawn**, **Play both**, and repeat steps 4 and 5. Say what differs (a walk-in, the T pose).
+10. Press **Read the weather**, then **Remove the actors**, and switch the app off.
+
 ## World node registry (#24)
 
 Asked for by EDGEbuilder in [#24](https://github.com/Edgemodders/REDnode/issues/24) for its world inspector: hover or click anything the game placed and see what it is and which sector and node it comes from, outline it, hide it for the session, list what is streamed in near the camera, and have the world stream around EDGEbuilder's camera. Entities are covered by `world.near` and `world.files`; static nodes (most buildings, street furniture, decals, lights, foliage) are not: nothing in the game API names the node a click hit, and on 2.5 a sector keeps a node's path only as a hash. RED Hot Tools solves it with hooks on sector loading and node-instance setup (its `WorldNodeRegistry`, MIT) but has no 2.5 build.

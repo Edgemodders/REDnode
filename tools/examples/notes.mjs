@@ -482,6 +482,18 @@ export const NOTES = {
     tryThis: ['Press Spawn the person, Arms crossed (gameplay), Make the device, then Play: device, actor data.', 'Then Medic 1, Make the device and Play again.'],
     preview: 'The preview\'s game has no workspot system, so the Play buttons log a failure here: the app is meant for the game.',
   },
+  'director-spike': {
+    group: 'tests',
+    summary: 'Write a workspot of your own for one actor\'s animation clips, swap it into the running game, play it on two people, jump between clips and time the jumps (#46\'s spike, for EDGEdir).',
+    teaches: ['kernel.bridge', 'archives.reload', 'world.spawn', 'world.useWorkspot', 'world.workspotState', 'game.call', 'WorkspotGameSystem'],
+    how: [
+      '**Build** reads one of the game\'s workspots through REDbridge and writes two of its own into the app\'s data folder: each test clip becomes a sequence whose idle is the clip. **Swap in** loads them into the running game with REDswap.',
+      'Two people carry the workspot from their spawn; **Play both** starts it, and the clip buttons jump both of them to a clip by name, blended or instant.',
+      '**Timed run** fires jumps on timers and logs how late each lands, in milliseconds and frames.',
+    ],
+    tryThis: ['Press Build, Swap in, Spawn, Play both, then B arms crossed.'],
+    preview: 'The preview\'s game has no REDbridge or workspots, so the buttons log a failure here: the app is meant for the game.',
+  },
   'nodes-test': {
     group: 'tests',
     summary: 'Find out what the camera looks at in the world: buildings, street furniture, decals and lights, each with the sector and node it comes from; outline one, hide it for the session (#24\'s spike).',
