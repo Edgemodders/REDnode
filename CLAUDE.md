@@ -99,3 +99,12 @@ Follow [docs/dev-setup.md](docs/dev-setup.md) top to bottom. Whenever you instal
 - Write docs as markdown in `docs/`. Jekyll renders them with the HUD layout (`docs/_layouts/default.html`, `docs/assets/css/hud.css`). Add every new page to `nav` in `docs/_config.yml`.
 - `docs/design.html` is a standalone, hand-written page and must stay a complete HTML document.
 - Long-term goal: a rich, navigable docs site with a full API browser. Offline browsing (shipping the built site) is a later concern.
+
+## Dashboard (EDGEweb)
+
+The platform dashboard at https://edgemodders.ai/dashboard.html draws one file in the EDGEweb repo, `docs/assets/dashboard/status.js` (plain JSON after the equals sign, one object per tool under `tools`). The owner and a managing session read it to see every tool's state, so REDnode's entry is kept current by the session that works on REDnode.
+
+- **When:** in the same piece of work as any change to REDnode's status: a phase built or done, a hand test added, run, passed or failed, a release, something REDnode starts or stops waiting on, something only the owner can do.
+- **How:** in the sibling checkout `../EDGEweb`, `git pull`, edit only REDnode's object, set its `checkedBy` to this session and the date, bump the `?v=` on the `status.js` script tag in `docs/dashboard.html`, commit and push to `main` (as `CyberbuildsAI`). Leave `issues`, `lastTag`, `lastTagDate`, `lastCommit` and `commitsSinceTag` alone: EDGEweb's `tools/dashboard/refresh.py` writes those.
+- **Words:** phases are `done`, `built, tests pending`, `in progress` or `planned`; tests are `passed`, `not run`, `partly run` or `failed`. The fields are described in EDGEweb's `CLAUDE.md`, under Dashboard.
+- **Honest:** never mark a test passed or a phase done that this repo's own docs do not. A test with a step still to run is `partly run`.
