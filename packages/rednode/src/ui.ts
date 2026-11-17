@@ -674,6 +674,11 @@ export const ui = {
    * false). Pressing F10 or Esc, or clicking empty screen, ends that and shows the app
    * again (`shown` true if the key had hidden it).
    *
+   * An app whose page fills the screen (`"fill": "screen"`, such as an editor's viewport)
+   * is not hidden: its page stays, with the cursor, so its own view keeps the mouse, and
+   * the key hides only the page's `rn-window`s, its panels (the UI kit does it). `panels`
+   * is then true. A page drawing panels of its own, not in `rn-window`s, hides them here.
+   *
    * The key never changes the app's own state: an editor stays in its edit mode while
    * hidden. Use this to pause what only makes sense on screen, such as a drag in progress.
    * Works in Node mods and in overlay apps. Returns a function that stops listening.
@@ -682,14 +687,15 @@ export const ui = {
    * ```ts
    * import { ui } from "rednode";
    *
-   * ui.onAppKey((shown) => {
-   *   if (!shown) endDrag(); // the player hid the editor to look at the world
+   * ui.onAppKey((shown, panels) => {
+   *   if (panels) toolbar.hidden = !shown; // a full-screen page's own toolbar
+   *   else if (!shown) endDrag(); // the player hid the window to look at the world
    * });
    * ```
    */
-  onAppKey(handler: (shown: boolean) => void): () => void {
+  onAppKey(handler: (shown: boolean, panels: boolean) => void): () => void {
     return transport().listen((m) => {
-      if (m.event === "app-key") handler(!!(m as { shown?: boolean }).shown);
+      if (m.event === "app-key") handler(!!(m as { shown?: boolean }).shown, (m as { panels?: boolean }).panels === true);
     });
   },
 };

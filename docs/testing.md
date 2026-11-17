@@ -1220,13 +1220,15 @@ REDagent needs its Anthropic key, as before.
 
 The 0.58.0 release ships EDGEmat 0.3.1 from npm, which ignores the shared REDbridge and starts its own. That combination was checked outside the game on 2026-11-05 with REDnode's variables set (scratchpad `e1/check-pin.cjs`, E1's 21 checks: tools listed, reads answered, ask flags). Raise the pin in `packages/overlay/package.json` once EDGEmat publishes a newer version.
 
-## App keys (0.67.0)
+## App keys (0.67.0, 0.67.1)
 
 A key the player gives an app (its title bar's **Key binding…**, or the Mod Manager): it shows only that app with the cursor, and hides it again; keys the game uses are refused. Steps and what each should show: [docs/overlay.md, "App keys: test"](overlay.md#app-keys-test).
 
 | Run | Result |
 |---|---|
 | Dev host, stand-in plugin, 2026-11-17, by Claude | **Pass**: 24 checks (scratchpad `akey/run.sh`): show and hide from passive, interactive and hidden mode, F10 ending the one-app view, a key no app has, the Key binding window refusing Ctrl+B and keeping F8, no app key firing while it listens. The plugin's watch needs the game |
+| In game, dev PC, 2026-11-17, 0.67.0 | **Failed at step 4**: F8 hid EDGEbuilder's whole page, so its gizmo went and the mouse went to the game (V turned; right-drag look in edit mode did nothing). EDGEbuilder is one full-screen page, its viewport and its panel in one window. Steps 2 and 3 passed (Ctrl+B refused, F8 kept). Fixed in 0.67.1: a page that fills the screen keeps its page and the cursor, and the key hides only its `rn-window`s (the owner chose to keep the cursor) |
+| Dev host, stand-in plugin, 2026-11-17, 0.67.1, by Claude | **Pass**: 32 checks, the 24 above plus a full-screen test app: its key shows only it, then hides only its panels with the page and cursor kept, shows them again, and F10 brings everything back |
 
 ## World node registry: S24 (#24)
 

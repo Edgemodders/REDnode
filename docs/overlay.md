@@ -906,13 +906,13 @@ Found on the way: the UI kit's `rn-button` had no `disabled` property, so `butto
 
 ### App keys: test
 
-1. Close the game. Deploy REDnode 0.67.0. Start the game and load a save.
+1. Close the game. Deploy REDnode 0.67.1 (0.67.0's first run failed step 4, below). Start the game and load a save.
 2. F10. On EDGEbuilder's window, open **Key binding…** from the title bar (the key icon, or ⋯). The Key binding window opens. Press **Ctrl+B**: it shows Ctrl+B with "The game uses B for holster weapon, ..." and Save stays grey. Press **F8**: it shows F8 and Save lights. Press **Save**. The key icon's tooltip now says "Key binding (F8)…".
 3. Switch EDGEbuilder to edit mode and solo mode, place an object and select it.
-4. Press **F8**: EDGEbuilder hides and the cursor goes. Move or turn the selected object as EDGEbuilder lets you without its window. Nothing of F8 reaches the game.
-5. Press **F8**: EDGEbuilder shows with the cursor, still in edit mode with the object selected. Type in one of its text boxes: the letters arrive.
-6. Press **F10**: the overlay hides. **F10**: it shows without the cursor. **F10**: the cursor comes back.
-7. End solo mode. Open the Mod Manager too, then press **F10** until no cursor shows. Press **F8**: only EDGEbuilder shows, with the cursor; the Mod Manager and the launcher tab are gone. **F8** again: EDGEbuilder hides, and the launcher tab and the other windows are back without the cursor.
+4. Press **F8**: EDGEbuilder's panel hides; its gizmo, the selection and the cursor stay. Drag the gizmo to move or turn the object, and hold the right mouse button to look around with EDGEbuilder's camera: V does not move. Nothing of F8 reaches the game. Press **F8**: the panel is back.
+5. Still in edit mode with the object selected, type in one of EDGEbuilder's text boxes: the letters arrive. Press **F8** to hide the panel again, then **F10**: the overlay hides; **F10** again: it shows, panel and all, without the cursor; **F10**: the cursor is back.
+6. (Folded into step 5.)
+7. End solo mode. Open the Mod Manager too, then press **F10** until no cursor shows. Press **F8**: only EDGEbuilder shows, with the cursor; the Mod Manager and the launcher tab are gone. **F8** again: only its panel hides, as in step 4 (EDGEbuilder fills the screen); **F8**: it is back. **F10** then shows the other windows again. For an ordinary window, F8 hides the window and gives the game its input back: try it on the Mod Manager (Key binding… in its title bar, F7), F7 to show only it, F7 to hide it, then Remove its key.
 8. F10. In the Mod Manager, select EDGEbuilder: its details show **Key F8** with Change and Remove. Press **Remove**, then F10 to give the game its input and press F8: nothing happens.
 9. Quit the game. Claude reads the plugin log (`Overlay: 1 app keys`, `Overlay: app key 119 (mods 0) pressed`) and the host log (`App key: ...` lines for each step).
 

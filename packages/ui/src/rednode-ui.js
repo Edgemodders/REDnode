@@ -297,7 +297,9 @@ footer:empty { display: none; }
 .resize { position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; z-index: 2; cursor: nwse-resize; touch-action: none;
   background: linear-gradient(135deg, transparent 0 55%, var(--rn-dim) 55% 61%, transparent 61% 72%, var(--rn-dim) 72% 78%, transparent 78% 89%, var(--rn-dim) 89% 95%, transparent 95%); }
 .resize:hover, .resize.on { background: linear-gradient(135deg, transparent 0 55%, var(--rn-accent) 55% 61%, transparent 61% 72%, var(--rn-accent) 72% 78%, transparent 78% 89%, var(--rn-accent) 89% 95%, transparent 95%); }
-.resize[hidden], :host([rolled]) .resize { display: none; }`,
+.resize[hidden], :host([rolled]) .resize { display: none; }
+/* Hidden by the app's key on a page that fills the screen: the page's own view stays (0.67.1). */
+:host([key-hidden]) { display: none !important; }`,
         `<header part="titlebar"><span class="grip"><span class="mark"></span><h1></h1></span><slot name="status"></slot><span class="actions"></span><button class="close" hidden aria-label="Close">✕</button></header>
 <div class="body" part="body"><slot></slot></div><footer><slot name="footer"></slot></footer><div class="resize" part="resize" hidden title="Drag to resize"></div>`,
       );
@@ -1423,5 +1425,16 @@ nav button:focus-visible { outline: 2px solid var(--rn-accent-2); outline-offset
   };
   for (const [name, cls] of Object.entries(elements)) {
     if (!customElements.get(name)) customElements.define(name, cls);
+  }
+
+  // The app's key on a page that fills the screen (0.67.1): REDnode keeps the page, so its own view
+  // (an editor's viewport, gizmo and camera) keeps the mouse, and the key hides only the page's
+  // rn-windows, its panels. `panels` says so; the page then shows them again on the next press.
+  if (window.rednode?.on) {
+    window.rednode.on((m) => {
+      if (m?.event !== 'app-key') return;
+      const hide = m.panels === true && m.shown === false;
+      for (const w of document.querySelectorAll('rn-window')) w.toggleAttribute('key-hidden', hide);
+    });
   }
 })();

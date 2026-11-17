@@ -664,6 +664,14 @@ ui.onAppKey((shown) => {
 });
 ```
 
+**A page that fills the screen** (`"fill": "screen"`), such as an editor with its own viewport, is not hidden by its key. Its page stays, with the cursor, so the viewport keeps the mouse: a gizmo still drags, a camera still turns with the right button, and nothing reaches the game. The key hides only the page's `rn-window`s, its panels, and the next press shows them again. The UI kit does it. A page that draws panels of its own, outside `rn-window`s, hides them when `panels` is true (REDnode 0.67.1):
+
+```js
+ui.onAppKey((shown, panels) => {
+  if (panels) toolbar.hidden = !shown;
+});
+```
+
 Every `rn-window` of an app offers Key binding, a full-screen page's inner windows too. `<rn-window no-key>` leaves it out of that window's menu.
 
 ## Editor tools: the editor channel

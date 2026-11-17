@@ -1056,6 +1056,7 @@ function checkSolo() {
   checkInk();
   checkPins();
   if (keyView && !packageRunning(keyView)) endKeyView('the app stopped');
+  for (const id of [...keyPanels]) if (!packageRunning(id)) keyPanels.delete(id);
   if (!soloOwner) return;
   if (!packageRunning(soloOwner)) endSolo('the package stopped');
 }
@@ -1071,11 +1072,16 @@ function checkSolo() {
 // mode. The key never touches the app's own state (its mod, solo mode, edit mode). Any other
 // change of mode (F10, Esc, a click on empty screen) ends the one-app view and shows the app
 // again: the overlay is as it was.
+// An app whose page fills the screen (an editor's viewport, such as EDGEbuilder's) is not hidden
+// by its key: its page stays, with the cursor, so its view keeps the mouse (a gizmo, a camera
+// dragged with the right button), and the page is told { panels: true } so the UI kit hides only
+// its rn-windows, the panels; the next press shows them again (0.67.1, from the App keys test).
 // settings.appKeys: { packageId: { vk, mods } }, mods: 1 Ctrl, 2 Shift, 4 Alt.
 
 let keyView = null; // the package shown by its key, or null
 let keyViewFrom = null; // the mode before the one-app view began
 const keyHidden = new Set(); // packages hidden by their key
+const keyPanels = new Set(); // packages filling the screen whose panels their key hid
 let modeByKey = null; // the mode the host asked the plugin for, until it says so
 let bindAsk = null; // the Key binding window's question: { id, name, candidate }
 
@@ -1104,17 +1110,21 @@ function setModeByKey(next) {
   sendJson({ cmd: 'overlay.mode', mode: next });
 }
 
-function tellAppKey(id, shown) {
-  for (const w of windowsOfPackage(id)) toPage(w, { event: 'app-key', shown });
-  if (mods?.has(id)) mods.toMod(id, { event: 'app-key', shown });
+function tellAppKey(id, shown, panels = false) {
+  const message = panels ? { event: 'app-key', shown, panels: true } : { event: 'app-key', shown };
+  for (const w of windowsOfPackage(id)) toPage(w, message);
+  if (mods?.has(id)) mods.toMod(id, message);
 }
 
 function endKeyView(why) {
-  if (!keyView && !keyHidden.size) return;
+  if (!keyView && !keyHidden.size && !keyPanels.size) return;
   const shownAgain = [...keyHidden];
+  const panelsAgain = [...keyPanels];
   keyView = null;
   keyViewFrom = null;
   keyHidden.clear();
+  keyPanels.clear();
+  for (const id of panelsAgain) tellAppKey(id, true, true);
   log(`App key: the overlay is as it was (${why})`);
   applySolo();
   for (const id of shownAgain) tellAppKey(id, true);
@@ -1141,6 +1151,24 @@ function onAppKey(vk, keyMods) {
   const entry = id && apps.get(id);
   if (!entry) return;
   const shown = windowsOfPackage(id).filter((w) => !windowHidden(w));
+  const fills = shown.some((w) => w.app.manifest.fill === 'screen' && !w.app.debugger);
+  if (mode === 'interactive' && keyPanels.has(id) && fills) {
+    // Its panels hidden, its view on screen: show the panels again. The cursor stayed.
+    keyPanels.delete(id);
+    log(`App key: ${id}'s panels shown`);
+    tellAppKey(id, true, true);
+    notifyLauncher();
+    return;
+  }
+  keyPanels.delete(id);
+  if (mode === 'interactive' && !keyHidden.has(id) && fills) {
+    // A page that fills the screen: hide only its panels; its view keeps the mouse and the cursor.
+    keyPanels.add(id);
+    log(`App key: ${id}'s panels hidden, its view keeps the cursor`);
+    tellAppKey(id, false, true);
+    notifyLauncher();
+    return;
+  }
   if (mode === 'interactive' && !keyHidden.has(id) && shown.length) {
     // On screen with the cursor: hide it and give the game its input back.
     const back = keyView && keyViewFrom === 'hidden' ? 'hidden' : 'passive';
