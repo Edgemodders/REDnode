@@ -666,4 +666,30 @@ export const ui = {
       if (m.event === "solo") handler(!!(m as { on?: boolean }).on);
     });
   },
+
+  /**
+   * Hears the app's key: the key the player gave this app in its title bar (Key binding)
+   * or the Mod Manager. A press shows only this app's windows with the cursor (`shown`
+   * true), and the next press hides them and gives the game its input back (`shown`
+   * false). Pressing F10 or Esc, or clicking empty screen, ends that and shows the app
+   * again (`shown` true if the key had hidden it).
+   *
+   * The key never changes the app's own state: an editor stays in its edit mode while
+   * hidden. Use this to pause what only makes sense on screen, such as a drag in progress.
+   * Works in Node mods and in overlay apps. Returns a function that stops listening.
+   *
+   * @example
+   * ```ts
+   * import { ui } from "rednode";
+   *
+   * ui.onAppKey((shown) => {
+   *   if (!shown) endDrag(); // the player hid the editor to look at the world
+   * });
+   * ```
+   */
+  onAppKey(handler: (shown: boolean) => void): () => void {
+    return transport().listen((m) => {
+      if (m.event === "app-key") handler(!!(m as { shown?: boolean }).shown);
+    });
+  },
 };

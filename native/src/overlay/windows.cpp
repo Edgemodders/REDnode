@@ -30,6 +30,8 @@
 //   {"cmd":"keys.lock","window":1,"escape":true}   the page asks for Esc (the web's Keyboard Lock
 //                                         API, #34): while it has focus, Esc goes to it as a key
 //                                         instead of leaving interactive mode; F10 still leaves
+//   {"cmd":"window.front","window":1}     to the front of its layer, focused in interactive mode
+//                                         (an app's key showed it)
 //   {"cmd":"window.drag","window":1,"regions":[x,y,w,h, ...]}   page pixels
 //   {"cmd":"window.size","window":1,"width":800,"height":500}   a resizable window's new size; its
 //                                         top-left corner stays, and "moved" answers where it is
@@ -475,6 +477,16 @@ void HandleWindowCommand(const std::string& aJson)
                 Log("Overlay: pointer locked by window %u", w->id);
                 Send(actions, "{\"event\":\"pointer-lock\",\"window\":" + std::to_string(w->id) + ",\"locked\":true}");
             }
+        }
+        else if (cmd == "window.front" && w)
+        {
+            // An app's key showed it (title-bar key binding): to the front of its layer, with the
+            // keyboard. Sent after overlay.mode interactive, which leaves no window focused.
+            const uint32_t front = w->id;
+            BringToFront(front);
+            w = Find(front);
+            if (w && !w->hud && !w->hidden && GetMode() == Mode::Interactive)
+                SetFocus(actions, front);
         }
         else if (cmd == "keys.lock" && w)
         {

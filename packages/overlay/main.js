@@ -35,6 +35,7 @@ const { createPinSets, readPinFile, writePinFile, pinFileOf } = require('./pinse
 const { scanGame, checkRequires, validRange, key: gamefilesKey } = require('./gamefiles');
 const { createRedbridge, findRedbridge, compareVersions, NOT_INSTALLED } = require('./redbridge');
 const bridgeInstall = require('./bridge-install');
+const appKeysRules = require('./appkeys');
 const { createAttached } = require('./attached');
 const { createBridgeShare } = require('./bridge-share');
 const { hasRemoteFrames, createRouter } = require('./frames');
@@ -79,6 +80,8 @@ const BUILTIN_ROOTS = [
   { dir: path.join(__dirname, 'keyask'), single: true, builtin: true, prompt: true },
   // The Editor request window (#44): open only while a tool on the PC waits for the player's Allow.
   { dir: path.join(__dirname, 'editorask'), single: true, builtin: true, prompt: true },
+  // The Key binding window: open while the player picks a key for an app (its title bar's Key binding).
+  { dir: path.join(__dirname, 'keybind'), single: true, builtin: true, prompt: true },
   // World pins (#43): the hidden page that draws the pins' labels, open while any pin is dropped.
   { dir: path.join(__dirname, 'pins'), single: true, builtin: true, pins: true },
   // The Pins window (#43, WP3): every pin, Drop a pin here, Go there, the player's pin sets.
@@ -854,9 +857,11 @@ function soloHides(w) {
   return !!soloOwner && windowLayer(w) !== 'tool' && ownerOf(w)?.manifest.id !== soloOwner;
 }
 
-// Hidden by solo mode or by the current space. Solo wins: its package's windows show
-// in every space while it lasts.
+// Hidden by an app's key, solo mode or the current space. An app's key wins (its one-app
+// view, or the app it hid), then solo: its package's windows show in every space while it lasts.
 function windowHidden(w) {
+  const k = appKeyHides(w);
+  if (k !== null) return k;
   return soloOwner ? soloHides(w) : spaceHides(w);
 }
 
@@ -988,6 +993,9 @@ function windowInfo(w) {
     tool: windowLayer(w) === 'tool',
     onHud: windowOnHud(w),
     canPin: !!owner && !owner.pinned && owner.manifest.kind !== 'hud',
+    // Its app's key (the title bar's Key binding), and whether it may have one.
+    canKey: !!owner && !owner.pinned && !owner.prompt && !owner.pins && owner.manifest.kind !== 'hud',
+    appKey: owner && appKeys()[owner.manifest.id] ? appKeysRules.keyName(appKeys()[owner.manifest.id]) : null,
     canReset: !!positions[spaceKey(w)],
     resizable: !!w.app.manifest.resizable,
     fill: w.app.manifest.fill,
@@ -1047,8 +1055,220 @@ function checkSolo() {
   checkSounds();
   checkInk();
   checkPins();
+  if (keyView && !packageRunning(keyView)) endKeyView('the app stopped');
   if (!soloOwner) return;
   if (!packageRunning(soloOwner)) endSolo('the package stopped');
+}
+
+// ---------- apps' keys ----------
+//
+// A key the player gives an app (its title bar's Key binding, or the Mod Manager). The plugin
+// watches for it in every mode and keeps it from the game (input.cpp), and says {event:'app-key'}.
+// A press when the app is not on screen with the cursor shows only that app's windows (with HUD
+// widgets, world pins and REDnode's prompts), turns the cursor on and gives the app the keyboard:
+// its one-app view. A press when it is on screen with the cursor hides its windows and gives the
+// game its input back, to hidden mode if the overlay was hidden before the view, else to passive
+// mode. The key never touches the app's own state (its mod, solo mode, edit mode). Any other
+// change of mode (F10, Esc, a click on empty screen) ends the one-app view and shows the app
+// again: the overlay is as it was.
+// settings.appKeys: { packageId: { vk, mods } }, mods: 1 Ctrl, 2 Shift, 4 Alt.
+
+let keyView = null; // the package shown by its key, or null
+let keyViewFrom = null; // the mode before the one-app view began
+const keyHidden = new Set(); // packages hidden by their key
+let modeByKey = null; // the mode the host asked the plugin for, until it says so
+let bindAsk = null; // the Key binding window's question: { id, name, candidate }
+
+const appKeys = () => (settings.appKeys && typeof settings.appKeys === 'object' ? settings.appKeys : {});
+
+// true or false when an app's key decides, null when it does not.
+function appKeyHides(w) {
+  const id = ownerOf(w)?.manifest.id;
+  if (id && keyHidden.has(id)) return true;
+  if (!keyView) return null;
+  if (id === keyView) return false;
+  if (w.app.prompt || w.app.pins || w.app.manifest.kind === 'hud' || w.app.manifest.id === 'keybind') return false;
+  return true;
+}
+
+function sendAppKeys() {
+  if (!connected) return;
+  // While the Key binding window listens, no app's key fires: the player may press one to take it.
+  const list = bindAsk ? [] : Object.values(appKeys()).filter((k) => k && k.vk);
+  sendJson({ cmd: 'keys.bind', vks: list.map((k) => k.vk | 0), mods: list.map((k) => (k.mods | 0) & 7) });
+}
+
+function setModeByKey(next) {
+  if (!connected || mode === next) return;
+  modeByKey = next;
+  sendJson({ cmd: 'overlay.mode', mode: next });
+}
+
+function tellAppKey(id, shown) {
+  for (const w of windowsOfPackage(id)) toPage(w, { event: 'app-key', shown });
+  if (mods?.has(id)) mods.toMod(id, { event: 'app-key', shown });
+}
+
+function endKeyView(why) {
+  if (!keyView && !keyHidden.size) return;
+  const shownAgain = [...keyHidden];
+  keyView = null;
+  keyViewFrom = null;
+  keyHidden.clear();
+  log(`App key: the overlay is as it was (${why})`);
+  applySolo();
+  for (const id of shownAgain) tellAppKey(id, true);
+  notifyLauncher();
+}
+
+// An app's windows to show: opens its page, starts its mod, or shows mod windows the player closed.
+function bringUpPackage(entry) {
+  const id = entry.manifest.id;
+  if (!isEnabled(entry)) {
+    setPackageOpen(id, true);
+    return;
+  }
+  if (entry.manifest.entry && !windowOfApp(id)) openApp(entry);
+  for (const [key, c] of playerClosed) {
+    if (c.modId !== id) continue;
+    rememberClosed(key, false);
+    mods.toMod(id, { event: 'ui', window: String(c.win), type: 'show' });
+  }
+}
+
+function onAppKey(vk, keyMods) {
+  const id = Object.entries(appKeys()).find(([, k]) => k && k.vk === vk && ((k.mods | 0) & 7) === keyMods)?.[0];
+  const entry = id && apps.get(id);
+  if (!entry) return;
+  const shown = windowsOfPackage(id).filter((w) => !windowHidden(w));
+  if (mode === 'interactive' && !keyHidden.has(id) && shown.length) {
+    // On screen with the cursor: hide it and give the game its input back.
+    const back = keyView && keyViewFrom === 'hidden' ? 'hidden' : 'passive';
+    keyView = null;
+    keyViewFrom = null;
+    keyHidden.add(id);
+    log(`App key: ${id} hidden, overlay to ${back}`);
+    applySolo();
+    setModeByKey(back);
+    tellAppKey(id, false);
+  } else {
+    if (!keyView) keyViewFrom = mode;
+    keyHidden.delete(id);
+    keyView = id;
+    log(`App key: only ${id} shows, with the cursor`);
+    bringUpPackage(entry);
+    applySolo();
+    setModeByKey('interactive');
+    // Its newest window takes the keyboard (one opening now gets it when it opens).
+    const top = windowsOfPackage(id).filter((w) => !w.app.debugger).pop();
+    if (top && connected) sendJson({ cmd: 'window.front', window: top.id });
+    tellAppKey(id, true);
+  }
+  notifyLauncher();
+}
+
+// The plugin's mode changed: one the host asked for, or the player's own (F10, Esc, a click).
+function appKeysOnMode(next) {
+  if (modeByKey !== null && next === modeByKey) {
+    modeByKey = null;
+    return;
+  }
+  modeByKey = null;
+  endKeyView(`the overlay went ${next}`);
+}
+
+// ---------- the Key binding window ----------
+
+function appKeyOthers(id) {
+  return Object.entries(appKeys())
+    .filter(([other, k]) => other !== id && k?.vk)
+    .map(([other, k]) => ({ id: other, name: apps.get(other)?.manifest.name ?? other, key: k }));
+}
+
+function bindAskView() {
+  if (!bindAsk) return null;
+  const current = appKeys()[bindAsk.id] ?? null;
+  const c = bindAsk.candidate;
+  const check = c ? appKeysRules.checkAppKey(c, { gameDir: GAME_DIR, others: appKeyOthers(bindAsk.id) }) : null;
+  return {
+    id: bindAsk.id,
+    name: bindAsk.name,
+    current: current ? appKeysRules.keyName(current) : null,
+    holding: bindAsk.holding ? appKeysRules.keyName({ vk: 0, mods: bindAsk.holding }).replace(/Key 0$/, '…') : null,
+    candidate: check ? { name: check.name, ok: check.ok, problem: check.problem, notes: check.notes } : null,
+  };
+}
+
+function showBindAsk() {
+  const w = windowOfApp('keybind');
+  if (w) toPage(w, { event: 'keybind', ask: bindAskView() });
+}
+
+function askAppKey(id) {
+  const entry = apps.get(id);
+  if (!entry || entry.pinned || entry.prompt || entry.pins) throw new Error(`No app or mod "${id}"`);
+  bindAsk = { id, name: entry.manifest.name, candidate: null, holding: 0 };
+  sendAppKeys();
+  const ask = apps.get('keybind');
+  if (ask) {
+    openApp(ask);
+    const w = windowOfApp('keybind');
+    if (w && connected) sendJson({ cmd: 'window.front', window: w.id });
+  }
+  showBindAsk();
+  log(`App key: asking the player for a key for ${id}`);
+}
+
+function endBindAsk() {
+  bindAsk = null;
+  closeApp('keybind');
+  sendAppKeys();
+}
+
+// The Key binding window's Save: the key shown, if the rules allow it.
+function saveBindAsk() {
+  if (!bindAsk?.candidate) throw new Error('Press the key first');
+  const check = appKeysRules.checkAppKey(bindAsk.candidate, { gameDir: GAME_DIR, others: appKeyOthers(bindAsk.id) });
+  if (!check.ok) throw new Error(check.problem);
+  setAppKey(bindAsk.id, bindAsk.candidate);
+  endBindAsk();
+  return true;
+}
+
+function setAppKey(id, key) {
+  const next = { ...appKeys() };
+  if (key) next[id] = { vk: key.vk | 0, mods: (key.mods | 0) & 7 };
+  else delete next[id];
+  settings.appKeys = next;
+  writeJson('settings.json', settings);
+  log(`App key: ${id} ${key ? `is ${appKeysRules.keyName(key)}` : 'has no key'}`);
+  for (const w of windowsOfPackage(id)) toPage(w, { event: 'window-info', info: windowInfo(w) });
+  notifyLauncher();
+}
+
+// A key pressed in the Key binding window (main.js's input routing): what it would be.
+function bindAskInput(m) {
+  const held = keyMods(m);
+  const bits = (held.includes('control') ? 1 : 0) | (held.includes('shift') ? 2 : 0) | (held.includes('alt') ? 4 : 0);
+  // Esc cancels (the window asks for it with the Keyboard Lock API); Enter alone keeps the key shown.
+  if (m.type === 'keyDown' && !bits && m.vk === 0x1b) return endBindAsk();
+  if (m.type === 'keyDown' && !bits && m.vk === 0x0d) {
+    if (bindAsk.candidate) {
+      try {
+        saveBindAsk();
+      } catch {
+        // the window shows why it cannot be kept
+      }
+    }
+    return;
+  }
+  if (m.type === 'keyDown' && !appKeysRules.MODIFIER_VKS.has(m.vk)) {
+    bindAsk.candidate = { vk: m.vk, mods: bits };
+    bindAsk.holding = 0;
+  } else {
+    bindAsk.holding = bits;
+  }
+  showBindAsk();
 }
 
 function setPin(id, where, on) {
@@ -1194,6 +1414,7 @@ function shouldOpen(entry) {
   if (entry.prompt) {
     if (entry.manifest.id === 'keyask') return keyAsks.length > 0;
     if (entry.manifest.id === 'editorask') return editorAsks.length > 0;
+    if (entry.manifest.id === 'keybind') return !!bindAsk;
     return !!oauth?.pending();
   }
   if (entry.pins) return pinsHost.count() > 0;
@@ -1542,6 +1763,13 @@ async function inputTo(w, m, router) {
       if (m.vk === 18) altDown = m.type === 'keyDown';
       const modifiers = keyMods(m);
       const ctrl = modifiers.includes('control');
+      // The Key binding window hears the keys themselves, by their Windows codes, as the
+      // plugin will watch for them. Esc and F10 never come here.
+      if (bindAsk && w.app.manifest.id === 'keybind' && w.app.builtin) {
+        bindAskInput(m);
+        swallowChar = m.type === 'keyDown';
+        break;
+      }
       // Ctrl+1 to 9: switch to that space. The key is not passed on, nor the digit it types.
       if (ctrl && m.vk >= 0x31 && m.vk <= 0x39) {
         if (m.type === 'keyDown') {
@@ -1600,6 +1828,9 @@ function onGameMessage(m) {
     case 'input':
       onInput(m);
       return;
+    case 'app-key':
+      onAppKey(m.vk | 0, (m.mods | 0) & 7);
+      return;
     case 'capture':
       onCapture(m);
       return;
@@ -1650,6 +1881,11 @@ function onGameMessage(m) {
     case 'overlay':
       mode = m.mode;
       log(m.event === 'hello' ? `Game says hello (${m.plugin}), mode ${mode}` : `Mode ${mode}`);
+      if (m.event === 'hello') {
+        modeByKey = null;
+        endKeyView('the game said hello');
+        sendAppKeys();
+      } else appKeysOnMode(mode);
       if (mode === 'interactive') endStartHold();
       if (mode !== 'interactive') onFocus(0);
       // Windows not pinned to the HUD appear and disappear with the mode: give them a frame.
@@ -3619,6 +3855,9 @@ function appList() {
         roles: rolesOf(m),
         closedWindows: [...playerClosed.values()].filter((c) => c.modId === m.id).map((c) => c.win),
         hasWindow: windowsOfPackage(m.id).length > 0,
+        // Its key (the title bar's Key binding): its name, or null.
+        appKey: appKeys()[m.id] ? appKeysRules.keyName(appKeys()[m.id]) : null,
+        canKey: m.kind !== 'hud',
         // Its space: set for the package, else the one its open windows share, else null.
         space: (() => {
           const s = spaces();
@@ -3918,6 +4157,39 @@ ipcMain.handle('rednode:apps:seen', (event, ids) => {
   return appList();
 });
 
+// An app's key from the Mod Manager: 'ask' opens the Key binding window, 'clear' removes it.
+ipcMain.handle('rednode:apps:app-key', (event, id, op) => {
+  fromLauncher(event);
+  if (op === 'clear') setAppKey(String(id), null);
+  else askAppKey(String(id));
+  return appList();
+});
+
+// REDnode's Key binding window, never a package's.
+function fromKeyBind(event) {
+  const w = windowFor(event.sender);
+  if (w?.app.manifest.id !== 'keybind' || !w.app.builtin) throw new Error("Only REDnode's Key binding window sets apps' keys");
+}
+ipcMain.handle('rednode:keybind:state', (event) => {
+  fromKeyBind(event);
+  return bindAskView();
+});
+ipcMain.handle('rednode:keybind:save', (event) => {
+  fromKeyBind(event);
+  return saveBindAsk();
+});
+ipcMain.handle('rednode:keybind:clear', (event) => {
+  fromKeyBind(event);
+  if (bindAsk) setAppKey(bindAsk.id, null);
+  endBindAsk();
+  return true;
+});
+ipcMain.handle('rednode:keybind:cancel', (event) => {
+  fromKeyBind(event);
+  endBindAsk();
+  return true;
+});
+
 // Shows a mod window the player closed again: the mod reopens it as it is now.
 ipcMain.handle('rednode:apps:show-window', (event, id, win) => {
   fromLauncher(event);
@@ -3940,6 +4212,11 @@ ipcMain.handle('rednode:app:action', (event, action, arg) => {
   const key = spaceKey(w);
   if (action === 'space') {
     moveToSpace(key, String(arg));
+  } else if (action === 'app-key') {
+    const owner = ownerOf(w);
+    if (!owner || owner.pinned || owner.prompt || owner.pins || owner.manifest.kind === 'hud') throw new Error('This window cannot have a key');
+    if (arg === 'clear') setAppKey(owner.manifest.id, null);
+    else askAppKey(owner.manifest.id);
   } else if (action === 'pin-hud') {
     const owner = ownerOf(w);
     if (!owner || owner.pinned) throw new Error('This window cannot be pinned');
@@ -5796,6 +6073,11 @@ function openApp(entry) {
     });
   }
   win.on('closed', () => {
+    // The Key binding window closed by its ✕: the apps' keys work again.
+    if (entry.builtin && m.id === 'keybind' && bindAsk) {
+      bindAsk = null;
+      sendAppKeys();
+    }
     windows.get(id)?.frames?.dispose();
     windows.delete(id);
     windowStats.delete(id);

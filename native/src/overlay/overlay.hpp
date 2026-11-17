@@ -156,6 +156,9 @@ bool InstallInput(HWND aWindow);
 void UninstallInput();
 void GetCursor(float& aX, float& aY); // reference pixels
 void CursorFrame(bool aDrawn);        // each present: counts for the cursor diagnostics log
+// Host commands for input: {"cmd":"keys.bind",...} (apps' keys) and {"cmd":"overlay.mode",...}.
+// True when the message was one of them.
+bool HandleInputCommand(const std::string& aJson);
 
 // gamestate.cpp: what the game is showing, for hideWith. Bits of GetUiState().
 enum : uint32_t

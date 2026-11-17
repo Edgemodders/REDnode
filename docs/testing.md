@@ -1220,6 +1220,14 @@ REDagent needs its Anthropic key, as before.
 
 The 0.58.0 release ships EDGEmat 0.3.1 from npm, which ignores the shared REDbridge and starts its own. That combination was checked outside the game on 2026-11-05 with REDnode's variables set (scratchpad `e1/check-pin.cjs`, E1's 21 checks: tools listed, reads answered, ask flags). Raise the pin in `packages/overlay/package.json` once EDGEmat publishes a newer version.
 
+## App keys (0.67.0)
+
+A key the player gives an app (its title bar's **Key binding…**, or the Mod Manager): it shows only that app with the cursor, and hides it again; keys the game uses are refused. Steps and what each should show: [docs/overlay.md, "App keys: test"](overlay.md#app-keys-test).
+
+| Run | Result |
+|---|---|
+| Dev host, stand-in plugin, 2026-11-17, by Claude | **Pass**: 24 checks (scratchpad `akey/run.sh`): show and hide from passive, interactive and hidden mode, F10 ending the one-app view, a key no app has, the Key binding window refusing Ctrl+B and keeping F8, no app key firing while it listens. The plugin's watch needs the game |
+
 ## World node registry: S24 (#24)
 
 REDnode's world node registry, ported from RED Hot Tools (REDnode 0.66.0): which sector and node a world object comes from, `world.pick`, `world.highlight`, `world.setVisible`, with the World nodes test app. Steps and what each should show: [docs/world.md, "S24 test"](world.md#s24-test).

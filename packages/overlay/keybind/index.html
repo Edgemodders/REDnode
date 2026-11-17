@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Key binding</title>
+<script src="rednode://ui/rednode-ui.js"></script>
+<style>
+  html, body { margin: 0; width: 520px; height: 300px; overflow: hidden; background: transparent; }
+  rn-window { position: absolute; inset: 0; }
+  p { margin: 0 0 10px; font-size: 15px; line-height: 1.45; }
+  .dim { color: var(--rn-dim); font-size: 13px; }
+  #key { display: flex; align-items: center; justify-content: center; min-height: 56px; margin: 0 0 10px;
+    border: 1px solid var(--rn-line); font: 700 22px var(--rn-mono); color: var(--rn-accent-2); letter-spacing: .04em; }
+  #key.wait { color: var(--rn-dim); font: 400 15px var(--rn-body, inherit); }
+  #key.bad { border-color: var(--rn-danger); }
+  #problem { color: var(--rn-danger); font-size: 13px; margin: 0 0 8px; }
+  #notes { color: var(--rn-dim); font-size: 13px; margin: 0 0 8px; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .row .gap { flex: 1; }
+  kbd { font: 700 12px var(--rn-mono); padding: 1px 6px; border: 1px solid var(--rn-line); color: var(--rn-fg); }
+</style>
+</head>
+<body>
+  <rn-window title="Key binding" no-space closable>
+    <p>Press the keys for <b id="app">this app</b>. The key shows only it, with the cursor; press it again to hide it.</p>
+    <div id="key" class="wait">Press a key…</div>
+    <p id="problem" hidden></p>
+    <p id="notes" hidden></p>
+    <div class="row">
+      <span class="dim" id="current"></span>
+      <span class="gap"></span>
+      <rn-button id="clear" variant="ghost" hidden>Remove key</rn-button>
+      <rn-button id="cancel" variant="ghost">Cancel</rn-button>
+      <rn-button id="save" disabled>Save</rn-button>
+    </div>
+  </rn-window>
+  <script src="app.js"></script>
+</body>
+</html>

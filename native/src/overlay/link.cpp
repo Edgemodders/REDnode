@@ -209,6 +209,8 @@ void Dispatch(uint32_t aType, std::vector<uint8_t>&& aPayload)
         }
         if (HandlePinsCommand(json)) // world pins (#43)
             return;
+        if (HandleInputCommand(json)) // apps' keys and the overlay's mode
+            return;
         if (json.find("\"cmd\":") != std::string::npos)
             HandleWindowCommand(json);
         else

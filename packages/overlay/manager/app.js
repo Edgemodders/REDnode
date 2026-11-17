@@ -514,6 +514,15 @@ function renderDetails() {
     parts.push(row);
     if (i.tool) parts.push(el('p', 'dim', 'A tool window: it stays above other windows (the front permission) and shows in every space.'));
   }
+  if (i.canKey && (i.app || i.mod)) {
+    // Its key: shows only this app with the cursor, and hides it again (the title bar's Key binding).
+    const row = el('div', 'row');
+    row.append(el('span', 'dim', 'Key'));
+    row.append(el('span', 'mono', i.appKey ?? 'none'));
+    row.append(button(i.appKey ? 'Change' : 'Set a key', () => act(i.name, () => window.rednode.apps.appKey(i.id, 'ask'))));
+    if (i.appKey) row.append(button('Remove', () => act(i.name, () => window.rednode.apps.appKey(i.id, 'clear')), 'ghost'));
+    parts.push(row);
+  }
   if (i.mod) {
     parts.push(
       // A mod being debugged runs alone, so the switch waits until Debug is off.

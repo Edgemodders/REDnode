@@ -61,7 +61,7 @@ contextBridge.exposeInMainWorld('rednode', {
   pointerLock: (on) => ipcRenderer.invoke('rednode:app:pointer-lock', !!on),
   /** Asks the plugin for Esc (true): it then goes to this page instead of leaving interactive mode; used by the page's Keyboard Lock API (#34). */
   keyboardLock: (on) => ipcRenderer.invoke('rednode:app:keyboard-lock', !!on),
-  /** A title-bar action on this window: 'space' (to a space's name or '*'), 'pin-hud' (true or false), 'reset', 'size' ({ width, height }, a resizable window only). Answers the window info. */
+  /** A title-bar action on this window: 'space' (to a space's name or '*'), 'pin-hud' (true or false), 'reset', 'size' ({ width, height }, a resizable window only), 'app-key' (asks the player for the app's key; 'clear' removes it). Answers the window info. */
   windowAction: (action, arg) => ipcRenderer.invoke('rednode:app:action', action, arg),
   /** Installed apps and mods. Only the built-in launcher and Mod Manager may use these; other apps get an error. */
   apps: {
@@ -113,6 +113,8 @@ contextBridge.exposeInMainWorld('rednode', {
     /** Grants or withdraws a permission a package asks for, such as 'mcp'. */
     grant: (id, permission, granted) => ipcRenderer.invoke('rednode:apps:grant', id, permission, granted),
     role: (role, id) => ipcRenderer.invoke('rednode:apps:role', role, id),
+    /** An app's key (title-bar Key binding): op 'ask' opens the Key binding window for it, 'clear' removes its key. */
+    appKey: (id, op) => ipcRenderer.invoke('rednode:apps:app-key', id, op),
     /** Gets the kernel MCP server's switch, or turns it on or off. */
     mcp: (on) => ipcRenderer.invoke('rednode:host:mcp', on),
     mcpStatus: () => ipcRenderer.invoke('rednode:host:mcp-status'),
@@ -145,6 +147,13 @@ contextBridge.exposeInMainWorld('rednode', {
   keyask: {
     pending: () => ipcRenderer.invoke('rednode:keyask:pending'),
     answer: (aid, allow, how, key) => ipcRenderer.invoke('rednode:keyask:answer', aid, allow, how, key),
+  },
+  /** REDnode's Key binding window only: the app it asks about, the key pressed, Save, Clear and Cancel. */
+  keybind: {
+    state: () => ipcRenderer.invoke('rednode:keybind:state'),
+    save: () => ipcRenderer.invoke('rednode:keybind:save'),
+    clear: () => ipcRenderer.invoke('rednode:keybind:clear'),
+    cancel: () => ipcRenderer.invoke('rednode:keybind:cancel'),
   },
   /** REDnode's Editor request window only (#44): the waiting request, and the player's answer. */
   editorask: {

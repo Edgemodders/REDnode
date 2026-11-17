@@ -12,7 +12,7 @@ Status: **developer preview.** See the [overlay design](overlay.md) for how it w
 | REDnode plugin (inside the game) | Draws your window, moves it when dragged, and sends you mouse and keyboard input |
 | Bridge | Runs your game calls on the game thread and returns the answer as a promise |
 
-In the game, **F10** cycles three modes: passive (your window is drawn, the game gets input), interactive (your window gets input) and hidden. **Esc**, or a click on empty screen, returns input to the game.
+In the game, **F10** cycles three modes: passive (your window is drawn, the game gets input), interactive (your window gets input) and hidden. **Esc**, or a click on empty screen, returns input to the game. A key the player gives an app shows only that app with the cursor, and hides it again ([An app's key](#an-apps-key)).
 
 > **Careful with F9.** It sits right beside F10 and is the game's Quick Load: pressed by mistake, it loads the last save, and what the player did since is lost. The Welcome window warns players too.
 
@@ -649,6 +649,22 @@ await ui.solo(false);
 ```
 
 Solo ends when the package turns it off, stops or crashes, another package takes it, or the player presses **End** beside the launcher tab, which shows "SOLO" and the package's name. `ui.onSolo` hears every end, so a package can keep its own button in step. The [Layers test](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/layers-test) sample shows both.
+
+### An app's key
+
+The player can give any app a key: **Key binding…** in its title bar (the key icon, or ⋯), or **Key** in the Mod Manager's details. The key shows only that app, with the cursor and the keyboard; pressed again, it hides the app and gives the game its input back. F10, Esc or a click on empty screen ends that and the overlay is as it was. REDnode refuses keys the game uses (it reads the game's own bindings), so on game 2.5 the choices are F2, F6, F7, F8, F11, F12, the numpad and a few others, alone or with Ctrl or Alt.
+
+The key never changes your app's state, so an editor stays in its edit mode while it is hidden. Your app needs no code for it. To react, for example to end a drag when the player hides the window:
+
+```js
+import { ui } from 'rednode';
+
+ui.onAppKey((shown) => {
+  if (!shown) endDrag();
+});
+```
+
+Every `rn-window` of an app offers Key binding, a full-screen page's inner windows too. `<rn-window no-key>` leaves it out of that window's menu.
 
 ## Editor tools: the editor channel
 

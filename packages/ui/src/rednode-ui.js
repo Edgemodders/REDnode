@@ -405,6 +405,11 @@ footer:empty { display: none; }
       if (whole && info.canPin) {
         list.push({ id: 'pin', name: info.onHud ? 'Unpin from HUD' : 'Pin to HUD', on: info.onHud, run: run('pin-hud', !info.onHud) });
       }
+      // The app's key: shows only this app with the cursor, and hides it again. It belongs to the
+      // whole app, so every window of the page offers it, a full-screen page's inner windows too.
+      if (info && window.rednode && info.canKey && !this.hasAttribute('no-key')) {
+        list.push({ id: 'appkey', icon: 'key', name: info.appKey ? `Key binding (${info.appKey})…` : 'Key binding…', run: run('app-key') });
+      }
       if (whole && info.canReset) list.push({ id: 'reset', name: info.resizable ? 'Reset position and size' : 'Reset position', run: run('reset') });
       if ((this.movesInPage() || this.resizesInPage()) && (this.savedPlace() || this.savedSize())) {
         list.push({ id: 'reset', name: this.savedSize() ? 'Reset position and size' : 'Reset position', run: () => this.resetPlace() });
@@ -859,6 +864,13 @@ button:focus-visible { outline: 2px solid var(--rn-accent-2); outline-offset: -4
     }
     attributeChangedCallback() {
       this.$('button').disabled = this.bool('disabled');
+    }
+    // As a native button: `b.disabled = true` sets the attribute (it did nothing before 0.67.0).
+    get disabled() {
+      return this.bool('disabled');
+    }
+    set disabled(on) {
+      this.toggleAttribute('disabled', !!on);
     }
     focus() {
       this.$('button').focus();

@@ -22,6 +22,9 @@ async function answer(allow) {
   $('allow').disabled = true;
   $('deny').disabled = true;
   await window.rednode.connect.answer(allow).catch(() => false);
+  // Answered, the host closes this window; if it is still here, the buttons work again.
+  $('allow').disabled = false;
+  $('deny').disabled = false;
 }
 
 $('allow').addEventListener('click', () => answer(true));

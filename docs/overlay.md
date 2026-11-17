@@ -868,6 +868,54 @@ Seen again on the laptop on 2026-10-19 (REDnode 0.26.4 to 0.26.6): after a save 
 
 REDnode 0.26.7 makes the arrow once on the CPU (`native/src/overlay/cursor.hpp`: the same outline, 36 x 48 texels, 4 x 4 samples a texel, premultiplied BGRA) into a texture in the slot that held the null view, and draws it exactly as a window is drawn. The shader's arrow stays only as the fallback if the texture cannot be made (the plugin log says which: `Overlay: the arrow is drawn from a 36 x 48 texture, like a window`). Unit tests in `native/tests/capture_test.cpp`. **Passed in game** on the laptop on 2026-10-19: the arrow showed and stayed after a save loaded (H1c-3's run).
 
+### App keys: built (0.67.0)
+
+Asked for by the owner on 2026-11-17, for apps like EDGEbuilder that need the whole screen to place and move objects but must come back at once. The player gives an app a key in its title bar (**Key binding…** in the ⋯ menu, a key icon) or in the Mod Manager's details. The key toggles the app on screen; it never changes the app's own state.
+
+| The app's key, pressed when… | What happens |
+|---|---|
+| The app is not on screen with the cursor (overlay hidden, passive, or the app hidden by its key) | Only that app's windows show, with HUD widgets, world pins and REDnode's prompts. The cursor comes on and the app's newest window takes the keyboard. A closed app is opened, a stopped mod started, and mod windows the player closed are shown again |
+| The app is on screen with the cursor | Its windows hide and the game gets its input back: to hidden mode if the overlay was hidden before the key showed the app, else to passive mode |
+
+Any other mode change, F10, Esc or a click on empty screen, ends the one-app view and shows a hidden app again, so F10 brings the overlay back as it was. The app's edit mode, solo mode and selection stay as they are throughout.
+
+Agreed with the owner the same day: the key must not be one the game uses. The Key binding window checks each key as it is pressed and says why one is refused:
+
+| Refused | Why |
+|---|---|
+| A key the game binds anywhere | Read from the game's own files: `r6/config/inputUserMappings.xml` and the other input files there, mods' files in `r6/input` (Input Loader), and the player's own changes in `%LOCALAPPDATA%\CD Projekt Red\Cyberpunk 2077\UserSettings.json` (`/key_bindings/*`). On 2.5 every letter is bound somewhere (menus, vehicles, braindance): free are F2, F6, F7, F8, F11, F12, F13 to F24, the numpad, Page Up and Down, End, Insert, Delete and a few symbol keys |
+| F10, Esc | The overlay's own keys |
+| Alt+Tab, Alt+F4, Alt+Esc, Alt+Space, Ctrl+Esc, Print Screen | Windows uses them |
+| Ctrl+1 to 9 | The overlay's spaces |
+| Ctrl+A, C, V, X, Y, Z | Edit keys in text boxes |
+| A typing key alone, or with Shift alone | Typing would stop working in the overlay |
+| Another app's key | One key, one app |
+
+A Ctrl, Shift or Alt held with the key is allowed with a note: the game hears it first (Ctrl is crouch, Shift sprint, Alt the free camera's slow speed on 2.5).
+
+| Piece | Where |
+|---|---|
+| Plugin | `input.cpp`: `keys.bind` (the list, Ctrl 1, Shift 2, Alt 4, exactly those held), watched in every mode from raw input and window messages, the press, its release and its character kept from the game and the pages, `{"event":"app-key","vk":..,"mods":..}`; `overlay.mode` sets the mode for the host. `windows.cpp`: `window.front` brings a window to the front of its layer with the keyboard |
+| Host | `appkeys.js` (key names, the game's bindings cached by the files' times, the rules), main.js's apps' keys section (`settings.appKeys`, `onAppKey`, the one-app view in `windowHidden`, `appKeysOnMode`, the Key binding window's questions, `rednode:apps:app-key`, `rednode:keybind:*`). The host hears the Key binding window's keys itself, by their Windows codes |
+| Windows | The built-in **Key binding** window (`packages/overlay/keybind`, root flag `prompt`); the UI kit's title-bar action `appkey` on every window of an app (`no-key` on `rn-window` leaves it out); the Mod Manager's **Key** row |
+| Package | `ui.onAppKey((shown) => ...)` in pages and Node mods |
+
+Checked outside the game on 2026-11-17 in a stand-in for the plugin (scratchpad `akey/run.sh`, 24 checks): show and hide from passive, interactive and hidden mode, F10 ending the view, a key no app has, the Key binding window refusing Ctrl+B ("The game uses B for holster weapon, ...") and keeping F8, and no app key firing while it listens. **Unverified** in the game: the plugin's watch, whether the game sees anything of a kept key, and the focus.
+
+Found on the way: the UI kit's `rn-button` had no `disabled` property, so `button.disabled = true` from code did nothing (the Key request and Editor request windows' busy states). 0.67.0 adds it.
+
+### App keys: test
+
+1. Close the game. Deploy REDnode 0.67.0. Start the game and load a save.
+2. F10. On EDGEbuilder's window, open **Key binding…** from the title bar (the key icon, or ⋯). The Key binding window opens. Press **Ctrl+B**: it shows Ctrl+B with "The game uses B for holster weapon, ..." and Save stays grey. Press **F8**: it shows F8 and Save lights. Press **Save**. The key icon's tooltip now says "Key binding (F8)…".
+3. Switch EDGEbuilder to edit mode and solo mode, place an object and select it.
+4. Press **F8**: EDGEbuilder hides and the cursor goes. Move or turn the selected object as EDGEbuilder lets you without its window. Nothing of F8 reaches the game.
+5. Press **F8**: EDGEbuilder shows with the cursor, still in edit mode with the object selected. Type in one of its text boxes: the letters arrive.
+6. Press **F10**: the overlay hides. **F10**: it shows without the cursor. **F10**: the cursor comes back.
+7. End solo mode. Open the Mod Manager too, then press **F10** until no cursor shows. Press **F8**: only EDGEbuilder shows, with the cursor; the Mod Manager and the launcher tab are gone. **F8** again: EDGEbuilder hides, and the launcher tab and the other windows are back without the cursor.
+8. F10. In the Mod Manager, select EDGEbuilder: its details show **Key F8** with Change and Remove. Press **Remove**, then F10 to give the game its input and press F8: nothing happens.
+9. Quit the game. Claude reads the plugin log (`Overlay: 1 app keys`, `Overlay: app key 119 (mods 0) pressed`) and the host log (`App key: ...` lines for each step).
+
 ### UI kit
 
 UI is written as markup, not built by hand in code. Two layers keep it optional:

@@ -1,7 +1,12 @@
-// Game window hook: the F10 hotkey, and input for overlay windows in interactive mode.
+// Game window hook: the F10 hotkey, apps' keys, and input for overlay windows in interactive mode.
 //
 // F10 cycles passive -> interactive -> hidden. Esc leaves interactive mode, unless the
 // focused page asked for it (the Keyboard Lock API, #34).
+// Apps' keys (a key the player gave an app in its title bar): the host sends the list with
+// {"cmd":"keys.bind","vks":[66,...],"mods":[4,...]} (mods: 1 Ctrl, 2 Shift, 4 Alt, exactly
+// those held). In every mode, a press of one is kept from the game and the pages and sent as
+// {"event":"app-key","vk":66,"mods":4}; the host shows or hides the app, and sets the mode with
+// {"cmd":"overlay.mode","mode":"interactive"}.
 // In interactive mode mouse and keyboard messages go to windows.cpp, which
 // routes them to the right overlay window, and are not passed to the game.
 // The game hides and locks the cursor, so the overlay keeps a virtual cursor
@@ -11,14 +16,72 @@
 
 #include <windowsx.h>
 
+#include "json.hpp"
+
 #include <algorithm>
 #include <atomic>
+#include <mutex>
+#include <vector>
 
 namespace rednode::overlay::detail
 {
 namespace
 {
 constexpr UINT ToggleKey = VK_F10;
+
+// Apps' keys. Written by the pipe's reader thread, read by the game window's thread.
+struct AppKey
+{
+    UINT vk;
+    uint8_t mods;
+};
+std::mutex g_appKeysMutex;
+std::vector<AppKey> g_appKeys;
+std::vector<UINT> g_appKeysDown; // window thread only: pressed apps' keys, whose release is kept too
+bool g_appKeyChar = false;        // window thread only: the character a pressed app's key makes is kept too
+
+uint8_t HeldMods()
+{
+    uint8_t mods = 0;
+    if (GetAsyncKeyState(VK_CONTROL) & 0x8000)
+        mods |= 1;
+    if (GetAsyncKeyState(VK_SHIFT) & 0x8000)
+        mods |= 2;
+    if (GetAsyncKeyState(VK_MENU) & 0x8000)
+        mods |= 4;
+    return mods;
+}
+
+// A key event, from raw input or a window message. True when it belongs to an app's key and
+// goes no further: the press (sent to the host once, not its repeats) and its release.
+bool AppKeyEvent(UINT aVk, bool aDown, bool aSend)
+{
+    const auto held = std::find(g_appKeysDown.begin(), g_appKeysDown.end(), aVk);
+    if (!aDown)
+    {
+        if (held == g_appKeysDown.end())
+            return false;
+        if (aSend)
+            g_appKeysDown.erase(held);
+        return true;
+    }
+    if (held != g_appKeysDown.end())
+        return true; // a repeat
+    const uint8_t mods = HeldMods();
+    {
+        std::scoped_lock lock(g_appKeysMutex);
+        if (std::none_of(g_appKeys.begin(), g_appKeys.end(), [&](const AppKey& k) { return k.vk == aVk && k.mods == mods; }))
+            return false;
+    }
+    if (aSend)
+    {
+        g_appKeysDown.push_back(aVk);
+        g_appKeyChar = true;
+        Log("Overlay: app key %u (mods %u) pressed", aVk, mods);
+        SendJson("{\"event\":\"app-key\",\"vk\":" + std::to_string(aVk) + ",\"mods\":" + std::to_string(mods) + "}");
+    }
+    return true;
+}
 
 HWND g_window = nullptr;
 WNDPROC g_origProc = nullptr;
@@ -147,6 +210,11 @@ LRESULT HandleRawInput(HWND aWnd, WPARAM aWParam, LPARAM aLParam, bool aInteract
             aHandled = true;
             return DefWindowProcW(aWnd, WM_INPUT, aWParam, aLParam);
         }
+        if (AppKeyEvent(k.VKey, down, true))
+        {
+            aHandled = true;
+            return DefWindowProcW(aWnd, WM_INPUT, aWParam, aLParam);
+        }
         if (aInteractive)
         {
             if (down && k.VKey == VK_ESCAPE && PointerLocked())
@@ -225,6 +293,8 @@ LRESULT CALLBACK WndProc(HWND aWnd, UINT aMsg, WPARAM aWParam, LPARAM aLParam)
                 ToggleMode();
             return 0;
         }
+        if (AppKeyEvent(UINT(aWParam), true, !g_rawKeyboard))
+            return 0;
         if (interactive)
         {
             if (!g_rawKeyboard)
@@ -243,6 +313,8 @@ LRESULT CALLBACK WndProc(HWND aWnd, UINT aMsg, WPARAM aWParam, LPARAM aLParam)
     case WM_SYSKEYUP:
         if (aWParam == ToggleKey)
             return 0;
+        if (AppKeyEvent(UINT(aWParam), false, !g_rawKeyboard))
+            return 0;
         if (interactive)
         {
             if (!g_rawKeyboard)
@@ -252,6 +324,11 @@ LRESULT CALLBACK WndProc(HWND aWnd, UINT aMsg, WPARAM aWParam, LPARAM aLParam)
         break;
     case WM_CHAR:
     case WM_SYSCHAR:
+        if (g_appKeyChar)
+        {
+            g_appKeyChar = false; // made by an app's key (Alt+B makes "b")
+            return 0;
+        }
         if (interactive)
         {
             if (!g_rawKeyboard)
@@ -426,6 +503,43 @@ bool InstallInput(HWND aWindow)
         return false;
     }
     return true;
+}
+
+bool HandleInputCommand(const std::string& aJson)
+{
+    if (aJson.find("\"cmd\":\"keys.bind\"") != std::string::npos)
+    {
+        std::vector<double> vks, mods;
+        json::Numbers(aJson, "vks", vks);
+        json::Numbers(aJson, "mods", mods);
+        std::vector<AppKey> keys;
+        for (size_t i = 0; i < vks.size() && i < mods.size() && keys.size() < 64; ++i)
+        {
+            const UINT vk = UINT(vks[i]);
+            // Never F10 or Esc: the overlay's own keys.
+            if (vk > 0 && vk < 256 && vk != ToggleKey && vk != VK_ESCAPE)
+                keys.push_back({vk, uint8_t(uint32_t(mods[i]) & 7)});
+        }
+        {
+            std::scoped_lock lock(g_appKeysMutex);
+            g_appKeys = std::move(keys);
+            Log("Overlay: %zu app keys", g_appKeys.size());
+        }
+        return true;
+    }
+    if (aJson.find("\"cmd\":\"overlay.mode\"") != std::string::npos)
+    {
+        std::string mode;
+        json::String(aJson, "mode", mode);
+        if (mode == "interactive")
+            SetMode(Mode::Interactive);
+        else if (mode == "hidden")
+            SetMode(Mode::Hidden);
+        else if (mode == "passive")
+            SetMode(Mode::Passive);
+        return true;
+    }
+    return false;
 }
 
 void UninstallInput()

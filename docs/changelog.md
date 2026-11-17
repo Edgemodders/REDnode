@@ -23,6 +23,8 @@ How to keep it:
 
 - Weather (#46, for EDGEdir): `world.setWeather("24h_weather_rain", { blend: 10 })` sets the weather and holds it, as a quest does, until `world.resetWeather()` gives it back to the game's own cycle; `world.weather()` reads the state, who holds it and every state the world has. A `WeatherPresets` record works too (`"WeatherPresets.Fog"`). Your mod's weather is given back when it stops, and a save made while REDnode held the weather does not stay stuck. AI assistants get `world_weather` and `world_weather_set` (which asks first). Game 2.5 has no script call for this; REDnode does what the game's quest weather node does. Docs: https://edgemodders.github.io/REDnode/world.html#weather-46-built-rednode-06610
 
+- A key for any app: **Key binding…** in an app's title bar (the key icon, or ⋯), or **Key** in the Mod Manager's details. The key shows only that app, with the cursor; pressed again it hides the app and gives the game its input back, so an editor like EDGEbuilder can step aside while you move what you selected, and come back in one press. The app stays as it was (edit mode, solo mode, selection); F10 brings the overlay back as it was. REDnode refuses keys the game uses, read from the game's own key bindings and your changes to them (on game 2.5: F2, F6, F7, F8, F11, F12, the numpad and a few others are free). Modders: `ui.onAppKey((shown) => ...)` hears it. Docs: https://edgemodders.github.io/REDnode/overlay-apps.html#an-apps-key
+
 **Changed**
 
 - `world.useWorkspot`'s `entry` jumps at once (it waited for the clip playing to end, which can be many seconds), and takes an entry id or a name from `world.writeWorkspot` too.
@@ -31,6 +33,7 @@ How to keep it:
 **Fixed**
 
 - **Update REDbridge** in the Mod Manager while REDbridge was running: the download finished, but the old version kept running and the button stayed, and pressing it again did nothing. The running REDbridge now stops as soon as no call waits, the next call starts the new one, and the update is no longer offered once it is downloaded.
+- The UI kit's `rn-button` takes `button.disabled = true` from code, as a native button does; before, only the `disabled` attribute worked, so the Key request and Editor request windows' buttons stayed live while busy.
 
 ## 0.65.3 (2026-11-15)
 
