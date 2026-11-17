@@ -916,6 +916,17 @@ Found on the way: the UI kit's `rn-button` had no `disabled` property, so `butto
 8. F10. In the Mod Manager, select EDGEbuilder: its details show **Key F8** with Change and Remove. Press **Remove**, then F10 to give the game its input and press F8: nothing happens.
 9. Quit the game. Claude reads the plugin log (`Overlay: 1 app keys`, `Overlay: app key 119 (mods 0) pressed`) and the host log (`App key: ...` lines for each step).
 
+### Dropdown: plan
+
+Asked for by the owner on 2026-11-14 (`ui.select`, for the VATS spike's zoom choice, which uses four buttons and a line of text in its place). The UI kit has no dropdown, and a page's own `<select>` likely never opens in the game: Chromium draws its list as a pop-up of its own, which offscreen pages do not show (unverified; the kit has its own tooltips for the same reason). Agreed with the owner on 2026-11-17: build it after the App keys test (0.67.0).
+
+| Piece | What |
+|---|---|
+| UI kit | `rn-select` with `rn-option` children (`value`, the text as the label, `disabled`); `value`, `placeholder` and `disabled` attributes; a `.value` property and an `options` property for code. The list opens inside the page, below the box or above it near the bottom, kept on the page, scrolling past about 10 items, with the kit's look and sounds. Mouse: click to open, click to pick, a click elsewhere closes. Keys: Enter, Space or Down open it, arrows move, Enter picks, typing a letter jumps to the next option starting with it; Esc closes it while it is open (the page asks for Esc only then, through the Keyboard Lock API). A `change` event with `{ value }` |
+| ui builder | `ui.select(label, options, { value, onChange })` in Node mods, options as strings or `{ value, label }`; `set({ value, options })` on what it returns; the host's `update` and `builder/builder.js` draw it with `rn-select`; the docs simulation's `runner.js` too |
+| Samples and docs | The Kit demo gets one; a builder sample shows `ui.select`; the API reference from the TSDoc; overlay-apps.md and the UI kit section. The VATS spike's zoom choice moves to it |
+| Checks | The mock game (scratch package; pictures of the closed and open list with `--render=cpu`), then an in-game test: open, pick by mouse and keys, near the bottom of a window, in a builder window, and in a full-screen page |
+
 ### UI kit
 
 UI is written as markup, not built by hand in code. Two layers keep it optional:
