@@ -1,0 +1,18 @@
+{
+  "page": 35793,
+  "upload": {
+    "name": "REDnode Admin Tools",
+    "category": "main",
+    "primary": true,
+    "modManager": true,
+    "archivePrevious": true,
+    "description": "REDnode Admin Tools {version}: the Task Manager and the Tools Manager. Needs REDnode 0.66.0 or later, on game 2.5."
+  },
+  "mod": "14315126033361",
+  "file": 8228343,
+  "pulled": {
+    "sha256": "7b469dfebaff051af980d6cbcbdfe8236d54f0452a1b5a1ec77b09d95194d214",
+    "at": "2026-11-18T09:08:57.936Z",
+    "version": "0.1.0"
+  }
+}
