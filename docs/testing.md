@@ -1229,6 +1229,7 @@ A key the player gives an app (its title bar's **Key binding…**, or the Mod Ma
 | Dev host, stand-in plugin, 2026-11-17, by Claude | **Pass**: 24 checks (scratchpad `akey/run.sh`): show and hide from passive, interactive and hidden mode, F10 ending the one-app view, a key no app has, the Key binding window refusing Ctrl+B and keeping F8, no app key firing while it listens. The plugin's watch needs the game |
 | In game, dev PC, 2026-11-17, 0.67.0 | **Failed at step 4**: F8 hid EDGEbuilder's whole page, so its gizmo went and the mouse went to the game (V turned; right-drag look in edit mode did nothing). EDGEbuilder is one full-screen page, its viewport and its panel in one window. Steps 2 and 3 passed (Ctrl+B refused, F8 kept). Fixed in 0.67.1: a page that fills the screen keeps its page and the cursor, and the key hides only its `rn-window`s (the owner chose to keep the cursor) |
 | Dev host, stand-in plugin, 2026-11-17, 0.67.1, by Claude | **Pass**: 32 checks, the 24 above plus a full-screen test app: its key shows only it, then hides only its panels with the page and cursor kept, shows them again, and F10 brings everything back |
+| In game, dev PC, 2026-11-18, 0.67.1 | **Pass**, every step: F8 hid only EDGEbuilder's panel, its gizmo moved the object and right-drag turned its camera with nothing reaching the game; F10 as before; the one-app view with solo ended (End beside the launcher tab); the Mod Manager on F7, then F6, hid whole and gave the game its input; both keys removed |
 
 ## World node registry: S24 (#24)
 
