@@ -1231,6 +1231,15 @@ A key the player gives an app (its title bar's **Key binding…**, or the Mod Ma
 | Dev host, stand-in plugin, 2026-11-17, 0.67.1, by Claude | **Pass**: 32 checks, the 24 above plus a full-screen test app: its key shows only it, then hides only its panels with the page and cursor kept, shows them again, and F10 brings everything back |
 | In game, dev PC, 2026-11-18, 0.67.1 | **Pass**, every step: F8 hid only EDGEbuilder's panel, its gizmo moved the object and right-drag turned its camera with nothing reaching the game; F10 as before; the one-app view with solo ended (End beside the launcher tab); the Mod Manager on F7, then F6, hid whole and gave the game its input; both keys removed |
 
+## The pause menu and the launcher's filter (0.67.2)
+
+**Hide in the pause menu** (the launcher's switch, on by default; F10 still works in the pause menu) and the launcher's filter taking the keyboard. Steps and what each should show: [docs/overlay.md, "The pause menu and the launcher's filter: test"](overlay.md#the-pause-menu-and-the-launchers-filter-test-0672).
+
+| Run | Result |
+|---|---|
+| Script check and stand-in plugin, 2026-11-18, 0.67.2, by Claude | **Pass**: redscript-cli alone and beside Codeware, the game's scc.exe beside Codeware (scratchpad `scripts-check/check.ps1`); 36 stand-in checks (scratchpad `akey/run.sh`), dev and packaged host |
+| In game, dev PC, 2026-11-18, 0.67.2 | **Failed at step 6**: steps 1 to 5 passed; the pause menu hid REDnode only every other time (a flag kept from the last open). Fixed in 0.67.3 |
+
 ## World node registry: S24 (#24)
 
 REDnode's world node registry, ported from RED Hot Tools (REDnode 0.66.0): which sector and node a world object comes from, `world.pick`, `world.highlight`, `world.setVisible`, with the World nodes test app. Steps and what each should show: [docs/world.md, "S24 test"](world.md#s24-test).

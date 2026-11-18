@@ -65,7 +65,12 @@ uint64_t g_detachedFrame = 0;
 constexpr uint64_t DetachHoldFrames = 600; // about 10 s at 60 fps
 // The pause menu, from REDnode.reds through NotePlayerEvent (any thread), and whether the poll
 // has seen the game's menu flag since it opened (the flag may come a poll after the scenario).
+// Each open counts up g_pauseOpens, so the poll starts every open afresh: 0.67.2 kept "saw the
+// menu" from the last open when the pause menu's own leave ended it, and the next open was taken
+// for closed at its first poll, before the game's menu flag came (every other Esc, 2026-11-18).
 std::atomic_bool g_pauseMenu{false};
+std::atomic<uint32_t> g_pauseOpens{0};
+uint32_t g_pauseSeen = 0; // the open the poll last looked at
 bool g_pauseSawMenu = false;
 bool g_scriptsChecked = false;
 bool g_scripts = false; // REDnode's scripts are loaded, so attach events come
@@ -203,6 +208,11 @@ void PollGameState(uint64_t aFrame)
             state |= StateMenu;
         if (g_pauseMenu)
         {
+            if (const uint32_t open = g_pauseOpens.load(); open != g_pauseSeen)
+            {
+                g_pauseSeen = open;
+                g_pauseSawMenu = false;
+            }
             if (state & StateMenu)
             {
                 g_pauseSawMenu = true;
@@ -315,6 +325,8 @@ void NotePlayerEvent(std::string_view aName, int32_t aValue)
     using namespace detail;
     if (aName == "REDnode.PauseMenu")
     {
+        if (aValue != 0)
+            g_pauseOpens.fetch_add(1);
         g_pauseMenu = aValue != 0;
         g_resend = true;
         return;

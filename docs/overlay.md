@@ -930,6 +930,9 @@ Checks: redscript-cli alone and beside Codeware, and the game's own `scc.exe` be
 
 ### The pause menu and the launcher's filter: test (0.67.2)
 
+First run, 2026-11-18, dev PC, 0.67.2: steps 1 to 5 passed; at step 6 the pause menu hid REDnode only every other time. The plugin kept "saw the game's menu" from the previous open when the pause menu's own leave ended it, so the next open was taken for closed at its first poll, before the game's menu flag came (plugin log 03:36:37: `REDnode.PauseMenu = 1` with no ui-state for the host). Fixed in REDnode 0.67.3: each open starts afresh (`g_pauseOpens` in gamestate.cpp). Retest from step 1.
+
+
 1. Load a save. Press F10 until the overlay shows without the cursor.
 2. Press **Esc**. Expected: the pause menu opens and REDnode hides (windows, HUD widgets, the launcher tab).
 3. Open **Settings** and **Load Game** from the pause menu, then back. Expected: REDnode stays hidden.
