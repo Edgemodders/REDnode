@@ -322,6 +322,13 @@ $('tips').addEventListener('change', async (e) => {
   RednodeUI.notify(on ? 'Tooltips show after a short hover' : 'No tooltips in any window', { title: 'Tooltips' });
 });
 
+// Versions in title bars: each app's version beside its title, in every window.
+$('versions').addEventListener('change', async (e) => {
+  const on = await window.rednode.apps.titleVersions(e.detail.checked);
+  $('versions').checked = on;
+  RednodeUI.notify(on ? 'Each window shows its app\'s version beside the title' : 'No versions in title bars', { title: 'Versions in title bars' });
+});
+
 // Theme: every window that uses the UI kit follows it, unless the app chose its own.
 const themeButtons = [...document.querySelectorAll('[data-theme]')];
 function showTheme(name) {
@@ -350,6 +357,7 @@ async function refresh() {
     if ($('dev').checked && !drawer.hidden) showDevFolders(await window.rednode.apps.devFolders());
     $('start').checked = await window.rednode.apps.openAtStart();
     $('tips').checked = await window.rednode.apps.tooltips();
+    $('versions').checked = await window.rednode.apps.titleVersions();
     $('pausehide').checked = await window.rednode.apps.hidePauseMenu();
     const state = await window.rednode.state();
     $('version').textContent = `Version ${state.version}`;

@@ -15,6 +15,7 @@ How to keep it:
 **New**
 
 - A dropdown for windows and pages: `ui.select(label, options, { value, onChange })` in Node mods' windows, and `rn-select` with `rn-option` in the UI kit. The list opens inside the window, below the box or above it near the bottom, scrolls past about 10 options, and works with the mouse and the keys (arrows, Enter, a letter to jump, Esc to close). A page's own `<select>` likely never opens in the game, so use these. The UI kit sample has one, and the VATS spike's zoom choice is one now. Docs: https://edgemodders.github.io/REDnode/overlay-apps.html
+- Each app's window shows its version, dimmed, beside its title. The launcher's Settings has **Versions in title bars** to turn them off.
 
 **Changed**
 

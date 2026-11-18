@@ -1001,6 +1001,9 @@ function windowInfo(w) {
     fill: w.app.manifest.fill,
     size: sizeOf(w),
     minSize: { width: w.app.manifest.minWidth, height: w.app.manifest.minHeight },
+    // The app's version, shown dimmed beside its title unless the launcher's switch is off (0.68.2).
+    version: owner?.manifest.version ?? null,
+    showVersion: settings.titleVersions !== false,
   };
 }
 
@@ -5816,6 +5819,18 @@ ipcMain.handle('rednode:host:tooltips', (event, on) => {
     toAllPages({ event: 'tooltips', on });
   }
   return settings.tooltips !== false;
+});
+
+// Versions in title bars (0.68.2): each app's version, dimmed beside its title; on by default.
+ipcMain.handle('rednode:host:title-versions', (event, on) => {
+  fromLauncher(event);
+  if (typeof on === 'boolean' && on !== (settings.titleVersions !== false)) {
+    settings.titleVersions = on;
+    writeJson('settings.json', settings);
+    log(`Versions in title bars: ${on ? 'on' : 'off'}`);
+    for (const w of windows.values()) toPage(w, { event: 'window-info', info: windowInfo(w) });
+  }
+  return settings.titleVersions !== false;
 });
 
 // Shared keys (#23, K2): the player's AI service keys in %APPDATA%\Edgemodders\keys, read by

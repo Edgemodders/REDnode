@@ -993,6 +993,26 @@ Asked for by the owner on 2026-11-18 after the dropdown test. The Mod log's mani
 | 3 | Close the game and start it again, open the Mod log | It keeps the size from step 2 |
 | 4 | Title bar menu, **Reset position and size** | Back to 640 x 380, bottom right |
 
+Result: steps 1, 2 and 4 passed in game on 2026-11-18 (dev PC, 0.68.1); step 3 waits for the next restart.
+
+### Versions in title bars (0.68.2)
+
+Asked for by the owner on 2026-11-18. Each app's window shows its version, dimmed, right after its title (`v0.68.2`). The launcher's Settings drawer has **Versions in title bars** under Tooltips, on by default (`settings.titleVersions`); switching it off hides every version at once.
+
+| Part | Where |
+|---|---|
+| The version | `windowInfo` in main.js gives `version` (the owning package's manifest version; for a ui-builder window, its mod's) and `showVersion`; the switch's IPC is `rednode:host:title-versions`, which sends every window its info again |
+| The title bar | The UI kit's `rn-window`: a `.ver` span beside the `h1` (`updateVersion`), on the page's first window only, so drawers and the other panels of a full-screen page show none. Pages without the host (the docs previews) show none |
+| Mock check | Scratchpad `tver/run.sh` (12 checks, with a picture) |
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | F10. Look at the launcher, the Mod Manager and the Mod log | Each title has a dimmed version after it: `v0.68.2` for REDnode's own windows |
+| 2 | Open a sample with its own version, such as **UI kit** | It shows its own version (`v0.1.1`) |
+| 3 | A ui-builder window, such as the **VATS spike** | Its mod's version (`v0.7.1`) |
+| 4 | Launcher, Settings: switch **Versions in title bars** off | Every version goes at once |
+| 5 | Close the game and start it again | Still off; switch it on, the versions come back |
+
 ### UI kit
 
 UI is written as markup, not built by hand in code. Two layers keep it optional:

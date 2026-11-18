@@ -283,7 +283,10 @@ header { display: flex; align-items: center; gap: 10px; padding: 9px 12px 8px 14
 .grip[data-rednode-drag], .grip.moves { cursor: move; }
 .mark { width: 8px; height: 8px; background: var(--rn-title-mark); flex: none; }
 :host(.unfocused) .mark { background: var(--rn-dim); }
-h1 { margin: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 15px var(--rn-display); letter-spacing: .1em; text-transform: var(--rn-title-case); }
+h1 { margin: 0; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 700 15px var(--rn-display); letter-spacing: .1em; text-transform: var(--rn-title-case); }
+/* The app's version, dimmed beside the title (the launcher's Versions in title bars). */
+.ver { flex: none; margin-left: -2px; font: 11px var(--rn-mono); letter-spacing: .04em; color: var(--rn-title-dim); opacity: .7; white-space: nowrap; }
+.ver[hidden] { display: none; }
 .close, .act { width: 22px; height: 22px; display: grid; place-items: center; padding: 0; flex: none; border: 1px solid var(--rn-title-line);
   background: transparent; color: var(--rn-title-dim); font: 14px var(--rn-mono); cursor: pointer; }
 .close[hidden] { display: none; }
@@ -311,7 +314,7 @@ footer:empty { display: none; }
 .resize[hidden], :host([rolled]) .resize { display: none; }
 /* Hidden by the app's key on a page that fills the screen: the page's own view stays (0.67.1). */
 :host([key-hidden]) { display: none !important; }`,
-        `<header part="titlebar"><span class="grip"><span class="mark"></span><h1></h1></span><slot name="status"></slot><span class="actions"></span><button class="close" hidden aria-label="Close">✕</button></header>
+        `<header part="titlebar"><span class="grip"><span class="mark"></span><h1></h1><span class="ver" hidden></span></span><slot name="status"></slot><span class="actions"></span><button class="close" hidden aria-label="Close">✕</button></header>
 <div class="body" part="body"><slot></slot></div><footer><slot name="footer"></slot></footer><div class="resize" part="resize" hidden title="Drag to resize"></div>`,
       );
       this.setupResize();
@@ -333,6 +336,7 @@ footer:empty { display: none; }
         (info) => {
           this._info = info;
           this.updateGrip();
+          this.updateVersion();
           this.renderActions();
         },
         () => {},
@@ -345,6 +349,7 @@ footer:empty { display: none; }
         if (m.event === 'window-info') {
           this._info = m.info;
           this.updateGrip();
+          this.updateVersion();
           this.renderActions();
         }
         if (m.event === 'developer') this.renderActions();
@@ -368,6 +373,15 @@ footer:empty { display: none; }
 
     // Whether this is the page's only window. A drawer (the `drawer` attribute: a panel that
     // belongs to the main window, such as a settings drawer beside it) does not count.
+    // The app's version beside the title, on the page's first window only (not drawers, nor
+    // the other panels of a full-screen page), unless the launcher's switch is off.
+    updateVersion() {
+      const ver = this.$('.ver');
+      const v = this._info?.version;
+      const first = !this.hasAttribute('drawer') && document.querySelector('rn-window:not([drawer])') === this;
+      ver.hidden = !(v && first && this._info.showVersion !== false);
+      ver.textContent = v ? `v${v}` : '';
+    }
     isMain() {
       return !this.hasAttribute('drawer') && document.querySelectorAll('rn-window:not([drawer])').length === 1;
     }
