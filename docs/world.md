@@ -2078,6 +2078,8 @@ REDnode 0.67.2, Director spike 0.6.1. Stand V outside.
 4. Press **Read the weather** after 15 s. Expected: step 1's weather, the game's cycle.
 5. Press **Rain**, wait for it, then switch the app off in the Mod Manager. Expected: as in step 3, the sky goes back to step 1's weather (host log: "blending back to ..., then the game's cycle (the mod stopped)").
 
+**Passed in game on 2026-11-18** (dev PC, REDnode 0.67.2, Director spike 0.6.1), every step. Host log: rain held at 03:42:41 with cloudy to come back to; Give it back at 03:42:55 blended back to `24h_weather_cloudy` and released it at 03:43:06; the app switched off at 03:43:21 did the same, released at 03:43:32. #46's weather is done.
+
 ## World node registry (#24)
 
 Asked for by EDGEbuilder in [#24](https://github.com/Edgemodders/REDnode/issues/24) for its world inspector: hover or click anything the game placed and see what it is and which sector and node it comes from, outline it, hide it for the session, list what is streamed in near the camera, and have the world stream around EDGEbuilder's camera. Entities are covered by `world.near` and `world.files`; static nodes (most buildings, street furniture, decals, lights, foliage) are not: nothing in the game API names the node a click hit, and on 2.5 a sector keeps a node's path only as a hash. RED Hot Tools solves it with hooks on sector loading and node-instance setup (its `WorldNodeRegistry`, MIT) but has no 2.5 build.

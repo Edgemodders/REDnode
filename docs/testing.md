@@ -1238,7 +1238,7 @@ A key the player gives an app (its title bar's **Key binding…**, or the Mod Ma
 | Run | Result |
 |---|---|
 | Script check and stand-in plugin, 2026-11-18, 0.67.2, by Claude | **Pass**: redscript-cli alone and beside Codeware, the game's scc.exe beside Codeware (scratchpad `scripts-check/check.ps1`); 36 stand-in checks (scratchpad `akey/run.sh`), dev and packaged host |
-| In game, dev PC, 2026-11-18, 0.67.2 | **Failed at step 6**: steps 1 to 5 passed; the pause menu hid REDnode only every other time (a flag kept from the last open). Fixed in 0.67.3 |
+| In game, dev PC, 2026-11-18, 0.67.2 | **Failed at step 6**: steps 1 to 5 passed; the pause menu hid REDnode only every other time (a flag kept from the last open). Fixed in 0.67.3. Step 8, the launcher's filter taking the keyboard, passed |
 
 ## World node registry: S24 (#24)
 
@@ -1264,6 +1264,7 @@ The Director spike (`packages/overlay/apps/director-spike`, REDnode 0.66.8, noth
 | The call, stand-in host and real REDbridge, 2026-11-16, by Claude | **Pass**: 18 checks of `world.writeWorkspot` (scratchpad `ws/check.mjs`). The game run: docs/world.md, "A written workspot: the call's test" (REDnode 0.66.9, Director spike 0.5.0) |
 | Weather (#46), stand-in plugin and MCP, 2026-11-16, by Claude | **Pass**: 12 host checks and 6 MCP checks (scratchpad `wx/check`); the plugin's reader on the real 2.5 exe finds the setter and the flag. The game run: docs/world.md, "Weather (#46): test" (REDnode 0.66.10, Director spike 0.6.0) |
 | In game, dev PC, 2026-11-18, 0.67.0 | **Partly passed**: steps 1 to 8 and 10 passed (rain at once with a smooth change over a couple of seconds; held through skipped time; fog; sunny at once; given back). Step 9 failed: the app's stop released the hold, but the rain stayed until the game's cycle would move on. docs/world.md, "Weather (#46): first run" |
+| In game, dev PC, 2026-11-18, 0.67.2 | **Pass**, the retest of step 9: Give it back and the app's stop each blended back from rain to the cloudy sky from before, then gave it to the game's cycle. docs/world.md, "Weather given back: retest (0.67.2)" |
 | Stand-in plugin, 2026-11-18, 0.67.2, by Claude | **Pass**: giving the weather back blends back to the weather from before (the cycle's, then released; a quest's, put back in its name) (scratchpad `wx/check`). Retest in game: docs/world.md, "Weather given back: retest (0.67.2)" |
 | The call, laptop, 2026-11-16, by the owner, REDnode 0.66.9, Director spike 0.5.0 | **Pass**: written and swapped; after Play the quest clip and the others jump at once and loop. The first play's T pose comes once per person. Results in docs/world.md, "A written workspot: the call's test results" |
 
