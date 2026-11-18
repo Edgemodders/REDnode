@@ -11,6 +11,8 @@ How to keep it:
 
 ## Unreleased
 
+## 0.67.3 (2026-11-18)
+
 **New**
 
 - **Hide in the pause menu**, a switch in the launcher's Settings, on by default: the game's pause menu (Esc) hides REDnode, its windows and its launcher tab, and it comes back as it was when you close the pause menu. F10 in the pause menu still brings REDnode up there. Modders: `game.state().pauseMenu` says the pause menu is open.

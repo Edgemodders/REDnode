@@ -1746,7 +1746,9 @@ REDnode 0.66.8, Codeware, game 2.5, Animation test 0.4.0 (in the apps folder). S
 
 ### A2 test: results
 
-Run on 2026-11-16 by the owner on the laptop, REDnode 0.66.8 (an update zip over 0.65.3), Animation test 0.4.0, game 2.5: **steps 1 to 8 passed as written**. The gameplay pose started and looped from `world.useWorkspot` on a person spawned with `workspot`, `world.workspotState` answered, a change of workspot spawned the person again in place, stop and the package's stop gave everything back. Step 9 (the MCP route) was not run; its tools passed the mock check. Quest clips stay for #46's written workspot.
+Run on 2026-11-16 by the owner on the laptop, REDnode 0.66.8 (an update zip over 0.65.3), Animation test 0.4.0, game 2.5: **steps 1 to 8 passed as written**. The gameplay pose started and looped from `world.useWorkspot` on a person spawned with `workspot`, `world.workspotState` answered, a change of workspot spawned the person again in place, stop and the package's stop gave everything back. Step 9 (the MCP route) was not run then; its tools passed the mock check. Quest clips stay for #46's written workspot.
+
+**Step 9 passed in game on 2026-11-18** (dev PC, REDnode 0.67.3, Claude Code with the EDGE plugin's REDnode server): `world_spawn` with `record: Character.trauma_team_paramedic` and the arms-crossed `workspot` placed the paramedic 3 m in front of V; `world_animate` play answered `started`, and she crossed her arms and held the pose; `state` read her in the workspot, active; `stop` and `world_remove` gave everything back. Claude Code asked the owner before each of the five calls.
 
 ### A1 test: results
 
