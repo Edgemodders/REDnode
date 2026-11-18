@@ -987,10 +987,19 @@ async function zoomOut(cam, saved) {
 
 function chooseZoom(way) {
   zoomWay = way;
-  zoomChoice.set({ text: `VATS zooms by ${ZOOM_WAYS[way]}` });
   say(`VATS zoom: ${ZOOM_WAYS[way]}`);
 }
-const zoomChoice = ui.text(`VATS zooms by ${ZOOM_WAYS[zoomWay]}`, { tone: 'dim' });
+// How VATS zooms, as a dropdown (ui.select, REDnode 0.68.0); it was four buttons and a line of text.
+const zoomChoice = ui.select(
+  'VATS zooms by',
+  [
+    { value: 'zoomOverride', label: 'Zoom override' },
+    { value: 'fovOverride', label: 'Field of view override' },
+    { value: 'setZoom', label: 'SetZoom' },
+    { value: 'setFov', label: 'SetFOV (eased in world time)' },
+  ],
+  { value: zoomWay, onChange: chooseZoom },
+);
 let vatsColour = 1; // the outline colour for VATS's part: green is to find (round 2 saw blue, white, red in 2, 5, 3)
 // The highlight's fill (entRenderHighlightEvent's fillIndex) beside its outline, to make the part
 // stand out when the outline is faint (the owner, 2026-11-14). 0 is no fill; which number gives
@@ -1219,12 +1228,6 @@ ui.window({
       }),
     ),
     zoomChoice,
-    ui.row(
-      ui.button('Zoom override', () => chooseZoom('zoomOverride'), { variant: 'ghost' }),
-      ui.button('FOV override', () => chooseZoom('fovOverride'), { variant: 'ghost' }),
-      ui.button('SetZoom', () => chooseZoom('setZoom'), { variant: 'ghost' }),
-      ui.button('SetFOV', () => chooseZoom('setFov'), { variant: 'ghost' }),
-    ),
     ui.heading('VATS tab (V13)'),
     ui.text('Needs the VATS repo\'s scripts in the game. Exposure sends its numbers; right trigger VATS sends them about once a second.', { tone: 'dim' }),
     ui.row(ui.button('Panel test values', panelTest), ui.button('Panel clear', panelClear, { variant: 'ghost' })),

@@ -1222,6 +1222,14 @@ REDagent needs its Anthropic key, as before.
 
 The 0.58.0 release ships EDGEmat 0.3.1 from npm, which ignores the shared REDbridge and starts its own. That combination was checked outside the game on 2026-11-05 with REDnode's variables set (scratchpad `e1/check-pin.cjs`, E1's 21 checks: tools listed, reads answered, ask flags). Raise the pin in `packages/overlay/package.json` once EDGEmat publishes a newer version.
 
+## The dropdown (0.68.0)
+
+`rn-select` in the UI kit and `ui.select` in Node mods' windows. Steps and what each should show: [docs/overlay.md, "Dropdown: test"](overlay.md#dropdown-test).
+
+| Run | Result |
+|---|---|
+| Dev host, stand-in plugin, 2026-11-18, 0.68.0, by Claude | **Pass**: 30 checks (scratchpad `sel/run.sh`, DevTools reading the pages back): open and pick by mouse, a disabled option, a click elsewhere, keys (Down, End, Up, Enter), letters, Esc closing only the list with the Keyboard Lock asked and given back, a list above the box near the bottom, options set from code, and `ui.select` in a builder window with `onChange` in the mod and `set({ options, value })`. The first run found two bugs, fixed: rows were 38 px, not the 30 px the list's height assumed (a 3-option list scrolled and a click on its last row closed it), and Chromium's move with the mouse at rest made the row under it active while moving with the keys |
+
 ## App keys (0.67.0, 0.67.1)
 
 A key the player gives an app (its title bar's **Key binding…**, or the Mod Manager): it shows only that app with the cursor, and hides it again; keys the game uses are refused. Steps and what each should show: [docs/overlay.md, "App keys: test"](overlay.md#app-keys-test).

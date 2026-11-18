@@ -953,6 +953,33 @@ Asked for by the owner on 2026-11-14 (`ui.select`, for the VATS spike's zoom cho
 | Samples and docs | The Kit demo gets one; a builder sample shows `ui.select`; the API reference from the TSDoc; overlay-apps.md and the UI kit section. The VATS spike's zoom choice moves to it |
 | Checks | The mock game (scratch package; pictures of the closed and open list with `--render=cpu`), then an in-game test: open, pick by mouse and keys, near the bottom of a window, in a builder window, and in a full-screen page |
 
+### Dropdown: built
+
+Built in REDnode 0.68.0 on 2026-11-18, as planned, awaiting its in-game test (below).
+
+| Part | Where |
+|---|---|
+| `rn-select`, `rn-option` | `packages/ui/src/rednode-ui.js`. The list is a `.rn-select-list` in the page's body, `position: fixed`, like the title-bar menu, so a window's edge never cuts it; it takes the select's theme. Its height is measured from the rows (the theme's font sets them), about 10 rows before it scrolls, and it opens above the box when there is more room there. While open it asks for Esc through the page's Keyboard Lock (`escHold`), and gives it back only when the page has not asked for Esc itself (the kit wraps `navigator.keyboard.lock` and `unlock` to know). Esc closes the list and stops there, so the page's own Esc handlers never hear it. A scroll outside the list, a resize, a click elsewhere, focus leaving and the app's key close it. Chromium sends a move with the mouse at rest when the list scrolls under it, which made the row under the mouse the active one while moving with the keys (found in the mock check): only a real move counts now |
+| `ui.select` | `packages/rednode/src/ui.ts` (`SelectProps`, `SelectOption`); the builder page (`builder/builder.js`) and the docs simulation (`docs/assets/examples/sim/runner.js`) draw it with `rn-select`. The host passes it through unchanged |
+| Samples | The UI kit sample 0.1.1 (a District choice with 15 options, one disabled); the VATS spike 0.7.1's zoom choice, which was four buttons and a line of text |
+| Mock check | Scratchpad `sel/run.sh` (30 checks: mouse, keys, typing, Esc and the Keyboard Lock, a list above the box, options from code, `ui.select` in a builder window with `set({ options, value })`, pictures with `--render=cpu`) |
+
+### Dropdown: test
+
+REDnode 0.68.0. Switch on **UI kit** and **VATS spike** in the Mod Manager (each has its **Allowed** switch on by default; neither asks for a permission).
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | F10 for the cursor. In the **UI kit** window, **Settings** panel, click the **District** box | The list opens below the box, about 10 rows with a scrollbar, Kabuki marked. North Oak is greyed |
+| 2 | Scroll the list with the wheel, then click **Coastview** | It closes; the box says Coastview; a notification says `District: coastview`; a click sound |
+| 3 | Open it again and click **North Oak**, then click on an empty part of the window | North Oak does nothing; the click elsewhere closes the list, Coastview stays |
+| 4 | Click the box, press **Esc** | The list closes and the overlay stays in interactive mode (without the list open, Esc leaves it as before) |
+| 5 | With the box focused (after step 4), press **Down** a few times, then **Enter** | Down opens the list and moves, skipping North Oak; Enter picks |
+| 6 | With the list closed, press **C** three times, a second apart | Each press picks the next option starting with C, round the list: the box steps through Charter Hill, Corpo Plaza and Coastview |
+| 7 | Drag the UI kit window near the bottom of the screen, open the box | The list opens above the box |
+| 8 | Open the **VATS spike** window. Its **VATS zooms by** dropdown has four choices; pick **SetZoom** | The Mod log says `VATS zoom: SetZoom` |
+| 9 | Press the UI kit's app key or F10 with a list open (any) | The list goes with the window |
+
 ### UI kit
 
 UI is written as markup, not built by hand in code. Two layers keep it optional:

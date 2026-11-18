@@ -88,6 +88,19 @@ export interface InputProps {
   /** Hide what is typed, for a key or a password (REDnode 0.44.0 or later). Keep the value with `secrets`, not in a file. */
   password?: boolean;
 }
+/** An option of {@link ui.select}: its value, or the value with a label to show and whether it can be picked. */
+export type SelectOption = string | { value: string; label?: string; disabled?: boolean };
+/** Properties of {@link ui.select}. */
+export interface SelectProps {
+  label: string;
+  /** The choices, in order. A string is both the value and the label. */
+  options: SelectOption[];
+  /** The chosen option's value. Without it, the first option is chosen, unless there is a `placeholder`. */
+  value?: string;
+  /** Shown while nothing is chosen, such as `"Pick a zoom"`. */
+  placeholder?: string;
+  disabled?: boolean;
+}
 /** Properties of {@link ui.progress}. */
 export interface ProgressProps {
   label?: string;
@@ -447,6 +460,39 @@ export const ui = {
         onChange?.(String(v));
       },
       submit: (v) => onSubmit?.(String(v)),
+    });
+    return self;
+  },
+
+  /**
+   * A dropdown: a box showing the chosen option, with the list opening below it (or above it near
+   * the bottom of the window). The player picks with the mouse, or with the arrows and Enter.
+   * `onChange` gets the value the player picks. Change the options or the choice later with
+   * `set({ options, value })`. Needs REDnode 0.68.0 or later.
+   *
+   * @example
+   * ```ts
+   * const zoom = ui.select("Zoom", [
+   *   { value: "near", label: "Near" },
+   *   { value: "body", label: "Whole body" },
+   *   { value: "far", label: "Far" },
+   * ], { value: "body", onChange: (v) => setZoom(v) });
+   *
+   * zoom.set({ value: "far" }); // from code, no onChange
+   * ```
+   */
+  select(
+    label: string,
+    options: SelectOption[],
+    props: Omit<SelectProps, "label" | "options"> & { onChange?: (value: string) => void } = {},
+  ): UiNode<SelectProps> {
+    const { onChange, ...rest } = props;
+    let self: UiNode<SelectProps>;
+    self = node("select", { label, options, ...rest }, {
+      change: (v) => {
+        Object.assign(self.props, { value: String(v) });
+        onChange?.(String(v));
+      },
     });
     return self;
   },

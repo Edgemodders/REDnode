@@ -96,6 +96,11 @@ The [UI kit](https://github.com/Edgemodders/REDnode/tree/main/packages/ui) turns
         <rn-toggle label="Freeze time" checked></rn-toggle>
         <rn-slider id="rain" label="Rain" min="0" max="100" value="35" unit="%"></rn-slider>
         <rn-input id="name" label="Call sign" placeholder="Type here"></rn-input>
+        <rn-select id="district" label="District" value="kabuki">
+          <rn-option value="little-china">Little China</rn-option>
+          <rn-option value="kabuki">Kabuki</rn-option>
+          <rn-option value="north-oak" disabled>North Oak</rn-option>
+        </rn-select>
         <rn-progress id="progress" label="Upload" value="35"></rn-progress>
       </rn-panel>
     </rn-tab>
@@ -400,6 +405,7 @@ game.on('PlayerPuppet.OnGameAttached', () => console.log('A save was loaded'));
 | `ui.toggle(label, onChange, { checked })` | An on and off switch |
 | `ui.slider(label, onChange, { min, max, step, value, unit, live })` | A slider. `onChange` gets the value when the player lets go; with `live: true` also while they drag, about 20 times a second (REDnode 0.55.2) |
 | `ui.input({ label, placeholder, value, password, onChange, onSubmit })` | A text field; `password: true` shows dots (0.44.0), for a key you keep with `secrets` |
+| `ui.select(label, options, { value, placeholder, disabled, onChange })` | A dropdown (REDnode 0.68.0): the box shows the chosen option and the list opens below it, or above it near the bottom of the window. `options` are strings or `{ value, label, disabled }`. Without `value` the first option is chosen, unless there is a `placeholder`. `onChange` gets the value the player picks. `set({ options, value })` changes them from the mod |
 | `ui.progress(value, { label, max })` | A progress bar |
 | `ui.list({ lines, keep, height, follow })` | A list of lines that scrolls on its own, for a log or a live feed. `push(...lines)` adds at the bottom (only the new lines travel to the window) and `clear()` empties it. It keeps the newest `keep` lines (500 by default, up to 5,000) and follows the newest one unless the player has scrolled up. Without `height` it fills the space the other nodes leave, at least 160 px; when they leave less, the window scrolls |
 | `ui.image(src, { width, alt, onClick })` | A picture (0.55.0): a PNG, JPEG, WebP or GIF file, a relative path in the package's folder or a full path in `pkg.dataDir`, a `data:image/` URL, or the picture's bytes (`Buffer`, `Uint8Array`). The height follows the picture; one wider than the window is scaled down, and pictures in a `ui.row` shrink side by side. `set({ src })` shows another picture, or the same file again after the mod wrote over it. A picture that cannot be shown says why in the window and in the Mod log. See the **Image mod** sample |

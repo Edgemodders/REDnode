@@ -137,7 +137,18 @@
 .rn-window-menu svg { width: 13px; height: 13px; flex: none; color: var(--rn-dim); }
 .rn-window-menu .rn-head { padding: 6px 8px 4px; font: 500 11px var(--rn-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--rn-dim); }
 .rn-window-menu .rn-on { margin-left: auto; color: var(--rn-accent); font: 12px var(--rn-mono); }
-.rn-window-menu hr { border: 0; border-top: 1px solid var(--rn-line); margin: 4px 0; }`;
+.rn-window-menu hr { border: 0; border-top: 1px solid var(--rn-line); margin: 4px 0; }
+/* rn-select's list. It floats over the page, like the title-bar menu, since a page's own <select>
+   draws its list as a pop-up of its own, which pages drawn offscreen do not show. */
+rn-option { display: none; }
+.rn-select-list { position: fixed; z-index: 2147483000; overflow-y: auto; padding: 3px 0; box-sizing: border-box;
+  background: var(--rn-panel-2); border: 1px solid var(--rn-accent); box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+  font: 500 15px var(--rn-body); color: var(--rn-fg); }
+.rn-select-list .rn-opt { display: flex; align-items: center; gap: 8px; box-sizing: border-box; min-height: 30px; padding: 4px 10px;
+  border-left: 3px solid transparent; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rn-select-list .rn-opt[data-active] { background: color-mix(in srgb, var(--rn-accent-2) 16%, transparent); }
+.rn-select-list .rn-opt[aria-selected="true"] { border-left-color: var(--rn-accent); color: var(--rn-accent); }
+.rn-select-list .rn-opt[aria-disabled="true"] { opacity: .4; cursor: default; }`;
 
   // Icons for a window's title-bar actions.
   const ACTION_ICONS = {
@@ -1038,6 +1049,357 @@ input::placeholder { color: var(--rn-dim); }
     }
   }
 
+  // ---------- rn-select, with rn-option ----------
+
+  // Esc for the open list. In the overlay Esc leaves interactive mode unless the page asks for it
+  // (the Keyboard Lock API, #34), so the list asks while it is open, and gives it back only when
+  // the page has not asked for Esc itself.
+  const escHold = (() => {
+    const kbd = navigator.keyboard;
+    if (!kbd?.lock || !kbd?.unlock) return () => {};
+    const lock = kbd.lock.bind(kbd);
+    const unlock = kbd.unlock.bind(kbd);
+    let pageWants = false;
+    let held = 0;
+    kbd.lock = (codes) => {
+      pageWants = codes === undefined || (Array.isArray(codes) && codes.includes('Escape'));
+      return lock(codes);
+    };
+    kbd.unlock = () => {
+      pageWants = false;
+      if (held) lock(['Escape']).catch(() => {});
+      else unlock();
+    };
+    return (on) => {
+      held = Math.max(0, held + (on ? 1 : -1));
+      if (on) lock(['Escape']).catch(() => {}); // a plain browser refuses it outside full screen
+      else if (!held && !pageWants) unlock();
+    };
+  })();
+
+  // An option: <rn-option value="far" disabled>Far</rn-option>. Its text is the label; with no
+  // value, the label is the value. The page never shows it: rn-select draws the list.
+  class RnOption extends HTMLElement {
+    get value() {
+      return this.getAttribute('value') ?? this.textContent.trim();
+    }
+    get label() {
+      return this.textContent.trim() || this.getAttribute('value') || '';
+    }
+  }
+
+  const ROWS = 10; // the list scrolls past about this many options
+  const ROW = 30; // an option's height until one is measured
+
+  // Where the mouse last was, so a list opening under a resting mouse leaves the active option alone.
+  let pointerAt = { x: NaN, y: NaN };
+  document.addEventListener('pointermove', (e) => (pointerAt = { x: e.clientX, y: e.clientY }), { capture: true, passive: true });
+
+  // A choice from a list: <rn-select label="Zoom" value="near"><rn-option value="near">Near</rn-option>...
+  // The list opens inside the page, below the box or above it near the bottom. Mouse: click to open,
+  // click to pick, a click elsewhere closes. Keys: Enter, Space or the arrows open it; the arrows,
+  // Home and End move; Enter picks; a letter jumps to the next option starting with it; Esc or Tab
+  // closes. Picking sends `change` with { value }. `.options` reads or sets the options from code
+  // ([{ value, label, disabled }] or strings).
+  class RnSelect extends Base {
+    static observedAttributes = ['label', 'value', 'placeholder', 'disabled'];
+    constructor() {
+      super(
+        `
+:host { display: block; }
+.label { display: block; margin-bottom: 6px; }
+.label:empty { display: none; }
+button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px;
+  padding: 6px 10px; cursor: pointer; font: 14px var(--rn-mono); color: var(--rn-fg);
+  background: color-mix(in srgb, var(--rn-panel-2) 70%, black); border: 1px solid var(--rn-line); border-left: 3px solid var(--rn-accent); }
+button:hover { border-color: color-mix(in srgb, var(--rn-accent-2) 60%, var(--rn-line)); border-left-color: var(--rn-accent); }
+button:focus-visible, :host([open]) button { border-color: var(--rn-accent-2); border-left-color: var(--rn-accent); outline: none; }
+.text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.text.empty { color: var(--rn-dim); }
+.caret { flex: none; width: 12px; height: 12px; color: var(--rn-dim); transition: transform .12s; }
+:host([open]) .caret { transform: rotate(180deg); color: var(--rn-accent); }
+:host([disabled]) button { cursor: default; opacity: .4; }`,
+        `<span class="label"></span><button type="button" part="button" aria-haspopup="listbox" aria-expanded="false"><span class="text"></span><svg class="caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6l5 5 5-5"/></svg></button>`,
+      );
+      this._list = null;
+      this._active = -1;
+      this._typed = '';
+      this._typedAt = 0;
+      const box = this.$('button');
+      box.addEventListener('click', () => (this._list ? this.close() : this.open()));
+      box.addEventListener('keydown', (e) => this.onKey(e));
+      box.addEventListener('blur', () => {
+        // Focus leaving for good (Tab, a click elsewhere) closes; a click on the list keeps it.
+        setTimeout(() => {
+          if (this._list && this.shadowRoot.activeElement !== box) this.close();
+        });
+      });
+      // Options added, removed or renamed in the markup.
+      new MutationObserver(() => {
+        this.render();
+        if (this._list) this.fill();
+      }).observe(this, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['value', 'disabled'] });
+    }
+
+    /** The options, from the rn-option children. */
+    get options() {
+      return [...this.querySelectorAll('rn-option')].map((o) => ({ value: o.value, label: o.label, disabled: o.hasAttribute('disabled') }));
+    }
+    /** Replaces the options: strings, or { value, label?, disabled? }. */
+    set options(list) {
+      const items = (Array.isArray(list) ? list : []).map((o) => {
+        const el = document.createElement('rn-option');
+        const opt = typeof o === 'object' && o !== null ? o : { value: o };
+        el.setAttribute('value', String(opt.value ?? opt.label ?? ''));
+        el.textContent = String(opt.label ?? opt.value ?? '');
+        if (opt.disabled) el.setAttribute('disabled', '');
+        return el;
+      });
+      this.replaceChildren(...items);
+    }
+    /** The chosen option's value: the value attribute when an option has it, else the first option's (with no placeholder), else ''. */
+    get value() {
+      const opts = this.options;
+      const v = this.getAttribute('value');
+      if (v !== null && opts.some((o) => o.value === v)) return v;
+      if (v === null && !this.hasAttribute('placeholder')) return opts.find((o) => !o.disabled)?.value ?? '';
+      return '';
+    }
+    set value(v) {
+      this.setAttribute('value', String(v ?? ''));
+    }
+    get selectedIndex() {
+      const v = this.value;
+      return this.options.findIndex((o) => o.value === v);
+    }
+    focus() {
+      this.$('button').focus();
+    }
+
+    attributeChangedCallback(name) {
+      if (name === 'disabled' && this.bool('disabled')) this.close();
+      this.render();
+      if (this._list) this.fill();
+    }
+    connectedCallback() {
+      this.render();
+    }
+    disconnectedCallback() {
+      this.close();
+    }
+
+    render() {
+      this.$('.label').textContent = this.getAttribute('label') || '';
+      const chosen = this.options[this.selectedIndex];
+      const text = this.$('.text');
+      text.textContent = chosen ? chosen.label : this.getAttribute('placeholder') || '';
+      text.classList.toggle('empty', !chosen);
+      const box = this.$('button');
+      box.setAttribute('aria-disabled', String(this.bool('disabled')));
+      box.setAttribute('aria-label', this.getAttribute('label') || this.getAttribute('placeholder') || 'Choose');
+    }
+
+    open() {
+      if (this._list || this.bool('disabled')) return;
+      const list = document.createElement('div');
+      list.className = 'rn-select-list';
+      list.setAttribute('role', 'listbox');
+      // Theme and look follow the select: the list lives in the page's body, outside the window.
+      const themed = this.closest('[theme]');
+      if (themed) list.setAttribute('theme', themed.getAttribute('theme'));
+      // A press on the list must not take the focus from the box (that would close it).
+      list.addEventListener('pointerdown', (e) => e.preventDefault());
+      list.addEventListener('click', (e) => {
+        const row = e.target.closest('.rn-opt');
+        if (row) this.pick(Number(row.dataset.index));
+      });
+      list.addEventListener('pointermove', (e) => {
+        // Chromium sends a move with the mouse at rest when the list scrolls under it (moving
+        // with the keys): only a real move makes the row under it the active one.
+        if (e.clientX === this._seen.x && e.clientY === this._seen.y) return;
+        this._seen = { x: e.clientX, y: e.clientY };
+        const row = e.target.closest('.rn-opt');
+        if (row && row.getAttribute('aria-disabled') !== 'true') this.setActive(Number(row.dataset.index), false);
+      });
+      document.body.append(list);
+      this._list = list;
+      this._seen = pointerAt;
+      this._active = this.selectedIndex;
+      this.fill();
+      this.place();
+      this.toggleAttribute('open', true);
+      this.$('button').setAttribute('aria-expanded', 'true');
+      escHold(true);
+      playSound(soundFor(this, 'press'));
+      this._off = (e) => {
+        if (!e.composedPath().some((n) => n === list || n === this)) this.close();
+      };
+      this._move = (e) => {
+        if (e.type === 'scroll' && e.composedPath().includes(list)) return;
+        this.close();
+      };
+      // Esc while open closes the list only: the page's own Esc handlers never see it.
+      this._esc = (e) => {
+        if (e.key !== 'Escape') return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.close();
+        this.focus();
+      };
+      // The app's key hiding the page's windows hides the list with them.
+      this._appKey = window.rednode?.on?.((m) => {
+        if (m?.event === 'app-key') this.close();
+      });
+      setTimeout(() => {
+        if (this._list !== list) return;
+        document.addEventListener('pointerdown', this._off, true);
+        document.addEventListener('scroll', this._move, true);
+        window.addEventListener('resize', this._move);
+        window.addEventListener('keydown', this._esc, true);
+      });
+    }
+
+    close() {
+      const list = this._list;
+      if (!list) return;
+      this._list = null;
+      list.remove();
+      this.toggleAttribute('open', false);
+      this.$('button').setAttribute('aria-expanded', 'false');
+      document.removeEventListener('pointerdown', this._off, true);
+      document.removeEventListener('scroll', this._move, true);
+      window.removeEventListener('resize', this._move);
+      window.removeEventListener('keydown', this._esc, true);
+      if (typeof this._appKey === 'function') this._appKey();
+      this._appKey = null;
+      escHold(false);
+    }
+
+    fill() {
+      const list = this._list;
+      const v = this.value;
+      list.replaceChildren(
+        ...this.options.map((o, i) => {
+          const row = document.createElement('div');
+          row.className = 'rn-opt';
+          row.setAttribute('role', 'option');
+          row.dataset.index = String(i);
+          row.textContent = o.label;
+          row.title = o.label;
+          row.setAttribute('aria-selected', String(o.value === v));
+          if (o.disabled) row.setAttribute('aria-disabled', 'true');
+          if (i === this._active) row.dataset.active = '';
+          return row;
+        }),
+      );
+    }
+
+    // Below the box, or above it when there is more room there; on the page, its width at least the box's.
+    place() {
+      const list = this._list;
+      const r = this.$('button').getBoundingClientRect();
+      // The rows' own height, measured (the theme's font sets it), and the list's border and padding.
+      const row = list.firstElementChild?.offsetHeight || ROW;
+      list.style.maxHeight = 'none';
+      const edge = list.offsetHeight - list.clientHeight + 6; // the border, and 3 px of padding at each end
+      const rows = Math.min(ROWS, Math.max(1, this.options.length));
+      const want = rows * row + edge;
+      const below = innerHeight - r.bottom - 6;
+      const above = r.top - 6;
+      const down = below >= want || below >= above;
+      const height = Math.max(row + edge, Math.min(want, down ? below : above));
+      list.style.maxHeight = `${height}px`;
+      list.style.minWidth = `${r.width}px`;
+      list.style.maxWidth = `${Math.max(r.width, innerWidth - 8)}px`;
+      const h = Math.min(list.scrollHeight, height);
+      list.style.top = `${down ? r.bottom + 2 : r.top - 2 - h}px`;
+      const w = list.offsetWidth;
+      list.style.left = `${Math.max(4, Math.min(r.left, innerWidth - w - 4))}px`;
+      this.reveal();
+    }
+
+    setActive(i, scroll = true) {
+      this._active = i;
+      if (!this._list) return;
+      for (const row of this._list.children) row.toggleAttribute('data-active', Number(row.dataset.index) === i);
+      if (scroll) this.reveal();
+    }
+    reveal() {
+      const row = this._list?.children[this._active];
+      if (row) row.scrollIntoView({ block: 'nearest' });
+    }
+
+    pick(i) {
+      const o = this.options[i];
+      if (!o || o.disabled) return;
+      const changed = o.value !== this.value;
+      this.value = o.value;
+      this.close();
+      this.focus();
+      playSound(soundFor(this, 'press'));
+      if (changed) this.emit('change', { value: o.value });
+    }
+
+    // The next enabled option from i in direction d (wrapping off: it stops at the ends).
+    step(i, d) {
+      const opts = this.options;
+      for (let k = i + d; k >= 0 && k < opts.length; k += d) if (!opts[k].disabled) return k;
+      return i;
+    }
+
+    onKey(e) {
+      if (this.bool('disabled')) return;
+      const opts = this.options;
+      const open = !!this._list;
+      const k = e.key;
+      if (!open) {
+        if (k === 'Enter' || k === ' ' || k === 'ArrowDown' || k === 'ArrowUp') {
+          e.preventDefault();
+          this.open();
+        } else if (k.length === 1 && /\S/.test(k)) {
+          // Closed, a letter picks the next option starting with it, as a native select does.
+          const i = this.typed(k);
+          if (i >= 0) this.pick(i);
+        }
+        return;
+      }
+      if (k === 'ArrowDown') this.setActive(this.step(this._active, 1));
+      else if (k === 'ArrowUp') this.setActive(this._active < 0 ? this.step(opts.length, -1) : this.step(this._active, -1));
+      else if (k === 'Home') this.setActive(this.step(-1, 1));
+      else if (k === 'End') this.setActive(this.step(opts.length, -1));
+      else if (k === 'PageDown') this.setActive(this.step(Math.min(opts.length - 1, this._active + ROWS - 1) - 1, 1));
+      else if (k === 'PageUp') this.setActive(this.step(Math.max(0, this._active - ROWS + 1) + 1, -1));
+      else if (k === 'Enter' || k === ' ') {
+        if (this._active >= 0) this.pick(this._active);
+        else this.close();
+      } else if (k === 'Tab') {
+        this.close();
+        return; // Tab moves the focus on as usual
+      } else if (k.length === 1 && /\S/.test(k)) {
+        const i = this.typed(k);
+        if (i >= 0) this.setActive(i);
+      } else return;
+      e.preventDefault();
+    }
+
+    // Typing: letters within a second build a prefix; a repeated single letter moves to the next match.
+    typed(ch) {
+      const now = Date.now();
+      this._typed = now - this._typedAt > 1000 ? ch : this._typed + ch;
+      this._typedAt = now;
+      const opts = this.options;
+      const from = this._list ? this._active : this.selectedIndex;
+      const same = [...this._typed].every((c) => c.toLowerCase() === this._typed[0].toLowerCase());
+      const prefix = (same ? this._typed[0] : this._typed).toLowerCase();
+      const start = same || this._typed.length === 1 ? from + 1 : Math.max(0, from);
+      for (let n = 0; n < opts.length; n++) {
+        const i = (start + n) % opts.length;
+        if (!opts[i].disabled && opts[i].label.toLowerCase().startsWith(prefix)) return i;
+      }
+      return -1;
+    }
+  }
+
   // ---------- rn-list and rn-menu, with rn-item / rn-menu-item ----------
 
   // Shared keyboard model: arrows move, Home/End jump, Enter/Space choose.
@@ -1413,6 +1775,8 @@ nav button:focus-visible { outline: 2px solid var(--rn-accent-2); outline-offset
     'rn-toggle': RnToggle,
     'rn-slider': RnSlider,
     'rn-input': RnInput,
+    'rn-select': RnSelect,
+    'rn-option': RnOption,
     'rn-list': RnList,
     'rn-item': RnItem,
     'rn-menu': RnMenu,

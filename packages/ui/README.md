@@ -44,6 +44,7 @@ Themes are CSS custom properties, so an app can adjust one: `--rn-bg`, `--rn-pan
 | `rn-toggle` | `label`, `checked`, `disabled`, `sound` | `change` (`{ checked }`) |
 | `rn-slider` | `label`, `min`, `max`, `step`, `value`, `unit`, `sound` | `input`, `change` (`{ value }`) |
 | `rn-input` | `label`, `placeholder`, `value`, `type`, `clearable` (a ✕ inside the field while it holds text; it empties it and sends `input` and `change`) | `input`, `change`, `submit` on Enter (`{ value }`) |
+| `rn-select` with `rn-option` | select: `label`, `value`, `placeholder` (shown while nothing is chosen; without it the first option is chosen), `disabled`, `sound`. Options: `value` (the label when left out), the text as the label, `disabled`. The list opens inside the page, below the box or above it near the bottom, and scrolls past about 10 options. Keys: Enter, Space or the arrows open it; arrows, Home, End, Page Up and Down move; Enter picks; a letter jumps to the next option starting with it; Esc or Tab closes it (REDnode 0.68.0) | `change` (`{ value }`), only when the player picks another option |
 | `rn-list` with `rn-item` | items: `value`, `selected`, `disabled`, slot `end`. List: `sound`. Height: `--rn-list-height` | `select` (`{ value, item }`) |
 | `rn-menu` with `rn-menu-item` | menu: `title`, `sound`. Items: `value`, `disabled`, slot `end` | `select` (`{ value, item }`) |
 | `rn-tabs` with `rn-tab` | tabs: `label`, `active`. Tabs: `sound` | `change` (`{ index, label }`) |
@@ -51,7 +52,9 @@ Themes are CSS custom properties, so an app can adjust one: `--rn-bg`, `--rn-pan
 | `rn-tooltip` | `text`. Wraps the element it explains | |
 | `rn-notification` | `type`: `success`, `warning` or `error`; `title` | |
 
-Properties: `rn-toggle.checked`, `rn-slider.value`, `rn-input.value`, `rn-list.value`.
+Properties: `rn-toggle.checked`, `rn-slider.value`, `rn-input.value`, `rn-list.value`, `rn-select.value`, and `rn-select.options` (read, or set to strings or `{ value, label, disabled }` to replace the options).
+
+A page's own `<select>` likely never opens in the game: Chromium draws its list as a pop-up of its own, which windows drawn off screen do not show (unverified). Use `rn-select`.
 
 Tooltips: any element with a `title` gets a tooltip drawn by the kit after half a second's hover, also inside the components (the title-bar icons). Overlay windows are drawn off screen, where the browser's own tooltips never show. On `rn-window`, `rn-panel`, `rn-menu` and `rn-notification` the `title` is the heading, so it gets none. Use `rn-tooltip` for a tooltip that shows on focus too. The launcher's **Tooltips** switch turns the `title` tooltips off in every window, for players who know REDnode; `rn-tooltip` elements are part of the page and stay.
 

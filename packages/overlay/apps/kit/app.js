@@ -18,6 +18,8 @@ $('name').addEventListener('submit', (e) => {
   RednodeUI.notify(`Call sign set to ${e.detail.value || 'nothing'}`, { type: 'success', title: 'Kit' });
 });
 
+$('district').addEventListener('change', (e) => RednodeUI.notify(`District: ${e.detail.value}`, { title: 'Select' }));
+
 $('list').addEventListener('select', (e) => RednodeUI.notify(`Selected ${e.detail.value}`, { title: 'List' }));
 $('menu').addEventListener('select', (e) => RednodeUI.notify(`Menu: ${e.detail.value}`, { title: 'Menu' }));
 

@@ -310,6 +310,12 @@ function apply(type, el, props) {
       if ('password' in props) attr(el, 'type', props.password ? 'password' : 'text');
       if ('value' in props) attr(el, 'value', props.value ?? '');
       break;
+    case 'select':
+      if ('options' in props) el.options = props.options ?? [];
+      for (const k of ['label', 'placeholder']) if (k in props) attr(el, k, props[k]);
+      if ('disabled' in props) attr(el, 'disabled', !!props.disabled);
+      if ('value' in props) attr(el, 'value', props.value);
+      break;
     case 'progress':
       for (const k of ['label', 'value', 'max']) if (k in props) attr(el, k, props[k]);
       break;
@@ -428,6 +434,10 @@ function render(spec) {
       el = document.createElement('rn-input');
       el.addEventListener('change', (e) => toMod(spec.id, 'change', e.detail.value));
       el.addEventListener('submit', (e) => toMod(spec.id, 'submit', e.detail.value));
+      break;
+    case 'select':
+      el = document.createElement('rn-select');
+      el.addEventListener('change', (e) => toMod(spec.id, 'change', e.detail.value));
       break;
     case 'progress':
       el = document.createElement('rn-progress');
