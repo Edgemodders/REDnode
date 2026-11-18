@@ -71,6 +71,8 @@ export interface GameState {
    * the world exists. {@link Game.onState} tells when it changes. From REDnode 0.47.0.
    */
   world: boolean;
+  /** The game's pause menu (Esc in the world) is open, its Save, Load and Settings pages too. `menu` is also true then. From REDnode 0.67.2. */
+  pauseMenu: boolean;
   /** The overlay's input mode, switched with F10. */
   overlay: "passive" | "interactive" | "hidden";
 }
@@ -307,6 +309,7 @@ function toState(raw: Record<string, unknown> | undefined): GameState {
     scene: connected && !!s.scene,
     mainMenu: connected && !!s.mainMenu,
     world: connected && !!s.world,
+    pauseMenu: connected && !!s.pauseMenu,
     overlay: s.overlay ?? "passive",
   };
 }

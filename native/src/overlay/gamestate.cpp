@@ -9,6 +9,9 @@
 // | main-menu  | no player, or the system requests handler's IsPreGame(): the   |
 // |            | main menu and loading screens, also the boot loading screen,   |
 // |            | where the game already has a player                            |
+// | pause-menu | the game's pause menu (Esc in the world): REDnode.reds marks   |
+// |            | its scenario's enter and leave (0.67.2); off again once the    |
+// |            | game leaves its menus or goes to the main menu                 |
 // | world      | V is in the world (#25): a player, not IsPreGame, and attached |
 // |            | (PlayerPuppet.OnGameAttached seen, and no OnDetach of the main |
 // |            | player since). False while the game starts, at the main menu   |
@@ -60,6 +63,10 @@ std::atomic_int g_lastEvent{NoEvent}; // the last attach or leave since the poll
 void* g_detachedPlayer = nullptr;     // game thread: the player there when world went off
 uint64_t g_detachedFrame = 0;
 constexpr uint64_t DetachHoldFrames = 600; // about 10 s at 60 fps
+// The pause menu, from REDnode.reds through NotePlayerEvent (any thread), and whether the poll
+// has seen the game's menu flag since it opened (the flag may come a poll after the scenario).
+std::atomic_bool g_pauseMenu{false};
+bool g_pauseSawMenu = false;
 bool g_scriptsChecked = false;
 bool g_scripts = false; // REDnode's scripts are loaded, so attach events come
 
@@ -187,11 +194,28 @@ void PollGameState(uint64_t aFrame)
     if (!player || preGame == 1)
     {
         state |= StateMainMenu;
+        g_pauseMenu = false;
+        g_pauseSawMenu = false;
     }
     else
     {
         if (InMenu())
             state |= StateMenu;
+        if (g_pauseMenu)
+        {
+            if (state & StateMenu)
+            {
+                g_pauseSawMenu = true;
+                state |= StatePauseMenu;
+            }
+            else if (g_pauseSawMenu)
+            {
+                g_pauseMenu = false; // the game left its menus: the pause menu is gone
+                g_pauseSawMenu = false;
+            }
+            else
+                state |= StatePauseMenu; // the menu flag comes a poll later
+        }
         if (InPhotoMode())
             state |= StatePhotoMode;
         tier = SceneTier(player);
@@ -260,6 +284,7 @@ void PollGameState(uint64_t aFrame)
                  ",\"scene\":" + (state & StateScene ? "true" : "false") +
                  ",\"mainMenu\":" + (state & StateMainMenu ? "true" : "false") +
                  ",\"world\":" + (state & StateWorld ? "true" : "false") +
+                 ",\"pauseMenu\":" + (state & StatePauseMenu ? "true" : "false") +
                  ",\"sceneTier\":" + std::to_string(tier) + "}");
     }
 }
@@ -288,6 +313,12 @@ namespace rednode::overlay
 void NotePlayerEvent(std::string_view aName, int32_t aValue)
 {
     using namespace detail;
+    if (aName == "REDnode.PauseMenu")
+    {
+        g_pauseMenu = aValue != 0;
+        g_resend = true;
+        return;
+    }
     if (aName == "PlayerPuppet.OnGameAttached")
     {
         g_attached = true;

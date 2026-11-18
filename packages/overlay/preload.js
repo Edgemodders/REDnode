@@ -106,6 +106,8 @@ contextBridge.exposeInMainWorld('rednode', {
     keys: (op, service, key) => ipcRenderer.invoke('rednode:host:keys', op ?? 'list', service, key),
     /** Gets the Tooltips switch, or turns it on or off for every window. */
     tooltips: (on) => ipcRenderer.invoke('rednode:host:tooltips', on),
+    /** Gets Hide in the pause menu, or turns it on or off (on by default; 0.67.2). */
+    hidePauseMenu: (on) => ipcRenderer.invoke('rednode:host:hide-pause-menu', on),
     /** Gets REDbridge, and .NET 10 for this Windows user if missing (W3). Progress arrives with the apps list. */
     getBridge: () => ipcRenderer.invoke('rednode:apps:get-bridge'),
     /** Gets the theme every window follows, or sets it: 'rednode', 'hud' (HUD red) or 'edge' (EDGE). */

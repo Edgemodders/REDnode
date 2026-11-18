@@ -379,7 +379,9 @@ const setWeather = (state, blend) =>
 const resetWeather = () =>
   step('world.resetWeather', async () => {
     const r = await world.resetWeather();
-    return `was ${r.was}; the game's cycle picks the next weather in its own time`;
+    return r.restored
+      ? `was ${r.was}; blending back to ${r.restored} over 10 s, then the game's cycle`
+      : `was ${r.was}; the game's cycle picks the next weather in its own time`;
   });
 
 // ---- 8. Quest variants -------------------------------------------------------------

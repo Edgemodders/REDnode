@@ -37,6 +37,27 @@ protected cb func OnDetach() -> Bool {
   return wrappedMethod();
 }
 
+// The pause menu (Esc in the world), for the overlay's "Hide in the pause menu" (0.67.2).
+// Its Save, Load and Settings are pages inside this scenario; its credits, mods and pitch
+// screens are scenarios of their own that come back to it. The plugin also ends it when the
+// game leaves its menus, so a way out these do not see cannot leave it on.
+@wrapMethod(MenuScenario_PauseMenu)
+protected cb func OnEnterScenario(prevScenario: CName, userData: ref<IScriptable>) -> Bool {
+  REDnode_Emit("REDnode.PauseMenu", 1);
+  return wrappedMethod(prevScenario, userData);
+}
+
+@wrapMethod(MenuScenario_BaseMenu)
+protected cb func OnLeaveScenario(nextScenario: CName) -> Bool {
+  if IsDefined(this as MenuScenario_PauseMenu)
+    && !Equals(nextScenario, n"MenuScenario_CreditsPickerPause")
+    && !Equals(nextScenario, n"MenuScenario_Mods_Pause")
+    && !Equals(nextScenario, n"MenuScenario_Pitch_Pause") {
+    REDnode_Emit("REDnode.PauseMenu", 0);
+  }
+  return wrappedMethod(nextScenario);
+}
+
 // The game session ends: the game calls each scriptable system's OnDetach then, at the start
 // of a load and when the game goes back to the main menu. A second signal for world (#25).
 public class REDnodeSessionSystem extends ScriptableSystem {

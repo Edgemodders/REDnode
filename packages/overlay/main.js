@@ -284,7 +284,7 @@ let nextRequestId = 1;
 // {event: 'state'} whenever it, the link or the overlay mode changes. Until the plugin's
 // first one, the main menu with no world: a mod linked while the game starts must not
 // take it for a loaded save (#25).
-let uiState = { menu: false, photoMode: false, scene: false, mainMenu: true, world: false };
+let uiState = { menu: false, photoMode: false, scene: false, mainMenu: true, world: false, pauseMenu: false };
 let lastStateJson = '';
 
 /** Node mods (mods.js), created when the app is ready. */
@@ -1061,6 +1061,42 @@ function checkSolo() {
   if (!packageRunning(soloOwner)) endSolo('the package stopped');
 }
 
+// ---------- the pause menu ----------
+//
+// Hide in the pause menu (0.67.2, the launcher's switch, settings.hidePauseMenu, on by default):
+// when the game's pause menu opens, the host puts the overlay in hidden mode, as F10 would. F10
+// works as ever there, so the player can bring REDnode up in the pause menu. When the pause menu
+// closes, the overlay goes back to the mode it had, unless the player changed it meanwhile.
+
+let pauseHide = null; // { from, asked, touched } while the pause menu hid the overlay
+
+function onPauseMenu(open) {
+  if (open) {
+    if (settings.hidePauseMenu === false || pauseHide || !connected || mode === 'hidden') return;
+    pauseHide = { from: mode, asked: true, touched: false };
+    log(`Pause menu: the overlay hides (was ${mode}); F10 brings it up`);
+    sendJson({ cmd: 'overlay.mode', mode: 'hidden' });
+    return;
+  }
+  if (!pauseHide) return;
+  const p = pauseHide;
+  pauseHide = null;
+  if (p.touched || mode !== 'hidden' || !connected) {
+    log('Pause menu closed: the overlay stays as the player left it');
+    return;
+  }
+  log(`Pause menu closed: the overlay is ${p.from} again`);
+  sendJson({ cmd: 'overlay.mode', mode: p.from });
+}
+
+// The plugin's mode changed while the pause menu hid the overlay: the host's own hide, or the
+// player's F10 (then the pause menu's close leaves the overlay as the player put it).
+function pauseOnMode(next) {
+  if (!pauseHide) return;
+  if (pauseHide.asked && next === 'hidden') pauseHide.asked = false;
+  else pauseHide.touched = true;
+}
+
 // ---------- apps' keys ----------
 //
 // A key the player gives an app (its title bar's Key binding, or the Mod Manager). The plugin
@@ -1454,7 +1490,7 @@ function shouldOpen(entry) {
 // ---------- game state for apps and mods ----------
 
 function gameState() {
-  return { connected, overlay: mode, ...(connected ? uiState : { menu: false, photoMode: false, scene: false, mainMenu: false, world: false }) };
+  return { connected, overlay: mode, ...(connected ? uiState : { menu: false, photoMode: false, scene: false, mainMenu: false, world: false, pauseMenu: false }) };
 }
 
 // Tells apps and mods when the state changed.
@@ -1911,9 +1947,13 @@ function onGameMessage(m) {
       log(m.event === 'hello' ? `Game says hello (${m.plugin}), mode ${mode}` : `Mode ${mode}`);
       if (m.event === 'hello') {
         modeByKey = null;
+        pauseHide = null;
         endKeyView('the game said hello');
         sendAppKeys();
-      } else appKeysOnMode(mode);
+      } else {
+        pauseOnMode(mode);
+        appKeysOnMode(mode);
+      }
       if (mode === 'interactive') endStartHold();
       if (mode !== 'interactive') onFocus(0);
       // Windows not pinned to the HUD appear and disappear with the mode: give them a frame.
@@ -1922,10 +1962,11 @@ function onGameMessage(m) {
       stateChanged();
       return;
     case 'ui-state': {
-      const next = { menu: !!m.menu, photoMode: !!m.photoMode, scene: !!m.scene, mainMenu: !!m.mainMenu, world: !!m.world };
+      const next = { menu: !!m.menu, photoMode: !!m.photoMode, scene: !!m.scene, mainMenu: !!m.mainMenu, world: !!m.world, pauseMenu: !!m.pauseMenu };
       const changed = JSON.stringify(next) !== JSON.stringify(uiState);
       onUiStateForSound(uiState, next);
       if (next.world && !uiState.world) weatherAfterLoad();
+      if (next.pauseMenu !== uiState.pauseMenu) onPauseMenu(next.pauseMenu);
       uiState = next;
       // A window hidden with the game's UI loses its texture in the game. Repaint every
       // window, so one that is shown again gets a frame even if its page is idle.
@@ -2253,23 +2294,77 @@ function worldNodesGone(id, why) {
 // #46: the package holding the weather through REDnode (the plugin sets it with the source
 // "REDnode"), or null. Given back to the game's cycle when it stops; a save load brings its own
 // weather, so the hold ends there too.
+// Giving it back (resetWeather, the package stopping) blends back to the weather from before
+// REDnode's first hold (read with weather.state just before it), so the sky a mod set does not
+// stay until the cycle next moves on (0.67.2, from the #46 test; restore: false skips it). The
+// game's cycle had it: REDnode holds it through the blend, then releases it. A quest held it: the
+// blend back sets it in the quest's name, so the quest's hold is as it was.
 let weatherHolder = null;
 let weatherSetAt = 0; // when a set last held the weather (Date.now())
+let weatherBefore = null; // { state, held, source, priority } before REDnode's hold began, or null
+let weatherBackTo = null; // the same, while a blend back is under way
+let weatherRelease = null; // the timer that releases the hold after a blend back
+const WEATHER_BACK_BLEND = 10; // seconds
+
+// Blends back to the weather from before the hold, then releases it. Answers what it did.
+async function weatherBack(restore) {
+  clearTimeout(weatherRelease);
+  weatherRelease = null;
+  const to = restore === false ? null : weatherBefore ?? weatherBackTo;
+  weatherBefore = null;
+  weatherBackTo = null;
+  if (!to?.state) return { ...(await bridgeCall('weather.reset', {})), restored: null };
+  const quest = to.held && to.source && to.source !== 'REDnode';
+  const set = await bridgeCall('weather.set', {
+    state: to.state,
+    blend: WEATHER_BACK_BLEND,
+    source: quest ? to.source : 'REDnode',
+    ...(quest && Number.isFinite(to.priority) ? { priority: to.priority } : {}),
+  }).catch(() => null);
+  if (!set?.applied) return { ...(await bridgeCall('weather.reset', {})), restored: null };
+  if (quest) return { held: false, was: 'held', restored: to.state, to: to.source };
+  weatherBackTo = to;
+  weatherRelease = setTimeout(() => {
+    weatherRelease = null;
+    weatherBackTo = null;
+    if (weatherHolder || !connected) return; // held again meanwhile, or the game is gone
+    bridgeCall('weather.reset', {}).then(() => log(`Weather: back at ${to.state}, given to the game's cycle`)).catch(() => {});
+  }, (WEATHER_BACK_BLEND + 1) * 1000);
+  return { held: false, was: 'held', restored: to.state, to: 'cycle' };
+}
 
 async function weatherCall(id, method, params) {
   if (method === 'weather.set') {
     const p = params ?? {};
-    const result = await bridgeCall('weather.set', { state: p.state, blend: p.blend, priority: p.priority, source: 'REDnode' });
+    // The weather before REDnode's first hold, to come back to; a blend back under way keeps its own.
+    if (!weatherHolder && !weatherBefore && !weatherRelease) {
+      const s = await bridgeCall('weather.state', {}).catch(() => null);
+      if (s?.state && !(s.held && s.source === 'REDnode')) weatherBefore = { state: s.state, held: !!s.held, source: s.source ?? null, priority: s.priority };
+    }
+    let result;
+    try {
+      result = await bridgeCall('weather.set', { state: p.state, blend: p.blend, priority: p.priority, source: 'REDnode' });
+    } finally {
+      if (!result?.applied && !weatherHolder && !weatherRelease) weatherBefore = null; // no hold began
+    }
     if (result?.applied) {
-      if (weatherHolder !== (id ?? null)) log(`Weather: ${result.state} held by ${id ?? 'an assistant'}`);
+      if (weatherRelease) {
+        // A blend back was under way: this set holds again, and the weather to come back to stays.
+        clearTimeout(weatherRelease);
+        weatherRelease = null;
+        weatherBefore = weatherBackTo;
+        weatherBackTo = null;
+      }
+      if (weatherHolder !== (id ?? null)) log(`Weather: ${result.state} held by ${id ?? 'an assistant'}${weatherBefore ? `, back to ${weatherBefore.state} when given back` : ''}`);
       weatherHolder = id ?? null;
       weatherSetAt = Date.now();
     }
     return result;
   }
   if (method === 'weather.reset') {
-    const result = await bridgeCall('weather.reset', {});
     weatherHolder = null;
+    const result = await weatherBack(params?.restore);
+    if (result.restored) log(`Weather: blending back to ${result.restored} for ${id ?? 'an assistant'}, then ${result.to === 'cycle' ? "the game's cycle" : `${result.to}'s hold`}`);
     return result;
   }
   if (method !== 'weather.state') throw new Error(`Unknown weather call ${method}`);
@@ -2281,8 +2376,8 @@ function weatherGone(id, why) {
   if (!id || weatherHolder !== id) return;
   weatherHolder = null;
   if (!connected || !uiState.world) return;
-  bridgeCall('weather.reset', {})
-    .then(() => log(`Weather of ${id} given back to the game's cycle (${why})`))
+  weatherBack(true)
+    .then((r) => log(r.restored ? `Weather of ${id}: blending back to ${r.restored}, then ${r.to === 'cycle' ? "the game's cycle" : `${r.to}'s hold`} (${why})` : `Weather of ${id} given back to the game's cycle (${why})`))
     .catch((err) => log(`Weather of ${id}: the reset failed: ${err.message}`));
 }
 
@@ -2293,7 +2388,13 @@ function weatherGone(id, why) {
 function weatherAfterLoad() {
   const at = Date.now();
   const current = () => weatherSetAt >= at - 2000;
-  if (!current()) weatherHolder = null;
+  if (!current()) {
+    weatherHolder = null;
+    weatherBefore = null; // the save brought its own weather
+    weatherBackTo = null;
+    clearTimeout(weatherRelease);
+    weatherRelease = null;
+  }
   bridgeCall('weather.state', {})
     .then((s) => {
       if (!s?.held || s.source !== 'REDnode' || current()) return;
@@ -5691,6 +5792,17 @@ ipcMain.handle('rednode:host:hot-reload', (event, on) => {
 ipcMain.handle('rednode:host:dev-folders', (event, op, dir) => {
   fromLauncher(event);
   return changeDevFolders(op, dir);
+});
+
+// Hide in the pause menu (0.67.2): on by default; the launcher's switch.
+ipcMain.handle('rednode:host:hide-pause-menu', (event, on) => {
+  fromLauncher(event);
+  if (typeof on === 'boolean' && on !== (settings.hidePauseMenu !== false)) {
+    settings.hidePauseMenu = on;
+    writeJson('settings.json', settings);
+    log(`Hide in the pause menu: ${on ? 'on' : 'off'}`);
+  }
+  return settings.hidePauseMenu !== false;
 });
 
 // Tooltips (the UI kit's, for title attributes): on by default; the launcher's switch

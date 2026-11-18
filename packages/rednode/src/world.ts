@@ -1114,11 +1114,26 @@ export const world = {
   },
 
   /**
-   * Gives the weather back to the game's own cycle (#46), as a quest's reset node does. The
-   * weather now stays until the cycle moves on in its own time.
+   * Gives the weather back (#46). REDnode blends back over 10 s to the weather from before it
+   * first held one, then gives it to the game's own cycle, so the sky a mod set does not stay
+   * until the cycle next moves on. `restored` names the weather it blends back to. With
+   * `restore: false` it only releases the hold, as a quest's reset node does: the weather then
+   * stays until the cycle moves on in its own time. A package's weather is given back the same
+   * way when it stops.
+   *
+   * @example
+   * ```ts
+   * await world.setWeather("24h_weather_rain", { blend: 10 });
+   * // later: the sky clears back to what it was
+   * await world.resetWeather();
+   * ```
    */
-  async resetWeather(): Promise<{ held: false; was: "held" | "cycle" }> {
-    return (await invoke("weather.reset", {})) as { held: false; was: "held" | "cycle" };
+  async resetWeather(options: { restore?: boolean } = {}): Promise<{ held: false; was: "held" | "cycle"; restored: string | null }> {
+    return (await invoke("weather.reset", options.restore === false ? { restore: false } : {})) as {
+      held: false;
+      was: "held" | "cycle";
+      restored: string | null;
+    };
   },
 
   /**

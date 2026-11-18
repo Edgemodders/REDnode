@@ -168,6 +168,7 @@ enum : uint32_t
     StateScene = 4,     // a cinematic scene
     StateMainMenu = 8,  // no player: main menu or loading screen
     StateWorld = 16,    // V is in the world: attached, past the main menu, no load under way (#25)
+    StatePauseMenu = 32, // the game's pause menu (Esc in the world), from REDnode.reds (0.67.2)
 };
 void PollGameState(uint64_t aFrame); // game thread
 bool InMainMenu();                     // the last poll's main-menu state (no player, or IsPreGame)

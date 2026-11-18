@@ -308,6 +308,13 @@ $('start').addEventListener('change', async (e) => {
   RednodeUI.notify(on ? 'REDnode opens with the game' : 'Next start: only HUD widgets until you press F10', { title: 'Open at start' });
 });
 
+// Hide in the pause menu (0.67.2): on by default; F10 in the pause menu still brings REDnode up.
+$('pausehide').addEventListener('change', async (e) => {
+  const on = await window.rednode.apps.hidePauseMenu(e.detail.checked);
+  $('pausehide').checked = on;
+  RednodeUI.notify(on ? 'The pause menu hides REDnode; F10 brings it up there' : 'REDnode stays as it is in the pause menu', { title: 'Hide in the pause menu' });
+});
+
 // Tooltips: the UI kit's, in every window. Off for players who know REDnode.
 $('tips').addEventListener('change', async (e) => {
   const on = await window.rednode.apps.tooltips(e.detail.checked);
@@ -343,6 +350,7 @@ async function refresh() {
     if ($('dev').checked && !drawer.hidden) showDevFolders(await window.rednode.apps.devFolders());
     $('start').checked = await window.rednode.apps.openAtStart();
     $('tips').checked = await window.rednode.apps.tooltips();
+    $('pausehide').checked = await window.rednode.apps.hidePauseMenu();
     const state = await window.rednode.state();
     $('version').textContent = `Version ${state.version}`;
     // Solo mode: which package has the screen, and a way out.
@@ -693,7 +701,11 @@ drawer.addEventListener('close', () => showDrawer(false)); // a drawer's close h
 $('toggle').addEventListener('click', () => {
   panel.hidden = !panel.hidden;
   if (panel.hidden) showDrawer(false);
-  else refresh();
+  else {
+    refresh();
+    // The filter takes the keyboard, so typing at once finds a mod (0.67.2).
+    requestAnimationFrame(() => $('filter').focus());
+  }
 });
 
 // Keep memory and state current while the list is open.

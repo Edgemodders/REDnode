@@ -2042,6 +2042,42 @@ REDnode 0.66.10, Director spike 0.6.0, game 2.5. Stand V outside, in the open, a
 9. Press **Rain** again, then switch the app off in the Mod Manager. Expected in the host log: "Weather of director-spike given back to the game's cycle".
 10. Optional: press **Rain**, make a save, load another save, then load that one. Expected: the rain from the save, given back to the game's cycle (a host log line says so).
 
+### Weather (#46): first run (0.67.0, 2026-11-18)
+
+Dev PC, REDnode 0.67.0 (it carries 0.66.10's weather), Director spike 0.6.0. Every step passed but 9.
+
+| Step | Result |
+|---|---|
+| 2 | `24h_weather_light_clouds`, the game's cycle; 19 states listed |
+| 3 | Rain at once, a smooth change over a couple of seconds (the blend asked for 10 s) |
+| 4 to 8 | As expected: held by director-spike, still held after skipping time, fog, sunny at once, back to the game's cycle |
+| 9 | **Failed:** switching the app off did release the hold (host: "Weather of director-spike given back to the game's cycle (the mod stopped)"; plugin: "back to the game's own cycle"), but the rain stayed: releasing a hold leaves the weather as it is until the game's cycle next moves on, which can take minutes. Step 8's Give it back had done the same with the sunny sky |
+
+Decided with the owner the same day: giving the weather back blends back to the weather from before. Built in REDnode 0.67.2 (below).
+
+### Weather given back: built (0.67.2)
+
+| Piece | What |
+|---|---|
+| The weather to come back to | Read with `weather.state` just before REDnode's first hold (a set while nothing REDnode holds it) |
+| Giving it back | `world.resetWeather()`, a package stopping, MCP `world_weather_set` with `reset`: a set of that weather with a 10 s blend. The game's cycle had it: REDnode holds it through the blend and releases the hold 11 s later. A quest held it: the set is in the quest's name and priority, so the quest's hold is as it was |
+| `restore: false` | `world.resetWeather({ restore: false })` only releases the hold, as before |
+| A set during the blend back | Holds again; the weather to come back to stays the same |
+| A save loaded | Forgets the weather to come back to: the save brought its own |
+| Answer | `{ held: false, was, restored, to }`: `restored` names the weather blended back to, `to` is `cycle` or the quest's name |
+
+Stand-in check (scratchpad `wx/check`, now with the quest's hold put back at a hot reload, and a fog over the cycle's rain given back to the rain, then released): all pass. Unverified in game: whether the game's cycle leaves the weather alone during the 10 s blend once REDnode holds it (it held for skip time in the first run).
+
+### Weather given back: retest (0.67.2)
+
+REDnode 0.67.2, Director spike 0.6.1. Stand V outside.
+
+1. Switch on **Director spike (#46)**. Under **7. Weather**, press **Read the weather** and note the weather now (for example light clouds).
+2. Press **Rain** and wait for the rain.
+3. Press **Give it back**. Expected: "blending back to `<the weather of step 1>` over 10 s, then the game's cycle", and over about 10 s the rain stops and the sky goes back to step 1's weather.
+4. Press **Read the weather** after 15 s. Expected: step 1's weather, the game's cycle.
+5. Press **Rain**, wait for it, then switch the app off in the Mod Manager. Expected: as in step 3, the sky goes back to step 1's weather (host log: "blending back to ..., then the game's cycle (the mod stopped)").
+
 ## World node registry (#24)
 
 Asked for by EDGEbuilder in [#24](https://github.com/Edgemodders/REDnode/issues/24) for its world inspector: hover or click anything the game placed and see what it is and which sector and node it comes from, outline it, hide it for the session, list what is streamed in near the camera, and have the world stream around EDGEbuilder's camera. Entities are covered by `world.near` and `world.files`; static nodes (most buildings, street furniture, decals, lights, foliage) are not: nothing in the game API names the node a click hit, and on 2.5 a sector keeps a node's path only as a hash. RED Hot Tools solves it with hooks on sector loading and node-instance setup (its `WorldNodeRegistry`, MIT) but has no 2.5 build.

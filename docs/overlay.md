@@ -916,6 +916,29 @@ Found on the way: the UI kit's `rn-button` had no `disabled` property, so `butto
 8. F10. In the Mod Manager, select EDGEbuilder: its details show **Key F8** with Change and Remove. Press **Remove**, then F10 to give the game its input and press F8: nothing happens.
 9. Quit the game. Claude reads the plugin log (`Overlay: 1 app keys`, `Overlay: app key 119 (mods 0) pressed`) and the host log (`App key: ...` lines for each step).
 
+### The pause menu and the launcher's filter (0.67.2)
+
+Asked for by the owner on 2026-11-18, after the App keys test.
+
+| Piece | What |
+|---|---|
+| **Hide in the pause menu** | A switch in the launcher's Settings drawer, on by default (`settings.hidePauseMenu`). When the game's pause menu (Esc in the world) opens, the host puts the overlay in hidden mode, as F10 would. F10 works as ever there, so the player can bring REDnode up in the pause menu. When it closes, the overlay goes back to the mode it had, unless the player changed it with F10 meanwhile |
+| The pause menu, read | `REDnode.reds` wraps `MenuScenario_PauseMenu.OnEnterScenario` and `MenuScenario_BaseMenu.OnLeaveScenario` (not into its own credits, mods and pitch screens) and sends `REDnode.PauseMenu`; the plugin's poll (gamestate.cpp, `StatePauseMenu`) also ends it once the game leaves its menus or goes to the main menu. Save, Load and Settings are pages inside the pause menu's scenario. `ui-state` and `game.state()` carry `pauseMenu` |
+| The launcher's filter | Opening the launcher puts the keyboard in its filter box, so typing at once finds a mod |
+
+Checks: redscript-cli alone and beside Codeware, and the game's own `scc.exe` beside Codeware, 0 errors in REDnode's scripts (scratchpad `scripts-check/check.ps1`); stand-in plugin (scratchpad `akey/run.sh`, 36 checks with the pause menu's: hidden at its open, back as it was at its close, F10 there brings it up, a mode the player chose is kept).
+
+### The pause menu and the launcher's filter: test (0.67.2)
+
+1. Load a save. Press F10 until the overlay shows without the cursor.
+2. Press **Esc**. Expected: the pause menu opens and REDnode hides (windows, HUD widgets, the launcher tab).
+3. Open **Settings** and **Load Game** from the pause menu, then back. Expected: REDnode stays hidden.
+4. Press **F10** in the pause menu. Expected: REDnode shows, without the cursor. **F10** again: the cursor too; click a window, then press **F10** to hide it again.
+5. Close the pause menu (Esc). Expected: REDnode stays as you left it in step 4.
+6. Press F10 until REDnode shows without the cursor, then **Esc**, then close the pause menu at once. Expected: hidden in the pause menu, and back without the cursor after it.
+7. Open the launcher's Settings drawer (the gear) and switch **Hide in the pause menu** off. Press **Esc**. Expected: REDnode stays on screen in the pause menu. Close it and switch the setting on again.
+8. Press F10 for the cursor, click the launcher tab to open the launcher, and type a few letters without clicking anything. Expected: they go into **Filter mods...** and the list narrows.
+
 ### Dropdown: plan
 
 Asked for by the owner on 2026-11-14 (`ui.select`, for the VATS spike's zoom choice, which uses four buttons and a line of text in its place). The UI kit has no dropdown, and a page's own `<select>` likely never opens in the game: Chromium draws its list as a pop-up of its own, which offscreen pages do not show (unverified; the kit has its own tooltips for the same reason). Agreed with the owner on 2026-11-17: build it after the App keys test (0.67.0).

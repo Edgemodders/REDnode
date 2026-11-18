@@ -582,12 +582,12 @@ function createMcp(host) {
         title: 'Set the weather',
         description:
           'Sets the weather to a state world_weather lists (or a WeatherPresets record, such as WeatherPresets.Rain) and holds it, as a quest does, ' +
-          'blending over blend seconds (default 5); reset: true gives it back to the game\'s own cycle instead. A save loaded later brings its own weather. ' +
+          'blending over blend seconds (default 5); reset: true gives it back instead: a blend back to the weather from before REDnode held it, then the game\'s own cycle.A save loaded later brings its own weather. ' +
           'The player is asked before every call.',
         inputSchema: {
           state: z.string().optional().describe('A weather state, such as 24h_weather_rain, or a WeatherPresets record'),
           blend: z.number().min(0).max(600).optional().describe('Seconds the change takes. Default 5'),
-          reset: z.boolean().optional().describe('Give the weather back to the game\'s cycle'),
+          reset: z.boolean().optional().describe('Give the weather back: a blend back to the weather from before, then the game\'s cycle'),
         },
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
         _meta: ASK_FIRST,

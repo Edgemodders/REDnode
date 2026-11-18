@@ -88,6 +88,7 @@ export function gameState() {
     scene: sim.scene,
     mainMenu: sim.mainMenu,
     world: sim.connected && !sim.mainMenu,
+    pauseMenu: false,
     overlay: sim.overlay,
   };
 }
