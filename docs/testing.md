@@ -1239,6 +1239,7 @@ A key the player gives an app (its title bar's **Key binding…**, or the Mod Ma
 |---|---|
 | Script check and stand-in plugin, 2026-11-18, 0.67.2, by Claude | **Pass**: redscript-cli alone and beside Codeware, the game's scc.exe beside Codeware (scratchpad `scripts-check/check.ps1`); 36 stand-in checks (scratchpad `akey/run.sh`), dev and packaged host |
 | In game, dev PC, 2026-11-18, 0.67.2 | **Failed at step 6**: steps 1 to 5 passed; the pause menu hid REDnode only every other time (a flag kept from the last open). Fixed in 0.67.3. Step 8, the launcher's filter taking the keyboard, passed |
+| In game, dev PC, 2026-11-18, 0.67.3 | **Pass**, steps 1 to 7: every pause menu open hid REDnode (eight in a row in the host log, also after a click into the game), each close gave the mode back, the F10 case kept the player's choice ("stays as the player left it"), and the switch off left REDnode on screen |
 
 ## World node registry: S24 (#24)
 
