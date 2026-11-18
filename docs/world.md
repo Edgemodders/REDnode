@@ -2147,6 +2147,8 @@ Run on 2026-11-15 by the owner on the dev PC, game 2.5, one build after another:
 
 The 0.66.7 log has the bench steps and the timing; the decal's outline and hide are in 0.66.6's log, and the owner reported the bin and the clean-up as written. **Step 5, the street lamp: not passed.** The lamp is an entity node (`crossing_light_1.ent`, a `worldEntityNode`; its neighbour `traffic_light_2.ent` too): with no mesh of its own it got the made-up 1 m box at its node's place, the static collision ray went through it (an entity's collision is its own), so the road's and decals' boxes held the hit and came first; and its line had no entity id, so the entity is not the object at +0xA0 (or EntityOf's check refused it). Entities in picks are N2's: the entity found from its node instance, its box from its visual components, and the ray cast against dynamic collision too (or `world.near`'s entities merged in). Decal boxes from their scale came out large (6.7 to 74 m3): the scale may be the full size of a box twice as big as assumed, unverified.
 
+**Decided by the owner on 2026-11-18:** step 5 does not block REDnode's release. `world.pick` ships as experimental, for meshes, decals and other static nodes; entity nodes such as street lamps are N2's, with the type filter.
+
 Still to do in N2: a pick on the game thread costs about 25 ms (a grid of the nodes by place would cut it), decal boxes from their scale are unverified, entities are reached by id but not hidden or outlined by `world.setVisible`/`world.highlight` yet, instanced meshes and foliage (one node, many copies) have one box for all, and the rest of N2's list.
 
 ### S24 test
