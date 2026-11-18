@@ -1,10 +1,15 @@
 # REDnode Sound Tools changelog
 
-What changed in each release of the Sound Tools pack, for its Nexus page and its GitHub release. The same rules as REDnode's own changelog (`docs/changelog.md`): a line under **Unreleased** with each change a player would notice, grouped **New**, **Changed**, **Fixed**, **Other**; before a release, rename **Unreleased** to `## <version> (<date>)`, with the version from `pack.json`. `npm run release:pack` stops if that version has no section.
+What changed in each release of the Sound Tools pack, for its Nexus page and its GitHub release. The same rules as REDnode's own changelog (`docs/changelog.md`): a line under **Unreleased** with each change a player would notice, grouped **New**, **Changed**, **Fixed**, **Other**; before a release, rename **Unreleased** to `## <version> (<date>)`, with the version from `pack.json`. `npm run release:pack` stops if that version has no section. Each released section also has a short Nexus summary under its heading (`<!-- nexus` ... `-->`, one plain line per change, at most 120 characters), as `docs/changelog.md` describes; the release workflow posts it and stops without it.
 
 ## Unreleased
 
 ## 0.1.2 (2026-11-03)
+
+<!-- nexus
+Needs: REDnode 0.41.0 or later, game 2.5
+Changed: Sound Search's and the Sound Tracer's search boxes have a clear button
+-->
 
 For REDnode 0.41.0 or later on game version 2.5.
 

@@ -1,10 +1,20 @@
 # REDnode UI Tools changelog
 
-What changed in each release of the UI Tools pack, for its Nexus page and its GitHub release. The same rules as REDnode's own changelog (`docs/changelog.md`): a line under **Unreleased** with each change a player would notice, grouped **New**, **Changed**, **Fixed**, **Other**; before a release, rename **Unreleased** to `## <version> (<date>)`, with the version from `pack.json`. `npm run release:pack` stops if that version has no section.
+What changed in each release of the UI Tools pack, for its Nexus page and its GitHub release. The same rules as REDnode's own changelog (`docs/changelog.md`): a line under **Unreleased** with each change a player would notice, grouped **New**, **Changed**, **Fixed**, **Other**; before a release, rename **Unreleased** to `## <version> (<date>)`, with the version from `pack.json`. `npm run release:pack` stops if that version has no section. Each released section also has a short Nexus summary under its heading (`<!-- nexus` ... `-->`, one plain line per change, at most 120 characters), as `docs/changelog.md` describes; the release workflow posts it and stops without it.
 
 ## Unreleased
 
 ## 0.1.0 (2026-11-03)
+
+<!-- nexus
+Needs: REDnode 0.56.0 or later and Codeware 1.16 or later, game 2.5
+New: The UI Workbench, opened from REDnode's launcher (F10)
+New: Inspect: the game's UI as a tree; pick a widget under the cursor to see all of it
+New: Try: change a widget live (visibility, opacity, tint, size, text), then reset it
+New: To source: copy a picked widget into a new project as ink markup
+New: Projects with an editor: markup and script side by side, run in the game as you save
+New: Export: a project as a zip that installs as a mod of its own
+-->
 
 The first release, for REDnode 0.56.0 or later and Codeware 1.16 or later, on game version 2.5. One app, the **UI Workbench**, opened from REDnode's launcher (F10) once switched on in the Mod Manager. Inspect works at once; To source, Try, Edit and Projects ask for the `admin` permission.
 

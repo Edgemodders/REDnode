@@ -1,10 +1,15 @@
 # REDswap changelog
 
-What changed in each release of REDswap, for its Nexus page (mod 36172) and the GitHub release it is attached to. REDswap has its own version, in `native/redswap/redswap.json`, apart from REDnode's. The same rules as REDnode's own changelog (`docs/changelog.md`): a line under **Unreleased** with each change a player or modder would notice, grouped **New**, **Changed**, **Fixed**, **Other**; before a release, raise the version in `redswap.json` and rename **Unreleased** to `## <version> (<date>)`. `npm run release:redswap` stops if that version has no section, or if anything is left under **Unreleased**.
+What changed in each release of REDswap, for its Nexus page (mod 36172) and the GitHub release it is attached to. REDswap has its own version, in `native/redswap/redswap.json`, apart from REDnode's. The same rules as REDnode's own changelog (`docs/changelog.md`): a line under **Unreleased** with each change a player or modder would notice, grouped **New**, **Changed**, **Fixed**, **Other**; before a release, raise the version in `redswap.json` and rename **Unreleased** to `## <version> (<date>)`. `npm run release:redswap` stops if that version has no section, or if anything is left under **Unreleased**. Each released section also has a short Nexus summary under its heading (`<!-- nexus` ... `-->`, one plain line per change, at most 120 characters), as `docs/changelog.md` describes; the release workflow posts it and stops without it.
 
 ## Unreleased
 
 ## 1.0.3 (2026-10-31)
+
+<!-- nexus
+Fixed: Replacing an archive with one that has fewer files no longer keeps the old versions of the files it dropped
+Other: Research switches for the dropped files (keep, watch, skip ArchiveXL's reload)
+-->
 
 **Fixed**
 

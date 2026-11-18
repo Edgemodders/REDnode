@@ -1,17 +1,30 @@
 # Changelog
 
-What changed in each REDnode release, for players and modders. Each release takes its notes from its section here: the GitHub release (written by the release workflow) and the version's changelog on the Nexus Mods page (pasted by hand). Test builds between releases (like 0.26.0) are folded into the next release.
+What changed in each REDnode release, for players and modders. Each release takes its notes from its section here: the GitHub release (written by the release workflow) and the version's changelog on the Nexus Mods page (the section's short Nexus summary, posted by the release workflow). Test builds between releases (like 0.26.0) are folded into the next release.
 
 How to keep it:
 
 - With each change a player or modder would notice, add a line under **Unreleased**, in its group: **New**, **Changed**, **Fixed** or **Other**. One change per line. Leave out what only the tests see, such as the test apps that are not in the player zip.
 - Before a release, rename **Unreleased** to `## <version> (<date>)` and start a new empty **Unreleased** above it. The release workflow stops if the version has no section.
-- Links are full URLs, since the same text goes to GitHub and Nexus.
-- `npm run release:notes` prints the GitHub notes; `npm run release:notes -- --nexus` prints plain lines for Nexus's changelog field, one per change.
+- With the rename, write the section's **Nexus summary** under its heading: an HTML comment that starts `<!-- nexus` and ends `-->`, with one short plain line per change a player would notice, each starting `New:`, `Changed:`, `Fixed:`, `Other:` or `Needs:`, at most 120 characters and 12 lines, no markdown. Nexus shows each line as one entry in a small text field, so these are not the section's lines cut down: write them for a player skimming. The comment hides it on GitHub and this site; the release workflow posts it with a "Full changelog" link and stops if it is missing or too long. Nexus cannot edit a changelog once posted.
+- Links are full URLs, since the same text goes to GitHub.
+- `npm run release:notes` prints the GitHub notes; `npm run release:notes -- --nexus` prints the Nexus summary, or says what is wrong with it.
 
 ## Unreleased
 
 ## 0.67.3 (2026-11-18)
+
+<!-- nexus
+New: Hide in the pause menu, on by default (F10 still shows REDnode there)
+New: A key for any app: shows only that app with the cursor; full-screen apps keep their view
+New: You choose which mods may call other mods' tools (Mod Manager, Calls)
+New: Weather for mods: set it, hold it, give it back (blends back to the weather from before)
+New: Workspots on people you spawn, and workspots written from your own clips
+New: Experimental world node picking, for EDGEbuilder's inspector
+Changed: The launcher's filter box takes the keyboard when the launcher opens
+Fixed: Update REDbridge while it was running kept the old version
+Fixed: Buttons disabled from code stayed clickable in the Key and Editor request windows
+-->
 
 **New**
 
