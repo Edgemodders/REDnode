@@ -1229,6 +1229,15 @@ The 0.58.0 release ships EDGEmat 0.3.1 from npm, which ignores the shared REDbri
 | Run | Result |
 |---|---|
 | Dev host, stand-in plugin, 2026-11-18, 0.68.0, by Claude | **Pass**: 30 checks (scratchpad `sel/run.sh`, DevTools reading the pages back): open and pick by mouse, a disabled option, a click elsewhere, keys (Down, End, Up, Enter), letters, Esc closing only the list with the Keyboard Lock asked and given back, a list above the box near the bottom, options set from code, and `ui.select` in a builder window with `onChange` in the mod and `set({ options, value })`. The first run found two bugs, fixed: rows were 38 px, not the 30 px the list's height assumed (a 3-option list scrolled and a click on its last row closed it), and Chromium's move with the mouse at rest made the row under it active while moving with the keys |
+| Game 2.5, dev PC, 2026-11-18, 0.68.0 | **Pass**: all nine steps |
+
+## Mod log: resizable (0.68.1)
+
+The Mod log window resizes by its grip, kept across starts. Steps: [docs/overlay.md, "Mod log: resizable (0.68.1)"](overlay.md#mod-log-resizable-0681).
+
+| Run | Result |
+|---|---|
+| Dev host, stand-in plugin, 2026-11-18, 0.68.1, by Claude | **Pass**: 9 checks (scratchpad `mlog/run.sh`): opens at 640 x 380 with the grip, a drag with the button held makes it 900 x 560 and asks the plugin for that size, the line list grows and the buttons stay at the bottom, a too-small request stops at 480 x 280 with the buttons still in the window. The first run found the mod chips wrapping into enough rows to push the buttons out of a small window: the chip row now holds at most two rows and scrolls, and the minimum went from 420 x 240 to 480 x 280 |
 
 ## App keys (0.67.0, 0.67.1)
 

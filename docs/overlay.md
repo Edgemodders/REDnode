@@ -955,7 +955,7 @@ Asked for by the owner on 2026-11-14 (`ui.select`, for the VATS spike's zoom cho
 
 ### Dropdown: built
 
-Built in REDnode 0.68.0 on 2026-11-18, as planned, awaiting its in-game test (below).
+Built in REDnode 0.68.0 on 2026-11-18, as planned. **Passed in game on 2026-11-18** (dev PC, all nine steps of the test below).
 
 | Part | Where |
 |---|---|
@@ -979,6 +979,19 @@ REDnode 0.68.0. Switch on **UI kit** and **VATS spike** in the Mod Manager (each
 | 7 | Drag the UI kit window near the bottom of the screen, open the box | The list opens above the box |
 | 8 | Open the **VATS spike** window. Its **VATS zooms by** dropdown has four choices; pick **SetZoom** | The Mod log says `VATS zoom: SetZoom` |
 | 9 | Press the UI kit's app key or F10 with a list open (any) | The list goes with the window |
+
+Result: passed in game on 2026-11-18 on the dev PC with REDnode 0.68.0, every step.
+
+### Mod log: resizable (0.68.1)
+
+Asked for by the owner on 2026-11-18 after the dropdown test. The Mod log's manifest says `"resizable": true` with a minimum of 480 x 280, and its page follows the window's size (`100vw` by `100vh`, as the Pins window's does), so the line list grows with it. The size is kept across starts in `window-positions.json`, like every resizable window; the title bar's menu has **Reset position and size**.
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | F10. Open the **Mod log** (launcher) | It opens at its old size, 640 x 380, bottom right |
+| 2 | Drag the grip in its bottom-right corner, larger then smaller | The window follows; the line list grows and shrinks, the buttons stay at the bottom; it stops at 480 x 280 |
+| 3 | Close the game and start it again, open the Mod log | It keeps the size from step 2 |
+| 4 | Title bar menu, **Reset position and size** | Back to 640 x 380, bottom right |
 
 ### UI kit
 
