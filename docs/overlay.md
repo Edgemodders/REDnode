@@ -993,7 +993,7 @@ Asked for by the owner on 2026-11-18 after the dropdown test. The Mod log's mani
 | 3 | Close the game and start it again, open the Mod log | It keeps the size from step 2 |
 | 4 | Title bar menu, **Reset position and size** | Back to 640 x 380, bottom right |
 
-Result: steps 1, 2 and 4 passed in game on 2026-11-18 (dev PC, 0.68.1); step 3 waits for the next restart.
+Result: steps 1, 2 and 4 passed in game on 2026-11-18 (dev PC, 0.68.1); step 3, the size kept across a restart, passed on 2026-11-19 on the laptop (0.68.2 from an update zip over 0.67.3). **Passed.**
 
 ### Versions in title bars (0.68.2)
 
@@ -1012,6 +1012,8 @@ Asked for by the owner on 2026-11-18. Each app's window shows its version, dimme
 | 3 | A ui-builder window, such as the **VATS spike** | Its mod's version (`v0.7.1`) |
 | 4 | Launcher, Settings: switch **Versions in title bars** off | Every version goes at once |
 | 5 | Close the game and start it again | Still off; switch it on, the versions come back |
+
+Result: **passed in game on 2026-11-19**, all five steps (laptop, 0.68.2 from an update zip over 0.67.3).
 
 ### UI kit
 

@@ -1239,6 +1239,7 @@ The Mod log window resizes by its grip, kept across starts. Steps: [docs/overlay
 |---|---|
 | Dev host, stand-in plugin, 2026-11-18, 0.68.1, by Claude | **Pass**: 9 checks (scratchpad `mlog/run.sh`): opens at 640 x 380 with the grip, a drag with the button held makes it 900 x 560 and asks the plugin for that size, the line list grows and the buttons stay at the bottom, a too-small request stops at 480 x 280 with the buttons still in the window. The first run found the mod chips wrapping into enough rows to push the buttons out of a small window: the chip row now holds at most two rows and scrolls, and the minimum went from 420 x 240 to 480 x 280 |
 | Game 2.5, dev PC, 2026-11-18, 0.68.1 | **Partly run**: steps 1, 2 and 4 passed; step 3 (kept across a restart) waits for the next start |
+| Game 2.5, laptop, 2026-11-19, 0.68.2 (update zip over 0.67.3) | **Pass**: step 3, the size kept across a restart |
 
 ## Versions in title bars (0.68.2)
 
@@ -1247,6 +1248,7 @@ Each app's version, dimmed beside its title, and the launcher's switch. Steps: [
 | Run | Result |
 |---|---|
 | Dev host, stand-in plugin, 2026-11-18, 0.68.2, by Claude | **Pass**: 12 checks (scratchpad `tver/run.sh`): `v0.68.2` right after the Mod log's and the launcher's titles, the switch on by default and shown on in the launcher, off hides them at once and is kept in settings.json, on brings them back, a drawer shows none. The dropdown's and the Mod log's checks pass again on this build |
+| Game 2.5, laptop, 2026-11-19, 0.68.2 (update zip over 0.67.3) | **Pass**: all five steps (REDnode's windows `v0.68.2`, UI kit `v0.1.1`, VATS spike `v0.7.1`, the switch off and kept off across a restart, on again) |
 
 ## App keys (0.67.0, 0.67.1)
 
