@@ -11,7 +11,7 @@ The player's AI service keys (Anthropic, Google Gemini, OpenAI, ElevenLabs and o
 | K1 | The store and its library, `tools/keys/keys.mjs` | Built |
 | K2 | A **Keys** view in the launcher's Settings drawer, in the game | Passed in game on 2026-10-30 (REDnode 0.47.0, 0.47.1's changes too) |
 | K3 | The `keys:<service>` permission, `secrets.shared` and `secrets.askShared` for packages, REDnode's **Key request** window; REDagent 0.4.0 moves to the store | Built in REDnode 0.48.0, awaiting its in-game test. `edgewave-voice` moves in EDGEwave's own repo (see below) |
-| K4 | REDcode keeps the store for every VS Code tool, decrypted by REDbridge (no PowerShell in any VS Code package); MCP servers read it through REDbridge. Design: [REDcode's Keys page](https://edgemodders.github.io/REDcode/design/keys.html) | Agreed with the owner on 2026-11-19, not built: K4a (REDbridge's `keys.*`), K4b (REDcode), K4c (EDGEwave, the pilot), K4d (the other tools) |
+| K4 | REDcode keeps the store for every VS Code tool, decrypted by REDbridge (no PowerShell in any VS Code package); MCP servers read it through REDbridge. Design: [REDcode's Keys page](https://edgemodders.github.io/REDcode/design/keys.html) | Agreed with the owner on 2026-11-19. K4a built on REDbridge's main on 2026-11-20 (`keys.*`, off unless REDbridge is started with `--keys`, so REDnode's host, which starts it without, cannot pass a key to a package); next K4b (REDcode #33), K4c (EDGEwave, the pilot), K4d (the other tools) |
 
 The files are the shared contract. REDnode's Keys view (K2) is the in-game way to set them; outside the game, each tool reads and writes the same files itself, with REDnode closed.
 
