@@ -12,7 +12,7 @@ How to keep it:
 
 ## Unreleased
 
-## 0.68.2 (2026-11-20)
+## 0.68.2 (2026-11-21)
 
 <!-- nexus
 New: A dropdown for Node mods' windows and pages (ui.select, rn-select in the UI kit)
