@@ -1015,6 +1015,25 @@ Asked for by the owner on 2026-11-18. Each app's window shows its version, dimme
 
 Result: **passed in game on 2026-11-19**, all five steps (laptop, 0.68.2 from an update zip over 0.67.3).
 
+### Hide on a click in the game (0.69.0)
+
+Asked for by the owner on 2026-11-21. In interactive mode a click on empty screen gives input back to the game. Until now it always went to passive mode, where HUD widgets and windows pinned to the HUD stay on screen. The launcher's Settings drawer has **Hide on a click in the game** under Hide in the pause menu, off by default (`settings.hideOnClickAway`). With it on, that click goes to hidden mode instead: nothing of REDnode is drawn until F10. F10 then cycles as ever: hidden, passive, interactive.
+
+| Part | Where |
+|---|---|
+| The plugin | `{"cmd":"overlay.clickAway","hide":true}` (input.cpp, `ClickAwayHides`); `OnMouseButton` in windows.cpp sets hidden instead of passive on a press on empty screen. A click on a world pin with clicks on, or on a window, is not a click away |
+| The host | `sendClickAway` in main.js at each hello and when the switch changes; IPC `rednode:host:hide-on-click-away` |
+| The launcher | The **Hide on a click in the game** switch (`clickhide`) |
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | Switch on the **Vitals** or **Coords** sample in the launcher, so a HUD widget shows | The widget is on the HUD |
+| 2 | F10, then click on the game outside every window | The overlay leaves interactive mode; the widget stays (passive mode, as before) |
+| 3 | F10. Launcher, Settings: switch **Hide on a click in the game** on | A notice says a click in the game hides REDnode |
+| 4 | Click on the game outside every window | Everything goes, the widget too; the game has the mouse. The plugin log says `Overlay: hidden` |
+| 5 | F10 | The widget shows again (passive mode); F10 once more opens the windows |
+| 6 | Close the game and start it again, F10, click outside | Still on: everything hides. Switch it off to leave it as before |
+
 ### UI kit
 
 UI is written as markup, not built by hand in code. Two layers keep it optional:

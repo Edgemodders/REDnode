@@ -1250,6 +1250,15 @@ Each app's version, dimmed beside its title, and the launcher's switch. Steps: [
 | Dev host, stand-in plugin, 2026-11-18, 0.68.2, by Claude | **Pass**: 12 checks (scratchpad `tver/run.sh`): `v0.68.2` right after the Mod log's and the launcher's titles, the switch on by default and shown on in the launcher, off hides them at once and is kept in settings.json, on brings them back, a drawer shows none. The dropdown's and the Mod log's checks pass again on this build |
 | Game 2.5, laptop, 2026-11-19, 0.68.2 (update zip over 0.67.3) | **Pass**: all five steps (REDnode's windows `v0.68.2`, UI kit `v0.1.1`, VATS spike `v0.7.1`, the switch off and kept off across a restart, on again) |
 
+## Hide on a click in the game (0.69.0)
+
+The launcher's switch that makes a click outside REDnode's windows hide the whole overlay, not leave windows pinned to the HUD. Steps: [docs/overlay.md, "Hide on a click in the game (0.69.0)"](overlay.md#hide-on-a-click-in-the-game-0690).
+
+| Run | Result |
+|---|---|
+| Dev and packaged host, stand-in plugin, 2026-11-21, 0.69.0, by Claude | **Pass**: 11 checks (scratchpad `clickaway/run.sh`): off by default and shown off in the launcher, the host sends `overlay.clickAway` with `hide: false` at hello, on sends `hide: true` at once and is kept in settings.json, a new hello sends it again, the same value again sends nothing, off sends `hide: false`. The plugin's unit test checks that a click on empty screen goes to hidden with it and to passive without it |
+| Game 2.5 | **Not run** |
+
 ## App keys (0.67.0, 0.67.1)
 
 A key the player gives an app (its title bar's **Key binding…**, or the Mod Manager): it shows only that app with the cursor, and hides it again; keys the game uses are refused. Steps and what each should show: [docs/overlay.md, "App keys: test"](overlay.md#app-keys-test).

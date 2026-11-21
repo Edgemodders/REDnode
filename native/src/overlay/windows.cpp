@@ -6,7 +6,8 @@
 //     gets the event (transparent pixels click through to the window below);
 //   - a press on a drag handle moves the window here, at the game's frame rate,
 //     and is not sent to the page;
-//   - a press on empty screen leaves interactive mode, giving input back to the game;
+//   - a press on empty screen leaves interactive mode, giving input back to the game (to
+//     hidden mode instead of passive when the host asks, ClickAwayHides);
 //   - keys go to the focused window.
 //
 // Host -> plugin commands (JSON, "cmd"):
@@ -890,7 +891,7 @@ void OnMouseButton(bool aDown, const char* aButton)
     }
     Run(actions);
     if (leaveInteractive)
-        SetMode(Mode::Passive);
+        SetMode(ClickAwayHides() ? Mode::Hidden : Mode::Passive);
 }
 
 void OnWheel(int aDelta)

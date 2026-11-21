@@ -315,6 +315,13 @@ $('pausehide').addEventListener('change', async (e) => {
   RednodeUI.notify(on ? 'The pause menu hides REDnode; F10 brings it up there' : 'REDnode stays as it is in the pause menu', { title: 'Hide in the pause menu' });
 });
 
+// Hide on a click in the game (0.69.0): off by default; a click outside the windows hides REDnode.
+$('clickhide').addEventListener('change', async (e) => {
+  const on = await window.rednode.apps.hideOnClickAway(e.detail.checked);
+  $('clickhide').checked = on;
+  RednodeUI.notify(on ? 'A click in the game hides REDnode; F10 brings it back' : 'A click in the game leaves windows pinned to the HUD', { title: 'Hide on a click in the game' });
+});
+
 // Tooltips: the UI kit's, in every window. Off for players who know REDnode.
 $('tips').addEventListener('change', async (e) => {
   const on = await window.rednode.apps.tooltips(e.detail.checked);
@@ -359,6 +366,7 @@ async function refresh() {
     $('tips').checked = await window.rednode.apps.tooltips();
     $('versions').checked = await window.rednode.apps.titleVersions();
     $('pausehide').checked = await window.rednode.apps.hidePauseMenu();
+    $('clickhide').checked = await window.rednode.apps.hideOnClickAway();
     const state = await window.rednode.state();
     $('version').textContent = `Version ${state.version}`;
     // Solo mode: which package has the screen, and a way out.

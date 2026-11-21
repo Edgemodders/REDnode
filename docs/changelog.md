@@ -12,6 +12,10 @@ How to keep it:
 
 ## Unreleased
 
+### New
+
+- **Hide on a click in the game**: a switch in the launcher's Settings, off by default. With it on, a click outside REDnode's windows hides the whole overlay, HUD widgets too, instead of leaving windows pinned to the HUD on screen. F10 brings it back.
+
 ## 0.68.2 (2026-11-21)
 
 <!-- nexus

@@ -1,6 +1,7 @@
 // Game window hook: the F10 hotkey, apps' keys, and input for overlay windows in interactive mode.
 //
-// F10 cycles passive -> interactive -> hidden. Esc leaves interactive mode, unless the
+// F10 cycles passive -> interactive -> hidden. A click on empty screen leaves interactive mode
+// for passive, or for hidden with {"cmd":"overlay.clickAway","hide":true}. Esc leaves interactive mode, unless the
 // focused page asked for it (the Keyboard Lock API, #34).
 // Apps' keys (a key the player gave an app in its title bar): the host sends the list with
 // {"cmd":"keys.bind","vks":[66,...],"mods":[4,...]} (mods: 1 Ctrl, 2 Shift, 4 Alt, exactly
@@ -39,6 +40,10 @@ std::mutex g_appKeysMutex;
 std::vector<AppKey> g_appKeys;
 std::vector<UINT> g_appKeysDown; // window thread only: pressed apps' keys, whose release is kept too
 bool g_appKeyChar = false;        // window thread only: the character a pressed app's key makes is kept too
+
+// Hide on a click in the game (0.69.0, the launcher's switch): a press on empty screen in
+// interactive mode goes to hidden mode instead of passive. {"cmd":"overlay.clickAway","hide":true}
+std::atomic_bool g_clickAwayHides{false};
 
 uint8_t HeldMods()
 {
@@ -505,8 +510,20 @@ bool InstallInput(HWND aWindow)
     return true;
 }
 
+bool ClickAwayHides()
+{
+    return g_clickAwayHides.load();
+}
+
 bool HandleInputCommand(const std::string& aJson)
 {
+    if (aJson.find("\"cmd\":\"overlay.clickAway\"") != std::string::npos)
+    {
+        const bool hide = aJson.find("\"hide\":true") != std::string::npos;
+        if (g_clickAwayHides.exchange(hide) != hide)
+            Log("Overlay: a click in the game %s", hide ? "hides the overlay" : "leaves the overlay passive");
+        return true;
+    }
     if (aJson.find("\"cmd\":\"keys.bind\"") != std::string::npos)
     {
         std::vector<double> vks, mods;

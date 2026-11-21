@@ -1092,6 +1092,14 @@ function onPauseMenu(open) {
   sendJson({ cmd: 'overlay.mode', mode: p.from });
 }
 
+// Hide on a click in the game (0.69.0, the launcher's switch, settings.hideOnClickAway, off by
+// default): a click on empty screen in interactive mode puts the overlay in hidden mode, as F10's
+// second press would, instead of passive mode, where windows pinned to the HUD stay. The plugin
+// does it (windows.cpp); the host tells it at each hello and when the switch changes.
+function sendClickAway() {
+  if (connected) sendJson({ cmd: 'overlay.clickAway', hide: settings.hideOnClickAway === true });
+}
+
 // The plugin's mode changed while the pause menu hid the overlay: the host's own hide, or the
 // player's F10 (then the pause menu's close leaves the overlay as the player put it).
 function pauseOnMode(next) {
@@ -1953,6 +1961,7 @@ function onGameMessage(m) {
         pauseHide = null;
         endKeyView('the game said hello');
         sendAppKeys();
+        sendClickAway();
       } else {
         pauseOnMode(mode);
         appKeysOnMode(mode);
@@ -5806,6 +5815,18 @@ ipcMain.handle('rednode:host:hide-pause-menu', (event, on) => {
     log(`Hide in the pause menu: ${on ? 'on' : 'off'}`);
   }
   return settings.hidePauseMenu !== false;
+});
+
+// Hide on a click in the game (0.69.0): off by default; the launcher's switch.
+ipcMain.handle('rednode:host:hide-on-click-away', (event, on) => {
+  fromLauncher(event);
+  if (typeof on === 'boolean' && on !== (settings.hideOnClickAway === true)) {
+    settings.hideOnClickAway = on;
+    writeJson('settings.json', settings);
+    log(`Hide on a click in the game: ${on ? 'on' : 'off'}`);
+    sendClickAway();
+  }
+  return settings.hideOnClickAway === true;
 });
 
 // Tooltips (the UI kit's, for title attributes): on by default; the launcher's switch

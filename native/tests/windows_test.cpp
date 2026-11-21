@@ -55,6 +55,11 @@ uint32_t PinAt(float, float)
 {
     return 0; // no world pins here (pins.cpp, #43)
 }
+bool g_clickAwayHides = false;
+bool ClickAwayHides()
+{
+    return g_clickAwayHides; // input.cpp: the launcher's Hide on a click in the game
+}
 } // namespace detail
 } // namespace rednode::overlay
 
@@ -205,6 +210,16 @@ int main()
     OnMouseButton(true, "left");
     Check(GetMode() == Mode::Passive, "a click on empty screen leaves interactive mode");
     Check(SentContains(R"({"event":"focus","window":0})"), "and clears the focus");
+    g_clickAwayHides = true;
+    SetMode(Mode::Interactive);
+    OnMouseButton(false, "left");
+    OnMouseButton(true, "left");
+    Check(GetMode() == Mode::Hidden, "with Hide on a click in the game, it hides the overlay");
+    g_clickAwayHides = false;
+    SetMode(Mode::Interactive);
+    OnMouseButton(false, "left");
+    OnMouseButton(true, "left");
+    Check(GetMode() == Mode::Passive, "and without it, passive again");
 
     // HUD widgets: drawn, but clicks go through them; hideWith hides them.
     SetMode(Mode::Interactive);

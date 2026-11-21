@@ -156,9 +156,10 @@ bool InstallInput(HWND aWindow);
 void UninstallInput();
 void GetCursor(float& aX, float& aY); // reference pixels
 void CursorFrame(bool aDrawn);        // each present: counts for the cursor diagnostics log
-// Host commands for input: {"cmd":"keys.bind",...} (apps' keys) and {"cmd":"overlay.mode",...}.
-// True when the message was one of them.
+// Host commands for input: {"cmd":"keys.bind",...} (apps' keys), {"cmd":"overlay.mode",...} and
+// {"cmd":"overlay.clickAway","hide":true}. True when the message was one of them.
 bool HandleInputCommand(const std::string& aJson);
+bool ClickAwayHides(); // a press on empty screen leaves interactive mode for hidden, not passive
 
 // gamestate.cpp: what the game is showing, for hideWith. Bits of GetUiState().
 enum : uint32_t
