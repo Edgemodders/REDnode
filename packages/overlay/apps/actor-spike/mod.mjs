@@ -18,6 +18,10 @@
 //              player_ma_photomode.ent), dressed with preview copies of what V wears, as photo
 //              mode does, then the workspot played on it as on any spawned person. Whether its
 //              face, hair and body match V's character creation is for the player to say
+//   7 Written  (0.2.0, REDcode's ask on #47) two workspots from world.writeWorkspot: one on V's own
+//              skeleton (V's own clip, then two NPC clips), one on the NPC rig (the NPC clips, then
+//              V's own clip); each played on V through the device, with jumps between entries,
+//              and the NPC rig one on the copy. Which rig V's clips must be made on is the question
 
 import { api, game, ui, world } from 'rednode';
 
@@ -259,6 +263,92 @@ const playOnCopy = () =>
     return r.started ? 'started' : `not started: ${r.why}`;
   });
 
+// ---- 7. Written workspots (REDcode's ask on #47, 0.2.0) -------------------------------
+// V's own clips are made on V's player skeleton (the game's player workspots name
+// player_man_skeleton.rig or player_woman_skeleton.rig), while NPC clips and the photo mode copy
+// use the NPC rigs (man_base, woman_base). world.writeWorkspot writes one rig per workspot, so two:
+//   "for V"     on V's skeleton: V's own clip, then two NPC clips (do NPC clips play on V's rig?)
+//   "NPC rig"   on the NPC rig: the two NPC clips, then V's own clip (for the copy, and on V too)
+// Jumps on V go to the entries by id (SendJumpCommandEnt), as world.jumpWorkspot does for a person.
+
+const PLAYER_SET = 'base\\animations\\player\\interactive_scene\\player_male__stand_thorton_mackinaw__2h_on_sides__01.anims';
+const PLAYER_CLIP = { set: PLAYER_SET, anim: 'stand_thorton_mackinaw__2h_on_sides__01', name: 'V own clip' };
+const NPC_CLIPS = {
+  ma: [
+    { set: 'base\\animations\\npc\\generic_characters\\male_average\\interactive_scene\\generic_male_average__stand__2h_on_sides__01.anims', anim: 'stand__2h_on_sides__01', name: 'NPC standing' },
+    { set: 'base\\animations\\npc\\generic_characters\\male_average\\interactive_scene\\generic_male_average__stand__arms_crossed_front__01.anims', anim: 'stand__arms_crossed_front__01', name: 'NPC arms crossed' },
+  ],
+  wa: [
+    { set: 'base\\animations\\npc\\generic_characters\\female_average\\interactive_scene\\generic_female_average__stand__2h_on_sides__01.anims', anim: 'stand__2h_on_sides__01__wait_long__01', name: 'NPC standing' },
+    { set: 'base\\animations\\npc\\generic_characters\\female_average\\interactive_scene\\generic_female_average__stand__2h_on_sides__01.anims', anim: 'stand__2h_on_sides__01__stretch_arms__03', name: 'NPC stretching' },
+  ],
+};
+const RIGS = {
+  ma: { player: 'base\\characters\\entities\\player\\player_man_skeleton.rig', npc: 'base\\characters\\base_entities\\man_base\\man_base.rig' },
+  wa: { player: 'base\\characters\\entities\\player\\player_woman_skeleton.rig', npc: 'base\\characters\\base_entities\\woman_base\\woman_base.rig' },
+};
+let written = {}; // { forV, npcRig }: what world.writeWorkspot answered
+let onV = null; // the written workspot V is in: its entries for the jumps
+
+const writeBoth = () =>
+  step('Write the two workspots', async () => {
+    const body = await game.player.body();
+    const npc = NPC_CLIPS[body];
+    written.forV = await world.writeWorkspot('actor_for_v', { clips: [PLAYER_CLIP, ...npc], rig: RIGS[body].player, swap: false });
+    written.npcRig = await world.writeWorkspot('actor_npc_rig', { clips: [...npc, PLAYER_CLIP], rig: RIGS[body].npc });
+    for (const w of [written.forV, written.npcRig]) say(`  ${w.path}: ${w.entries.map((e) => `${e.name} ${e.entry}`).join(', ')} (${w.ms} ms)`);
+    return `for a ${body} V; ${written.npcRig.swap ? `swapped in via ${written.npcRig.swap.via}` : 'not swapped'}`;
+  });
+
+const playWritten = (which) =>
+  step(`Play "${which === 'forV' ? 'for V' : 'NPC rig'}" on V`, async () => {
+    const w = written[which];
+    if (!w) throw new Error('Press Write the two workspots first');
+    if (device) await world.remove(device.id).catch(() => false);
+    const place = await vPlace();
+    const { id, entity } = await world.spawn({ template: EMPTY, position: place.position, yaw: place.yaw, workspot: w.path, tags: ['actor-spike'] });
+    device = { id };
+    const v = await player();
+    const ws = await workspots();
+    await ws.PlayInDeviceSimple(entity ?? (await world.entity(id)), v, cameraMoves, COMPONENT, '', '', 0.3, 'DontPlayAtResourcePosition', api.$null);
+    let r;
+    for (let i = 0; i < 12; i += 1) {
+      await wait(250);
+      r = await reading(v);
+      if (r.inWs === true) break;
+    }
+    onV = r.inWs === true ? w : null;
+    return `in workspot ${r.inWs}, scene tier ${r.tier}; it starts on "${w.entries[0].name}". Turn third person on and say whether V plays it, plays it warped, or stands in a T pose`;
+  });
+
+const jumpV = (index) =>
+  step(`V: jump to entry ${index + 1}`, async () => {
+    if (!onV) throw new Error('Play a written workspot on V first');
+    const e = onV.entries[index];
+    const v = await player();
+    const ws = await workspots();
+    if ((await ws.IsActorInWorkspot(v)) !== true) throw new Error('V is not in the workspot any more');
+    await ws.SendJumpCommandEnt(v, e.entry, true);
+    return `"${e.name}" (${e.anim}, entry ${e.entry}). Say whether V moved to it`;
+  });
+
+const writtenOnCopy = () =>
+  step('Play "NPC rig" on the copy', async () => {
+    if (!copy) throw new Error('Press Spawn the copy first');
+    if (!written.npcRig) throw new Error('Press Write the two workspots first');
+    const r = await world.useWorkspot(copy.id, { workspot: written.npcRig.path });
+    copy.id = r.id;
+    return r.started ? 'started (the copy was spawned again carrying it, so it lost its clothes: press Dress the copy)' : `not started: ${r.why}`;
+  });
+
+const jumpCopy = (index) =>
+  step(`Copy: jump to entry ${index + 1}`, async () => {
+    if (!copy || !written.npcRig) throw new Error('Play "NPC rig" on the copy first');
+    const e = written.npcRig.entries[index];
+    const done = await world.jumpWorkspot(copy.id, e.name);
+    return done ? `"${e.name}" (${e.anim})` : 'the copy is not in the workspot';
+  });
+
 // ---- clean-up -----------------------------------------------------------------------
 
 const giveBack = () =>
@@ -274,6 +364,7 @@ const giveBack = () =>
     for (const s of world.spawned()) if (await world.remove(s.id).catch(() => false)) n += 1;
     device = null;
     copy = null;
+    onV = null;
     const r = await reading(v);
     return `${n} removed; in workspot ${r.inWs}, scene tier ${r.tier}`;
   });
@@ -312,8 +403,13 @@ ui.window({
     ui.heading('6. The fallback: a copy of V'),
     ui.toggle('The Phantom Liberty copy (player_*_photomode_ep1.ent)', (on) => (ep1 = on)),
     ui.row(ui.button('Spawn the copy', spawnCopy), ui.button('Dress the copy', dressCopy), ui.button('Play on the copy', playOnCopy)),
+    ui.heading("7. Written workspots: NPC clips and V's own clip, on V and on the copy"),
+    ui.row(ui.button('Write the two workspots', writeBoth)),
+    ui.row(ui.button('Play "for V" on V', () => playWritten('forV')), ui.button('Play "NPC rig" on V', () => playWritten('npcRig'), { variant: 'ghost' })),
+    ui.row(...[0, 1, 2].map((i) => ui.button(`V: entry ${i + 1}`, () => jumpV(i), { variant: 'ghost' }))),
+    ui.row(ui.button('Play "NPC rig" on the copy', writtenOnCopy), ...[0, 1, 2].map((i) => ui.button(`Copy: entry ${i + 1}`, () => jumpCopy(i), { variant: 'ghost' }))),
     ui.row(ui.button('Give V back', giveBack, { variant: 'ghost' })),
     log,
   ],
 });
-say('V actor spike 0.1.0 ready');
+say('V actor spike 0.2.0 ready');

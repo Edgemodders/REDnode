@@ -1252,11 +1252,11 @@ Each app's version, dimmed beside its title, and the launcher's switch. Steps: [
 
 ## V as an actor (#47)
 
-The V actor spike (`apps/actor-spike` 0.1.0) and `game.player.body()`, for EDGEdir's #47: the real V in a workspot through a device at V's feet, third person, and a dressed photo mode copy of V as the fallback. Steps: [docs/world.md, "#47 test"](world.md#47-test).
+The V actor spike (`apps/actor-spike` 0.2.0) and `game.player.body()`, for EDGEdir's #47 and REDcode's Animation Tools: the real V in a workspot through a device at V's feet, third person, a dressed photo mode copy of V as the fallback, and written workspots (on V's skeleton and on the NPC rig) played and jumped on V and on the copy. Steps: [docs/world.md, "#47 test"](world.md#47-test).
 
 | Run | Result |
 |---|---|
-| Stand-in `rednode`, 2026-11-22, 0.70.0, by Claude | **Pass**: 17 checks (scratchpad `v47/stand/check.mjs`): every button against a stand-in that answers as the game would, `PlayInDeviceSimple`'s arguments, the device facing V's way and the copy facing V, the dropdown and switches changing the next call, the hidden item left off the copy, Give V back |
+| Stand-in `rednode`, 2026-11-22, 0.70.0, by Claude | **Pass**: 26 checks (scratchpad `v47/stand/check.mjs`): every button against a stand-in that answers as the game would, `PlayInDeviceSimple`'s arguments, the device facing V's way and the copy facing V, the dropdown and switches changing the next call, the hidden item left off the copy, the written workspots on the right rig for a `wa` V, jumps by entry id on V and by name on the copy, Give V back |
 | Game 2.5 | **Not run** |
 
 ## The WL build (0.70.0)
