@@ -745,6 +745,19 @@ await rednode('tweakdb.reset', { editor: 'EDGEhack' }); // { ok, restored }
 
 A tool the player denied gets 403 at once until REDnode restarts. Every tool's changes are undone when REDnode stops. What shows live was settled by EDGEhack's H4.1 spike: a changed number on the next scan, an added effect after a refresh, a renamed item at once, a quickhack made live working.
 
+A tool can also call a package's [service](#calling-other-packages), as another package would: EDGEdir's **Play in game** hands its player package a cue sheet. REDnode 0.70.0 ([#48](https://github.com/Edgemodders/REDnode/issues/48)). Any function the service file exports can be called. The first call from a tool to a package opens the **Editor request** window, which names the tool and the package; the Allow covers that tool and that package only, apart from its Try Live changes, and lasts until REDnode restarts. Inside the function, `service.caller()` is `{ editor: "EDGEdir", name: "editor:EDGEdir" }`.
+
+```js
+const r = await rednode('service.call', { editor: 'EDGEdir', package: 'edgedir-player', call: 'play', args: [cueSheet] });
+// { ok: true, result } or { ok: false, reason }
+```
+
+| Call | Body | Answer |
+|---|---|---|
+| `POST /editor/service.call` | `{ editor, package, call, args? }`: the package's id, the function's name, its arguments as a list. Up to 2 MB | `{ ok: true, result }`. Refused in words: no such package (404), it offers no service (404), the player denied it (403), no such function, the function threw or did not answer in 30 s (422) |
+
+A call waits at most 30 seconds, so a long job answers when it has started, and the tool asks for its state with another call.
+
 ## Calling other packages
 
 A package can offer functions to every other package, and call theirs: a quest mod asks a world builder for a scene's places, a HUD widget asks a stats mod for its numbers. REDnode 0.34.0 and later; descriptions from JSDoc come with 0.35.0 and AI assistants calling them as tools with 0.36.0. The design and its tests are on the [Mod services](services.md) page.
@@ -790,7 +803,7 @@ await counter.$with({ timeoutMs: 60000 }).add(1);            // a longer timeout
 | What crosses | Plain JSON-like values: numbers, strings, booleans, arrays, plain objects, entity ids. Not game references: each package's references are its own |
 | Errors | What your function throws reaches the caller as an error with your message. A call fails at once when the package is not installed, offers no service, is switched off or crashed, or has no such function, with that reason |
 | Waiting | `connect` and calls wait up to 10 seconds for a package that is starting or hot-reloading. A call times out after 30 seconds; `$with({ timeoutMs })` changes it |
-| Who calls | Inside your function, `service.caller()` is `{ id, name }` of the calling package. Refuse callers you do not want by throwing |
+| Who calls | Inside your function, `service.caller()` is `{ id, name }` of the calling package, `{ assistant }` for an AI assistant, or `{ editor, name: "editor:<tool>" }` for a tool on the player's PC calling through the [editor channel](#editor-tools-the-editor-channel) (0.70.0). Refuse callers you do not want by throwing |
 | Stopping | `$with({ signal })` gives a call an `AbortSignal`. Inside your function, `service.signal()` aborts when the caller gives up or the call times out: pass it on to long work |
 | Events | `service.emit(name, data)` reaches every package that connected to yours, its Node mod and its pages; `$on(name, handler)` hears them |
 | Names | Methods starting with `$` belong to the handle. Call a function with such a name, or one known only at run time, with `$call(name, ...args)` |
@@ -1044,12 +1057,17 @@ await world.remove(id);
 // An EDGEbuilder scene, from a file in your package's folder.
 const scene = await world.load('scenes/my_alley.scene.json');
 await world.unload(scene.name);
+
+// A baked scene: its props are in the game's own world already, so load only its people.
+await world.load('scenes/my_alley.scene.json', { kinds: ['npc'], name: 'alley_people' });
+// Or all of it but the people your package spawns itself.
+await world.load('scenes/my_alley.scene.json', { skip: ['joe', 'ann'] });
 ```
 
 | Call | What it does |
 |---|---|
 | `world.spawn(options)` | Spawns an entity from a template (`template`), a TweakDB record (`record`) or a mesh alone (`mesh`, with `meshAppearance` and `scale`), and resolves once it is in the world, with its ID and the entity. A `Character.*` record stands where placed and stays friendly to V (`npc: false` leaves the game's behaviour). `keep: true` keeps it in the save. `components` are attached while it assembles |
-| `world.load(scene)`, `world.unload(name)` | Loads an [EDGEbuilder scene](https://edgemodders.github.io/EDGEbuilder/scene.html) (a `.scene.json` path or the scene itself): its meshes, entities and NPCs; lights are not spawned yet. Unload removes them |
+| `world.load(scene)`, `world.unload(name)` | Loads an [EDGEbuilder scene](https://edgemodders.github.io/EDGEbuilder/scene.html) (a `.scene.json` path or the scene itself): its meshes, entities and NPCs; lights are not spawned yet. Unload removes them. Since REDnode 0.70.0, `kinds` loads only objects of those kinds (`"mesh"`, `"entity"`, `"npc"`, `"light"`) and `skip` leaves out objects by their id in the scene; both land in the answer's `skipped`, as `not in kinds` or `skipped by id`, and an unknown kind is refused |
 | `world.near({ radius, files, uses })` | The entities near V, nearest first, with their class, distance and appearance; `files` adds the files each one uses, `uses` keeps only those that use one of the given files |
 | `world.files(entity)` | The files an entity uses: its template and every resource its components name, as path hashes |
 | `world.spawned()` | This package's spawns, with what each was spawned with |

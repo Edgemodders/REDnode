@@ -4,7 +4,12 @@
 // session to the next, so a pin that follows an entity is saved at the place it had).
 //
 //   { "format": "rednode-pins", "version": 1, "name": "Scene spots",
-//     "pins": [{ "title": "Stairs", "text": "the drums", "at": { "x": 1, "y": 2, "z": 3 }, "style": { "color": "#ffcf3f" } }] }
+//     "pins": [{ "id": "3f9a0c21d4", "title": "Stairs", "text": "the drums", "at": { "x": 1, "y": 2, "z": 3 }, "yaw": 90,
+//                "style": { "color": "#ffcf3f" } }] }
+//
+// `id` and `yaw` are optional (#50, still version 1): `id` stays with a pin across renames, so a
+// scene can name a pin by it; REDnode gives every pin one when it writes a set. `yaw` is the way
+// V faced at Drop a pin here, in degrees (0 faces +Y, as world.spawn's yaw).
 //
 // The player's own sets are listed in the Pins window: settings.pinSets keeps their files, which
 // are shown, which one Drop a pin here adds to, and the window's switches. A set the player made
@@ -16,14 +21,14 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { styleOf } = require('./pins');
+const { styleOf, newPinKey, pinKeyOf, yawOf } = require('./pins');
 
 const EXT = '.pins.json';
 const MAX_SET = 200;
 
 const nameFromFile = (file) => path.basename(file).slice(0, -EXT.length) || 'Pins';
 
-/** A set's file, read and checked. Answers { name, pins: [{ title, text, at, style }] }. */
+/** A set's file, read and checked. Answers { name, pins: [{ id?, title, text, at, yaw?, style }] }. */
 function readPinFile(file) {
   let data;
   try {
@@ -35,26 +40,41 @@ function readPinFile(file) {
     throw new Error(`${path.basename(file)} is not a pin set (no "format": "rednode-pins")`);
   }
   const pins = [];
+  const ids = new Set();
   for (const [i, p] of data.pins.slice(0, MAX_SET).entries()) {
     const at = p?.at;
     const place = at && ['x', 'y', 'z'].every((k) => Number.isFinite(Number(at[k]))) ? { x: Number(at.x), y: Number(at.y), z: Number(at.z) } : null;
     const title = String(p?.title ?? '').slice(0, 80);
     if (!place || !title) throw new Error(`${path.basename(file)}: pin ${i + 1} needs a title and at { x, y, z }`);
-    pins.push({ title, text: p.text ? String(p.text).slice(0, 160) : '', at: place, style: styleOf(p.style, `${path.basename(file)}: pin ${i + 1}`) });
+    const pin = { title, text: p.text ? String(p.text).slice(0, 160) : '', at: place, style: styleOf(p.style, `${path.basename(file)}: pin ${i + 1}`) };
+    // A second pin with the same id gets a new one when the set is next written.
+    const id = pinKeyOf(p.id);
+    if (id && !ids.has(id)) {
+      pin.id = id;
+      ids.add(id);
+    }
+    const yaw = yawOf(p.yaw);
+    if (yaw !== undefined) pin.yaw = yaw;
+    pins.push(pin);
   }
   return { name: String(data.name ?? '').slice(0, 80) || nameFromFile(file), pins };
 }
 
-/** Writes a set's file, through a temp file so a crash never leaves half of one. */
+/**
+ * Writes a set's file, through a temp file so a crash never leaves half of one. A pin with no id
+ * is given one here, on the object passed in, so the next write keeps it.
+ */
 function writePinFile(file, name, pins) {
   const data = {
     format: 'rednode-pins',
     version: 1,
     name,
     pins: pins.map((p) => ({
+      id: (p.id ??= newPinKey()),
       title: p.title,
       ...(p.text ? { text: p.text } : {}),
       at: { x: round(p.at.x), y: round(p.at.y), z: round(p.at.z) },
+      ...(p.yaw !== undefined ? { yaw: p.yaw } : {}),
       ...(p.style && Object.keys(p.style).length ? { style: p.style } : {}),
     })),
   };
@@ -106,7 +126,7 @@ function createPinSets({ pinsHost, dir, getSettings, save, log }) {
     hide(file);
     s.ids = s.pins.map((p) => {
       try {
-        return pinsHost.add(owner(file), { title: p.title, text: p.text, at: p.at, style: p.style });
+        return pinsHost.add(owner(file), { title: p.title, text: p.text, at: p.at, style: p.style, key: p.id, yaw: p.yaw });
       } catch (err) {
         log(`Pins: ${s.name}: ${err.message}`);
         return null;
@@ -165,14 +185,16 @@ function createPinSets({ pinsHost, dir, getSettings, save, log }) {
       };
     },
 
-    /** Drop a pin here: a pin at V's place, added to the current set (made if there is none). */
+    /** Drop a pin here: a pin at V's place, facing V's way, added to the current set (made if there is none). */
     drop(place, { title, text, file } = {}) {
       let target = file ? conf().files.find((f) => same(f.file, file))?.file : currentFile();
       if (!target) target = api.create('My pins').file;
       const s = sets.get(target) ?? read(target);
       if (s.error) throw new Error(`${s.name}: ${s.error}`);
       if (s.pins.length >= MAX_SET) throw new Error(`${s.name} has ${MAX_SET} pins, the most a set holds`);
-      const pin = { title: String(title ?? '').trim().slice(0, 80) || `Pin ${s.pins.length + 1}`, text: String(text ?? '').trim().slice(0, 160), at: place, style: {} };
+      const pin = { id: newPinKey(), title: String(title ?? '').trim().slice(0, 80) || `Pin ${s.pins.length + 1}`, text: String(text ?? '').trim().slice(0, 160), at: { x: place.x, y: place.y, z: place.z }, style: {} };
+      const yaw = yawOf(place.yaw);
+      if (yaw !== undefined) pin.yaw = yaw;
       s.pins.push(pin);
       write(target);
       const e = entry(target);
@@ -182,10 +204,10 @@ function createPinSets({ pinsHost, dir, getSettings, save, log }) {
         show(target);
       } else if (s.ids) {
         // Only the new pin: the set's other pins keep their ids.
-        s.ids.push(pinsHost.add(owner(target), { title: pin.title, text: pin.text, at: pin.at, style: pin.style }));
+        s.ids.push(pinsHost.add(owner(target), { title: pin.title, text: pin.text, at: pin.at, style: pin.style, key: pin.id, yaw: pin.yaw }));
       } else show(target);
       log(`Pins: dropped "${pin.title}" in ${s.name} at ${place.x.toFixed(1)}, ${place.y.toFixed(1)}, ${place.z.toFixed(1)}`);
-      return { file: target, title: pin.title };
+      return { file: target, title: pin.title, id: pin.id, ...(pin.yaw !== undefined ? { yaw: pin.yaw } : {}) };
     },
 
     /** Removes one of a set's pins (by its shown pin's id) from the set and its file. */

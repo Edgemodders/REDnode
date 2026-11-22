@@ -56,23 +56,51 @@ export interface SceneRead {
 const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
 const gamePath = (p: string) => p.replace(/\//g, "\\");
 
+/** The scene kinds {@link SceneFilter}'s `kinds` takes. Lights are not spawned yet. */
+export const SCENE_KINDS = ["mesh", "entity", "npc", "light"] as const;
+
+/** Which of a scene's objects to load (#48, #49). Both may be given; left out, every object loads. */
+export interface SceneFilter {
+  /** Only objects of these kinds, such as `["npc"]` for a baked scene's people. The others are skipped as `not in kinds`. */
+  kinds?: readonly string[];
+  /** Objects to leave out, by their id in the scene. They are skipped as `skipped by id`. */
+  skip?: readonly string[];
+}
+
 /**
- * Reads a scene (parsed JSON) into spawn plans. Throws when it is not a scene.
+ * Reads a scene (parsed JSON) into spawn plans. Throws when it is not a scene, or when
+ * `kinds` names a kind REDnode does not know.
  *
  * @example
  * ```ts
  * const { plans, skipped } = readScene(JSON.parse(text));
+ * const people = readScene(JSON.parse(text), { kinds: ["npc"] });
  * ```
  */
-export function readScene(scene: unknown): SceneRead {
+export function readScene(scene: unknown, filter: SceneFilter = {}): SceneRead {
   const s = scene as Scene;
   if (!s || typeof s !== "object" || !Array.isArray(s.objects)) throw new Error("not a scene: it has no objects list");
   if (typeof s.format === "number" && s.format > 2) throw new Error(`scene format ${s.format} is newer than REDnode reads (1 and 2)`);
+  const kinds = filter.kinds == null ? null : new Set(listOf(filter.kinds, "kinds"));
+  for (const k of kinds ?? []) {
+    if (!(SCENE_KINDS as readonly string[]).includes(k)) throw new Error(`kinds: "${k}" is not a scene kind. It takes ${SCENE_KINDS.join(", ")}`);
+  }
+  const skip = new Set(filter.skip == null ? [] : listOf(filter.skip, "skip"));
   const plans: ScenePlan[] = [];
   const skipped: { object: string; why: string }[] = [];
   const notes: string[] = [];
+  const seen = new Set<string>();
   for (const o of s.objects) {
     const object = String(o?.id ?? `#${plans.length + skipped.length}`);
+    seen.add(object);
+    if (skip.has(object)) {
+      skipped.push({ object, why: "skipped by id" });
+      continue;
+    }
+    if (kinds && !kinds.has(String(o?.kind))) {
+      skipped.push({ object, why: "not in kinds" });
+      continue;
+    }
     const t = o?.transform ?? {};
     const p = t.position ?? [];
     const r = t.rotation ?? [];
@@ -118,5 +146,12 @@ export function readScene(scene: unknown): SceneRead {
       skipped.push({ object, why: `unknown kind "${o.kind}"` });
     }
   }
+  const missing = [...skip].filter((id) => !seen.has(id));
+  if (missing.length) notes.push(`skip names ${missing.map((id) => `"${id}"`).join(", ")}, which the scene has no object for`);
   return { name: String(s.name ?? "scene"), plans, skipped, notes };
+}
+
+function listOf(v: unknown, what: string): string[] {
+  if (!Array.isArray(v) || !v.every((x) => typeof x === "string")) throw new Error(`${what}: give a list of texts`);
+  return v as string[];
 }

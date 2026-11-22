@@ -405,6 +405,14 @@ export interface PinOptions {
   text?: string;
   /** How it looks: colour, font, sizes, the post's height and its scale. */
   style?: PinStyle;
+  /**
+   * The pin's id in a `.pins.json` file, up to 40 characters (#50): {@link world.pinSet}'s
+   * `save` writes it, and makes one for a pin without it. A scene names a pin by it, since the
+   * title may change.
+   */
+  key?: string;
+  /** The way the pin faces, in degrees (0 faces +Y, as {@link world.spawn}'s `yaw`). Saved with the pin; nothing is drawn for it. */
+  yaw?: number;
   /** WP1's name for `style.color`, still read. */
   color?: string;
   /** WP1's name for `style.pinHeight`, still read. */
@@ -434,6 +442,10 @@ export interface PinEntry {
   set: string | null;
   /** Hidden with its set ({@link world.pinSet}'s `show`). */
   hidden: boolean;
+  /** Its id in a `.pins.json` file, when it came from one or was saved to one (#50). */
+  key?: string;
+  /** The way it faces, in degrees, when it has one: Drop a pin here saves V's facing (#50). */
+  yaw?: number;
 }
 
 /** Where {@link world.goTo} put V. */
@@ -1186,22 +1198,38 @@ export const world = {
    * its id in the scene (a function picks each label, or null for none), as `world.spawn`'s
    * `label` does.
    *
+   * `kinds` loads only objects of those kinds (`"mesh"`, `"entity"`, `"npc"`, `"light"`), such
+   * as a baked scene's people, whose props are already in the game's own world; an unknown kind
+   * is refused. `skip` leaves out objects by their id in the scene, such as the people a
+   * package spawns itself. Objects left out are in the answer's `skipped`, as `not in kinds` or
+   * `skipped by id`.
+   *
    * @example
    * ```ts
    * const r = await world.load("scenes/my_alley.scene.json");
    * // later
    * await world.unload(r.name);
+   *
+   * // A baked scene: its props are in the game's world already, so only its people.
+   * await world.load("scenes/my_alley.scene.json", { kinds: ["npc"], wait: false, name: "alley_people" });
    * ```
    */
   async load(
     scene: Scene | string,
-    options: { name?: string; wait?: boolean; alwaysSpawned?: boolean; label?: boolean | ((object: string) => string | PinLabel | null) } = {},
+    options: {
+      name?: string;
+      wait?: boolean;
+      alwaysSpawned?: boolean;
+      label?: boolean | ((object: string) => string | PinLabel | null);
+      kinds?: ("mesh" | "entity" | "npc" | "light")[];
+      skip?: string[];
+    } = {},
   ): Promise<LoadResult> {
     const started = Date.now();
     let read: SceneRead;
     try {
       const data = typeof scene === "string" ? await transport().call("world.scene", { file: scene }) : scene;
-      read = readScene(data);
+      read = readScene(data, { kinds: options.kinds, skip: options.skip });
     } catch (err) {
       throw cleanError(err);
     }

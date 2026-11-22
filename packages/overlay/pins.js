@@ -17,6 +17,8 @@
 
 'use strict';
 
+const crypto = require('node:crypto');
+
 const MAX_PINS = 200;
 const COLOR = /^#[0-9a-fA-F]{3,8}$/;
 const FONT = /^[\w\s,'"-]{1,80}$/;
@@ -174,6 +176,8 @@ function createPins({ sendJson, log, openAtlas, closeAtlas, atlasWindow, toPage 
     text: p.text,
     set: p.set,
     hidden: !!p.hidden,
+    ...(p.key ? { key: p.key } : {}),
+    ...(p.yaw !== undefined ? { yaw: p.yaw } : {}),
     style: styleFor(p),
     color: styleFor(p).color,
     height: styleFor(p).pinHeight,
@@ -195,6 +199,11 @@ function createPins({ sendJson, log, openAtlas, closeAtlas, atlasWindow, toPage 
       if (options?.color !== undefined && style.color === undefined) Object.assign(style, styleOf({ color: options.color }, 'world.pin'));
       if (options?.height !== undefined && style.pinHeight === undefined) Object.assign(style, styleOf({ pinHeight: options.height }, 'world.pin'));
       const pin = { id: nextId++, owner, at: place, entity, title, text: options?.text ? String(options.text).slice(0, 160) : '', style, set: set ? String(set).slice(0, 80) : null, hidden: false };
+      // #50: a set's pin keeps its file id and facing, so a save writes them back.
+      const key = pinKeyOf(options?.key);
+      if (key) pin.key = key;
+      const yaw = yawOf(options?.yaw);
+      if (yaw !== undefined) pin.yaw = yaw;
       pins.set(pin.id, pin);
       if (pins.size === 1) log(`Pins: ${owner ?? 'a tool'} dropped the first pin`);
       refresh(); // the plugin hears of it once the page has laid it out
@@ -289,7 +298,10 @@ function createPins({ sendJson, log, openAtlas, closeAtlas, atlasWindow, toPage 
     forSave(owner, set) {
       return [...pins.values()]
         .filter((p) => p.owner === owner && p.at && (set === undefined || set === null || p.set === set))
-        .map((p) => ({ title: p.title, text: p.text, at: { ...p.at }, style: { ...p.style } }));
+        .map((p) => {
+          p.key ??= newPinKey(); // given once, so the next save writes the same id
+          return { id: p.key, title: p.title, text: p.text, at: { ...p.at }, ...(p.yaw !== undefined ? { yaw: p.yaw } : {}), style: { ...p.style } };
+        });
     },
 
     /** One pin, any owner's, or null. */
@@ -347,4 +359,21 @@ function createPins({ sendJson, log, openAtlas, closeAtlas, atlasWindow, toPage 
   };
 }
 
-module.exports = { createPins, styleOf, BASE };
+// #50: a pin's id in a .pins.json file, kept across renames, and the way it faces.
+function newPinKey() {
+  return crypto.randomBytes(5).toString('hex');
+}
+function pinKeyOf(v) {
+  const k = typeof v === 'string' ? v.trim() : '';
+  return k && k.length <= 40 ? k : null;
+}
+/** Degrees in (-180, 180], to 0.1; undefined when it is not a number. */
+function yawOf(v) {
+  const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() ? Number(v) : NaN;
+  if (!Number.isFinite(n)) return undefined;
+  let d = ((n % 360) + 360) % 360;
+  if (d > 180) d -= 360;
+  return Math.round(d * 10) / 10 || 0;
+}
+
+module.exports = { createPins, styleOf, BASE, newPinKey, pinKeyOf, yawOf };

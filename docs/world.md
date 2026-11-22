@@ -2384,3 +2384,31 @@ Claude then reads the host's `Pins:` lines (drops, Go there, clicks) and the plu
 | Step 11 again, 2026-11-14, by the owner, same session | **Pass** once the Console had a pin of its own: the first two saves wrote 0 pins (the Console pin of step 4 went at step 12's save load, as designed, and only the save was run again); with the pin command and the save in one line, `count: 1`, and Open listed the set "console" with its pink pin, beside My pins (Start) and Scene B (B1), all shown. Found on the way: the Pins window cannot list a switched-off set's pins, and ✕ removes a set's pin from its file at once with no undo (both to improve) |
 | Step 13, 2026-11-14, by the owner, dev PC, after a restart of the game | **Pass**: the new host (18:36:18) logged "3 of the player's pin set(s) shown" at its start, and the owner saw the sets and their pins after loading a save. **WP3 passed; #43 closed** |
 
+## The WL build: scene filters, editor service calls, a pin's id and facing (0.70.0)
+
+Agreed with the owner on 2026-11-17 and 2026-11-18, built on 2026-11-21: EDGEbuilder's [#49](https://github.com/Edgemodders/REDnode/issues/49) and EDGEdir's [#48](https://github.com/Edgemodders/REDnode/issues/48) part 1, with [#50](https://github.com/Edgemodders/REDnode/issues/50) part 3 folded in. #48 part 2 (directing a person who does not carry the workspot) and #50 part 2 (a walk) wait for the scene spike that follows.
+
+### WL: build
+
+| Part | Where | What |
+|---|---|---|
+| Scene filters (#49, #48) | `packages/rednode/src/scene.ts` (`readScene(scene, { kinds, skip })`, `SCENE_KINDS`), `world.load` in world.ts, `loadSceneForAgent` in main.js, MCP `world_load` | `kinds`: `mesh`, `entity`, `npc`, `light`; others skipped as `not in kinds`. `skip`: object ids, skipped as `skipped by id`; an id the scene lacks is noted. An unknown kind, or either option not a list of texts, is refused. Both scene formats |
+| Editor service call (#48) | `editor.js` (`POST /editor/service.call`, 2 MB body), `serviceCallFromEditor` in main.js, `editorAllowed(editor, label, pkg)` with `editorKey`, the Editor request window (`editorask`) | The router's `call` with caller `{ editor, name: "editor:<tool>" }`, a 30 s cap. The Allow is kept per tool and package, apart from the tool's Try Live Allow; the window says "A tool asks to call a mod" and names both. Refusals in words: 404 no package or no service, 403 denied or no answer, 422 no such function, threw or timed out |
+| A pin's id and facing (#50 part 3) | `pins.js` (`key` and `yaw` on a pin, `newPinKey`, `pinKeyOf`, `yawOf`; `forSave` gives a lasting key), `pinsets.js` (read and write `id`, `yaw`), `playerPlace` in main.js (V's facing from `GetWorldForward`) | Format version 1 still. Every pin gets a 10-hex `id` when REDnode writes its set; a duplicate or an id over 40 characters is dropped on reading and a new one given at the next write. `yaw` in degrees (-180 to 180, 0.1), 0 facing +Y as `world.spawn`'s. `world.pins()` lists `key` and `yaw`; `world.pinSet` keeps both; `world.pin` takes them |
+
+Checks: scratchpad `wl/plain.mjs` (32, plain Node: the filters on formats 1 and 2, the pin file, the player's sets, a package's load and save) and `wl/run.sh` (25, the mock game on the dev and packaged host: the Editor request window answered over DevTools, two scratch service packages, Drop a pin here with a stand-in V facing +X).
+
+### WL test
+
+Claude drives the editor calls and the scene loads from VS Code while the owner plays; the owner answers the windows and watches. Load a save first, somewhere with open ground in front of V.
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | In the launcher, switch on **Counter service** | It runs (the Mod log says its service is ready) |
+| 2 | Claude calls Counter service's `add` through the editor channel, as the tool "REDnode test". Press F10 for the mouse | The **Editor request** window says "A tool asks to call a mod": REDnode test asks to call Counter service. Press **Allow**; Claude gets the new count |
+| 3 | Claude calls `get` the same way | No window this time; Claude gets the count |
+| 4 | Claude calls Counter service as the tool "Deny test" | The window asks again, naming Deny test. Press **Deny**; Claude gets "denied" |
+| 5 | Claude loads a test scene 5 m in front of V with `kinds: ["npc"]` (a box and two people). Claude Code asks you first | Two people stand there, and no box |
+| 6 | Claude loads it again under the same name with `skip` naming one person | The box and the other person; the first load is gone |
+| 7 | Claude unloads it | All of it goes |
+| 8 | Open the **Pins** window. Face one way and press **Drop a pin here**, then turn V about a quarter turn and press it again | Two pins. Claude reads the set's file: each has an `id`, and their `yaw` values differ by about 90 |

@@ -1250,6 +1250,16 @@ Each app's version, dimmed beside its title, and the launcher's switch. Steps: [
 | Dev host, stand-in plugin, 2026-11-18, 0.68.2, by Claude | **Pass**: 12 checks (scratchpad `tver/run.sh`): `v0.68.2` right after the Mod log's and the launcher's titles, the switch on by default and shown on in the launcher, off hides them at once and is kept in settings.json, on brings them back, a drawer shows none. The dropdown's and the Mod log's checks pass again on this build |
 | Game 2.5, laptop, 2026-11-19, 0.68.2 (update zip over 0.67.3) | **Pass**: all five steps (REDnode's windows `v0.68.2`, UI kit `v0.1.1`, VATS spike `v0.7.1`, the switch off and kept off across a restart, on again) |
 
+## The WL build (0.70.0)
+
+`world.load`'s `kinds` and `skip` (#49, #48), the editor channel's `service.call` with its Allow per tool and package (#48), and a pin's `id` and `yaw` from Drop a pin here (#50 part 3). Steps: [docs/world.md, "WL test"](world.md#wl-test).
+
+| Run | Result |
+|---|---|
+| Plain Node, 2026-11-21, 0.70.0, by Claude | **Pass**: 32 checks (scratchpad `wl/plain.mjs`): the filters on scene formats 1 and 2 (only the people, kinds and skip together, lights still not spawned, an empty list, unknown kinds and non-lists refused, a missing skip id noted); a set from before #50 reads and gets ids at its first write, the same ids at the next, kept across a rename; duplicate and over-long ids dropped; yaw read as degrees in (-180, 180]; Drop a pin here writes id and yaw, `world.pins` lists them, a package's load and save keeps them |
+| Dev and packaged host, stand-in plugin, 2026-11-21, 0.70.0, by Claude | **Pass**: 25 checks (scratchpad `wl/run.sh`, `MOCK_HOST_EXE` for the packaged host): the Editor request window names the tool and package in its own words, Allow lets the call through with `service.caller()` `{ editor, name: "editor:EDGEdir" }`, a second call asks nothing, another package asks again and Deny holds, Try Live asks on its own; every refusal in words; a 150 KB cue sheet; the 30 s cap; Drop a pin here with V facing +X writes `yaw: -90` |
+| Game 2.5 | **Not run** |
+
 ## Hide on a click in the game (0.69.0)
 
 The launcher's switch that makes a click outside REDnode's windows hide the whole overlay, not leave windows pinned to the HUD. Steps: [docs/overlay.md, "Hide on a click in the game (0.69.0)"](overlay.md#hide-on-a-click-in-the-game-0690).

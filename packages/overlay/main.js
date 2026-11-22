@@ -2652,9 +2652,9 @@ async function removeForAgent(hash) {
   return (await bridgeCall('rtti.call', { class: 'REDnodeWorld', fn: 'Delete', args: [{ hash: id }] })) === true;
 }
 
-async function loadSceneForAgent(file, name) {
+async function loadSceneForAgent(file, name, filter = {}) {
   const { readScene } = await sceneReader;
-  const read = readScene(readSceneFile(null, file));
+  const read = readScene(readSceneFile(null, file), { kinds: filter.kinds, skip: filter.skip });
   const scene = name || read.name;
   if (agentScenes.has(scene)) await unloadSceneForAgent(scene);
   const ids = [];
@@ -3705,7 +3705,10 @@ async function playerPlace() {
     const v = await call({ fn: 'GetPlayer', args: [{}] });
     if (!v?.$ref) throw new Error('No player: load a save first');
     const p = await call({ self: { $ref: v.$ref }, fn: 'GetWorldPosition' });
-    return { x: p.X, y: p.Y, z: p.Z };
+    // #50: the way V faces, as world.spawn's yaw (0 faces +Y).
+    const f = await call({ self: { $ref: v.$ref }, fn: 'GetWorldForward' }).catch(() => null);
+    const yaw = f && Number.isFinite(f.X) && Number.isFinite(f.Y) && (f.X || f.Y) ? (Math.atan2(f.Y, f.X) * 180) / Math.PI - 90 : undefined;
+    return { x: p.X, y: p.Y, z: p.Z, ...(yaw !== undefined ? { yaw } : {}) };
   });
 }
 
@@ -3759,7 +3762,7 @@ function loadPinSet(id, params) {
   const read = readPinFile(file);
   const name = params?.name ? String(params.name).slice(0, 80) : read.name;
   pinsHost.clear(id ?? null, name); // loading a set again replaces it
-  const ids = read.pins.map((p) => pinsHost.add(id ?? null, { title: p.title, text: p.text, at: p.at, style: p.style }, name));
+  const ids = read.pins.map((p) => pinsHost.add(id ?? null, { title: p.title, text: p.text, at: p.at, style: p.style, key: p.id, yaw: p.yaw }, name));
   return { name, ids, file };
 }
 
@@ -4646,15 +4649,21 @@ async function answerKeyAsk(aid, allow, how, typed) {
 // channel (editor.js) while the player plays: TweakDB changes kept in an undo journal of its own
 // ("editor:<name>", as a package's), V's quickhack list refreshed, an item given. The first change
 // from a tool waits for the player's Allow in REDnode's Editor request window; Allow and Deny last
-// until the host restarts.
+// until the host restarts. A tool's calls to a package's service (#48) are allowed per tool and
+// package, apart from its Try Live changes.
 
 const EDITOR_ASK_MS = 5 * 60 * 1000;
 const editorAsks = []; // waiting requests, the first one shown
-const editorAnswers = new Map(); // editor name -> true (allowed) or false (denied), this run
+const editorAnswers = new Map(); // editorKey -> true (allowed) or false (denied), this run
 let nextEditorAid = 1;
 
+// What an Allow covers: a tool's Try Live changes, or its calls to one package's service.
+const editorKey = (editor, pkg) => (pkg ? `${editor}\n${pkg}` : editor);
+
 function editorAskView(a) {
-  return a ? { aid: a.aid, editor: a.editor, label: a.label, waiting: editorAsks.length - 1 } : null;
+  if (!a) return null;
+  const pkg = a.package ? { package: a.package, packageName: apps.get(a.package)?.manifest.name ?? a.package } : {};
+  return { aid: a.aid, editor: a.editor, label: a.label, ...pkg, waiting: editorAsks.length - 1 };
 }
 
 function showEditorAsk() {
@@ -4674,24 +4683,51 @@ function finishEditorAsk(a, allowed, why) {
   if (i < 0) return;
   editorAsks.splice(i, 1);
   clearTimeout(a.timer);
-  if (allowed !== null) editorAnswers.set(a.editor, allowed);
-  log(`Editor: ${a.editor}'s request to change the game: ${why}`);
+  if (allowed !== null) editorAnswers.set(editorKey(a.editor, a.package), allowed);
+  log(`Editor: ${a.editor}'s request to ${a.package ? `call ${a.package}` : 'change the game'}: ${why}`);
   for (const r of a.waiting) r(allowed);
   showEditorAsk();
 }
 
-/** Resolves true once the player allowed the editor, false if denied, null with no answer in time. */
-function editorAllowed(editor, label) {
-  if (editorAnswers.has(editor)) return Promise.resolve(editorAnswers.get(editor));
-  const same = editorAsks.find((a) => a.editor === editor);
+/**
+ * Resolves true once the player allowed the editor, false if denied, null with no answer in time.
+ * With a package (#48): the editor's calls to that package's service, asked and kept on their own.
+ */
+function editorAllowed(editor, label, pkg = null) {
+  const key = editorKey(editor, pkg);
+  if (editorAnswers.has(key)) return Promise.resolve(editorAnswers.get(key));
+  const same = editorAsks.find((a) => editorKey(a.editor, a.package) === key);
   if (same) return new Promise((resolve) => same.waiting.push(resolve));
   return new Promise((resolve) => {
-    const a = { aid: nextEditorAid++, editor, label, waiting: [resolve] };
+    const a = { aid: nextEditorAid++, editor, label, package: pkg, waiting: [resolve] };
     a.timer = setTimeout(() => finishEditorAsk(a, null, 'no answer in 5 minutes'), EDITOR_ASK_MS);
     editorAsks.push(a);
-    log(`Editor: ${editor} asks to change the game${label ? ` (${label})` : ''}`);
+    log(`Editor: ${editor} asks to ${pkg ? `call ${pkg}'s service` : 'change the game'}${label ? ` (${label})` : ''}`);
     showEditorAsk();
   });
+}
+
+// POST /editor/service.call (#48): a tool on the player's PC calls a package's service, as another
+// mod would, once the player allowed that tool and package. service.caller() answers
+// { editor, name: "editor:<tool>" }. Answers [status, body] for editor.js.
+const EDITOR_CALL_MS = 30000;
+async function serviceCallFromEditor(editor, pkg, fn, args) {
+  if (!services) return [503, { ok: false, reason: 'REDnode is still starting: try again in a moment' }];
+  const entry = apps.get(pkg);
+  if (!entry) return [404, { ok: false, reason: `No package "${pkg}" is installed` }];
+  if (!entry.manifest.service) return [404, { ok: false, reason: `${entry.manifest.name} offers no service (its rednode-app.json names no "service" file)` }];
+  const ok = await editorAllowed(editor, '', pkg);
+  if (ok !== true) {
+    const reason = ok === false ? `The player denied ${editor} calls to ${entry.manifest.name} for this session` : `No answer in the game: allow ${editor} in the Editor request window`;
+    return [403, { ok: false, reason }];
+  }
+  try {
+    const result = await services.call({ editor, name: `editor:${editor}` }, pkg, fn, args, { timeoutMs: EDITOR_CALL_MS });
+    return [200, { ok: true, result: result === undefined ? null : result }];
+  } catch (err) {
+    log(`Editor: ${editor}'s call ${pkg}.${fn} failed: ${err.message}`);
+    return [422, { ok: false, reason: err.message }];
+  }
 }
 
 function answerEditorAsk(aid, allow) {
@@ -6352,7 +6388,7 @@ app.whenReady().then(() => {
   // The editor channel (#17): tools on this PC, such as EDGEwave, play game sounds through
   // it. "editorChannel": "off" in settings.json turns it off.
   if (settings.editorChannel !== 'off') {
-    editor = createEditor({ log, version: VERSION, connected: () => connected, bridgeCall, tryLive });
+    editor = createEditor({ log, version: VERSION, connected: () => connected, bridgeCall, tryLive, serviceCall: serviceCallFromEditor });
     editor.start();
   } else log('Editor channel: off in settings');
   // Mods start below; one may ask for the kernel's tools at once (mcpFor).

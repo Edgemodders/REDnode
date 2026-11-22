@@ -23,8 +23,16 @@
 //   POST /editor/quickhacks.refresh { editor }              -> { ok }   V's cached quickhack list cleared
 //   POST /editor/player.give       { editor, item, count? } -> { ok }
 //
+// A tool's call to a package's service (#48), such as EDGEdir handing its player package a cue
+// sheet. Any function the service file exports, as for another mod; the first call to a package
+// waits for the player's Allow of that tool and package. Capped at 30 s, so answer at the start
+// and ask for the state with another call. service.caller() answers { editor, name: "editor:<tool>" }.
+//
+//   POST /editor/service.call      { editor, package, call, args? } -> { ok, result }
+//
 // Errors answer { ok: false, reason }. The sound calls cannot change the game's files or its
-// state; the Try Live calls change TweakDB (never a file) once the player allows it.
+// state; the Try Live calls change TweakDB (never a file) once the player allows it; a service
+// call does what the package's function does.
 
 'use strict';
 
@@ -45,6 +53,8 @@ const MAX_APPLY_BODY = 2 * 1024 * 1024;
  * @param {(method: string, params: object) => Promise<any>} host.bridgeCall
  * @param {string} [host.file]                            where editor.json goes
  * @param {object} [host.tryLive]                         Try Live (#44): ask, apply, reset, refreshQuickhacks, give
+ * @param {(editor: string, pkg: string, fn: string, args: unknown[]) => Promise<[number, object]>} [host.serviceCall]
+ *        #48: a package's service call, after the player's Allow of that editor and package
  */
 function createEditor(host) {
   const file = host.file ?? path.join(process.env.LOCALAPPDATA ?? path.join(require('node:os').homedir(), 'AppData', 'Local'), 'REDnode', 'editor.json');
@@ -128,6 +138,24 @@ function createEditor(host) {
     return [200, await host.tryLive.give(editor, item, count)];
   });
 
+  // #48: a package's service, by its id and function name.
+  async function serviceCall(params) {
+    if (!host.serviceCall) return [404, { ok: false, reason: 'Service calls are not available in this REDnode' }];
+    let editor;
+    try {
+      editor = editorOf(params);
+    } catch (err) {
+      return [400, { ok: false, reason: err.message }];
+    }
+    const pkg = String(params.package ?? '').trim();
+    if (!pkg) return [400, { ok: false, reason: 'Name the package in "package", by its id, such as "edgedir-player"' }];
+    const fn = String(params.call ?? '').trim();
+    if (!fn) return [400, { ok: false, reason: 'Name the function in "call", such as "play"' }];
+    const args = params.args ?? [];
+    if (!Array.isArray(args)) return [400, { ok: false, reason: 'Give the arguments in "args", a list' }];
+    return host.serviceCall(editor, pkg, fn, args);
+  }
+
   async function handle(req, res) {
     // Only this server's own name, and no web page: a browser sends an Origin.
     const here = [`127.0.0.1:${port}`, `localhost:${port}`];
@@ -149,12 +177,14 @@ function createEditor(host) {
       '/editor/tweakdb.reset': reset,
       '/editor/quickhacks.refresh': refresh,
       '/editor/player.give': give,
+      '/editor/service.call': serviceCall,
     }[url.pathname];
     if (!call) return fail(res, 404, `No call ${url.pathname}`);
     if (req.method !== 'POST') return fail(res, 405, 'Use POST');
     let params;
     try {
-      params = await readBody(req, url.pathname === '/editor/tweakdb.apply' ? MAX_APPLY_BODY : MAX_BODY);
+      // A Try Live change carries a quickhack's records; a service call may carry a cue sheet.
+      params = await readBody(req, ['/editor/tweakdb.apply', '/editor/service.call'].includes(url.pathname) ? MAX_APPLY_BODY : MAX_BODY);
       if (!params || typeof params !== 'object' || Array.isArray(params)) throw new Error('The body is a JSON object');
     } catch (err) {
       return fail(res, 400, err.message);

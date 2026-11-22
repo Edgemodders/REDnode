@@ -66,10 +66,15 @@ export interface ServiceInfo {
 export interface ServiceCaller {
   /** The calling package's id. */
   id?: string;
-  /** The calling package's name. */
+  /** The calling package's name; `"editor:<tool>"` when a tool calls through the editor channel. */
   name?: string;
   /** The assistant's MCP client name, when an assistant calls. */
   assistant?: string;
+  /**
+   * The tool's name, such as `"EDGEdir"`, when a tool on the player's PC calls through the
+   * editor channel's `service.call` (the player allowed that tool to call this package).
+   */
+  editor?: string;
 }
 
 /** Options for calls made through {@link ServiceHandle.$with}. */

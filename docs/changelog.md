@@ -12,6 +12,12 @@ How to keep it:
 
 ## Unreleased
 
+### New
+
+- **`world.load` filters** ([#49](https://github.com/Edgemodders/REDnode/issues/49), [#48](https://github.com/Edgemodders/REDnode/issues/48)): `kinds` loads only objects of those kinds, such as `["npc"]` for a baked scene whose props are already in the game's world, and `skip` leaves out objects by their id in the scene. Both are in the answer's `skipped`, and MCP's `world_load` takes them too.
+- **Tools can call a mod's service** ([#48](https://github.com/Edgemodders/REDnode/issues/48)): `POST /editor/service.call` on the editor channel, after the player allows that tool and that mod in the Editor request window. `service.caller()` names the tool.
+- **A pin's id and facing** ([#50](https://github.com/Edgemodders/REDnode/issues/50)): every pin in a `.pins.json` file gets an `id` that stays when it is renamed, and **Drop a pin here** saves the way V faces as `yaw`. Still format version 1; `world.pins()` lists both, and `world.pinSet` keeps them.
+
 ## 0.69.0 (2026-11-21)
 
 <!-- nexus

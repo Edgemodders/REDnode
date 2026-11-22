@@ -703,23 +703,26 @@ function createMcp(host) {
         title: 'Load a scene',
         description:
           'Loads an EDGEbuilder scene file (.scene.json, a full path) into the running game: its meshes, entities and npc objects (lights are not spawned yet). ' +
-          'People stand where placed and stay friendly to V. Loading a scene of the same name again replaces it; unload removes it. The player is asked before every call.',
+          'People stand where placed and stay friendly to V. Loading a scene of the same name again replaces it; unload removes it. ' +
+          'kinds loads only objects of those kinds (a baked scene\'s people: ["npc"]); skip leaves out objects by their id in the scene. The player is asked before every call.',
         inputSchema: {
           file: z.string().optional().describe('The scene file, a full path. Not needed for unload'),
           name: z.string().optional().describe('The scene name; default the file\'s own'),
+          kinds: z.array(z.enum(['mesh', 'entity', 'npc', 'light'])).optional().describe('Only objects of these kinds; default every kind'),
+          skip: z.array(z.string()).optional().describe('Objects to leave out, by their id in the scene'),
           unload: z.boolean().optional().describe('Remove the scene of this name instead'),
         },
         annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
         _meta: ASK_FIRST,
       },
-      async ({ file, name, unload }) => {
+      async ({ file, name, kinds, skip, unload }) => {
         try {
           if (unload) {
             if (!name) return fail('Give the name of the scene to unload');
             return text(await host.worldUnload(name));
           }
           if (!file) return fail('Give the scene file');
-          return text(await host.worldLoad(file, name));
+          return text(await host.worldLoad(file, name, { kinds, skip }));
         } catch (err) {
           return fail(err.message);
         }
