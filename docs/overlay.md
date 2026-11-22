@@ -1034,6 +1034,8 @@ Asked for by the owner on 2026-11-21. In interactive mode a click on empty scree
 | 5 | F10 | The widget shows again (passive mode); F10 once more opens the windows |
 | 6 | Close the game and start it again, F10, click outside | Still on: everything hides. Switch it off to leave it as before |
 
+**Passed in game on 2026-11-21** on the dev PC (REDnode 0.69.0, all six steps; docs/testing.md has the log lines).
+
 ### UI kit
 
 UI is written as markup, not built by hand in code. Two layers keep it optional:

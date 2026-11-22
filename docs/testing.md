@@ -1257,7 +1257,7 @@ The launcher's switch that makes a click outside REDnode's windows hide the whol
 | Run | Result |
 |---|---|
 | Dev and packaged host, stand-in plugin, 2026-11-21, 0.69.0, by Claude | **Pass**: 11 checks (scratchpad `clickaway/run.sh`): off by default and shown off in the launcher, the host sends `overlay.clickAway` with `hide: false` at hello, on sends `hide: true` at once and is kept in settings.json, a new hello sends it again, the same value again sends nothing, off sends `hide: false`. The plugin's unit test checks that a click on empty screen goes to hidden with it and to passive without it |
-| Game 2.5 | **Not run** |
+| Game 2.5, dev PC, 2026-11-21, REDnode 0.69.0 | **Pass**: all six steps. The host logged the switch on at 21:03:16; after the restart the plugin was told at start that a click hides the overlay (step 6), and a click went from interactive straight to hidden (21:05:10), F10 then passive. No errors in the plugin, host or script logs. The first launch that evening crashed before REDnode loaded: a Vortex collection had deployed the game 2.31 builds of RED4ext, ArchiveXL, Codeware and TweakXL over EDGEdeck's, and its purge put back REDnode 0.68.1 from a `.vortex_backup`; redeployed with EDGEdeck and deploy-native.ps1 |
 
 ## App keys (0.67.0, 0.67.1)
 
