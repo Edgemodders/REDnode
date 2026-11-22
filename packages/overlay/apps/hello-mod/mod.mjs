@@ -12,6 +12,17 @@ const loads = ui.text('Saves loaded since the mod started: 0', { tone: 'dim' });
 let follow = true;
 let presses = 0;
 
+// A tooltip (tip) shows when the cursor rests on a control, a disabled one too. The button
+// says what it is doing while it rests between presses.
+const SOUND_TIP = 'Play the menu press sound';
+const sound = ui.button('Play sound', async () => {
+  presses += 1;
+  sound.set({ disabled: true, tip: 'Playing... ready again in 2 seconds' });
+  await game.audio.play('ui_menu_onpress');
+  console.log(`Sound button pressed ${presses} time(s)`);
+  setTimeout(() => sound.set({ disabled: false, tip: SOUND_TIP }), 2000);
+}, { tip: SOUND_TIP });
+
 ui.window({
   title: 'Hello mod',
   anchor: 'right',
@@ -24,15 +35,11 @@ ui.window({
     where,
     state,
     ui.row(
-      ui.button('Play sound', async () => {
-        presses += 1;
-        await game.audio.play('ui_menu_onpress');
-        console.log(`Sound button pressed ${presses} time(s)`);
-      }),
+      sound,
       ui.toggle('Follow', (on) => {
         follow = on;
         console.log(`Follow ${on ? 'on' : 'off'}`);
-      }, { checked: true }),
+      }, { checked: true, tip: 'Update the position twice a second' }),
     ),
     loads,
     ui.text(`Mod code: ${VERSION}, loaded at ${new Date().toLocaleTimeString()}`, { tone: 'accent' }),

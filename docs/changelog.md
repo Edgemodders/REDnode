@@ -18,6 +18,11 @@ How to keep it:
 - **Tools can call a mod's service** ([#48](https://github.com/Edgemodders/REDnode/issues/48)): `POST /editor/service.call` on the editor channel, after the player allows that tool and that mod in the Editor request window. `service.caller()` names the tool.
 - **A pin's id and facing** ([#50](https://github.com/Edgemodders/REDnode/issues/50)): every pin in a `.pins.json` file gets an `id` that stays when it is renamed, and **Drop a pin here** saves the way V faces as `yaw`. Still format version 1; `world.pins()` lists both, and `world.pinSet` keeps them.
 - **`game.player.body()`** ([#47](https://github.com/Edgemodders/REDnode/issues/47)): V's body from character creation, `"wa"` or `"ma"`, so a mod can pick the workspot or garment made for it.
+- **Tooltips on ui controls** ([#55](https://github.com/Edgemodders/REDnode/issues/55)): `tip` on `ui.button`, `ui.toggle`, `ui.slider`, `ui.input` and `ui.select` shows a tooltip when the cursor rests on the control, a disabled one too, so a button that waits can say why. `set({ tip })` changes or clears it, and a tooltip already showing takes the new text. The Hello mod sample shows it.
+
+### Fixed
+
+- A UI kit tooltip stayed on screen when the cursor moved from its control onto a part of the window with no tooltip of its own; it now goes.
 
 ## 0.69.0 (2026-11-21)
 

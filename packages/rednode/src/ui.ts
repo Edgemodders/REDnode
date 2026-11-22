@@ -58,12 +58,16 @@ export interface ButtonProps {
   disabled?: boolean;
   /** A game sound event played on press. The UI kit's default is used when not set. */
   sound?: string;
+  /** A tooltip shown when the player rests the cursor on it, a disabled one too. Change or clear it with `set({ tip })`. Needs REDnode 0.70.0 or later. */
+  tip?: string;
 }
 /** Properties of {@link ui.toggle}. */
 export interface ToggleProps {
   label: string;
   checked?: boolean;
   disabled?: boolean;
+  /** A tooltip shown when the player rests the cursor on it, a disabled one too. Change or clear it with `set({ tip })`. Needs REDnode 0.70.0 or later. */
+  tip?: string;
 }
 /** Properties of {@link ui.slider}. */
 export interface SliderProps {
@@ -79,6 +83,8 @@ export interface SliderProps {
    * when they let go. Needs REDnode 0.55.2 or later.
    */
   live?: boolean;
+  /** A tooltip shown when the player rests the cursor on it, a disabled one too. Change or clear it with `set({ tip })`. Needs REDnode 0.70.0 or later. */
+  tip?: string;
 }
 /** Properties of {@link ui.input}. */
 export interface InputProps {
@@ -87,6 +93,8 @@ export interface InputProps {
   value?: string;
   /** Hide what is typed, for a key or a password (REDnode 0.44.0 or later). Keep the value with `secrets`, not in a file. */
   password?: boolean;
+  /** A tooltip shown when the player rests the cursor on it, a disabled one too. Change or clear it with `set({ tip })`. Needs REDnode 0.70.0 or later. */
+  tip?: string;
 }
 /** An option of {@link ui.select}: its value, or the value with a label to show and whether it can be picked. */
 export type SelectOption = string | { value: string; label?: string; disabled?: boolean };
@@ -100,6 +108,8 @@ export interface SelectProps {
   /** Shown while nothing is chosen, such as `"Pick a zoom"`. */
   placeholder?: string;
   disabled?: boolean;
+  /** A tooltip shown when the player rests the cursor on it, a disabled one too. Change or clear it with `set({ tip })`. Needs REDnode 0.70.0 or later. */
+  tip?: string;
 }
 /** Properties of {@link ui.progress}. */
 export interface ProgressProps {
@@ -411,7 +421,19 @@ export const ui = {
     return node("heading", { text, ...options });
   },
 
-  /** A button. `onClick` runs in the mod when the player presses it. */
+  /**
+   * A button. `onClick` runs in the mod when the player presses it. `tip` is a tooltip, shown on
+   * a disabled button too, to say why it cannot be pressed.
+   *
+   * @example
+   * ```ts
+   * const make = ui.button("Generate", async () => {
+   *   make.set({ disabled: true, tip: "Generating..." });
+   *   await generate();
+   *   make.set({ disabled: false, tip: "Make a clip from the prompt" });
+   * }, { tip: "Make a clip from the prompt" });
+   * ```
+   */
   button(label: string, onClick?: () => void, options: Omit<ButtonProps, "label"> = {}): UiNode<ButtonProps> {
     return node("button", { label, ...options }, { click: onClick && (() => onClick()) });
   },

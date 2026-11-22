@@ -1711,6 +1711,7 @@ nav button:focus-visible { outline: 2px solid var(--rn-accent-2); outline-offset
   function hideTip(e) {
     clearTimeout(tipTimer);
     if (tipTarget && e && e.type !== 'pointerleave' && e.type !== 'blur') tipDismissed = tipTarget;
+    if (e && (e.type === 'pointerleave' || e.type === 'blur')) tipDismissed = null; // the cursor left
     if (tipTarget) {
       const shown = tipBox && !tipBox.hidden;
       console.debug(`[rn-tip] ${shown ? 'hid' : 'dropped before showing'} "${tipName(tipTarget)}" (${e?.type || 'moved on'})`);
@@ -1730,6 +1731,9 @@ nav button:focus-visible { outline: 2px solid var(--rn-accent-2); outline-offset
     }
     target.setAttribute('data-rn-title', text);
     target.removeAttribute('title');
+    placeTip(target, text);
+  }
+  function placeTip(target, text) {
     if (!tipBox) {
       tipBox = document.createElement('div');
       tipBox.id = 'rn-tip';
@@ -1758,13 +1762,29 @@ nav button:focus-visible { outline: 2px solid var(--rn-accent-2); outline-offset
     if (document.documentElement.hasAttribute('rn-no-tips')) return; // the player turned them off
     const target = titledIn(e.composedPath());
     if (target === tipTarget) return;
-    if (target === tipDismissed) return;
+    if (target && target === tipDismissed) return; // a null target (no title here) hides a shown tip
     tipDismissed = null;
     hideTip();
     if (!target) return;
     tipTarget = target;
     console.debug(`[rn-tip] hover "${tipName(target)}" (${e.type})`);
     tipTimer = setTimeout(() => showTip(target), 500);
+  }
+  // A tooltip whose text changed (the ui builder's set({ tip }), #55): a shown one takes the new
+  // text, or hides when cleared. One closed by a press shows again after the usual pause, since
+  // the cursor is still on it (a press on Generate that sets "Generating..." shows that).
+  function retip(el) {
+    if (document.documentElement.hasAttribute('rn-no-tips')) return;
+    if (el === tipTarget && tipBox && !tipBox.hidden) {
+      const text = el.getAttribute('data-rn-title');
+      if (text) placeTip(el, text);
+      else hideTip();
+    } else if (el === tipDismissed && el.getAttribute('title')) {
+      tipDismissed = null;
+      clearTimeout(tipTimer);
+      tipTarget = el;
+      tipTimer = setTimeout(() => showTip(el), 500);
+    }
   }
   for (const type of ['pointerover', 'pointermove']) document.addEventListener(type, onPointer, true);
   for (const type of ['pointerdown', 'wheel', 'keydown']) document.addEventListener(type, hideTip, true);
@@ -1779,6 +1799,8 @@ nav button:focus-visible { outline: 2px solid var(--rn-accent-2); outline-offset
     sounds: { press: null, hover: null, notify: null },
     playSound,
     notify,
+    /** Shows a control's changed title at once when its tooltip is showing, or again after a press closed it. */
+    retip,
   };
   window.RednodeUI = RednodeUI;
 

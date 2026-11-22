@@ -402,13 +402,14 @@ game.on('PlayerPuppet.OnGameAttached', () => console.log('A save was loaded'));
 | Node | Makes |
 |---|---|
 | `ui.text(text, { tone })`, `ui.heading(text)` | Text. `tone` is `dim`, `accent` or `danger` |
-| `ui.button(label, onClick, { variant, sound })` | A button. `variant` is `ghost` or `danger` |
-| `ui.toggle(label, onChange, { checked })` | An on and off switch |
+| `ui.button(label, onClick, { variant, sound, tip })` | A button. `variant` is `ghost` or `danger` |
+| `ui.toggle(label, onChange, { checked, tip })` | An on and off switch |
 | `ui.slider(label, onChange, { min, max, step, value, unit, live })` | A slider. `onChange` gets the value when the player lets go; with `live: true` also while they drag, about 20 times a second (REDnode 0.55.2) |
 | `ui.input({ label, placeholder, value, password, onChange, onSubmit })` | A text field; `password: true` shows dots (0.44.0), for a key you keep with `secrets` |
 | `ui.select(label, options, { value, placeholder, disabled, onChange })` | A dropdown (REDnode 0.68.0): the box shows the chosen option and the list opens below it, or above it near the bottom of the window. `options` are strings or `{ value, label, disabled }`. Without `value` the first option is chosen, unless there is a `placeholder`. `onChange` gets the value the player picks. `set({ options, value })` changes them from the mod |
 | `ui.progress(value, { label, max })` | A progress bar |
 | `ui.list({ lines, keep, height, follow })` | A list of lines that scrolls on its own, for a log or a live feed. `push(...lines)` adds at the bottom (only the new lines travel to the window) and `clear()` empties it. It keeps the newest `keep` lines (500 by default, up to 5,000) and follows the newest one unless the player has scrolled up. Without `height` it fills the space the other nodes leave, at least 160 px; when they leave less, the window scrolls |
+| `tip` on a control | A tooltip (REDnode 0.70.0, [#55](https://github.com/Edgemodders/REDnode/issues/55)) on `ui.button`, `ui.toggle`, `ui.slider`, `ui.input` and `ui.select`, shown when the cursor rests on it, a disabled one too: `ui.button('Generate', run, { tip: 'Make a clip' })`, then `make.set({ disabled: true, tip: 'Generating...' })` while it works. `set({ tip: '' })` clears it. The launcher's **Tooltips** switch turns every tooltip off |
 | `ui.image(src, { width, alt, onClick })` | A picture (0.55.0): a PNG, JPEG, WebP or GIF file, a relative path in the package's folder or a full path in `pkg.dataDir`, a `data:image/` URL, or the picture's bytes (`Buffer`, `Uint8Array`). The height follows the picture; one wider than the window is scaled down, and pictures in a `ui.row` shrink side by side. `set({ src })` shows another picture, or the same file again after the mod wrote over it. A picture that cannot be shown says why in the window and in the Mod log. See the **Image mod** sample |
 | `ui.row(...nodes)`, `ui.column(...nodes)` | Layout |
 | `ui.window({ title, width, height, anchor, x, y, titleButtons, children, onClose })` | Opens the window. The player can drag it in interactive mode, and its position is saved. A saved position applies only while the window keeps the size it was saved with; after a size change it opens at its anchor again |

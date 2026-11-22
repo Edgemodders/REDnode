@@ -17,10 +17,11 @@ export const NOTES = {
   'hello-mod': {
     group: 'start',
     summary: 'The smallest useful Node mod: a window built with the ui builder that follows V, plays a sound and counts save loads.',
-    teaches: ['ui.window', 'ui.text', 'ui.button', 'ui.toggle', 'node.set', 'game.player.position', 'game.onState', 'game.on', 'game.audio.play'],
+    teaches: ['ui.window', 'ui.text', 'ui.button', 'ui.toggle', 'tip', 'node.set', 'game.player.position', 'game.onState', 'game.on', 'game.audio.play'],
     how: [
       'A Node mod is a JavaScript module named by `main` in its manifest. REDnode runs it in Node beside the game, so it can use npm packages, files and timers, and a mistake in it cannot crash the game.',
       'The window is a tree of nodes. `ui.text(...)` makes a node and returns it; keep the ones that change, then call `set()` on them. REDnode draws the tree with the UI kit and sends clicks back to your handlers.',
+      'The **Play sound** button has a tooltip (`tip`), shown when the cursor rests on it. While the sound plays the mod disables it and sets another tip with `set({ disabled, tip })`, so a disabled button can say why.',
       'Every half second the mod asks for V\'s position and shows it. `game.onState` reports menus, photo mode and scenes; `game.on("PlayerPuppet.OnGameAttached")` fires on each save load.',
     ],
     tryThis: ['Change `VERSION` and save: with hot reload on, the mod restarts and the window shows the new text.', 'Add a `ui.slider` that sets how often the position updates.'],

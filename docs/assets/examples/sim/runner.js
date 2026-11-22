@@ -284,7 +284,18 @@ function attr(el, name, value) {
   if (value === undefined || value === null || value === false) el.removeAttribute(name);
   else el.setAttribute(name, value === true ? '' : String(value));
 }
+// A control's tooltip (#55), as the host's builder sets it: the UI kit draws a title in the page.
+const TIPPED = new Set(['button', 'toggle', 'slider', 'input', 'select']);
+function setTip(el, tip) {
+  const text = tip === undefined || tip === null || tip === '' ? null : String(tip);
+  if (el.hasAttribute('data-rn-title')) {
+    if (text) el.setAttribute('data-rn-title', text);
+    else el.removeAttribute('data-rn-title');
+  } else attr(el, 'title', text);
+  window.RednodeUI?.retip?.(el);
+}
 function apply(type, el, props) {
+  if ('tip' in props && TIPPED.has(type)) setTip(el, props.tip);
   switch (type) {
     case 'text':
     case 'heading':

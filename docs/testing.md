@@ -1222,6 +1222,15 @@ REDagent needs its Anthropic key, as before.
 
 The 0.58.0 release ships EDGEmat 0.3.1 from npm, which ignores the shared REDbridge and starts its own. That combination was checked outside the game on 2026-11-05 with REDnode's variables set (scratchpad `e1/check-pin.cjs`, E1's 21 checks: tools listed, reads answered, ask flags). Raise the pin in `packages/overlay/package.json` once EDGEmat publishes a newer version.
 
+## Tooltips on ui controls (#55, 0.70.0)
+
+`tip` on the ui builder's controls, shown on a disabled button too. Steps and what each should show: [docs/overlay.md, "Tooltips on ui controls: test"](overlay.md#tooltips-on-ui-controls-test-0700).
+
+| Run | Result |
+|---|---|
+| Dev host, stand-in plugin, 2026-11-22, 0.70.0, by Claude | **Pass**: 16 checks (scratchpad `tip/run.sh`, DevTools reading the page back): see docs/overlay.md. The first run found a tooltip kept on screen after the cursor moved onto a part of the window with no title, fixed in the kit. The dropdown's 30 checks (`sel/run.sh`) pass again with the change; the 16 pass on the packaged host too (`MOCK_HOST_EXE`, `MOCK_HOST_DIR=--mcp=off`) |
+| Game 2.5 | **Not run** |
+
 ## The dropdown (0.68.0)
 
 `rn-select` in the UI kit and `ui.select` in Node mods' windows. Steps and what each should show: [docs/overlay.md, "Dropdown: test"](overlay.md#dropdown-test).

@@ -1036,6 +1036,31 @@ Asked for by the owner on 2026-11-21. In interactive mode a click on empty scree
 
 **Passed in game on 2026-11-21** on the dev PC (REDnode 0.69.0, all six steps; docs/testing.md has the log lines).
 
+### Tooltips on ui controls (#55, 0.70.0)
+
+Asked for by REDcode's Animation Tools pack on 2026-11-22 ([#55](https://github.com/Edgemodders/REDnode/issues/55)): its **Generate** button is disabled for about a minute while Uthana makes a clip, and the owner wanted it to say so. `tip` on `ui.button`, `ui.toggle`, `ui.slider`, `ui.input` and `ui.select` is a tooltip, and `set({ tip })` changes or clears it. It is the control's `title`, which the UI kit already draws in the page (Chromium's own tooltips never show in offscreen windows). A disabled `rn-button` still gets pointer moves, so its tip shows too.
+
+Two cases needed the kit's help, through `RednodeUI.retip(el)`, which the builder calls after each change. A tooltip already showing takes the new text in place, or goes when the tip is cleared. A press closes a tooltip until the cursor leaves (the kit's rule since 0.24.7), so a button that sets "Generating..." when pressed would say nothing; now a tip changed while the cursor is still on its control shows after the usual half second, with no move needed. On the way: a tooltip stayed shown when the cursor went from its control onto a part of the window with no title (`target === tipDismissed` was true for two nulls).
+
+| Part | Where |
+|---|---|
+| The package | `tip` in `ButtonProps`, `ToggleProps`, `SliderProps`, `InputProps`, `SelectProps` (`packages/rednode/src/ui.ts`) |
+| The builder | `setTip` in `builder/builder.js` (the title, or `data-rn-title` while its tooltip shows); the docs simulation's `runner.js` the same |
+| The UI kit | `retip` and `placeTip` in `packages/ui/src/rednode-ui.js`, `RednodeUI.retip` |
+| Sample | Hello mod 0.2.0: **Play sound** has a tip, and is disabled for 2 seconds after a press with another |
+| Mock check | Scratchpad `tip/run.sh` (16 checks, DevTools on port 9239): the title, a tip shown after a rest, hidden by a press, the new tip shown with no move once the mod disables the button, the text changed in place when the mod enables it, hidden on moving off with the title back, toggle and input tips, cleared with `tip: ''`, a disabled button's tip on a plain hover |
+
+### Tooltips on ui controls: test (0.70.0)
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | Launcher: switch on **Hello mod** (it asks for no permission). Check **Tooltips** is on in the launcher's Settings | Its window opens |
+| 2 | Rest the cursor on **Play sound** | After half a second: "Play the menu press sound" |
+| 3 | Press it and keep the cursor still on it | The press sound; the button greys out, and after half a second "Playing... ready again in 2 seconds" shows, with no move |
+| 4 | Keep the cursor on it for 2 seconds | The button comes back, and the tooltip changes to "Play the menu press sound" where it is |
+| 5 | Move onto the window's empty space below the buttons | The tooltip goes |
+| 6 | Rest the cursor on **Follow** | "Update the position twice a second" |
+
 ### UI kit
 
 UI is written as markup, not built by hand in code. Two layers keep it optional:

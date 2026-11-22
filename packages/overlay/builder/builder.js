@@ -18,8 +18,22 @@ function attr(el, name, value) {
   else el.setAttribute(name, value === true ? '' : String(value));
 }
 
+// A control's tooltip (#55): its title, which the UI kit draws in the page, on a disabled
+// control too. While the tooltip shows, the kit keeps the text in data-rn-title, so a change
+// then goes there, and RednodeUI.retip shows it at once (or hides it when cleared).
+const TIPPED = new Set(['button', 'toggle', 'slider', 'input', 'select']);
+function setTip(el, tip) {
+  const text = tip === undefined || tip === null || tip === '' ? null : String(tip);
+  if (el.hasAttribute('data-rn-title')) {
+    if (text) el.setAttribute('data-rn-title', text);
+    else el.removeAttribute('data-rn-title');
+  } else attr(el, 'title', text);
+  window.RednodeUI?.retip?.(el);
+}
+
 // Applies props to an element. Used for the first render and for updates.
 function apply(type, el, props) {
+  if ('tip' in props && TIPPED.has(type)) setTip(el, props.tip);
   switch (type) {
     case 'text':
     case 'heading':
