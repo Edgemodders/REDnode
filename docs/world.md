@@ -2412,3 +2412,39 @@ Claude drives the editor calls and the scene loads from VS Code while the owner 
 | 6 | Claude loads it again under the same name with `skip` naming one person | The box and the other person; the first load is gone |
 | 7 | Claude unloads it | All of it goes |
 | 8 | Open the **Pins** window. Face one way and press **Drop a pin here**, then turn V about a quarter turn and press it again | Two pins. Claude reads the set's file: each has an `id`, and their `yaw` values differ by about 90 |
+
+## V as an actor (#47)
+
+EDGEdir's [#47](https://github.com/Edgemodders/REDnode/issues/47), for its phase D5: can V act out a workspot at a set time, as a spawned person does with `world.useWorkspot`? The owner chose on 2026-11-18 that the real V acts where the game allows it (way A), with a stand-in copy of V as the fallback (way B). The answer in words is on the issue (2026-11-16). Built on 2026-11-22 as a spike, at the owner's request, with `game.player.body()`.
+
+### #47: build
+
+| Part | Where | What |
+|---|---|---|
+| V's body | `game.player.body()` in game.ts | `"wa"` or `"ma"`, from the game's `GetResolvedGenderName` (`Female`, `Male`); anything else is refused with what the game answered |
+| The spike | `packages/overlay/apps/actor-spike` (V actor spike 0.1.0, `api` and `world` only) | **Read the body**. **Make the device at V**: a bare entity at V's feet facing V's way, carrying the chosen workspot (V has no workspot component, so a device holds it, as the game's own devices do). **Play on V**: `PlayInDeviceSimple(device, V, allowCameraMov, "rednode_workspot", ...)`, then `IsActorInWorkspot`, V's workspot tags (`GetPlayerCurrentWorkspotTags`) and the scene tier from V's state machine blackboard (`PlayerStateMachine.SceneTier`). **Watch 10 s** logs them and how far V moved, each second. Three exits: fast, slow, `StopInDevice`. **Third person**: `gameActivateTPPRepresentationEvent` (and its Deactivate) queued on V, with the FPP camera's local position moved back 0 to 5 m. **The copy**: the photo mode puppet for V's body (`player_wa_photomode.ent` or `player_ma_photomode.ent`, or Phantom Liberty's `_ep1`), dressed with preview copies of what V shows (`GivePreviewItemByItemData`, `CreatePreviewItemID`, `AddItemToSlot`, the slots REDnode's refresh after a swap reads), and the workspot played on it through `world.useWorkspot`. **Give V back** exits, turns third person off, puts the camera back and removes the spawns |
+
+The workspots in its dropdown are the game's own player workspots (stand idle, dance, sit on the ground, kneel, a third-person bar seat) and one NPC workspot (arms crossed), to see whether an NPC's plays on V's body.
+
+Not tried: raising the scene tier from a package (the game does it from quest nodes; the spike only reads it), the quest scene route (no call starts a quest node, Q-A), and the copy's face: the photo mode puppet may or may not take V's character creation by itself.
+
+Check: scratchpad `v47/stand/check.mjs` (17, plain Node against a stand-in `rednode` that answers as the game would: each button, the calls' arguments, the yaw facing V's way, the hidden `empty_appearance` item left off the copy, Give V back).
+
+### #47 test
+
+On the dev PC, game 2.5 with Codeware. Press F10 for the mouse to press a button, and F10 again to play. If V is stuck at any point, press **Give V back**; if that does not free V, load the save.
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | Load a save outdoors on flat open ground. In the launcher, switch on **V actor spike (#47)**. Press **Read the body** | The log says `wa` for a feminine V, `ma` for a masculine one, and `Female` or `Male` beside it |
+| 2 | Workspot **Player: stand idle**. Press **Make the device at V**, then **Play on V** | The log says whether V is in the workspot, V's workspot tags and the scene tier. Say what V's view does |
+| 3 | Press **Watch 10 s**, press F10, and try to walk and look around | Say whether V could walk, turn or look. The log has the tier and metres moved each second |
+| 4 | **Third person on** with the camera 3 m back | Say whether V's body shows and plays the workspot |
+| 5 | **Fast exit** | Say whether V walks again. If not, **StopInDevice**, then **Give V back** |
+| 6 | Steps 2 to 5 again with **Player: dance**, and once with **The camera follows the animation** off | Say what changed |
+| 7 | Workspot **An NPC's: arms crossed**, **Make the device at V**, **Play on V**, **Third person on** | Say whether an NPC's workspot plays on V's body |
+| 8 | **Give V back**. Press **Spawn the copy** | A copy of V 2.5 m in front, facing V. Say whether its face, hair and body are V's |
+| 9 | **Dress the copy** | Say whether it wears what V wears. The log lists each item |
+| 10 | Workspot **Player: stand idle**, **Spawn the copy**, **Dress the copy**, **Play on the copy** | Say whether the copy plays it |
+| 11 | Switch on **The Phantom Liberty copy**, **Spawn the copy** | Say whether it looks closer to V than the first |
+| 12 | **Give V back** | V walks in first person, and no copy or device is left |

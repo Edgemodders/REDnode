@@ -495,6 +495,18 @@ export const NOTES = {
     tryThis: ['Press Build, Swap in, Spawn, Play both, then B arms crossed.', 'Press Rain, then Read the weather.'],
     preview: 'The preview\'s game has no REDbridge or workspots, so those buttons log a failure here; the weather buttons answer from a simulated sky.',
   },
+  'actor-spike': {
+    group: 'tests',
+    summary: 'Can V act out an animation? Play the game\'s own player workspots on V through a device at V\'s feet, switch V\'s third-person body on, or spawn a photo mode copy of V in V\'s clothes and play it there (#47\'s spike, for EDGEdir).',
+    teaches: ['game.player.body', 'world.spawn', 'world.useWorkspot', 'WorkspotGameSystem', 'api.$new', 'api.GameInstance', 'ui.select'],
+    how: [
+      'V carries no workspot, so **Make the device at V** spawns a bare entity at V\'s feet carrying the chosen one, as the game\'s own devices do. **Play on V** puts V in it with `PlayInDeviceSimple` and reads whether V is in, V\'s workspot tags and the scene tier.',
+      '**Third person on** queues the game\'s third-person body event on V and moves the camera back, so V is seen acting.',
+      'The fallback: **Spawn the copy** places the photo mode puppet for V\'s body, **Dress the copy** puts preview copies of V\'s clothes on it, and **Play on the copy** plays the workspot on it.',
+    ],
+    tryThis: ['Press Read the body, then Make the device at V and Play on V.', 'Press Spawn the copy, Dress the copy, then Play on the copy.'],
+    preview: 'The preview\'s game has no player or workspots, so the buttons log a failure here: the app is meant for the game.',
+  },
   'nodes-test': {
     group: 'tests',
     summary: 'Find out what the camera looks at in the world: buildings, street furniture, decals and lights, each with the sector and node it comes from; outline one, hide it for the session (#24\'s spike).',

@@ -128,6 +128,19 @@ export interface Player {
   teleport(to: { x: number; y: number; z: number; yaw?: number } | { nodeRef: string }): Promise<void>;
 
   /**
+   * V's body, as chosen in character creation: `"wa"` (the feminine body) or `"ma"` (the
+   * masculine one), the two letters the game's own file names use, such as a workspot or a
+   * garment made for one body. Read from the game's `GetResolvedGenderName` (#47).
+   *
+   * @example
+   * ```ts
+   * const body = await game.player.body();
+   * const workspot = `my_mod\\workspots\\wave_${body}.workspot`;
+   * ```
+   */
+  body(): Promise<"wa" | "ma">;
+
+  /**
    * Puts items in V's inventory by their TweakDB id, as Cyber Engine Tweaks'
    * `Game.AddToInventory` does. Built on the transaction system's `GiveItemByTDBID`.
    * Rejects when there is no such record, so a typo is not given as an empty item.
@@ -384,6 +397,12 @@ export const game: Game = {
     async setHealth(value: number) {
       const pools = await api.GameInstance.GetStatPoolsSystem(instance);
       await pools!.RequestSettingStatPoolValue(await playerStatsId(), "Health", value, api.$null, false); // no instigator, as the game's scripts do
+    },
+    async body() {
+      const name = String(await (await player()).GetResolvedGenderName());
+      if (name === "Female") return "wa";
+      if (name === "Male") return "ma";
+      throw new Error(`body: the game answered "${name}", not Female or Male: load a save first`);
     },
     async teleport(to) {
       const facility = (await api.GameInstance.GetTeleportationFacility(instance)) as unknown as Record<

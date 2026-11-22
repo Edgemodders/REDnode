@@ -1250,6 +1250,15 @@ Each app's version, dimmed beside its title, and the launcher's switch. Steps: [
 | Dev host, stand-in plugin, 2026-11-18, 0.68.2, by Claude | **Pass**: 12 checks (scratchpad `tver/run.sh`): `v0.68.2` right after the Mod log's and the launcher's titles, the switch on by default and shown on in the launcher, off hides them at once and is kept in settings.json, on brings them back, a drawer shows none. The dropdown's and the Mod log's checks pass again on this build |
 | Game 2.5, laptop, 2026-11-19, 0.68.2 (update zip over 0.67.3) | **Pass**: all five steps (REDnode's windows `v0.68.2`, UI kit `v0.1.1`, VATS spike `v0.7.1`, the switch off and kept off across a restart, on again) |
 
+## V as an actor (#47)
+
+The V actor spike (`apps/actor-spike` 0.1.0) and `game.player.body()`, for EDGEdir's #47: the real V in a workspot through a device at V's feet, third person, and a dressed photo mode copy of V as the fallback. Steps: [docs/world.md, "#47 test"](world.md#47-test).
+
+| Run | Result |
+|---|---|
+| Stand-in `rednode`, 2026-11-22, 0.70.0, by Claude | **Pass**: 17 checks (scratchpad `v47/stand/check.mjs`): every button against a stand-in that answers as the game would, `PlayInDeviceSimple`'s arguments, the device facing V's way and the copy facing V, the dropdown and switches changing the next call, the hidden item left off the copy, Give V back |
+| Game 2.5 | **Not run** |
+
 ## The WL build (0.70.0)
 
 `world.load`'s `kinds` and `skip` (#49, #48), the editor channel's `service.call` with its Allow per tool and package (#48), and a pin's `id` and `yaw` from Drop a pin here (#50 part 3). Steps: [docs/world.md, "WL test"](world.md#wl-test).

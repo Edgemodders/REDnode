@@ -308,6 +308,7 @@ Import the `rednode` package, the same one Node mods use. An import map lets the
 | Call | What it does |
 |---|---|
 | `game.player.position()` | V's world position. Rejects at the main menu, where there is no player |
+| `game.player.body()` | V's body from character creation, `"wa"` or `"ma"`, the letters the game's file names use (REDnode 0.70.0, #47) |
 | `game.player.addItem(id, count?)`, `game.player.removeItem(id, count?)` | Puts items in V's inventory, or takes them out, by TweakDB id: `addItem("Items.Pants_01_basic_01")`. `addItem` rejects an id with no record (REDnode 0.42.0) |
 | `game.audio.play(name)` | Plays a game sound event |
 | `game.on(name, handler)` | A game event: `"PlayerPuppet.OnGameAttached"` (at the main menu and on every save load), `"language"` (the player changed the game's language), and the `quests.fact:<name>` events that [`quests.watch`](quests.md) uses |

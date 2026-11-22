@@ -1,0 +1,13 @@
+{
+  "id": "actor-spike",
+  "name": "V actor spike (#47)",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "#47's spike for EDGEdir: can V act out a workspot? Reads V's body, plays the game's own player workspots on V through a device spawned at V's feet, switches V's third-person body and camera on and off, and, as the fallback, spawns a photo mode copy of V, dresses it in V's clothes and plays the workspot on it. Every call, its answer and its time go to the log.",
+  "main": "mod.mjs",
+  "open": false,
+  "requires": {
+    "rednode": ">=0.70.0",
+    "codeware": ">=1.14"
+  }
+}
