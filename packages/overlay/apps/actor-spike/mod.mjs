@@ -38,7 +38,8 @@ const COPIES = {
   ma: ['base\\characters\\entities\\player\\photo_mode\\player_ma_photomode.ent', 'ep1\\characters\\entities\\player\\photo_mode\\player_ma_photomode_ep1.ent'],
 };
 const COMPONENT = 'rednode_workspot'; // the name world.spawn gives the workspot component
-const EMPTY = 'base\\spawner\\empty_entity.ent';
+// A bare gameObject with no components, from the game's own files (base\spawner\empty_entity.ent is not in game 2.5).
+const EMPTY = 'base\\quest\\minor_quests\\mq061\\entities\\mq061_empty_entity.ent';
 const BASE_SLOTS = ['Head', 'Eyes', 'Chest', 'Torso', 'Legs', 'Feet', 'Outfit', 'UnderwearTop', 'UnderwearBottom'];
 const OUTFIT_SLOTS = [
   'Head', 'Balaclava', 'Mask', 'Glasses', 'Eyes', 'EyeLeft', 'EyeRight', 'Wreath', 'EarLeft', 'EarRight',
@@ -412,4 +413,4 @@ ui.window({
     log,
   ],
 });
-say('V actor spike 0.2.0 ready');
+say('V actor spike 0.2.1 ready');

@@ -1266,7 +1266,7 @@ The V actor spike (`apps/actor-spike` 0.2.0) and `game.player.body()`, for EDGEd
 | Run | Result |
 |---|---|
 | Stand-in `rednode`, 2026-11-22, 0.70.0, by Claude | **Pass**: 26 checks (scratchpad `v47/stand/check.mjs`): every button against a stand-in that answers as the game would, `PlayInDeviceSimple`'s arguments, the device facing V's way and the copy facing V, the dropdown and switches changing the next call, the hidden item left off the copy, the written workspots on the right rig for a `wa` V, jumps by entry id on V and by name on the copy, Give V back |
-| Game 2.5 | **Not run** |
+| Game 2.5, dev PC, 2026-11-23, REDnode 0.70.0, spike 0.2.1 | **Partly run.** 0.2.0's device template is not in 2.5 (fixed in 0.2.1, copied into the game during the run). The real V played the game's player workspots in first person (the dance, over 10 s) and took jumps between entries; NPC clips put V in a T pose in third person and broke the first person camera; Third person on flips the camera with or without a workspot. **Spawn the copy crashed the game** (the photo mode puppet spawned as a plain entity; no REDnode frame on the stack), so the copy's steps were not run. Results: [docs/world.md, "#47 test: results"](world.md#47-test-results) |
 
 ## The cursor in a windowed game (#56, 0.70.0)
 
@@ -1275,6 +1275,7 @@ The overlay's cursor follows the Windows pointer while the game is in a window s
 | Run | Result |
 |---|---|
 | Build, 2026-11-22, 0.70.0, by Claude | Builds; native tests pass. Not checked in the mock game, which has no game window. Awaits its in-game test |
+| Game 2.5, dev PC, 2026-11-23, REDnode 0.70.0 | **Pass**, all 7 steps: Windowed at 1920 x 1080; in the pause menu the cursor started at the pointer, stayed on it slow and fast, was not drawn outside the window and took over where the pointer came back, and the launcher's buttons and drag worked. The log: `the game is in a window smaller than its screen`, `follows the Windows pointer` at F10 in the pause menu, `moves by raw mouse input` at F10 in the world (the game holds the pointer there; one 24 ms flip to follows and back), `the game is full screen` after the switch back. MCP `game_state` answered `gameWindow: { windowed: true, pointer: "follows" }` |
 
 ## The WL build (0.70.0)
 

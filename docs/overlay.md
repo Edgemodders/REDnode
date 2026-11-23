@@ -1094,6 +1094,8 @@ Not handled: a page holding the pointer (pointer lock) in a windowed game gets r
 
 After the run: the plugin log's `Overlay: the cursor follows ...` and `moves by raw mouse input` lines for each step, and MCP `game_state`'s `gameWindow`.
 
+**Passed in game on 2026-11-23** (dev PC, game 2.5, REDnode 0.70.0), all 7 steps: the cursor followed the pointer in the pause menu, was not drawn outside the window, and moved by raw input in the world, where the game holds the pointer. Closes #56.
+
 ### UI kit
 
 UI is written as markup, not built by hand in code. Two layers keep it optional:

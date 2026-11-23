@@ -2471,3 +2471,29 @@ On the dev PC, game 2.5 with Codeware. Press F10 for the mouse to press a button
 | 15 | **Give V back**. **Play "NPC rig" on V**, **Third person on**, then entries 2 and 3 | The same question, with the workspot on the NPC rig (entry 3 is V's own clip) |
 | 16 | **Give V back**. **Spawn the copy**, **Play "NPC rig" on the copy**, then **Copy: entry 2** and **Copy: entry 3** | Say whether the copy plays the NPC clips, and V's own clip (entry 3) |
 | 17 | **Give V back** | V walks in first person, and nothing is left |
+
+### #47 test: results
+
+Run on 2026-11-23 on the dev PC (game 2.5, REDnode 0.70.0, V actor spike 0.2.1, a `wa` V). Partly run: the copy's steps crashed the game and were left out after.
+
+**0.2.0's device never spawned:** `base\spawner\empty_entity.ent` is not in game 2.5's archives, so **Make the device at V** answered `world.spawn failed: no entity was created`. Spike 0.2.1 uses the game's own bare `gameObject` template, `base\quest\minor_quests\mq061\entities\mq061_empty_entity.ent` (no components; checked with REDbridge). The same wrong path in `world.spawn`'s TSDoc example is fixed.
+
+| Step | Result |
+|---|---|
+| 1 | `wa`, `Female` (`GetBodyType` answers Undefined; not used) |
+| 2, 3 | **Player: stand idle** on V: in the workspot (`IsActorInWorkspot` true), the view moved slightly, scene tier stayed 1. A second press of Play on V ended it within 5 s; V then walked freely |
+| 4 | **Third person on** turns the camera upside down in front of V, V crouched, the camera jiggling, with or without a workspot: the event plus a moved FPP camera is not a usable third person view |
+| 6 | **Player: dance**: **V danced** in first person, in the workspot for over 10 s without moving, out when the dance ended |
+| 7 | An NPC's workspot (arms crossed): the game puts V in it (in the workspot 10 s), the camera taken to look ahead; in third person **V stands in a T pose** |
+| 8 | **Spawn the copy crashed the game** (`player_wa_photomode.ent` spawned as a plain entity with the workspot component; an access violation reading 0xD9 in the game's own code, no REDnode frame on the stack; dump in `%LOCALAPPDATA%\REDEngine\ReportQueue\Cyberpunk2077-20261123-172735-51352-56888`). Steps 9 to 11 and 16 not run |
+| 13 | Both workspots written and swapped in through REDswap (78 ms) |
+| 14 | **for V** (V's skeleton) on V, first person: all three jumps reached V. Entry 1, V's own clip, a normal view; entry 2, an NPC clip, threw the camera upside down into a dark, broken view |
+| 15 | **NPC rig** on V: in the workspot, a slight camera twitch, then nothing visible for NPC standing or V's own clip (entry 3). Likely the clips do not drive V's body on the wrong rig (unverified: no third person view) |
+| 17 | V walks in first person, nothing left |
+
+**What it answers:**
+
+- **Way A works for the game's player workspots.** A package can put the real V into a workspot through a bare device at V's feet (`PlayInDeviceSimple`) at scene tier 1, and V plays it in first person (the dance) until it ends. Jumps between entries reach V.
+- **NPC clips do not play on V.** On a workspot for V's skeleton they break the first person camera, and in third person V stands in a T pose; on a workspot for the NPC rig nothing visible happens. Clips for V must be made on V's skeleton (`player_woman_skeleton.rig` or `player_man_skeleton.rig`): REDcode's Animation Tools should target it for V.
+- **The photo mode copy cannot be spawned as a plain entity**: it crashes the game. A copy of V (way B) needs another route, such as photo mode's own system, for the scene spike.
+- **A third person view** of V in a workspot is still open: the TPP event with the FPP camera moved back does not give one.

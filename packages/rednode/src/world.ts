@@ -653,7 +653,7 @@ function planOptions(p: ScenePlan): SpawnOptions {
  *   meshAppearance: "default",
  * });
  * const { id } = await world.spawn({
- *   template: "base\\spawner\\empty_entity.ent",
+ *   template: "base\\quest\\minor_quests\\mq061\\entities\\mq061_empty_entity.ent", // a bare gameObject
  *   position: { x: -1234, y: 987, z: 12 },
  *   components: [mesh as GameRef],
  * });
