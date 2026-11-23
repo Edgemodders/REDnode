@@ -1061,6 +1061,8 @@ Two cases needed the kit's help, through `RednodeUI.retip(el)`, which the builde
 | 5 | Move onto the window's empty space below the buttons | The tooltip goes |
 | 6 | Rest the cursor on **Follow** | "Update the position twice a second" |
 
+**Passed in game on 2026-11-23** (dev PC, game 2.5, REDnode 0.70.0), all six steps. Closes #55.
+
 ### The cursor in a windowed game (#56, 0.70.0)
 
 Found by REDcode's Game view spike on 2026-11-22 ([#56](https://github.com/Edgemodders/REDnode/issues/56)): with the game in a window smaller than the screen (Windowed, 1920 x 1080, over VS Code), the overlay's cursor in interactive mode did not follow the Windows pointer. The cursor is the overlay's own, moved by raw mouse input. Full screen that is right, since the game hides and holds the pointer. In a window, the game's menus set no clip, so the Windows pointer moves freely, at Windows' pointer speed, and can leave the window. Raw input has neither, so the overlay's cursor drifted from the pointer and stopped at the window's edge while the pointer went on.

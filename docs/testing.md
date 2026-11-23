@@ -1229,7 +1229,7 @@ The 0.58.0 release ships EDGEmat 0.3.1 from npm, which ignores the shared REDbri
 | Run | Result |
 |---|---|
 | Dev host, stand-in plugin, 2026-11-22, 0.70.0, by Claude | **Pass**: 16 checks (scratchpad `tip/run.sh`, DevTools reading the page back): see docs/overlay.md. The first run found a tooltip kept on screen after the cursor moved onto a part of the window with no title, fixed in the kit. The dropdown's 30 checks (`sel/run.sh`) pass again with the change; the 16 pass on the packaged host too (`MOCK_HOST_EXE`, `MOCK_HOST_DIR=--mcp=off`) |
-| Game 2.5 | **Not run** |
+| Game 2.5, dev PC, 2026-11-23, REDnode 0.70.0 | **Pass**, all six steps with Hello mod 0.2.0: each tip after half a second, the disabled button's new tip shown with no move, the tip changed in place when the button came back, gone over empty space |
 
 ## The dropdown (0.68.0)
 
