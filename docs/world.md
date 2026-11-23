@@ -2413,6 +2413,20 @@ Claude drives the editor calls and the scene loads from VS Code while the owner 
 | 7 | Claude unloads it | All of it goes |
 | 8 | Open the **Pins** window. Face one way and press **Drop a pin here**, then turn V about a quarter turn and press it again | Two pins. Claude reads the set's file: each has an `id`, and their `yaw` values differ by about 90 |
 
+### WL test: results
+
+**Passed in game on 2026-11-23** (dev PC, game 2.5, REDnode 0.70.0), all 8 steps, with Claude making the calls from VS Code:
+
+| Step | Result |
+|---|---|
+| 1 to 4 | The Editor request window named REDnode test and Counter service; Allow let `add` through (count 1, 8 s with the wait for the press); `get` asked nothing (24 ms); Deny test was asked about again and Deny refused it for the session (403, in words) |
+| 5 | Only the two people, standing still; the box skipped as `not in kinds` |
+| 6 | Loaded again under the same name with `skip`: the first load gone, the box and the other person in, `person-left` skipped by id |
+| 7 | Unload removed both |
+| 8 | Yaw -4.4 and 82 (86 degrees apart for a quarter turn); every pin in the set has an `id`, an older pin's added at the write; pin format version 1 |
+
+Closes #49, #48 part 1 and #50 part 3. #48 part 2 and #50 part 2 ride with the scene spike (SC1).
+
 ## V as an actor (#47)
 
 EDGEdir's [#47](https://github.com/Edgemodders/REDnode/issues/47), for its phase D5: can V act out a workspot at a set time, as a spawned person does with `world.useWorkspot`? The owner chose on 2026-11-18 that the real V acts where the game allows it (way A), with a stand-in copy of V as the fallback (way B). The answer in words is on the issue (2026-11-16). Built on 2026-11-22 as a spike, at the owner's request, with `game.player.body()`.
