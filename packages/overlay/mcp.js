@@ -247,7 +247,7 @@ function createMcp(host) {
       'game_state',
       {
         title: 'Game state',
-        description: 'Whether REDnode is linked to the game, what the game shows (a menu, photo mode, a scene, the main menu) and the overlay mode (passive, interactive, hidden).',
+        description: 'Whether REDnode is linked to the game, what the game shows (a menu, photo mode, a scene, the main menu) and the overlay mode (passive, interactive, hidden). `gameWindow.windowed` is true when the game is in a window smaller than its screen, and `gameWindow.pointer` says whether the overlay cursor follows the Windows pointer ("follows") or raw mouse input ("raw"). `windowed` is about the overlay host (started with --window to show its pages as desktop windows), not the game.',
         annotations: READ,
       },
       async () => text(host.state()),

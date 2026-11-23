@@ -1061,6 +1061,37 @@ Two cases needed the kit's help, through `RednodeUI.retip(el)`, which the builde
 | 5 | Move onto the window's empty space below the buttons | The tooltip goes |
 | 6 | Rest the cursor on **Follow** | "Update the position twice a second" |
 
+### The cursor in a windowed game (#56, 0.70.0)
+
+Found by REDcode's Game view spike on 2026-11-22 ([#56](https://github.com/Edgemodders/REDnode/issues/56)): with the game in a window smaller than the screen (Windowed, 1920 x 1080, over VS Code), the overlay's cursor in interactive mode did not follow the Windows pointer. The cursor is the overlay's own, moved by raw mouse input. Full screen that is right, since the game hides and holds the pointer. In a window, the game's menus set no clip, so the Windows pointer moves freely, at Windows' pointer speed, and can leave the window. Raw input has neither, so the overlay's cursor drifted from the pointer and stopped at the window's edge while the pointer went on.
+
+Now, while the game's client area leaves part of its monitor uncovered and nothing clips the pointer inside it, the overlay's cursor sits where the Windows pointer is. Outside the game's window it is not drawn, and presses and the wheel there are not the overlay's (a release still is, so a drag that ends outside ends). Full screen, or with the game clipping the pointer (mouse-look), it moves by raw input as before. A game that holds the pointer by putting it back at the centre, without a clip, is caught too: three raw moves in a row that find the pointer at the centre switch to raw input for a second. That case is unverified; the clip case is what REDcode saw.
+
+The plugin tells the host whether the game is windowed and how the cursor moves (`{"event":"game-window","windowed":true,"pointer":"follows"}`), so MCP's `game_state` has them as `gameWindow`. The `windowed` field it had before is the overlay host's own `--window` mode, not the game's.
+
+| Part | Where |
+|---|---|
+| The check | `Follow` in `native/src/overlay/input.cpp` (at most every 100 ms: the client area against its monitor, and `GetClipCursor`), `FollowPointer` (`GetCursorPos` into reference pixels), `CheckRecentre`; `WM_MOUSELEAVE` through `TrackMouseEvent` for a pointer that leaves while another window is in front |
+| Not drawn outside | `CursorAway` in the compositor's cursor draw |
+| The state | `NoteWindowed`, checked every 2 seconds in any mode; `ResendGameWindow` when the host connects; `gameWindow` in the host's state (`packages/overlay/main.js`) |
+| Log | `Overlay: the game is in a window smaller than its screen`, `Overlay: the cursor follows the Windows pointer (a window, no clip)` or `moves by raw mouse input`, and the cursor diagnostics line every 5 seconds ends with how it moves |
+
+Not handled: a page holding the pointer (pointer lock) in a windowed game gets raw movement as before, but the Windows pointer is still free and can leave the window.
+
+### The cursor in a windowed game: test (0.70.0)
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | Game settings, Video: **Window Mode** Windowed, **Resolution** 1920 x 1080 (or any listed size smaller than the screen). Move the window away from the screen's corner. Open the pause menu | The game's own pointer follows the mouse |
+| 2 | F10 | The overlay's cursor shows where the Windows pointer was, not at the middle of the window |
+| 3 | Move the mouse slowly, then fast, around the window | The overlay's cursor stays on the pointer, at Windows' pointer speed; one cursor only |
+| 4 | Move the pointer out of the window over the desktop, and back in | Outside: only the Windows pointer, no overlay cursor frozen at the edge. Back inside: the overlay's cursor takes over where the pointer enters |
+| 5 | Press a button in the launcher; drag the launcher by its title bar | Both work where the cursor is |
+| 6 | Esc to close the pause menu, back to the world. F10 | The overlay's cursor shows. Note whether it follows the pointer or stays put while the pointer moves |
+| 7 | Settings: Window Mode back to what it was (Fullscreen or Borderless). F10 | The cursor works as before |
+
+After the run: the plugin log's `Overlay: the cursor follows ...` and `moves by raw mouse input` lines for each step, and MCP `game_state`'s `gameWindow`.
+
 ### UI kit
 
 UI is written as markup, not built by hand in code. Two layers keep it optional:

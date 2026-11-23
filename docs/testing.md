@@ -1268,6 +1268,14 @@ The V actor spike (`apps/actor-spike` 0.2.0) and `game.player.body()`, for EDGEd
 | Stand-in `rednode`, 2026-11-22, 0.70.0, by Claude | **Pass**: 26 checks (scratchpad `v47/stand/check.mjs`): every button against a stand-in that answers as the game would, `PlayInDeviceSimple`'s arguments, the device facing V's way and the copy facing V, the dropdown and switches changing the next call, the hidden item left off the copy, the written workspots on the right rig for a `wa` V, jumps by entry id on V and by name on the copy, Give V back |
 | Game 2.5 | **Not run** |
 
+## The cursor in a windowed game (#56, 0.70.0)
+
+The overlay's cursor follows the Windows pointer while the game is in a window smaller than its screen and does not clip the pointer. Steps and what each should show: [docs/overlay.md, "The cursor in a windowed game: test"](overlay.md#the-cursor-in-a-windowed-game-test-0700).
+
+| Run | Result |
+|---|---|
+| Build, 2026-11-22, 0.70.0, by Claude | Builds; native tests pass. Not checked in the mock game, which has no game window. Awaits its in-game test |
+
 ## The WL build (0.70.0)
 
 `world.load`'s `kinds` and `skip` (#49, #48), the editor channel's `service.call` with its Allow per tool and package (#48), and a pin's `id` and `yaw` from Drop a pin here (#50 part 3). Steps: [docs/world.md, "WL test"](world.md#wl-test).

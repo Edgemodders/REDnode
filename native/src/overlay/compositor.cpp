@@ -1392,7 +1392,7 @@ void RenderFrame(IDXGISwapChain* aSwapChain)
     }
 
     // The cursor, on top of everything.
-    if (mode == Mode::Interactive && !PointerLocked()) // a locked pointer is not drawn
+    if (mode == Mode::Interactive && !PointerLocked() && !CursorAway()) // a locked pointer is not drawn, nor one outside a windowed game (#56)
     {
         float cx, cy;
         GetCursor(cx, cy);

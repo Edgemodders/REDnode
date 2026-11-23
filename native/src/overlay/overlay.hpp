@@ -156,6 +156,8 @@ bool InstallInput(HWND aWindow);
 void UninstallInput();
 void GetCursor(float& aX, float& aY); // reference pixels
 void CursorFrame(bool aDrawn);        // each present: counts for the cursor diagnostics log
+bool CursorAway();                    // following the Windows pointer, which is outside the game's window (#56): not drawn
+void ResendGameWindow();              // {"event":"game-window"} again, for a host that just connected
 // Host commands for input: {"cmd":"keys.bind",...} (apps' keys), {"cmd":"overlay.mode",...} and
 // {"cmd":"overlay.clickAway","hide":true}. True when the message was one of them.
 bool HandleInputCommand(const std::string& aJson);

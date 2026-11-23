@@ -12,6 +12,9 @@
 // routes them to the right overlay window, and are not passed to the game.
 // The game hides and locks the cursor, so the overlay keeps a virtual cursor
 // over the whole screen, moved by raw mouse input. The compositor draws it.
+// In a game window smaller than its screen whose pointer the game does not hold (its menus
+// set no clip), the cursor follows the Windows pointer instead, and is neither drawn nor
+// pressed while that pointer is outside the game's client area (#56).
 
 #include "overlay.hpp"
 
@@ -127,7 +130,133 @@ struct CursorDiag
 };
 CursorDiag g_diag;
 
-// aVia: 'r' raw input, 'w' WM_MOUSEMOVE, 'c' centred on entering interactive mode.
+// #56 (REDcode's Game view): a game in a window smaller than its screen leaves the Windows
+// pointer free in its menus (no clip), and visible outside the window. Raw movement there
+// drives a cursor that drifts from the real pointer (no pointer speed or acceleration) and
+// stops at the window's edge while the pointer carries on. So while the game is windowed and
+// does not clip the pointer to its window, the cursor follows the Windows pointer.
+std::atomic_bool g_windowed{false};          // the client area does not cover its monitor
+std::atomic_bool g_windowedKnown{false};
+std::atomic_bool g_follow{false};            // the cursor follows the Windows pointer
+std::atomic_bool g_pointerAway{false};       // following, and the pointer is outside the client area
+std::atomic<uint64_t> g_followCheckedAt{0};
+std::atomic<uint64_t> g_heldUntil{0};        // a game seen re-centring the pointer: raw movement until then
+std::atomic<uint64_t> g_windowCheckedAt{0};  // render thread: the windowed check outside interactive mode
+int g_centred = 0;                           // window thread: raw moves in a row that found the pointer at the centre
+bool g_tracking = false;                     // window thread: WM_MOUSELEAVE asked for
+POINT g_lastFollowed{-1, -1};                // window thread: the client point the cursor was last put at
+
+// The client area, in client and in screen coordinates.
+bool ClientOnScreen(RECT& aClient, RECT& aOnScreen)
+{
+    if (!g_window || !GetClientRect(g_window, &aClient) || aClient.right <= 0 || aClient.bottom <= 0)
+        return false;
+    POINT topLeft{0, 0}, bottomRight{aClient.right, aClient.bottom};
+    ClientToScreen(g_window, &topLeft);
+    ClientToScreen(g_window, &bottomRight);
+    aOnScreen = {topLeft.x, topLeft.y, bottomRight.x, bottomRight.y};
+    return true;
+}
+
+// The client area leaves part of its monitor uncovered: a window, not full screen.
+bool CoversLessThanMonitor(const RECT& aOnScreen)
+{
+    MONITORINFO info{sizeof(info)};
+    if (!GetMonitorInfoW(MonitorFromWindow(g_window, MONITOR_DEFAULTTONEAREST), &info))
+        return false;
+    const RECT& m = info.rcMonitor;
+    return aOnScreen.left > m.left || aOnScreen.top > m.top || aOnScreen.right < m.right || aOnScreen.bottom < m.bottom;
+}
+
+void SendGameWindow()
+{
+    if (!g_windowedKnown)
+        return;
+    SendJson(std::string("{\"event\":\"game-window\",\"windowed\":") + (g_windowed ? "true" : "false") +
+             ",\"pointer\":" + (g_follow ? "\"follows\"" : "\"raw\"") + "}");
+}
+
+void NoteWindowed(bool aWindowed)
+{
+    const bool known = g_windowedKnown.exchange(true);
+    if (known && g_windowed.exchange(aWindowed) == aWindowed)
+        return;
+    g_windowed = aWindowed;
+    Log("Overlay: the game is %s", aWindowed ? "in a window smaller than its screen" : "full screen");
+    SendGameWindow();
+}
+
+// How the cursor moves now: true to follow the Windows pointer. Checked at most every 100 ms,
+// or at once with aNow.
+bool Follow(bool aNow = false)
+{
+    const uint64_t now = NowMs();
+    if (!aNow && now - g_followCheckedAt.load() < 100)
+        return g_follow;
+    g_followCheckedAt = now;
+    bool follow = false;
+    RECT client{}, box{};
+    if (ClientOnScreen(client, box))
+    {
+        const bool windowed = CoversLessThanMonitor(box);
+        NoteWindowed(windowed);
+        RECT clip{};
+        GetClipCursor(&clip); // the whole desktop when nothing clips it
+        const bool clipped =
+            clip.left >= box.left && clip.top >= box.top && clip.right <= box.right && clip.bottom <= box.bottom;
+        follow = windowed && !clipped && now >= g_heldUntil.load();
+    }
+    if (g_follow.exchange(follow) != follow)
+    {
+        if (!follow)
+            g_pointerAway = false;
+        g_lastFollowed = {-1, -1};
+        Log("Overlay: the cursor %s", follow ? "follows the Windows pointer (a window, no clip)"
+                                             : "moves by raw mouse input (full screen, or the game holds the pointer)");
+        SendGameWindow();
+    }
+    return follow;
+}
+
+void MoveCursorTo(float aX, float aY, char aVia);
+
+// Puts the cursor where the Windows pointer is. Outside the client area it is not drawn and
+// takes no presses; it stays where it last was inside.
+void FollowPointer()
+{
+    POINT p{};
+    RECT client{};
+    if (!GetCursorPos(&p) || !ScreenToClient(g_window, &p) || !GetClientRect(g_window, &client) || client.right <= 0 ||
+        client.bottom <= 0)
+        return;
+    const bool inside = p.x >= 0 && p.y >= 0 && p.x < client.right && p.y < client.bottom;
+    g_pointerAway = !inside;
+    if (!inside || (p.x == g_lastFollowed.x && p.y == g_lastFollowed.y))
+        return;
+    g_lastFollowed = p;
+    const Screen s = GetScreen();
+    MoveCursorTo(float(p.x) * s.width / float(client.right), float(p.y) * s.height / float(client.bottom), 'p');
+}
+
+// Following, a raw move that finds the pointer at the client area's centre three times in a row
+// means the game puts it back there (it holds the pointer without a clip): raw movement for a second.
+void CheckRecentre()
+{
+    RECT client{};
+    POINT p{};
+    if (!GetClientRect(g_window, &client) || !GetCursorPos(&p) || !ScreenToClient(g_window, &p))
+        return;
+    const bool centred = std::abs(p.x - client.right / 2) <= 2 && std::abs(p.y - client.bottom / 2) <= 2;
+    g_centred = centred ? g_centred + 1 : 0;
+    if (g_centred < 3)
+        return;
+    g_centred = 0;
+    g_heldUntil = NowMs() + 1000;
+    Log("Overlay: the game puts the pointer back at the centre: raw mouse input for a second");
+    Follow(true);
+}
+
+// aVia: 'r' raw input, 'w' WM_MOUSEMOVE, 'p' the Windows pointer followed, 'c' centred on entering interactive mode.
 void MoveCursorTo(float aX, float aY, char aVia)
 {
     const Screen s = GetScreen();
@@ -252,10 +381,18 @@ LRESULT HandleRawInput(HWND aWnd, WPARAM aWParam, LPARAM aLParam, bool aInteract
             // Locked: the cursor stays; the page gets the raw movement.
             if (PointerLocked())
                 OnMouseDelta(float(m.lLastX), float(m.lLastY));
+            else if (Follow())
+            {
+                FollowPointer();
+                CheckRecentre();
+            }
             else
                 MoveCursorTo(g_cursorX + float(m.lLastX), g_cursorY + float(m.lLastY), 'r');
         }
-        const USHORT f = JustActivated() ? 0 : m.usButtonFlags;
+        USHORT f = JustActivated() ? 0 : m.usButtonFlags;
+        if (g_pointerAway) // a press outside the game's window is for another window; releases still go
+            f &= ~USHORT(RI_MOUSE_LEFT_BUTTON_DOWN | RI_MOUSE_RIGHT_BUTTON_DOWN | RI_MOUSE_MIDDLE_BUTTON_DOWN |
+                         RI_MOUSE_WHEEL);
         if (f & RI_MOUSE_LEFT_BUTTON_DOWN)
             OnMouseButton(true, "left");
         if (f & RI_MOUSE_LEFT_BUTTON_UP)
@@ -347,7 +484,18 @@ LRESULT CALLBACK WndProc(HWND aWnd, UINT aMsg, WPARAM aWParam, LPARAM aLParam)
             static float lastX = 0, lastY = 0;
             float x = lastX, y = lastY;
             g_diag.msgMoves += 1;
-            if (!g_rawMouse && ClientToReference(aLParam, x, y))
+            if (!PointerLocked() && Follow())
+            {
+                // #56: the Windows pointer is over the game's window; asked to hear when it leaves.
+                if (!g_tracking)
+                {
+                    TRACKMOUSEEVENT track{sizeof(track), TME_LEAVE, aWnd, 0};
+                    g_tracking = TrackMouseEvent(&track) != FALSE;
+                }
+                g_diag.msgUsed += 1;
+                FollowPointer();
+            }
+            else if (!g_rawMouse && ClientToReference(aLParam, x, y))
             {
                 g_diag.msgUsed += 1;
                 if (PointerLocked())
@@ -359,6 +507,11 @@ LRESULT CALLBACK WndProc(HWND aWnd, UINT aMsg, WPARAM aWParam, LPARAM aLParam)
             lastY = y;
             return 0;
         }
+        break;
+    case WM_MOUSELEAVE:
+        g_tracking = false;
+        if (g_follow)
+            g_pointerAway = true; // passed on: the game may have asked for it too
         break;
     case WM_LBUTTONDOWN:
     case WM_LBUTTONUP:
@@ -425,6 +578,11 @@ void SetMode(Mode aMode)
     {
         const Screen s = GetScreen();
         MoveCursorTo(s.width * 0.5f, s.height * 0.5f, 'c');
+        if (Follow(true)) // #56: where the Windows pointer is, not the centre
+        {
+            g_lastFollowed = {-1, -1};
+            FollowPointer();
+        }
     }
     Log("Overlay: %s", ModeName(aMode));
     SendJson(std::string("{\"event\":\"overlay\",\"mode\":") + JsonString(ModeName(aMode)) + "}");
@@ -449,9 +607,27 @@ void GetCursor(float& aX, float& aY)
     aY = g_cursorY.load();
 }
 
+bool CursorAway()
+{
+    return g_pointerAway.load();
+}
+
+void ResendGameWindow()
+{
+    SendGameWindow();
+}
+
 void CursorFrame(bool aDrawn)
 {
     const uint64_t now = NowMs();
+    // Windowed or full screen, for the host's state (#56), every 2 seconds in any mode.
+    if (now - g_windowCheckedAt.load() >= 2000)
+    {
+        g_windowCheckedAt = now;
+        RECT client{}, box{};
+        if (ClientOnScreen(client, box))
+            NoteWindowed(CoversLessThanMonitor(box));
+    }
     if (GetMode() != Mode::Interactive)
     {
         g_diag.lastReport = 0;
@@ -477,14 +653,16 @@ void CursorFrame(bool aDrawn)
     if (g_diag.jumps)
         snprintf(jump, sizeof(jump), " (last %.0f,%.0f to %.0f,%.0f by %s)", g_diag.jumpFromX.load(),
                  g_diag.jumpFromY.load(), g_diag.jumpToX.load(), g_diag.jumpToY.load(),
-                 g_diag.jumpVia == 'r' ? "raw input" : "window message");
+                 g_diag.jumpVia == 'r' ? "raw input" : g_diag.jumpVia == 'p' ? "the Windows pointer" : "window message");
     Log("Overlay: cursor, last %.1f s: %u frames, drawn on %u; raw moves %u (absolute %u, while away %u); window "
         "moves %u (used %u); jumps over 150 px %u%s; now at %.0f,%.0f; Windows cursor %s at %ld,%ld, clip %ld,%ld "
-        "to %ld,%ld",
+        "to %ld,%ld; %s",
         double(now - g_diag.lastReport) / 1000.0, g_diag.frames, g_diag.drawn, g_diag.raw.load(),
         g_diag.rawAbsolute.load(), g_diag.rawAway.load(), g_diag.msgMoves.load(), g_diag.msgUsed.load(),
         g_diag.jumps.load(), jump, g_cursorX.load(), g_cursorY.load(), osCursor ? "shown" : "hidden", info.ptScreenPos.x,
-        info.ptScreenPos.y, clip.left, clip.top, clip.right, clip.bottom);
+        info.ptScreenPos.y, clip.left, clip.top, clip.right, clip.bottom,
+        g_follow ? (g_pointerAway ? "following the Windows pointer, now outside the game's window" : "following the Windows pointer")
+                 : "raw movement");
     g_diag.lastReport = now;
     g_diag.frames = g_diag.drawn = 0;
     g_diag.raw = g_diag.rawAbsolute = g_diag.rawAway = g_diag.msgMoves = g_diag.msgUsed = g_diag.jumps = 0;

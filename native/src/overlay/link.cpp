@@ -262,6 +262,7 @@ void ReaderLoop()
                      JsonString(ModeName(GetMode())) + "}");
             ResendGameState();
             ResendScreen();
+            ResendGameWindow(); // windowed or not, and how the cursor moves (#56)
 
             for (;;)
             {

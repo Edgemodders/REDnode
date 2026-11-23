@@ -22,6 +22,7 @@ How to keep it:
 
 ### Fixed
 
+- **The cursor in a windowed game** ([#56](https://github.com/Edgemodders/REDnode/issues/56)): with the game in a window smaller than the screen, the overlay's cursor now follows the Windows pointer in the game's menus, at its speed, and is not drawn outside the game's window. Full screen it moves as before. MCP's `game_state` says whether the game is windowed (`gameWindow`).
 - A UI kit tooltip stayed on screen when the cursor moved from its control onto a part of the window with no tooltip of its own; it now goes.
 
 ## 0.69.0 (2026-11-21)

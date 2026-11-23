@@ -1602,6 +1602,8 @@ function sizeOf(w) {
 
 // The game view in reference pixels (1080 high), from the plugin's screen event; null until the first.
 let gameScreen = null;
+// What the plugin says of the game's window (#56): { windowed, pointer: 'follows' | 'raw' }, null until it does.
+let gameWindow = null;
 
 // The size of a window that fills the screen: the game view, or the manifest's size until the plugin has told it.
 // Pages are at most 4096 pixels wide, enough for 32:9 (3840).
@@ -1912,6 +1914,11 @@ function onGameMessage(m) {
     case 'screen':
       onScreen(m);
       return;
+    case 'game-window':
+      // #56: the game in a window smaller than its screen, and whether the cursor follows the Windows pointer.
+      gameWindow = { windowed: m.windowed === true, pointer: m.pointer === 'follows' ? 'follows' : 'raw' };
+      log(`The game is ${gameWindow.windowed ? 'in a window' : 'full screen'}; the overlay's cursor ${gameWindow.pointer === 'follows' ? 'follows the Windows pointer' : 'moves by raw mouse input'}`);
+      return;
     case 'focus':
       onFocus(m.window);
       return;
@@ -2169,7 +2176,7 @@ function hostState() {
   const solo = soloOwner ? { id: soloOwner, name: apps.get(soloOwner)?.manifest.name ?? soloOwner } : null;
   const s = spaces();
   return {
-    connected, mode, windowed, version: VERSION, game: gameState(), theme: theme(), developer: !!settings.developer, solo,
+    connected, mode, windowed, gameWindow, version: VERSION, game: gameState(), theme: theme(), developer: !!settings.developer, solo,
     tooltips: settings.tooltips !== false,
     spaces: { names: [...s.names], current: s.current },
   };
