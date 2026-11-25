@@ -396,7 +396,7 @@ Check: the mock game on the dev and packaged host (scratchpad `r71/run.sh`, 25 c
 
 ## Providers of a role test
 
-Run in game on 2026-11-25 (dev PC, REDnode 0.73.0): steps 1, 2, 3 and 5 passed; step 4 is still to run. Results in [docs/testing.md](testing.md#providers-of-a-role-58-071).
+**Passed in game on 2026-11-25** (dev PC, REDnode 0.73.0), all five steps (step 4 in a second run). Results in [docs/testing.md](testing.md#providers-of-a-role-58-071).
 
 REDnode 0.71.0. In the **Console** (launcher, Console):
 
