@@ -95,7 +95,13 @@ export interface NpcDownedEvent extends GameEvent {
    * When REDnode does not know the name it is the `"0x..."` id: compare with `tweakdb.id(...)`.
    */
   affiliation: string | null;
-  /** True when killed, false when defeated (down but alive, such as a non-lethal takedown). */
+  /**
+   * True when the game killed them; false when it left them in its defeated state: down on the
+   * ground, often still moving, and able to be finished off (which then sends a second event
+   * with `killed: true`). Which one comes depends on the damage: in the first test one Overheat
+   * left its target defeated, Contagion and then Overheat killed. Non-lethal takedowns are
+   * defeated too. Count both as downed.
+   */
   killed: boolean;
   /** True when V downed them, by any means the game credits to V, or one of V's companions or drones did. */
   byPlayer: boolean;

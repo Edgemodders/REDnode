@@ -1283,7 +1283,7 @@ The overlay's cursor follows the Windows pointer while the game is in a window s
 
 | Run | Result |
 |---|---|
-| In game, dev PC, 2026-11-25, 0.73.0, by the owner (Chooms!'s fights code not yet deployed, so C3's step 12 did not run) | **Pass but step 9**: combat in and out; Voodoo Boys killed by V with full record and faction names; defeated then killed counted once; a System Collapse target defeated "by player"; the grenade not told apart; others "by none"; tally "VoodooBoys 6" across a load. Step 9: a load sent "V left combat" with no fight (fixed in 0.73.1). People placed already down send "by none" as they stream in |
+| In game, dev PC, 2026-11-25, 0.73.0, by the owner (Chooms!'s fights code not yet deployed, so C3's step 12 did not run) | **Pass but step 9**: combat in and out; Voodoo Boys killed by V with full record and faction names; defeated then killed counted once; a System Collapse target defeated "by player"; Overheat alone left two targets defeated (still moving), Contagion then Overheat killed one, all "by player"; the grenade not told apart; others "by none"; tally "VoodooBoys 6" across a load. Step 9: a load sent "V left combat" with no fight (fixed in 0.73.1). People placed already down send "by none" as they stream in |
 | Host, stand-in plugin, 2026-11-25, 0.73.1, by Claude | **Pass**: 2 checks (scratchpad `f61/run.sh`): the run's combat states 0, 0, 1, 0, 1, 0 reach a mod as entered, left, entered, left; `npcDowned` unchanged |
 | Scripts and package, 2026-11-25, 0.73.0, by Claude | **Pass**: REDnodeFights.reds compiles with 0 errors alone, beside Codeware and with the game's scc.exe (scratchpad `f61/check.ps1`); 11 checks of the package's fields against a stand-in transport (scratchpad `f61/check.mjs`) |
 
