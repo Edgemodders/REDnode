@@ -12,6 +12,17 @@ How to keep it:
 
 ## Unreleased
 
+## 0.70.0 (2026-11-25)
+
+<!-- nexus
+New: world.load takes kinds and skip, to load only a scene's people or leave objects out
+New: tools can call a mod's functions through the editor channel, after the player allows it
+New: pins get an id that survives a rename, and Drop a pin here saves the way V faces
+New: game.player.body() says V's body type, for workspots and garments made for it
+New: tooltips on ui buttons, toggles, sliders, inputs and dropdowns
+Fixed: in a windowed game the overlay's cursor follows the Windows pointer in the menus
+-->
+
 ### New
 
 - **`world.load` filters** ([#49](https://github.com/Edgemodders/REDnode/issues/49), [#48](https://github.com/Edgemodders/REDnode/issues/48)): `kinds` loads only objects of those kinds, such as `["npc"]` for a baked scene whose props are already in the game's world, and `skip` leaves out objects by their id in the scene. Both are in the answer's `skipped`, and MCP's `world_load` takes them too.
