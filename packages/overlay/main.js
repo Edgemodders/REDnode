@@ -4918,13 +4918,38 @@ ipcMain.handle('rednode:pkg:secret', (event, op, name, value) => secret(packageO
 // the package that "provides": ["agent"] and serves (REDagent), and streams its
 // answer back to the asker. The provider decides the model, the tools and the
 // spending limits.
-//   asker -> host:    { op: 'ask', aid, prompt, context } or { op: 'cancel', aid }
+//   asker -> host:    { op: 'ask', aid, prompt, context, tools?, model? } or { op: 'cancel', aid }
 //   host -> asker:    { event: 'agent', aid, type: 'text' | 'done' | 'error', text, cost, error }
 //   provider -> host: { op: 'serve' } once, then { op: 'reply', rid, type, text, cost, error }
-//   host -> provider: { event: 'agent-request', rid, from: { id, name }, prompt, context }
+//   host -> provider: { event: 'agent-request', rid, from: { id, name }, prompt, context, tools, model? }
 //                     and { event: 'agent-cancel', rid }
 
 let agentProvider = null; // the package id that serves questions
+// #54: a question's limits, refused rather than cut (the rednode package checks the same first).
+const AGENT_PROMPT_LIMIT = 20000;
+const AGENT_CONTEXT_LIMIT = 65536;
+
+function agentAskRefusal(msg) {
+  const prompt = msg.prompt;
+  if (typeof prompt !== 'string' || !prompt.trim()) return 'agent.ask needs a question.';
+  if (prompt.length > AGENT_PROMPT_LIMIT) return `The question is ${prompt.length} characters; agent.ask takes at most ${AGENT_PROMPT_LIMIT}. Put the data in context.`;
+  if (msg.tools !== undefined && typeof msg.tools !== 'boolean') return "agent.ask's tools must be true or false.";
+  if (msg.model !== undefined && (typeof msg.model !== 'string' || !/^[a-z0-9-]{1,32}$/.test(msg.model))) {
+    return 'agent.ask\'s model must be a model family, such as "sonnet", "opus" or "haiku".';
+  }
+  if (msg.context !== undefined) {
+    let json;
+    try {
+      json = JSON.stringify(msg.context);
+    } catch (err) {
+      return `agent.ask's context cannot be sent as JSON: ${err.message}`;
+    }
+    if (json !== undefined && json.length > AGENT_CONTEXT_LIMIT) {
+      return `The context is ${json.length} characters of JSON; agent.ask takes at most ${AGENT_CONTEXT_LIMIT}. Send less, such as only the recent posts.`;
+    }
+  }
+  return null;
+}
 let nextAgentAsk = 1;
 const agentAsks = new Map(); // rid -> { from, aid, send, at }
 
@@ -4947,6 +4972,8 @@ function onAgent(id, msg, send) {
         fail('The player has not allowed this package to ask the assistant yet. They can allow it in the launcher or the Mod Manager.');
       } else if (!agentProvider || !mods.isEnabled(agentProvider)) {
         fail('No assistant is running. Install REDagent and switch it on.');
+      } else if (agentAskRefusal(msg)) {
+        fail(agentAskRefusal(msg));
       } else {
         const rid = nextAgentAsk++;
         agentAsks.set(rid, { from: id, aid: msg.aid, send, at: Date.now() });
@@ -4954,8 +4981,10 @@ function onAgent(id, msg, send) {
           event: 'agent-request',
           rid,
           from: { id, name: entry.manifest.name },
-          prompt: String(msg.prompt ?? '').slice(0, 20000),
+          prompt: msg.prompt,
           context: msg.context,
+          tools: msg.tools !== false,
+          ...(msg.model !== undefined ? { model: msg.model } : {}),
         });
       }
       return;

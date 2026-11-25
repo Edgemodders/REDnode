@@ -226,12 +226,12 @@ export const NOTES = {
   'ask-mod': {
     group: 'game',
     summary: 'Ask REDagent, the in-game assistant powered by Claude, a question from your own mod, and stream the answer into a window.',
-    teaches: ['agent.ask', 'onText', 'AbortController', '"agent" permission'],
+    teaches: ['agent.ask', 'onText', 'AbortController', '"agent" permission', 'model', 'tools: false'],
     how: [
       '`agent.ask` sends a question with context only your mod knows, here V\'s position. The answer streams through `onText`, and `signal` stops it.',
       'The `agent` permission needs the player\'s OK in the Mod Manager, because each answer costs the player a little.',
     ],
-    preview: 'On this page a fixed text streams back. In the game, REDagent answers.',
+    preview: 'On this page a fixed text streams back. In the game, REDagent answers, with the model and tools you chose (REDnode 0.72.0).',
   },
   'crash-mod': {
     group: 'mods',

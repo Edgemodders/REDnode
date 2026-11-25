@@ -6,6 +6,8 @@ import { agent, game, ui } from 'rednode';
 
 let question = '';
 let asking = null; // AbortController of the question in progress
+let model = 'sonnet'; // REDnode 0.72.0: a model family, which REDagent maps to its newest model
+let noTools = false; // REDnode 0.72.0: answer from the question and context alone
 
 const answer = ui.text('Ask about the game or your mods. Each answer costs a little.', { tone: 'dim' });
 const cost = ui.text('', { tone: 'dim' });
@@ -28,6 +30,11 @@ ui.window({
         ask();
       },
     }),
+    ui.select('Model', [{ value: 'sonnet', label: 'Sonnet (default)' }, { value: 'opus', label: 'Opus' }, { value: 'haiku', label: 'Haiku' }], {
+      value: model,
+      onChange: (v) => (model = v),
+    }),
+    ui.toggle('No tools: answer from the question alone', (on) => (noTools = on), { tip: 'Quicker and cheaper; REDagent reads nothing from the game' }),
     ui.row(askButton, stopButton),
     answer,
     cost,
@@ -47,6 +54,8 @@ async function ask() {
     const where = await game.player.position().catch(() => null);
     const result = await agent.ask(question, {
       context: { mod: 'Ask mod', playerPosition: where },
+      model,
+      tools: !noTools,
       onText: (t) => {
         text += t;
         answer.set({ text });
@@ -54,8 +63,8 @@ async function ask() {
       signal: asking.signal,
     });
     answer.set({ text: result.text });
-    cost.set({ text: `This answer cost $${result.cost.toFixed(4)}` });
-    console.log(`Answered for $${result.cost.toFixed(4)}: ${question.slice(0, 80)}`);
+    cost.set({ text: `This answer cost $${result.cost.toFixed(4)} (${model}${noTools ? ', no tools' : ''})` });
+    console.log(`Answered for $${result.cost.toFixed(4)} (${model}${noTools ? ', no tools' : ''}): ${question.slice(0, 80)}`);
   } catch (err) {
     answer.set({ text: err.message, tone: 'dim' });
     cost.set({ text: '' });

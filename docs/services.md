@@ -405,3 +405,30 @@ REDnode 0.71.0. In the **Console** (launcher, Console):
 | 3 | In the launcher, switch Counter service off, then on again | A line within a second of each: off and stopped, then on and running |
 | 4 | `stop()`, then switch it off and on again | No more lines |
 | 5 | `await service.providers("agent")` | Refused: the agent role is reached with agent.ask |
+
+## agent.ask options (#54): built
+
+Asked for by EDGEmobile's Chooms! on 2026-11-21 ([#54](https://github.com/Edgemodders/REDnode/issues/54)): its people post by themselves every few minutes, each post one question whose context (the person's knowledge cards, recent posts, the scene) holds everything, and later (C5) conversations with V that need a stronger model. The owner asked for it on 2026-11-25, ahead of 0.71.0's test. Built in REDnode 0.72.0 with REDagent 0.4.5.
+
+| Part | Where | What |
+|---|---|---|
+| More context, its limit stated | `AGENT_CONTEXT_LIMIT` and `AGENT_PROMPT_LIMIT` in agent.ts (`askRefusal`), `agentAskRefusal` in main.js, `MOD_CONTEXT_LIMIT` in REDagent | The context goes whole, up to 65,536 characters of JSON; the question up to 20,000 characters. More is refused with an error saying how much was sent, by the package before anything goes, by the host for a page that skips the package, and by REDagent. Before, REDagent cut the context at 8,000 characters and the host cut the question, without a word |
+| No tools | `tools: false` in `AskOptions`; `AgentRequest.tools`; REDagent's `answerMod` | REDagent answers from the question and context alone: no REDnode MCP server (the kernel is not even asked), no file tools, one turn, every tool denied, and a briefing that says so and keeps the format the question asks for (such as JSON) |
+| A choice of model | `model` in `AskOptions` (`AgentModel`: `"sonnet"`, `"opus"`, `"haiku"`); `modModel` in REDagent | A family, never an id: REDagent maps it to its newest model of that family (Sonnet 5.5, Opus 5.5, Haiku 5.5). Default Sonnet, as before. Another name is refused by REDagent before the question waits in line; the host refuses anything that is not a short lowercase name. The daily limit per mod covers the cost |
+| The Mods view | REDagent's `chat.js` | A question's model (when not Sonnet) and "no tools" beside its cost |
+| Ask mod 0.2.0 | `packages/overlay/apps/ask-mod` | A model choice and a **No tools** switch |
+
+Checks: the mock game on the dev and packaged host (scratchpad `r71/run.sh`, 30 with 0.71.0's: a plain question reaches a stand-in agent with tools on, `tools: false` with `model: "opus"` and 30,000 characters of context whole, too much context, a long question and a bad model name refused), and REDagent's side with a stand-in Agent SDK (scratchpad `r71/a54check/check.mjs`, 18: Sonnet with its tools by default, `tools: false` with no tools, no MCP server, one turn and its own briefing, each family's model, an unknown family refused before anything is sent, 30,000 characters whole, over the limit refused, the Mods view's record).
+
+## agent.ask options test
+
+REDnode 0.72.0 and REDagent 0.4.5, REDagent set up with its key. Load a save.
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | In the Mod Manager switch on **Ask mod** 0.2.0 and its **agent** permission | Its window shows a Model choice and a **No tools** switch |
+| 2 | Model **Sonnet**, No tools off. Ask "Say hello in five words." | An answer; the cost line ends "(sonnet)" |
+| 3 | Model **Haiku**, No tools on. Ask: Write one short post as Judy about the rain in Watson. Answer as JSON with a text field. | A JSON answer, quickly, for less than step 2; the cost line ends "(haiku, no tools)" |
+| 4 | Still no tools. Ask "What is in V's inventory?" | It says it cannot tell from what it was sent, with no tool calls (REDagent's log shows none) |
+| 5 | Model **Opus**, No tools off. Ask "Which district am I in?" | It reads the game (tools) and answers; it costs more |
+| 6 | In REDagent, open **Chats**, then **Mods** | Ask mod's recent questions show "haiku, no tools" and "opus" beside their costs |

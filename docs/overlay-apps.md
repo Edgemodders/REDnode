@@ -914,9 +914,11 @@ const { cost } = await agent.ask('Suggest a build for a netrunner at level 12.',
 
 | Rule | Why |
 |---|---|
-| Every answer costs the player | Ask when the player wants it, never on a timer. REDagent gives each package a daily limit ($0.25 unless the player changes it) and the player can pause it; past the limit, `ask` rejects and says so |
+| Every answer costs the player | Ask when it helps the player. A mod that asks on its own, such as a feed that writes posts, keeps it rare and says so in its description. REDagent gives each package a daily limit ($0.25 unless the player changes it) and the player can pause it; past the limit, `ask` rejects and says so |
 | The assistant only reads | It may look at logs, the game state, the game API and the apps folders, but never changes files or the game. Pictures of windows and the screen only if the player switches them on for your package |
-| Send what it needs | Put your mod's state in `context`, so the assistant does not spend tool calls finding it |
+| Send what it needs | Put your mod's state in `context`, so the assistant does not spend tool calls finding it. It goes whole, up to 65,536 characters of JSON (`AGENT_CONTEXT_LIMIT`); a bigger one, or a question over 20,000 characters, is refused with an error, never cut (REDnode 0.72.0) |
+| `tools: false` when the context is enough | The assistant then answers from the question and context alone, with no tool calls: quicker and cheaper, as for "write one post as this person" (REDnode 0.72.0, REDagent 0.4.5) |
+| `model` for a harder or a quicker question | `"sonnet"` by default, `"opus"` for harder questions such as a conversation, `"haiku"` for quick ones. The assistant takes its newest model of that family; another name is refused. Each costs the player a different amount (REDnode 0.72.0, REDagent 0.4.5) |
 | `signal` stops a question | Pass an `AbortSignal` to let the player cancel |
 
 The [Ask mod](https://github.com/Edgemodders/REDnode/tree/main/packages/overlay/apps/ask-mod) sample asks whatever the player types and streams the answer into its window. The answering side is `agent.serve`, for a package that says `"provides": ["agent"]` in its manifest; REDagent is one.

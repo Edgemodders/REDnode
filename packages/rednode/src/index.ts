@@ -26,14 +26,14 @@ export type { Game, GameEvent, GameState, EventHandler, Unsubscribe, Player, Aud
 export { ui } from "./ui.js";
 export { api } from "./api.js";
 export { pkg, secrets, kernel, channel } from "./pkg.js";
-export { agent } from "./agent.js";
+export { agent, AGENT_CONTEXT_LIMIT, AGENT_PROMPT_LIMIT } from "./agent.js";
 export { service, use } from "./service.js";
 export type { ServiceInfo, ProviderInfo, ServiceCaller, ServiceCallOptions, ServiceHandle, ServiceDescription, FunctionDescriptor, ParamDescriptor, EventDescriptor, Schema } from "./service.js";
 export { world } from "./world.js";
 export type { EntityId, WorldPoint, WorldRotation, SpawnOptions, Spawned, EntityEventName, NearEntity, NearOptions, EntityFiles, SpawnedEntry, LoadResult, PinOptions, PinEntry, PinStyle, PinLabel, GoToResult, PinSetSaved, PinSetLoaded, WorldNode, PickOptions, PickResult, RayHit, NodeRegistryState, NodeHighlight, UseWorkspotOptions, WorkspotResult, WorkspotState, WeatherState, SetWeatherOptions, SetWeatherResult } from "./world.js";
 export type { WorkspotClip, WriteWorkspotOptions, WorkspotEntry, WrittenWorkspot } from "./workspot.js";
 export type { Scene, SceneObject } from "./scene.js";
-export type { AgentAnswer, AskOptions, AgentRequest, AgentResult } from "./agent.js";
+export type { AgentAnswer, AskOptions, AgentRequest, AgentResult, AgentModel } from "./agent.js";
 export type { PackageInfo, KernelMcp, KernelBridge, Requirement, AskSharedOptions } from "./pkg.js";
 export { tweakdb } from "./tweakdb.js";
 export type { TweakId, Flat, RecordTypeName } from "./tweakdb.js";

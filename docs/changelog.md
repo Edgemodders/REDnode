@@ -14,16 +14,34 @@ How to keep it:
 
 ### New
 
+- **A person spawned on the ground** ([#59](https://github.com/Edgemodders/REDnode/issues/59)): `world.spawn` puts a person (and anything with `ground: true`) on the ground under the place given, since a person plays a workspot from where they were spawned and one spawned in the air played it in the air. `ground: false` keeps the place exactly; `world.spawn` answers `position`. MCP's `world_spawn` and `world.load` do the same.
+- **`world.ray`** ([#59](https://github.com/Edgemodders/REDnode/issues/59), [#60](https://github.com/Edgemodders/REDnode/issues/60)): where a line first meets the world's collision, over the collision groups you name (the game's own names only; default `Static`), with the group that stopped it.
+- **`world.pick` groups** ([#60](https://github.com/Edgemodders/REDnode/issues/60)): `groups` casts the physics line over more collision groups than `Static`, so objects baked by EDGEbuilder (in `Dynamic`) stop it; `physicsHit.group` names the group.
+- **`service.providers` and `service.onProviders`** ([#58](https://github.com/Edgemodders/REDnode/issues/58)): every package that provides a role, switched on or not, with its folder, whether its service runs and its manifest as written, and a handler told when that list changes. For a mod that shows a button per provider, such as EDGEbuilder's Tools.
+- **`agent.ask` options** ([#54](https://github.com/Edgemodders/REDnode/issues/54)): `tools: false` answers from the question and context alone, with no tool calls, and `model` picks a family (`"sonnet"`, the default, `"opus"` or `"haiku"`), which REDagent maps to its newest model. Needs REDagent 0.4.5.
+
+### Changed
+
+- **`agent.ask` sends the whole context, up to 65,536 characters of JSON** ([#54](https://github.com/Edgemodders/REDnode/issues/54)), and refuses a bigger one, or a question over 20,000 characters, with an error. Before, REDagent cut the context at 8,000 characters and the host cut a long question, without a word.
+
+## 0.70.0 (2026-11-25)
+
+<!-- nexus
+New: world.load takes kinds and skip, to load only a scene's people or leave objects out
+New: tools can call a mod's functions through the editor channel, after the player allows it
+New: pins get an id that survives a rename, and Drop a pin here saves the way V faces
+New: game.player.body() says V's body type, for workspots and garments made for it
+New: tooltips on ui buttons, toggles, sliders, inputs and dropdowns
+Fixed: in a windowed game the overlay's cursor follows the Windows pointer in the menus
+-->
+
+### New
+
 - **`world.load` filters** ([#49](https://github.com/Edgemodders/REDnode/issues/49), [#48](https://github.com/Edgemodders/REDnode/issues/48)): `kinds` loads only objects of those kinds, such as `["npc"]` for a baked scene whose props are already in the game's world, and `skip` leaves out objects by their id in the scene. Both are in the answer's `skipped`, and MCP's `world_load` takes them too.
 - **Tools can call a mod's service** ([#48](https://github.com/Edgemodders/REDnode/issues/48)): `POST /editor/service.call` on the editor channel, after the player allows that tool and that mod in the Editor request window. `service.caller()` names the tool.
 - **A pin's id and facing** ([#50](https://github.com/Edgemodders/REDnode/issues/50)): every pin in a `.pins.json` file gets an `id` that stays when it is renamed, and **Drop a pin here** saves the way V faces as `yaw`. Still format version 1; `world.pins()` lists both, and `world.pinSet` keeps them.
 - **`game.player.body()`** ([#47](https://github.com/Edgemodders/REDnode/issues/47)): V's body from character creation, `"wa"` or `"ma"`, so a mod can pick the workspot or garment made for it.
 - **Tooltips on ui controls** ([#55](https://github.com/Edgemodders/REDnode/issues/55)): `tip` on `ui.button`, `ui.toggle`, `ui.slider`, `ui.input` and `ui.select` shows a tooltip when the cursor rests on the control, a disabled one too, so a button that waits can say why. `set({ tip })` changes or clears it, and a tooltip already showing takes the new text. The Hello mod sample shows it.
-
-- **A person spawned on the ground** ([#59](https://github.com/Edgemodders/REDnode/issues/59)): `world.spawn` puts a person (and anything with `ground: true`) on the ground under the place given, since a person plays a workspot from where they were spawned and one spawned in the air played it in the air. `ground: false` keeps the place exactly; `world.spawn` answers `position`. MCP's `world_spawn` and `world.load` do the same.
-- **`world.ray`** ([#59](https://github.com/Edgemodders/REDnode/issues/59), [#60](https://github.com/Edgemodders/REDnode/issues/60)): where a line first meets the world's collision, over the collision groups you name (the game's own names only; default `Static`), with the group that stopped it.
-- **`world.pick` groups** ([#60](https://github.com/Edgemodders/REDnode/issues/60)): `groups` casts the physics line over more collision groups than `Static`, so objects baked by EDGEbuilder (in `Dynamic`) stop it; `physicsHit.group` names the group.
-- **`service.providers` and `service.onProviders`** ([#58](https://github.com/Edgemodders/REDnode/issues/58)): every package that provides a role, switched on or not, with its folder, whether its service runs and its manifest as written, and a handler told when that list changes. For a mod that shows a button per provider, such as EDGEbuilder's Tools.
 
 ### Fixed
 

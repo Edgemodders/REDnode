@@ -1277,6 +1277,15 @@ The overlay's cursor follows the Windows pointer while the game is in a window s
 | Build, 2026-11-22, 0.70.0, by Claude | Builds; native tests pass. Not checked in the mock game, which has no game window. Awaits its in-game test |
 | Game 2.5, dev PC, 2026-11-23, REDnode 0.70.0 | **Pass**, all 7 steps: Windowed at 1920 x 1080; in the pause menu the cursor started at the pointer, stayed on it slow and fast, was not drawn outside the window and took over where the pointer came back, and the launcher's buttons and drag worked. The log: `the game is in a window smaller than its screen`, `follows the Windows pointer` at F10 in the pause menu, `moves by raw mouse input` at F10 in the world (the game holds the pointer there; one 24 ms flip to follows and back), `the game is full screen` after the switch back. MCP `game_state` answered `gameWindow: { windowed: true, pointer: "follows" }` |
 
+## agent.ask options (#54; 0.72.0)
+
+`agent.ask`'s whole context with its limit stated, `tools: false` and a model family, with REDagent 0.4.5. Steps: [docs/services.md, "agent.ask options test"](services.md#agentask-options-test).
+
+| Run | Result |
+|---|---|
+| Dev and packaged host, stand-in plugin and agent, 2026-11-25, 0.72.0, by Claude | **Pass**: 5 checks in the 30 of scratchpad `r71/run.sh`: a plain question with tools on and no model, `tools: false` with `model: "opus"` and 30,000 characters of context reaching the agent whole, over 65,536 characters of context, a question over 20,000 characters and a bad model name refused |
+| REDagent with a stand-in Agent SDK, 2026-11-25, REDagent 0.4.5, by Claude | **Pass**: 18 checks (scratchpad `r71/a54check/check.mjs`): Sonnet with its tools by default; `tools: false` with no tools, no MCP server (the kernel not asked), one turn, its own briefing, every tool denied; opus, haiku and sonnet each to their model; an unknown family refused before anything is sent; 30,000 characters of context whole, over the limit refused; the Mods view's record |
+
 ## A person on the ground, a ray, and pick groups (#59, #60; 0.71.0)
 
 `world.spawn` putting a person on the ground, `world.ray`, and `world.pick`'s `groups`. Steps: [docs/world.md, "#59, #60 test"](world.md#59-60-test).
