@@ -2519,6 +2519,8 @@ Checks: `raygroups_test` (12, in `tools/build-native.ps1`) and the mock game on 
 
 ### #59, #60 test
 
+**Passed in game on 2026-11-25** (dev PC, REDnode 0.72.0), all six steps; results in [docs/testing.md](testing.md#a-person-on-the-ground-a-ray-and-pick-groups-59-60-071). Step 4's pose started with no T pose. Step 6: the ray over Static went through a baked floor and stopped 0.60 m below V's feet; over Static and Dynamic it stopped at V's feet, group `Dynamic`.
+
 REDnode 0.71.0, Codeware, game 2.5. Load a save outside combat, somewhere a street or path **slopes away** in front of V (or at the top of a few steps, facing down). Steps 1 to 3 use the **Console** (launcher, Console); type each line and press Enter.
 
 | Step | Do | Expect |
