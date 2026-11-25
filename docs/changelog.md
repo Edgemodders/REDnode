@@ -12,6 +12,18 @@ How to keep it:
 
 ## Unreleased
 
+## 0.73.1 (2026-11-25)
+
+<!-- nexus
+New: fight events: game.on('combat') and game.on('npcDowned') with the person's faction and whether V did it
+New: a person spawned with world.spawn stands on the ground, so their workspot plays on the ground
+New: world.ray, and world.pick over more collision groups, so objects baked by EDGEbuilder stop it
+New: service.providers and service.onProviders list every mod that provides a role
+New: agent.ask takes tools: false and a model (sonnet, opus, haiku); needs REDagent 0.4.6
+Changed: agent.ask sends the whole context, up to 64 KB, and refuses more instead of cutting it
+New: the Fight test sample
+-->
+
 ### New
 
 - **A person spawned on the ground** ([#59](https://github.com/Edgemodders/REDnode/issues/59)): `world.spawn` puts a person (and anything with `ground: true`) on the ground under the place given, since a person plays a workspot from where they were spawned and one spawned in the air played it in the air. `ground: false` keeps the place exactly; `world.spawn` answers `position`. MCP's `world_spawn` and `world.load` do the same.
@@ -19,7 +31,7 @@ How to keep it:
 - **`world.pick` groups** ([#60](https://github.com/Edgemodders/REDnode/issues/60)): `groups` casts the physics line over more collision groups than `Static`, so objects baked by EDGEbuilder (in `Dynamic`) stop it; `physicsHit.group` names the group.
 - **`service.providers` and `service.onProviders`** ([#58](https://github.com/Edgemodders/REDnode/issues/58)): every package that provides a role, switched on or not, with its folder, whether its service runs and its manifest as written, and a handler told when that list changes. For a mod that shows a button per provider, such as EDGEbuilder's Tools.
 - **Fight events** ([#61](https://github.com/Edgemodders/REDnode/issues/61)): `game.on("combat")` hears V enter and leave combat (`inCombat`), and `game.on("npcDowned")` hears every person defeated or killed, with their `entity`, `record`, `affiliation` (a record id such as `"Factions.Maelstrom"`), `killed`, and `byPlayer` (V or V's companion). The game sends them as they happen, from its own handlers, never by polling. Sample **Fight test**.
-- **`agent.ask` options** ([#54](https://github.com/Edgemodders/REDnode/issues/54)): `tools: false` answers from the question and context alone, with no tool calls, and `model` picks a family (`"sonnet"`, the default, `"opus"` or `"haiku"`), which REDagent maps to its newest model. Needs REDagent 0.4.5.
+- **`agent.ask` options** ([#54](https://github.com/Edgemodders/REDnode/issues/54)): `tools: false` answers from the question and context alone, with no tool calls, and `model` picks a family (`"sonnet"`, the default, `"opus"` or `"haiku"`), which REDagent maps to its newest model. Needs REDagent 0.4.6.
 
 ### Changed
 
