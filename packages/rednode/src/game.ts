@@ -73,7 +73,9 @@ export type DownedBy = "player" | "companion" | "other" | "none";
  * The `"npcDowned"` event (#61): a person was defeated or killed, sent from the two places the
  * game finds and rewards the killer. Every person: gangers, police, civilians, drones and
  * mechs. One event each for defeated and for killed, so a person defeated and then finished off
- * sends two (the same `entity`); count by `entity` to count people.
+ * sends two (the same `entity`); count by `entity` to count people. People placed in the
+ * world already down (a body at a crash site) send one `"by none"` event as they stream in,
+ * after each load too: keep to `byPlayer` to count V's fights.
  *
  * @example
  * ```ts

@@ -1996,6 +1996,13 @@ function onGameMessage(m) {
     }
     case 'game':
       if (m.name === 'REDnode.SessionEnd') pinsHost.gone(null, 'the game session ended');
+      // #61: each new player puppet (the main menu's, every save load's) reports V's combat state
+      // once, so the same state could come twice ("left combat" with no fight). Pass on changes only.
+      if (m.name === 'combat') {
+        const inCombat = Number(m.value) === 1;
+        if (inCombat === lastInCombat) return;
+        lastInCombat = inCombat;
+      }
       toAllPages(m);
       mods?.broadcast(m);
       return;
@@ -2424,6 +2431,10 @@ function weatherAfterLoad() {
 
 // Packages that defined quickhack functions (#42), so the host can release them when they stop.
 const quickhackOwners = new Set();
+
+// #61: V's combat state as last passed on to packages; V starts out of combat, so a first
+// "left combat" from a new player puppet is not sent.
+let lastInCombat = false;
 
 function releaseQuickhacks(id, why) {
   if (!quickhackOwners.delete(id) || !connected) return;
