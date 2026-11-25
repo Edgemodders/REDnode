@@ -396,6 +396,8 @@ Check: the mock game on the dev and packaged host (scratchpad `r71/run.sh`, 25 c
 
 ## Providers of a role test
 
+Run in game on 2026-11-25 (dev PC, REDnode 0.73.0): steps 1, 2, 3 and 5 passed; step 4 is still to run. Results in [docs/testing.md](testing.md#providers-of-a-role-58-071).
+
 REDnode 0.71.0. In the **Console** (launcher, Console):
 
 | Step | Do | Expect |
@@ -421,6 +423,8 @@ Asked for by EDGEmobile's Chooms! on 2026-11-21 ([#54](https://github.com/Edgemo
 Checks: the mock game on the dev and packaged host (scratchpad `r71/run.sh`, 30 with 0.71.0's: a plain question reaches a stand-in agent with tools on, `tools: false` with `model: "opus"` and 30,000 characters of context whole, too much context, a long question and a bad model name refused), and REDagent's side with a stand-in Agent SDK (scratchpad `r71/a54check/check.mjs`, 18: Sonnet with its tools by default, `tools: false` with no tools, no MCP server, one turn and its own briefing, each family's model, an unknown family refused before anything is sent, 30,000 characters whole, over the limit refused, the Mods view's record).
 
 ## agent.ask options test
+
+**Passed in game on 2026-11-25** (dev PC, REDnode 0.73.0 with REDagent 0.4.6), all six steps; results in [docs/testing.md](testing.md#agentask-options-54-072).
 
 REDnode 0.72.0 and REDagent 0.4.5, REDagent set up with its key. Load a save.
 

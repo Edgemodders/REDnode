@@ -1293,6 +1293,7 @@ The overlay's cursor follows the Windows pointer while the game is in a window s
 |---|---|
 | Dev and packaged host, stand-in plugin and agent, 2026-11-25, 0.72.0, by Claude | **Pass**: 5 checks in the 30 of scratchpad `r71/run.sh`: a plain question with tools on and no model, `tools: false` with `model: "opus"` and 30,000 characters of context reaching the agent whole, over 65,536 characters of context, a question over 20,000 characters and a bad model name refused |
 | REDagent with a stand-in Agent SDK, 2026-11-25, REDagent 0.4.5, by Claude | **Pass**: 18 checks (scratchpad `r71/a54check/check.mjs`): Sonnet with its tools by default; `tools: false` with no tools, no MCP server (the kernel not asked), one turn, its own briefing, every tool denied; opus, haiku and sonnet each to their model; an unknown family refused before anything is sent; 30,000 characters of context whole, over the limit refused; the Mods view's record |
+| In game, dev PC, 2026-11-25, REDnode 0.73.0 with REDagent 0.4.6, by the owner | **Pass**, all six steps, with REDagent's own record (`mods.json`): Sonnet with tools for "Say hello" ($0.088); Haiku with no tools for the Judy post as JSON ($0.00014) and the inventory question ($0.00012); Opus with tools for the district ($0.265); the Mods view showed each. REDagent 0.4.6's default limit moved Ask mod and the Wardrobe Designer from $0.25 to $2.00 (neither set by the player). #54 closed |
 
 ## A person on the ground, a ray, and pick groups (#59, #60; 0.71.0)
 
@@ -1312,6 +1313,7 @@ The overlay's cursor follows the Windows pointer while the game is in a window s
 | Run | Result |
 |---|---|
 | Dev and packaged host, stand-in plugin, 2026-11-25, 0.71.0, by Claude | **Pass**: 25 checks with #59's and #60's (scratchpad `r71/run.sh`): the two other providers sorted by name and without the caller, the switch, the manifest's own block, the folder, `running`, the agent role and a bad name refused; `onProviders` at once, when a service became ready, when a package was installed in a development folder while the host ran and when it was removed |
+| In game, dev PC, 2026-11-25, 0.73.0, by the owner | **Steps 1, 2, 3 and 5 pass**, from the Console's output: Counter service listed with enabled, running, its folder and its manifest (no Counter copy installed); onProviders gave "Counter service on running" at once, then "off stopped" and "on running" as it was switched; `providers("agent")` refused with "The agent role is reached with agent.ask". Step 4 (`stop()`, then no more lines) was not run |
 
 ## The WL build (0.70.0)
 
