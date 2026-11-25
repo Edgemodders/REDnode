@@ -1302,6 +1302,7 @@ The overlay's cursor follows the Windows pointer while the game is in a window s
 |---|---|
 | Plugin unit test, 2026-11-25, 0.71.0, by Claude | **Pass**: 12 checks (`raygroups_test`): the game's group names taken in order and once each, names with a space and query groups known, a name the game lacks or an empty one refused with the list, at most 8 |
 | Dev and packaged host, stand-in plugin, 2026-11-25, 0.71.0, by Claude | **Pass**: 25 checks with #58's (scratchpad `r71/run.sh`, `MOCK_HOST_EXE` for the packaged host): a person spawned at the ground the stand-in's ray gives, `ground: false` and a prop kept where given, a prop with `ground: true` grounded, the line from 0.6 m above to 3 m below over Static, Terrain, PlayerBlocker and Dynamic, `world.ray`'s answer and miss, `world.pick` passing its groups |
+| In game, dev PC, 2026-11-25, 0.72.0, step 6 (a baked floor) | **Pass**: standing on New Test Scene's baked mesh (V's feet at z 79.720), the ray over Static alone passed through it and hit 0.60 m lower (z 79.116, distance 1.604, `Static`); over Static and Dynamic it hit at V's feet (distance 1.000, `Dynamic`). So baked solid meshes are in Dynamic, as #60 found, and `groups` reaches them. Steps 1 to 5: results to come |
 
 ## Providers of a role (#58; 0.71.0)
 
