@@ -532,6 +532,18 @@ export const NOTES = {
     ],
     tryThis: ['Watch a line arrive every two seconds.', 'Scroll the list up: it stays put while lines arrive; scroll back down and it follows again.', 'Press Clear.'],
   },
+  'fight-test': {
+    group: 'mods',
+    summary: 'A Node mod that hears fights: V entering and leaving combat, and every person defeated or killed, with their affiliation and whether V did it.',
+    teaches: ['game.on("combat")', 'game.on("npcDowned")', 'ui.list'],
+    how: [
+      'The game sends these as they happen, from its own handlers: nothing polls, and nothing is sent while nothing happens.',
+      'npcDowned carries the person\'s entity, their character record, their affiliation as a record id such as "Factions.Maelstrom", killed or defeated, and who the game credits (byPlayer is true for V and V\'s companions).',
+      'A person defeated and then finished off sends two events with the same entity, so the mod counts people by entity.',
+    ],
+    tryThis: ['Start a fight with a gang and watch Combat change.', 'Down a ganger with a non-lethal weapon, then finish them off: one Defeated line, then one Killed line.'],
+    preview: 'The preview has no fights, so the window waits for one.',
+  },
   'controller-test': {
     group: 'mods',
     summary: 'A Node mod that shows what REDnode reads from the controller: the buttons held, both triggers, and which buttons have been seen.',

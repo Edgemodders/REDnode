@@ -311,7 +311,7 @@ Import the `rednode` package, the same one Node mods use. An import map lets the
 | `game.player.body()` | V's body from character creation, `"wa"` or `"ma"`, the letters the game's file names use (REDnode 0.70.0, #47) |
 | `game.player.addItem(id, count?)`, `game.player.removeItem(id, count?)` | Puts items in V's inventory, or takes them out, by TweakDB id: `addItem("Items.Pants_01_basic_01")`. `addItem` rejects an id with no record (REDnode 0.42.0) |
 | `game.audio.play(name)` | Plays a game sound event |
-| `game.on(name, handler)` | A game event: `"PlayerPuppet.OnGameAttached"` (at the main menu and on every save load), `"language"` (the player changed the game's language), and the `quests.fact:<name>` events that [`quests.watch`](quests.md) uses |
+| `game.on(name, handler)` | A game event: `"PlayerPuppet.OnGameAttached"` (at the main menu and on every save load), `"language"` (the player changed the game's language), the `quests.fact:<name>` events that [`quests.watch`](quests.md) uses, `"combat"` (V entered or left combat: `inCombat`) and `"npcDowned"` (a person defeated or killed: `entity`, `record`, `affiliation` such as `"Factions.Maelstrom"`, `killed`, `byPlayer`; one defeated and then killed sends both, so count by `entity`). Since 0.73.0 |
 | `game.state()`, `game.onState(handler)` | Whether a menu, photo mode, a scene or the main menu is showing, whether V is in the world (`world`), the overlay mode, and whether the game is linked |
 | `loc.text(key)` | The game's own text for a LocKey, in the player's language: `loc.text("LocKey#10963")` gives "Little China" in English. An array of keys reads them all in one round trip; `null` for a key the game does not know (REDnode 0.47.0) |
 | `game.call(method, params)` | Any bridge method by name, for example `"game.info"` |
@@ -914,7 +914,7 @@ const { cost } = await agent.ask('Suggest a build for a netrunner at level 12.',
 
 | Rule | Why |
 |---|---|
-| Every answer costs the player | Ask when it helps the player. A mod that asks on its own, such as a feed that writes posts, keeps it rare and says so in its description. REDagent gives each package a daily limit ($0.25 unless the player changes it) and the player can pause it; past the limit, `ask` rejects and says so |
+| Every answer costs the player | Ask when it helps the player. A mod that asks on its own, such as a feed that writes posts, keeps it rare and says so in its description. REDagent gives each package a daily limit ($2.00 unless the player changes it; $0.25 before REDagent 0.4.6) and the player can pause it; past the limit, `ask` rejects and says so |
 | The assistant only reads | It may look at logs, the game state, the game API and the apps folders, but never changes files or the game. Pictures of windows and the screen only if the player switches them on for your package |
 | Send what it needs | Put your mod's state in `context`, so the assistant does not spend tool calls finding it. It goes whole, up to 65,536 characters of JSON (`AGENT_CONTEXT_LIMIT`); a bigger one, or a question over 20,000 characters, is refused with an error, never cut (REDnode 0.72.0) |
 | `tools: false` when the context is enough | The assistant then answers from the question and context alone, with no tool calls: quicker and cheaper, as for "write one post as this person" (REDnode 0.72.0, REDagent 0.4.5) |

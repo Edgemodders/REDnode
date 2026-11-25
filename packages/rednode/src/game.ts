@@ -51,6 +51,92 @@ export interface GameEvent {
   language?: string;
 }
 
+/**
+ * The `"combat"` event (#61): V's combat state changed, as the game itself sees it (its own
+ * listener on the player state machine's Combat value). Sent only when it changes; nothing is
+ * sent while it stays the same.
+ *
+ * @example
+ * ```ts
+ * game.on<CombatEvent>("combat", (e) => console.log(e.inCombat ? "Fight!" : "Calm again"));
+ * ```
+ */
+export interface CombatEvent extends GameEvent {
+  /** True when V entered combat, false when V left it (stealth counts as out of combat). */
+  inCombat: boolean;
+}
+
+/** Who downed a person, for {@link NpcDownedEvent}. Unverified for every case: see docs/world.md, "Fight events (#61)". */
+export type DownedBy = "player" | "companion" | "other" | "none";
+
+/**
+ * The `"npcDowned"` event (#61): a person was defeated or killed, sent from the two places the
+ * game finds and rewards the killer. Every person: gangers, police, civilians, drones and
+ * mechs. One event each for defeated and for killed, so a person defeated and then finished off
+ * sends two (the same `entity`); count by `entity` to count people.
+ *
+ * @example
+ * ```ts
+ * game.on<NpcDownedEvent>("npcDowned", (e) => {
+ *   if (e.byPlayer && e.affiliation === "Factions.Maelstrom") console.log("V downed a Maelstrom ganger");
+ * });
+ * ```
+ */
+export interface NpcDownedEvent extends GameEvent {
+  /** The person's entity id hash, as a string: the same as `entityId`, for further {@link api} calls while they are still there. */
+  entity: string;
+  /** The person's character record, such as `"Character.maelstrom_grunt1_melee1_baseball_ma"`, or its `"0x..."` id when REDnode does not know its name. */
+  record: string | null;
+  /**
+   * The record of the person's affiliation, such as `"Factions.Maelstrom"` or
+   * `"Factions.MaelstromAndroid"`, the same in every language; `null` when they have none.
+   * When REDnode does not know the name it is the `"0x..."` id: compare with `tweakdb.id(...)`.
+   */
+  affiliation: string | null;
+  /** True when killed, false when defeated (down but alive, such as a non-lethal takedown). */
+  killed: boolean;
+  /** True when V downed them, by any means the game credits to V, or one of V's companions or drones did. */
+  byPlayer: boolean;
+  /** Who the game credits: V, a companion of V's, someone else, or nobody found. */
+  by: DownedBy;
+}
+
+/** The record id from the script: its debug name when the game has one, else its number. */
+function recordName(name: unknown, number: unknown, guess?: string): string | null {
+  if (typeof name === "string" && name && !name.startsWith("<")) return name;
+  if (typeof number !== "string" || !/^\d+$/.test(number) || number === "0") return null;
+  const id = `0x${BigInt(number).toString(16).toUpperCase().padStart(16, "0")}`;
+  if (guess) {
+    const key = (s: string) => BigInt(s) & ((1n << 40n) - 1n);
+    if (key(tweakdb.id(guess)) === key(id)) return guess;
+  }
+  return tweakdb.name(id) ?? id;
+}
+
+/** Adds the named fields of REDnode's own game events (#61) to a parsed event. */
+function addFightFields(e: GameEvent): void {
+  if (e.name === "combat") {
+    (e as CombatEvent).inCombat = e.value === 1;
+    return;
+  }
+  if (e.name !== "npcDowned" || typeof e.text !== "string") return;
+  let t: Record<string, unknown> = {};
+  try {
+    t = JSON.parse(e.text) as Record<string, unknown>;
+  } catch {
+    // an older or broken script: only the entity is known
+  }
+  const d = e as NpcDownedEvent;
+  d.entity = e.entityId ?? "";
+  d.record = recordName(t.record, t.recordId);
+  const aff = typeof t.affiliationEnum === "string" && t.affiliationEnum ? `Factions.${t.affiliationEnum}` : undefined;
+  d.affiliation = recordName(t.affiliation, t.affiliationId, aff);
+  d.killed = t.killed === true;
+  const by = String(t.by ?? "none");
+  d.by = (["player", "companion", "other", "none"].includes(by) ? by : "none") as DownedBy;
+  d.byPlayer = d.by === "player" || d.by === "companion";
+}
+
 /** What the game is showing, and whether REDnode is linked to it. */
 export interface GameState {
   /** True while the overlay host is linked to the game. All other fields are false when it is not. */
@@ -194,9 +280,11 @@ export interface Game {
   /**
    * Subscribes to a game event.
    *
-   * Events are named by the game class and method that raise them. Today the
-   * plugin sends `"PlayerPuppet.OnGameAttached"`, at the main menu and on every
-   * save load. Events from any hooked game function arrive with phase P2.
+   * Events are named by the game class and method that raise them, such as
+   * `"PlayerPuppet.OnGameAttached"`, at the main menu and on every save load. REDnode's own
+   * events have short names: `"combat"` ({@link CombatEvent}: V's combat state changed) and
+   * `"npcDowned"` ({@link NpcDownedEvent}: a person defeated or killed, with their
+   * affiliation and whether V did it), sent by the game as they happen, never polled.
    *
    * @typeParam T - The event payload.
    * @param name - Event name, for example `"PlayerPuppet.OnGameAttached"`.
@@ -353,6 +441,7 @@ export const game: Game = {
         if (typeof m.entityType === "string") e.entityType = m.entityType;
         if (typeof m.text === "string") e.text = m.text;
         if (typeof m.language === "string") e.language = m.language;
+        addFightFields(e);
         void handler(e as T);
       }
     });

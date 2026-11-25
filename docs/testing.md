@@ -1277,6 +1277,14 @@ The overlay's cursor follows the Windows pointer while the game is in a window s
 | Build, 2026-11-22, 0.70.0, by Claude | Builds; native tests pass. Not checked in the mock game, which has no game window. Awaits its in-game test |
 | Game 2.5, dev PC, 2026-11-23, REDnode 0.70.0 | **Pass**, all 7 steps: Windowed at 1920 x 1080; in the pause menu the cursor started at the pointer, stayed on it slow and fast, was not drawn outside the window and took over where the pointer came back, and the launcher's buttons and drag worked. The log: `the game is in a window smaller than its screen`, `follows the Windows pointer` at F10 in the pause menu, `moves by raw mouse input` at F10 in the world (the game holds the pointer there; one 24 ms flip to follows and back), `the game is full screen` after the switch back. MCP `game_state` answered `gameWindow: { windowed: true, pointer: "follows" }` |
 
+## Fight events (#61; 0.73.0)
+
+`game.on("combat")` and `game.on("npcDowned")`, from the game's own handlers. Steps: [docs/world.md, "Fight events test"](world.md#fight-events-test).
+
+| Run | Result |
+|---|---|
+| Scripts and package, 2026-11-25, 0.73.0, by Claude | **Pass**: REDnodeFights.reds compiles with 0 errors alone, beside Codeware and with the game's scc.exe (scratchpad `f61/check.ps1`); 11 checks of the package's fields against a stand-in transport (scratchpad `f61/check.mjs`) |
+
 ## agent.ask options (#54; 0.72.0)
 
 `agent.ask`'s whole context with its limit stated, `tools: false` and a model family, with REDagent 0.4.5. Steps: [docs/services.md, "agent.ask options test"](services.md#agentask-options-test).

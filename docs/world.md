@@ -2529,3 +2529,34 @@ REDnode 0.71.0, Codeware, game 2.5. Load a save outside combat, somewhere a stre
 | 4 | In the Mod Manager switch on **Animation test** (no permission). With **Pose: arms crossed (gameplay)** chosen, press **A2 spawn**, then **A2 use** | The paramedic 3 m ahead, down the slope, plays the arms-crossed pose with her feet on the ground: no rise as it starts, no hovering (before 0.71.0 she played it from V's height). Then **A2 stop** and switch the app off |
 | 5 | Optional, with Claude Code connected: Claude spawns a paramedic with the arms-crossed workspot down the slope (`world_spawn`) and plays it (`world_animate`); each call asks you first | Feet on the ground, as in step 4; `world_spawn` answers the grounded `position` |
 | 6 | Optional, at a scene baked by EDGEbuilder, standing on one of its floors: in the Console `p = await pos()`, then `await world.ray({ ...p, z: p.z + 1 }, { ...p, z: p.z - 3 })` and the same with `{ groups: ["Static", "Dynamic"] }` | The first misses the baked floor (null, or a hit well below V's feet); the second hits at V's feet with `group` `"Dynamic"`. EDGEbuilder's own Pick then checks `world.pick({ groups })` |
+
+## Fight events (#61): built
+
+Asked for by EDGEmobile's Chooms! on 2026-11-25 ([#61](https://github.com/Edgemodders/REDnode/issues/61)): a gang remembers a fight with V (the gang, the district, the game time, how many V downed) and posts about it for a few game days. The owner's rule: the game's own events, never polling. Asked for by the owner through EDGEmobile on 2026-11-25, to build next. Built in REDnode 0.73.0.
+
+| Part | Where | What |
+|---|---|---|
+| `"combat"` | `native/scripts/REDnodeFights.reds`: a wrap of `PlayerPuppet.OnCombatStateChanged` | The game's own listener on the player state machine's `Combat` value (1 in combat; 0, 2 and 3, stealth, out). Sent with `REDnode_Emit` only when in or out changes, so value 1 or 0. The package adds `inCombat` |
+| `"npcDowned"` | The same file: wraps of `ScriptedPuppet.HandleDeath(instigator)` and `HandleDefeated()`, `OnResurrected` | The two places the game finds and rewards the killer (`FindAndRewardKiller`, with kill type Normal and Defeat). After the game's own code, for an `NPCPuppet` only: the killer the game rewarded (`GetKiller()`, set by `RewardKiller`), else the death's instigator, else the last hit's (`GetLastHitInstigator()`); `by` is `player`, `companion` (`ScriptedPuppet.IsPlayerCompanion`), `other` or `none`. The character record and its `Affiliation()` record go as their debug names (`TDBID.ToStringDEBUG`, empty when the game has none) and their numbers (`TDBID.ToNumber`), with the affiliation's `EnumName`. Sent with `REDnode_EntityText`: the person's entity id and a JSON text. Each person sends defeated once and killed once (a field on the puppet; `OnResurrected` clears it) |
+| The event's fields | `addFightFields` in `packages/rednode/src/game.ts`; types `CombatEvent`, `NpcDownedEvent`, `DownedBy` | `entity`, `record` and `affiliation` (a name when the game or the package knows it; the affiliation also from `"Factions." + EnumName` when its id matches; else the `"0x..."` id; `null` for none), `killed`, `by`, `byPlayer` (V or a companion) |
+| Fight test 0.1.0 | `packages/overlay/apps/fight-test` | V's combat state, every event in a list, the people V downed counted per affiliation (by entity), each event in the Mod log |
+
+Not built: `district` (no cheap read found yet; a package reads V's district through `api` when an event comes). Unverified until the test: which kills reach `HandleDeath` and `HandleDefeated` (a non-lethal takedown, a quickhack's damage over time, a thrown object, a car, a fall), who the game credits for each, and whether the game has debug names for records in a release build (without them the package's own names and the enum name's guess give `"Factions.*"`). The decompiled scripts read were from 2.31 (January 2026); 2.5's type data has the same functions with the same flags.
+
+Checks: the scripts compile with 0 errors alone, beside Codeware 1.21 and with the game's own `scc.exe` (scratchpad `f61/check.ps1`); the package's fields against a stand-in transport (scratchpad `f61/check.mjs`, 11: in and out of combat, names from the game, ids from numbers, the affiliation from its enum name alone, a companion counted as V's, no affiliation, an unknown `by`, a broken text).
+
+## Fight events test
+
+REDnode 0.73.0. Load a save outside a fight.
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | In the Mod Manager switch on **Fight test** 0.1.0 (it needs no permission) | Its window: "Combat: not heard yet", "V has downed nobody yet." |
+| 2 | Start a fight with a gang (Maelstrom, Tyger Claws, Valentinos, 6th Street, ...) | "Combat: in combat" and a "V entered combat" line, once |
+| 3 | Kill one ganger with a gun | One "Killed" line with a `Character.*` record (or a `0x...` id), `Factions.<gang>` and "by player"; the tally counts 1 |
+| 4 | Down one with a non-lethal weapon or a takedown (choke), then finish them off | A "Defeated" line, then a "Killed" line with the same record; the tally still counts them once |
+| 5 | Kill one with a quickhack (Overheat or Short Circuit) | "Killed ... by player" (unverified: the quickhack's damage may credit no one) |
+| 6 | Kill one with a thrown knife or a grenade, if you have one | "by player" (unverified) |
+| 7 | Let a gang member die by other means if one comes up (police, another gang, a car), or run over a civilian | A line "by other" or "by none", not counted in the tally; a civilian's affiliation (unverified) |
+| 8 | Leave the fight until combat ends | "Combat: out of combat" and one "V left combat" line |
+| 9 | Load another save | No lines from the load; a fight there gives lines again |

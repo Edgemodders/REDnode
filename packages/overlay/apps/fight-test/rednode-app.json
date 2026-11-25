@@ -1,0 +1,9 @@
+{
+  "id": "fight-test",
+  "name": "Fight test",
+  "version": "0.1.0",
+  "author": "Edgemodders",
+  "description": "REDnode #61's events: V entering and leaving combat, and every person defeated or killed, with their affiliation and whether V did it. A count per affiliation of the people V downed.",
+  "main": "mod.mjs",
+  "open": true
+}
