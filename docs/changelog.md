@@ -20,6 +20,11 @@ How to keep it:
 - **`game.player.body()`** ([#47](https://github.com/Edgemodders/REDnode/issues/47)): V's body from character creation, `"wa"` or `"ma"`, so a mod can pick the workspot or garment made for it.
 - **Tooltips on ui controls** ([#55](https://github.com/Edgemodders/REDnode/issues/55)): `tip` on `ui.button`, `ui.toggle`, `ui.slider`, `ui.input` and `ui.select` shows a tooltip when the cursor rests on the control, a disabled one too, so a button that waits can say why. `set({ tip })` changes or clears it, and a tooltip already showing takes the new text. The Hello mod sample shows it.
 
+- **A person spawned on the ground** ([#59](https://github.com/Edgemodders/REDnode/issues/59)): `world.spawn` puts a person (and anything with `ground: true`) on the ground under the place given, since a person plays a workspot from where they were spawned and one spawned in the air played it in the air. `ground: false` keeps the place exactly; `world.spawn` answers `position`. MCP's `world_spawn` and `world.load` do the same.
+- **`world.ray`** ([#59](https://github.com/Edgemodders/REDnode/issues/59), [#60](https://github.com/Edgemodders/REDnode/issues/60)): where a line first meets the world's collision, over the collision groups you name (the game's own names only; default `Static`), with the group that stopped it.
+- **`world.pick` groups** ([#60](https://github.com/Edgemodders/REDnode/issues/60)): `groups` casts the physics line over more collision groups than `Static`, so objects baked by EDGEbuilder (in `Dynamic`) stop it; `physicsHit.group` names the group.
+- **`service.providers` and `service.onProviders`** ([#58](https://github.com/Edgemodders/REDnode/issues/58)): every package that provides a role, switched on or not, with its folder, whether its service runs and its manifest as written, and a handler told when that list changes. For a mod that shows a button per provider, such as EDGEbuilder's Tools.
+
 ### Fixed
 
 - **The cursor in a windowed game** ([#56](https://github.com/Edgemodders/REDnode/issues/56)): with the game in a window smaller than the screen, the overlay's cursor now follows the Windows pointer in the game's menus, at its speed, and is not drawn outside the game's window. Full screen it moves as before. MCP's `game_state` says whether the game is windowed (`gameWindow`).

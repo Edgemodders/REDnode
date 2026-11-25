@@ -2497,3 +2497,35 @@ Run on 2026-11-23 on the dev PC (game 2.5, REDnode 0.70.0, V actor spike 0.2.1, 
 - **NPC clips do not play on V.** On a workspot for V's skeleton they break the first person camera, and in third person V stands in a T pose; on a workspot for the NPC rig nothing visible happens. Clips for V must be made on V's skeleton (`player_woman_skeleton.rig` or `player_man_skeleton.rig`): REDcode's Animation Tools should target it for V.
 - **The photo mode copy cannot be spawned as a plain entity**: it crashes the game. A copy of V (way B) needs another route, such as photo mode's own system, for the scene spike.
 - **A third person view** of V in a workspot is still open: the TPP event with the FPP camera moved back does not give one.
+
+## A person on the ground, a ray, and pick groups (#59, #60; 0.71.0)
+
+Asked for on 2026-11-24 by REDcode ([#59](https://github.com/Edgemodders/REDnode/issues/59), from its Animation Tools pack's AT3 test) and EDGEbuilder ([#60](https://github.com/Edgemodders/REDnode/issues/60), from its Pick in a baked scene); the owner chose on 2026-11-25 to build the new requests now, ahead of the scene spike.
+
+- **#59:** a person spawned above the ground looks right while idle (the idle puts the feet down), but a workspot plays from the person's own place, so every clip played about 30 cm in the air on a sidewalk that sloped away. REDcode's pack fixed it with a ray down before the spawn; REDnode now does that for every package and assistant.
+- **#60:** `world.pick`'s physics line was cast over `Static` only, which passes through a bake's solid objects (`worldInstancedDestructibleMeshNode`, in `Dynamic`), so a click on a baked keg picked the floor behind it.
+
+### #59, #60: build
+
+| Part | Where | What |
+|---|---|---|
+| The ray cast over any group | `Raycast(from, to, group, ...)` in reflect.cpp (`RaycastStatic` is it with `"Static"`), `RaycastGroups` (one cast per group, the hit nearest `from` winning), `ReadGroups` | The game's `SyncRaycastByCollisionGroup`, as before |
+| The groups the game has | `native/src/overlay/raygroups.hpp` (unit test `native/tests/raygroups_test.cpp`, 12 checks) | Only the 31 names in the game's `engine\physics\collision_groups.json` (its 20 collision groups and 11 query groups) reach the game; another name is refused in words with the list, since how the game takes a name it does not have is unverified. At most 8, each cast once |
+| `world.ray` (#59, #60) | bridge method `world.ray` in reflect.cpp; `world.ray(from, to, { groups })` in world.ts | Where a line first meets the collision: `{ point, distance, group }`, or null. Default `["Static"]`. No node registry needed |
+| A person on the ground (#59) | `ground` in `SpawnOptions`, `groundUnder` in world.ts; `spawnForAgent` in main.js and MCP `world_spawn`'s `ground` | A line from 0.6 m above `position` to 3 m below, over `Static`, `Terrain`, `PlayerBlocker` and `Dynamic` (so EDGEbuilder's baked floors count); the spawn goes where it first meets something, or at `position` with nothing there. On by default for a person (a `Character.*` record, or `npc`), off for the rest; `ground: false` keeps `position`. `world.spawn` answers `position`, and so does `world_spawn`. `world.load` spawns its people the same way |
+| Pick groups (#60) | `nodes.pick`'s `groups` in worldnodes.cpp, `PickOptions.groups` in world.ts | The physics line cast over each group, the nearest hit winning; `physicsHit.group` names it. Default `["Static"]`, as before |
+
+Checks: `raygroups_test` (12, in `tools/build-native.ps1`) and the mock game on the dev and packaged host (scratchpad `r71/run.sh`, 25 checks with #58's: a person's spawn at the ground the stand-in's ray gives, `ground: false` and a prop kept where given, a prop with `ground: true` grounded, the line from 0.6 m above to 3 m below over the four groups, `world.ray`'s answer and miss, `world.pick` passing its groups). The game's own ray answers are unverified until the in-game test.
+
+### #59, #60 test
+
+REDnode 0.71.0, Codeware, game 2.5. Load a save outside combat, somewhere a street or path **slopes away** in front of V (or at the top of a few steps, facing down). Steps 1 to 3 use the **Console** (launcher, Console); type each line and press Enter.
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | `p = await pos()`, then `await world.ray({ ...p, z: p.z + 1 }, { ...p, z: p.z - 3 }, { groups: ["Static", "Terrain", "Dynamic"] })` | A `point` whose `z` is within a few centimetres of `p.z` (V's feet), a `distance` of about 1, and the `group` that stopped it |
+| 2 | `await world.ray({ ...p, z: p.z + 1 }, { ...p, z: p.z - 3 }, { groups: ["Floor"] })` | Refused: "Floor" is not one of the game's collision groups, with the list |
+| 3 | `s = await world.spawn({ record: "Character.trauma_team_paramedic", position: { ...p, x: p.x + 2, z: p.z + 1.5 } })`, then `s.position.z - p.z` | The paramedic stands on the ground 2 m from V, not 1.5 m up; the number is about 0 (more or less where the ground slopes). Then `await world.remove(s.id)` |
+| 4 | In the Mod Manager switch on **Animation test** (no permission). With **Pose: arms crossed (gameplay)** chosen, press **A2 spawn**, then **A2 use** | The paramedic 3 m ahead, down the slope, plays the arms-crossed pose with her feet on the ground: no rise as it starts, no hovering (before 0.71.0 she played it from V's height). Then **A2 stop** and switch the app off |
+| 5 | Optional, with Claude Code connected: Claude spawns a paramedic with the arms-crossed workspot down the slope (`world_spawn`) and plays it (`world_animate`); each call asks you first | Feet on the ground, as in step 4; `world_spawn` answers the grounded `position` |
+| 6 | Optional, at a scene baked by EDGEbuilder, standing on one of its floors: in the Console `p = await pos()`, then `await world.ray({ ...p, z: p.z + 1 }, { ...p, z: p.z - 3 })` and the same with `{ groups: ["Static", "Dynamic"] }` | The first misses the baked floor (null, or a hit well below V's feet); the second hits at V's feet with `group` `"Dynamic"`. EDGEbuilder's own Pick then checks `world.pick({ groups })` |

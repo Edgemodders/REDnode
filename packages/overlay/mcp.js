@@ -637,6 +637,7 @@ function createMcp(host) {
           appearance: z.string().optional().describe('The entity appearance'),
           position: POINT.optional(),
           alwaysSpawned: z.boolean().optional().describe('Ask the game to keep it spawned wherever V is, for objects far from V'),
+          ground: z.boolean().optional().describe('Put it on the ground under the position (a line cast 0.6 m up to 3 m down); on by default for a person, who plays workspots from where they were spawned. false keeps the position exactly'),
           workspot: z.string().optional().describe('For a person: a .workspot depot path they carry, played with world_animate (no hold command then)'),
         },
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },

@@ -12,11 +12,12 @@
 //     who never use it run none of it.
 //   nodes.state {} -> {"attached","layout","sectors","setups","instances","hidden","refused",...}
 //   nodes.pick {"from":[x,y,z]?,"dir":[x,y,z]?,"max":50,"limit":20,"kinds":[...]?,"all":false,
-//               "physics":true}
-//     -> {"hits":[node...],"physicsHit":{"point":[x,y,z],"distance":d}|null,"looked":n,"ms":t}
+//               "physics":true,"groups":["Static"]?}
+//     -> {"hits":[node...],"physicsHit":{"point":[x,y,z],"distance":d,"group"}|null,"looked":n,"ms":t}
 //     Every recorded node whose box the ray crosses, nearest first (bounds mode). Default ray: the
 //     camera's. With physics, the static collision is cast too and each hit says whether its box
-//     holds that point.
+//     holds that point. "groups" (#60): the collision groups the line is cast over, the nearest hit
+//     across them winning (a bake's solid objects are "Dynamic"); default ["Static"].
 //   nodes.get {"id":"0x<sector>:<instance>"} -> node | null
 //   nodes.highlight {...} -> {"done":false,"why"}: not on 2.5 yet (see below)
 //   nodes.visible {"id","visible":false} -> {"done","was","id"}: hides or shows the node for the
@@ -1037,12 +1038,17 @@ std::string Pick(const json::Value& aParams, std::string& aError)
 
     bool hit = false;
     float point[3] = {};
+    std::string hitGroup;
     if (BoolOr(aParams, "physics", true))
     {
+        // #60: the groups to cast over, nearest hit across them; "Static" alone by default.
+        std::vector<std::string> groups;
+        if (!ReadGroups(aParams.Get("groups"), groups, aError))
+            return {};
+        if (groups.empty())
+            groups.push_back("Static");
         const float to[3] = {from[0] + dir[0] * max, from[1] + dir[1] * max, from[2] + dir[2] * max};
-        std::string why;
-        if (!RaycastStatic(from, to, hit, point, why))
-            hit = false;
+        RaycastGroups(from, to, groups, hit, point, hitGroup);
     }
 
     struct Hit
@@ -1117,7 +1123,8 @@ std::string Pick(const json::Value& aParams, std::string& aError)
             : 0;
     const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
     return "{\"hits\":" + list + ",\"found\":" + std::to_string(hits.size()) + ",\"physicsHit\":" +
-           (hit ? "{\"point\":" + Vec(point, 3) + ",\"distance\":" + Num(hitDistance) + "}" : std::string("null")) +
+           (hit ? "{\"point\":" + Vec(point, 3) + ",\"distance\":" + Num(hitDistance) + ",\"group\":" + JsonString(hitGroup) + "}"
+                : std::string("null")) +
            ",\"from\":" + Vec(from, 3) + ",\"dir\":" + Vec(dir, 3) + ",\"looked\":" + std::to_string(looked) +
            ",\"ms\":" + Num(ms) + "}";
 }

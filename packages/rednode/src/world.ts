@@ -58,6 +58,16 @@ export interface SpawnOptions {
   /** Keep it in the save: it comes back when that save loads (about 8 s after). Default `false`. */
   keep?: boolean;
   position: WorldPoint;
+  /**
+   * Put it on the ground (#59): a line is cast down from 0.6 m above `position` to 3 m below it
+   * (over the `Static`, `Terrain`, `PlayerBlocker` and `Dynamic` collision, so floors baked by
+   * EDGEbuilder count), and it is spawned where the line first meets something. With no ground
+   * there, `position` is used as given. On by default for a person, since a person plays a
+   * workspot from where they were spawned, so one spawned above the ground plays it in the air
+   * (the idle alone hides it); off by default for everything else. `false` keeps `position`
+   * exactly. {@link Spawned.position} says where it went. Since REDnode 0.71.0.
+   */
+  ground?: boolean;
   /** A quaternion; or use `yaw`. Default: facing north. */
   orientation?: WorldRotation;
   /** Turn around the vertical axis, in degrees, when `orientation` is not given. */
@@ -105,6 +115,17 @@ export interface Spawned {
   id: EntityId;
   /** The entity itself, or null if it is gone again. */
   entity: GameRef | null;
+  /** Where it was spawned: `position`, or the ground under it ({@link SpawnOptions.ground}). Since REDnode 0.71.0. */
+  position: WorldPoint;
+}
+
+/** Where {@link world.ray} met the world's collision. */
+export interface RayHit {
+  point: WorldPoint;
+  /** Metres from `from`. */
+  distance: number;
+  /** The collision group that stopped it, such as `"Static"`. */
+  group: string;
 }
 
 /** The entity events REDnode passes on. `Entity/Attached` is Codeware's old name for `Entity/AfterAttach`. */
@@ -221,6 +242,20 @@ export interface PickOptions {
   /** Also cast against the static collision, so each hit says whether its box holds that point. Default `true`. */
   physics?: boolean;
   /**
+   * The collision groups the physics line is cast over; the nearest hit across them wins, and
+   * `physicsHit.group` names it. Default `["Static"]`. Objects baked by EDGEbuilder are in
+   * `"Dynamic"`, which a `"Static"` line passes through. Only the game's own group names are taken
+   * (`Static`, `Dynamic`, `Terrain`, `PlayerBlocker`, `Vehicle`, `Water` and the rest; another is refused
+   * with the list). Each group costs one more ray cast; at most 8. Since REDnode 0.71.0.
+   *
+   * @example
+   * ```ts
+   * const { hits, physicsHit } = await world.pick({ groups: ["Static", "Terrain", "PlayerBlocker", "Dynamic"] });
+   * console.log(physicsHit?.group, hits.find((h) => h.holdsHit)?.kind);
+   * ```
+   */
+  groups?: string[];
+  /**
    * `"fit"` (the default): with a collision hit, the nodes whose box holds the hit point first,
    * the smallest box first (what was aimed at, rather than the road or terrain piece the ray
    * starts inside), then the rest by distance. `"nearest"`: by distance only.
@@ -239,8 +274,8 @@ export interface PickResult {
   hits: WorldNode[];
   /** How many crossed it, before `limit`. */
   found: number;
-  /** Where the static collision cast hit, or null. */
-  physicsHit: { point: [number, number, number]; distance: number } | null;
+  /** Where the collision cast hit, or null; `group` is the collision group that stopped it. */
+  physicsHit: { point: [number, number, number]; distance: number; group: string } | null;
   /** How many nodes near the ray were looked at, and how long it took in the game. */
   looked: number;
   ms: number;
@@ -598,6 +633,18 @@ async function respawn(entry: SpawnedEntry, changes: Partial<SpawnOptions> = {})
   return id;
 }
 
+// #59: the collision a spawn's ground line looks for, and how far up and down it looks.
+const GROUND_GROUPS = ["Static", "Terrain", "PlayerBlocker", "Dynamic"];
+const GROUND_ABOVE = 0.6;
+const GROUND_BELOW = 3;
+
+async function groundUnder(p: WorldPoint): Promise<WorldPoint | null> {
+  const hit = await world
+    .ray({ x: p.x, y: p.y, z: p.z + GROUND_ABOVE }, { x: p.x, y: p.y, z: p.z - GROUND_BELOW }, { groups: GROUND_GROUPS })
+    .catch(() => null);
+  return hit ? { x: p.x, y: p.y, z: hit.point.z } : null;
+}
+
 function isPerson(options: SpawnOptions): boolean {
   if (options.npc === false) return false;
   return !!options.npc || (options.record ?? "").startsWith("Character.");
@@ -692,6 +739,11 @@ export const world = {
       throw new Error("world.spawn needs one of template, record and mesh");
     }
     listen();
+    // #59: a person (or anything asked to) goes on the ground under the place given.
+    if (options.ground ?? isPerson(options)) {
+      const ground = await groundUnder(options.position);
+      if (ground) options = { ...options, position: ground };
+    }
     const components = [...(options.components ?? [])];
     if (options.mesh) {
       const s = options.scale ?? { x: 1, y: 1, z: 1 };
@@ -738,7 +790,7 @@ export const world = {
           if (entry.attached) settleLater(entry);
           else unsettled.add(id.hash);
         }
-        return { id, entity: null };
+        return { id, entity: null, position: options.position };
       }
       const timeout = options.timeoutMs ?? 10000;
       const until = Date.now() + timeout;
@@ -761,7 +813,7 @@ export const world = {
       entry.pin = await pinSpawn(id, options).catch(() => undefined);
       const entity = await world.entity(id);
       if (entity && isPerson(options)) await settlePerson(entity, options);
-      return { id, entity };
+      return { id, entity, position: options.position };
     } finally {
       stop();
     }
@@ -948,9 +1000,33 @@ export const world = {
       ...(options.kinds ? { kinds: options.kinds } : {}),
       all: !!options.all,
       physics: options.physics !== false,
+      ...(options.groups ? { groups: options.groups } : {}),
       ...(options.order ? { order: options.order } : {}),
       ...(options.helpers ? { helpers: true } : {}),
     })) as PickResult;
+  },
+
+  /**
+   * A line through the world's collision, from `from` to `to`: where it first meets something,
+   * or null. `groups` are the collision groups it is cast over (default `["Static"]`; EDGEbuilder's
+   * baked objects are `"Dynamic"`), one ray cast each, the nearest hit winning. Needs no node
+   * registry. Since REDnode 0.71.0.
+   *
+   * @example
+   * ```ts
+   * const p = await game.player.position();
+   * const floor = await world.ray({ ...p, z: p.z + 1 }, { ...p, z: p.z - 5 }, { groups: ["Static", "Terrain", "Dynamic"] });
+   * console.log(floor ? `ground at z ${floor.point.z.toFixed(2)} (${floor.group})` : "nothing below");
+   * ```
+   */
+  async ray(from: WorldPoint, to: WorldPoint, options: { groups?: string[] } = {}): Promise<RayHit | null> {
+    const r = (await invoke("world.ray", {
+      from: [from.x, from.y, from.z],
+      to: [to.x, to.y, to.z],
+      ...(options.groups ? { groups: options.groups } : {}),
+    })) as { hit: boolean; point?: [number, number, number]; distance?: number; group?: string };
+    if (!r?.hit || !r.point) return null;
+    return { point: { x: r.point[0], y: r.point[1], z: r.point[2] }, distance: r.distance ?? 0, group: r.group ?? "" };
   },
 
   /** One node again by its id, or null when its sector is not loaded. Experimental (#24). */

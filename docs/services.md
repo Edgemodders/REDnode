@@ -381,3 +381,27 @@ REDnode 0.66.0, Admin Tools 0.2.0 (its Tools Manager), Counter service 0.3.0, Co
 10. Quit the game. Start it again and open the Tools Manager: the switches and grants are as you left them.
 
 {% endraw %}
+
+## Providers of a role (#58): built
+
+Asked for by EDGEbuilder on 2026-11-24 ([#58](https://github.com/Edgemodders/REDnode/issues/58)) for its Tools, plugins in a drawer: a tool is a package that `provides` `edgebuilder-tool`, with an `edgebuilderTool` block in its manifest, and EDGEbuilder draws a button for each. `use(role)` answers one provider; it needs them all, with whether each is switched on, and to hear when that changes. The owner chose on 2026-11-25 to build it now. Built in REDnode 0.71.0.
+
+| Part | Where | What |
+|---|---|---|
+| `service.providers(role)` | service.ts; the host's service op `providers`, `providerList` in main.js | Every installed package that provides the role, switched on or not, without the caller, sorted by name: `{ id, name, version, dir, enabled, running, manifest }`. `dir` is the folder REDnode loaded it from (a development folder's copy wins); `enabled` the player's switch; `running` whether its service is ready; `manifest` its rednode-app.json as written (`manifestAsRead`: the checked copy the host keeps drops fields it does not know, such as a role's own block). Nothing is chosen and nothing is called. `agent` and a bad role name are refused as `use` refuses them |
+| `service.onProviders(role, handler)` | service.ts (handlers under the provider name `$providers`, on the existing service event road); `watchProviders` and a check each second in main.js | The list at once, then again within a second of a change: a provider installed or removed, switched on or off, its service starting or stopping, its manifest changed by a hot reload. Returns a function that stops it. A package that stops is dropped from the watch list |
+| Docs simulation | `sim/rednode.js`, `sim/worker.js` | No providers in a preview: an empty list |
+
+Check: the mock game on the dev and packaged host (scratchpad `r71/run.sh`, 25 checks with #59's and #60's: the two other providers sorted and without the caller, the switch, the manifest's own block, the folder, `running`, refusals; `onProviders` at once, when a service became ready, when a package was installed in a development folder while the host ran and when it was removed).
+
+## Providers of a role test
+
+REDnode 0.71.0. In the **Console** (launcher, Console):
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | `await service.providers("counter")` | **Counter service** (and Counter copy, if installed) with `enabled` as its launcher switch, `running` true while it runs, its folder, and its manifest with `"provides": ["counter"]` |
+| 2 | `stop = service.onProviders("counter", (l) => console.log(l.map((p) => p.name + (p.enabled ? " on " : " off ") + (p.running ? "running" : "stopped")).join("; ")))` | A line at once in the Console or the Mod log: Counter service with its state |
+| 3 | In the launcher, switch Counter service off, then on again | A line within a second of each: off and stopped, then on and running |
+| 4 | `stop()`, then switch it off and on again | No more lines |
+| 5 | `await service.providers("agent")` | Refused: the agent role is reached with agent.ask |

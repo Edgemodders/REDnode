@@ -47,6 +47,8 @@ if ($LASTEXITCODE) { throw 'Opus state unit tests failed.' }
 if ($LASTEXITCODE) { throw 'World pins unit tests failed.' }
 & (Join-Path $build "$Config\REDnode_weather_tests.exe")
 if ($LASTEXITCODE) { throw 'Weather node unit tests failed.' }
+& (Join-Path $build "$Config\REDnode_raygroups_tests.exe")
+if ($LASTEXITCODE) { throw 'Ray group unit tests failed.' }
 & (Join-Path $build "$Config\REDnode_gamepad_tests.exe")
 if ($LASTEXITCODE) { throw 'Gamepad unit tests failed.' }
 & (Join-Path $build "$Config\REDnode_capture_tests.exe")

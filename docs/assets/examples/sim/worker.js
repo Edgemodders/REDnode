@@ -514,6 +514,14 @@ export const service = {
     const functions = Object.fromEntries(h.$info.functions.map((name) => [name, { name, description: '', params: [], checked: false, returns: null, tool: false, readonly: false, timeoutMs: null, deprecated: null }]));
     return { id, name: id, version: 'preview', functions, events: {} };
   },
+  // No role providers in a preview, and the list never changes.
+  async providers() {
+    return [];
+  },
+  onProviders(role, fn) {
+    setTimeout(() => fn([]), 0);
+    return () => {};
+  },
   caller: () => serviceCall?.caller ?? null,
   signal: () => serviceCall?.signal ?? null,
   emit(name, data) {

@@ -58,6 +58,7 @@
 //   loc.text      {"keys":["LocKey#10963", ...]}  -> ["Watson", null, ...]: the game's own text in its
 //                 current language (GetLocalizedText), null for a key it does not know (#26)
 
+#include "raygroups.hpp"
 #include "jvalue.hpp"
 #include "overlay.hpp"
 #include "pins.hpp"
@@ -2091,11 +2092,58 @@ bool IsReflectMethod(const std::string& aMethod)
            aMethod == "rtti.set" || aMethod == "tweakdb.get" || aMethod == "tweakdb.record" ||
            aMethod == "tweakdb.records" || aMethod == "tweakdb.set" || aMethod == "tweakdb.clone" ||
            aMethod == "tweakdb.create" || aMethod == "tweakdb.update" || aMethod == "world.near" ||
-           aMethod == "world.files" || aMethod == "loc.text";
+           aMethod == "world.files" || aMethod == "world.ray" || aMethod == "loc.text";
+}
+
+// #59, #60: a line through the world's collision.
+//   world.ray {"from":[x,y,z],"to":[x,y,z],"groups":["Static"]?}
+//     -> {"hit":true,"point":[x,y,z],"distance":d,"group":"Static"} | {"hit":false}
+// One cast per group (default "Static"), the hit nearest "from" winning.
+std::string WorldRay(const json::Value& aParams, std::string& aError)
+{
+    float from[3], to[3];
+    auto vec = [](const json::Value* v, float* out) {
+        if (!v || v->kind != json::Value::Kind::Array || v->items.size() < 3)
+            return false;
+        for (int i = 0; i < 3; ++i)
+        {
+            if (v->items[i].kind != json::Value::Kind::Number)
+                return false;
+            out[i] = static_cast<float>(v->items[i].number);
+        }
+        return true;
+    };
+    if (!vec(aParams.Get("from"), from) || !vec(aParams.Get("to"), to))
+    {
+        aError = "world.ray needs from and to, each [x, y, z]";
+        return {};
+    }
+    std::vector<std::string> groups;
+    if (!ReadGroups(aParams.Get("groups"), groups, aError))
+        return {};
+    if (groups.empty())
+        groups.push_back("Static");
+    bool hit = false;
+    float point[3] = {};
+    std::string group;
+    if (!RaycastGroups(from, to, groups, hit, point, group))
+    {
+        aError = "the game's ray cast is not available (no spatial queries system: is a game loaded?)";
+        return {};
+    }
+    if (!hit)
+        return "{\"hit\":false}";
+    const float dx = point[0] - from[0], dy = point[1] - from[1], dz = point[2] - from[2];
+    char buf[256];
+    std::snprintf(buf, sizeof(buf), "{\"hit\":true,\"point\":[%.4f,%.4f,%.4f],\"distance\":%.4f,\"group\":", point[0],
+                  point[1], point[2], std::sqrt(dx * dx + dy * dy + dz * dz));
+    return std::string(buf) + JsonString(group) + "}";
 }
 
 std::string Reflect(const std::string& aMethod, const json::Value& aParams, std::string& aError)
 {
+    if (aMethod == "world.ray")
+        return WorldRay(aParams, aError);
     if (aMethod == "rtti.call")
         return Call(aParams, aError);
     if (aMethod == "rtti.get")
@@ -2287,6 +2335,65 @@ bool EntityPosition(uint64_t aHash, float aOut[3], std::string& aError)
 // the Console). aHit says whether it hit; aPoint is where.
 bool RaycastStatic(const float aFrom[3], const float aTo[3], bool& aHit, float aPoint[3], std::string& aError)
 {
+    return Raycast(aFrom, aTo, "Static", aHit, aPoint, aError);
+}
+
+bool ReadGroups(const json::Value* aGroups, std::vector<std::string>& aOut, std::string& aError)
+{
+    aOut.clear();
+    if (!aGroups || aGroups->kind == json::Value::Kind::Null)
+        return true;
+    if (aGroups->kind != json::Value::Kind::Array)
+    {
+        aError = "groups must be a list of collision group names, such as [\"Static\", \"Dynamic\"]";
+        return false;
+    }
+    std::vector<std::string> asked;
+    for (const auto& item : aGroups->items)
+    {
+        if (item.kind != json::Value::Kind::String)
+        {
+            aError = "groups must be collision group names, such as \"Static\" or \"Dynamic\"";
+            return false;
+        }
+        asked.push_back(item.text);
+    }
+    return raygroups::Check(asked, aOut, aError);
+}
+
+bool RaycastGroups(const float aFrom[3], const float aTo[3], const std::vector<std::string>& aGroups, bool& aHit,
+                   float aPoint[3], std::string& aGroup)
+{
+    aHit = false;
+    float best = -1;
+    bool any = false;
+    for (const auto& group : aGroups)
+    {
+        bool h = false;
+        float p[3] = {};
+        std::string why;
+        if (!Raycast(aFrom, aTo, group.c_str(), h, p, why))
+            continue;
+        any = true;
+        if (!h)
+            continue;
+        const float d2 = (p[0] - aFrom[0]) * (p[0] - aFrom[0]) + (p[1] - aFrom[1]) * (p[1] - aFrom[1]) +
+                         (p[2] - aFrom[2]) * (p[2] - aFrom[2]);
+        if (best < 0 || d2 < best)
+        {
+            best = d2;
+            aHit = true;
+            std::memcpy(aPoint, p, 3 * sizeof(float));
+            aGroup = group;
+        }
+    }
+    return any;
+}
+
+// #60: any collision group. A bake's solid objects (EDGEbuilder's) are in "Dynamic", which a
+// "Static" cast passes through.
+bool Raycast(const float aFrom[3], const float aTo[3], const char* aGroup, bool& aHit, float aPoint[3], std::string& aError)
+{
     aHit = false;
     Handle<IScriptable> none;
     Handle<IScriptable> sys;
@@ -2321,7 +2428,7 @@ bool RaycastStatic(const float aFrom[3], const float aTo[3], bool& aHit, float a
     args.kind = Value::Kind::Array;
     args.items.push_back(vec(aFrom));
     args.items.push_back(vec(aTo));
-    args.items.push_back(Text("Static"));
+    args.items.push_back(Text(aGroup));
     args.items.push_back(out);
     args.items.push_back(no);
     args.items.push_back(no);

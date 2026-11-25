@@ -632,7 +632,11 @@ export const world = {
     }
     setTimeout(() => worldEvent('Entity/Initialize', e), 30);
     setTimeout(() => worldEvent('Entity/AfterAttach', e), 90);
-    return { id: { hash }, entity: new Remote('entEntity', {}) };
+    return { id: { hash }, entity: new Remote('entEntity', {}), position: options.position ?? { x: 0, y: 0, z: 0 } };
+  },
+  async ray() {
+    await nextFrame();
+    return null; // the simulated game has no collision
   },
   async move(id) {
     const hash = typeof id === 'string' ? id : id?.hash;
@@ -1192,6 +1196,14 @@ export const service = {
   },
   async describe(id) {
     throw new Error(`No package "${id}" in this preview: in the game it must be installed and switched on`);
+  },
+  // No other packages in a preview: no providers, and the list never changes.
+  async providers() {
+    return [];
+  },
+  onProviders(role, fn) {
+    setTimeout(() => fn([]), 0);
+    return () => {};
   },
   caller: () => null,
   signal: () => null,

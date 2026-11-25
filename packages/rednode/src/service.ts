@@ -217,6 +217,21 @@ export async function use<T = Record<string, (...args: any[]) => any>>(role: str
   return handle<T>(info, {});
 }
 
+/** A package that provides a role, as {@link service.providers} lists it. */
+export interface ProviderInfo {
+  id: string;
+  name: string;
+  version: string | null;
+  /** The folder REDnode loaded it from (a development folder's copy wins over the apps folder's). */
+  dir: string;
+  /** Switched on in the Mod Manager. */
+  enabled: boolean;
+  /** Its service is ready now. */
+  running: boolean;
+  /** Its rednode-app.json as read, so a role can define a block of its own in it. */
+  manifest: Record<string, unknown>;
+}
+
 /**
  * Other packages' services, and the tools to offer one.
  */
@@ -253,6 +268,55 @@ export const service = {
    */
   async describe(id: string): Promise<ServiceDescription> {
     return (await send({ op: "describe", provider: id })) as ServiceDescription;
+  },
+
+  /**
+   * Every installed package that provides a role, switched on or not, sorted by name, without
+   * the caller itself (#58; REDnode 0.71.0 or later). Unlike {@link use}, nothing is chosen and
+   * nothing is called: it is for a package that shows something for each provider, such as a
+   * button per tool. `enabled` says whether the player switched it on, `running` whether its
+   * service answers now, and `manifest` is its rednode-app.json, so a role can define its own
+   * block there.
+   *
+   * @example
+   * ```js
+   * import { service } from "rednode";
+   *
+   * for (const p of await service.providers("edgebuilder-tool")) {
+   *   console.log(p.name, p.enabled ? "on" : "off", p.manifest.edgebuilderTool);
+   * }
+   * ```
+   */
+  async providers(role: string): Promise<ProviderInfo[]> {
+    return (await send({ op: "providers", role })) as ProviderInfo[];
+  },
+
+  /**
+   * Calls the handler with the whole list from {@link service.providers} whenever it changes:
+   * a provider installed or removed, switched on or off, its service starting or stopping, or
+   * its manifest changed by a hot reload. It is called once at the start with the list as it
+   * is, and then within a second of each change. Returns a function that stops it.
+   *
+   * @example
+   * ```js
+   * const stop = service.onProviders("edgebuilder-tool", (list) => drawTools(list));
+   * ```
+   */
+  onProviders(role: string, handler: (list: ProviderInfo[]) => void): () => void {
+    listen();
+    const key = `$providers ${role}`;
+    const set = handlers.get(key) ?? new Set();
+    const wrapped: EventHandler = (data) => handler(data as ProviderInfo[]);
+    set.add(wrapped);
+    handlers.set(key, set);
+    send({ op: "providers", role, watch: true })
+      .then((list) => {
+        if (set.has(wrapped)) wrapped(list);
+      })
+      .catch((err) => console.error(err));
+    return () => {
+      set.delete(wrapped);
+    };
   },
 
   /**

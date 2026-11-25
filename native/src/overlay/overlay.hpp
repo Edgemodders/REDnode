@@ -383,6 +383,13 @@ bool GameCameraForward(float aOut[3], std::string& aError);
 // WP2: where a followed entity is now, and a ray cast against static collision for "behind a wall".
 bool EntityPosition(uint64_t aHash, float aOut[3], std::string& aError);
 bool RaycastStatic(const float aFrom[3], const float aTo[3], bool& aHit, float aPoint[3], std::string& aError);
+// The same cast over any collision group, such as "Dynamic" or "Terrain" (#60).
+bool Raycast(const float aFrom[3], const float aTo[3], const char* aGroup, bool& aHit, float aPoint[3], std::string& aError);
+// A request's "groups": collision group names, at most 8, each once; empty when not given.
+bool ReadGroups(const json::Value* aGroups, std::vector<std::string>& aOut, std::string& aError);
+// One cast per group, the hit nearest aFrom winning; aGroup names it.
+bool RaycastGroups(const float aFrom[3], const float aTo[3], const std::vector<std::string>& aGroups, bool& aHit,
+                   float aPoint[3], std::string& aGroup);
 // overlay.cpp
 const RED4ext::v1::Sdk* GetSdk();
 RED4ext::v1::PluginHandle GetHandle();

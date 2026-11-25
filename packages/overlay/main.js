@@ -2539,6 +2539,17 @@ async function spawnForAgent(o) {
       const half = (((Math.atan2(f.Y, f.X) * 180) / Math.PI + 90) * Math.PI) / 360;
       orientation = { i: 0, j: 0, k: Math.sin(half), r: Math.cos(half) };
     }
+    const person = o.npc !== false && (o.npc || String(o.record ?? '').startsWith('Character.'));
+    // #59: a person (or anything asked to) on the ground under the place, as world.spawn does:
+    // a person plays a workspot from where they were spawned.
+    if (o.ground ?? person) {
+      const hit = await bridgeCall('world.ray', {
+        from: [position.x, position.y, position.z + 0.6],
+        to: [position.x, position.y, position.z - 3],
+        groups: ['Static', 'Terrain', 'PlayerBlocker', 'Dynamic'],
+      }).catch(() => null);
+      if (hit?.hit && Array.isArray(hit.point)) position = { ...position, z: hit.point[2] };
+    }
     const components = [];
     // #39: a workspot the person carries, played with world_animate.
     if (o.workspot) components.push(await call('rtti.new', { class: 'workWorkspotResourceComponent', props: { name: 'rednode_workspot', workspotResource: o.workspot } }));
@@ -2569,7 +2580,6 @@ async function spawnForAgent(o) {
       entity = await call('rtti.call', { class: 'GameInstance', fn: 'FindEntityByID', args: [{}, id] }).catch(() => null);
       if (!entity) await new Promise((r) => setTimeout(r, 100));
     }
-    const person = o.npc !== false && (o.npc || String(o.record ?? '').startsWith('Character.'));
     if (entity && person) {
       // Stand still, friendly to V (as world.spawn does).
       const quiet = (p) => p.catch(() => null);
@@ -5052,6 +5062,73 @@ function providerOf(role, callerId) {
   throw new Error(`${names.slice(0, -1).join(', ')} and ${names.at(-1)} all provide "${role}": choose one in the Mod Manager`);
 }
 
+// #58: every package that provides a role, switched on or not, without the caller: for a
+// package that draws something for each (EDGEbuilder's Tools), rather than calling one.
+function providerList(role, callerId) {
+  if (role === 'agent') throw new Error('The agent role is reached with agent.ask');
+  if (!ROLE_NAME.test(role)) throw new Error('providers needs a role name, such as "voice"');
+  const ready = new Set((services?.providers() ?? []).map((p) => p.id));
+  return providersOf(role)
+    .filter((e) => e.manifest.id !== callerId)
+    .map((e) => ({
+      id: e.manifest.id,
+      name: e.manifest.name ?? e.manifest.id,
+      version: e.manifest.version ?? null,
+      dir: e.dir,
+      enabled: isEnabled(e),
+      running: ready.has(e.manifest.id),
+      manifest: manifestAsRead(e),
+    }))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)) || a.id.localeCompare(b.id));
+}
+
+// A package's rednode-app.json as written, with fields REDnode does not know (a role's own block,
+// such as EDGEbuilder's edgebuilderTool); the checked manifest keeps only REDnode's own.
+function manifestAsRead(entry) {
+  try {
+    const m = JSON.parse(fs.readFileSync(path.join(entry.dir, 'rednode-app.json'), 'utf8'));
+    if (m && typeof m === 'object' && m.id === entry.manifest.id) return m;
+  } catch {
+    // changed or removed since it was read: the checked copy below
+  }
+  return JSON.parse(JSON.stringify(entry.manifest));
+}
+
+// #58: packages that asked to hear when a role's providers change: role -> Map(package id -> the
+// list last sent, as JSON). Checked each second while anyone watches; a package that stops is
+// dropped (it asks again when it starts).
+const providerWatchers = new Map();
+function watchProviders(id, role) {
+  const list = providerList(role, id);
+  const forRole = providerWatchers.get(role) ?? new Map();
+  forRole.set(id, JSON.stringify(list));
+  providerWatchers.set(role, forRole);
+  return list;
+}
+setInterval(() => {
+  for (const [role, forRole] of providerWatchers) {
+    for (const [id, last] of forRole) {
+      if (!apps.has(id) || !packageRunning(id)) {
+        forRole.delete(id);
+        continue;
+      }
+      let list;
+      try {
+        list = providerList(role, id);
+      } catch {
+        continue;
+      }
+      const now = JSON.stringify(list);
+      if (now === last) continue;
+      forRole.set(id, now);
+      const message = { event: 'service', provider: '$providers', name: role, data: list };
+      mods.toMod(id, message);
+      for (const w of windowsOfPackage(id)) toPage(w, message);
+    }
+    if (!forRole.size) providerWatchers.delete(role);
+  }
+}, 1000);
+
 // What the Mod Manager shows of a package's roles: who else provides each, and whether
 // this package is the one that answers.
 function rolesOf(m) {
@@ -5088,6 +5165,10 @@ function onService(id, msg, fromPage = false) {
     case 'use': {
       const role = String(msg.role ?? '');
       return services.connect(id, providerOf(role, id)).then((info) => ({ ...info, role }));
+    }
+    case 'providers': {
+      const role = String(msg.role ?? '');
+      return msg.watch ? watchProviders(id, role) : providerList(role, id);
     }
     case 'call': {
       const key = `${id}:${msg.cid}`;

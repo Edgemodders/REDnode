@@ -1,7 +1,7 @@
 {
   "id": "keybind",
   "name": "Key binding",
-  "version": "0.70.0",
+  "version": "0.71.0",
   "author": "Edgemodders",
   "description": "Shown while you pick a key for an app from its title bar or the Mod Manager. The key shows only that app with the cursor, and hides it again.",
   "entry": "index.html",

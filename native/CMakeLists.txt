@@ -144,6 +144,9 @@ target_compile_options(REDnode_pins_tests PRIVATE /W4 /utf-8)
 add_executable(REDnode_weather_tests tests/weather_test.cpp)
 target_compile_options(REDnode_weather_tests PRIVATE /W4 /utf-8)
 
+add_executable(REDnode_raygroups_tests tests/raygroups_test.cpp)
+target_compile_options(REDnode_raygroups_tests PRIVATE /W4 /utf-8)
+
 add_executable(REDnode_gamepad_tests tests/gamepad_test.cpp)
 target_compile_options(REDnode_gamepad_tests PRIVATE /W4 /utf-8)
 
