@@ -1063,6 +1063,10 @@ export const world = {
    * themselves. A quest's workspot plays outside its scene too, but once, for a moment, after a
    * T pose (A1's test): it is made for a scene to drive.
    *
+   * It plays from where the person stands, so a person spawned in the air plays it in the air
+   * (the idle alone puts the feet down and hides it). `world.spawn` puts a person on the ground
+   * by default since REDnode 0.71.0 (#59); with `ground: false`, give a place on the ground.
+   *
    * @example
    * ```ts
    * const { id } = await world.spawn({ record: "Character.trauma_team_paramedic", ...here,
