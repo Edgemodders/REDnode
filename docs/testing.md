@@ -1293,6 +1293,15 @@ Steps: [docs/world.md, "SC1 test"](world.md#sc1-test).
 | Plain Node, 2026-11-25, 0.74.0, by Claude | **Pass**: 9 checks (scratchpad `w51/check.mjs`): a format 3 scene's objects read as format 2's, removals counted (one and two), mixed actions with an unknown one named, no note without edits, `kinds` and `skip` on format 3, a stray list in format 2 noted, format 4 refused, format 1 unchanged |
 | Game 2.5, dev PC | **Not run** |
 
+## Saves spike (#57 step 1, 0.74.0)
+
+The Saves spike (`apps/saves-spike` 0.1.0, on REDnode 0.74.0 with its `REDnodeSavesListener` script), for REDcode's tests run by an assistant: the game's system requests handler from the main menu and in game, the game's own list of saves without its load menu, `LoadSavedGame(index)` and `LoadLastCheckpoint`. Steps: [docs/game-tests.md, "Saves spike: test"](game-tests.md#saves-spike-test).
+
+| Run | Result |
+|---|---|
+| Stand-in `rednode`, 2026-11-25, 0.74.0, by Claude | **Pass**: 11 checks (scratchpad `s57/check.mjs`): the handler's three reads, a load before a list refused, the listener made once and registered for both callbacks (again after unregistering), the list and the details shown and the select filled, the picked index loaded, the state's changes timed, Continue with and without a checkpoint, an empty list. The script: 0 errors with redscript-cli alone and beside Codeware, and with the game's scc.exe |
+| Game 2.5, dev PC | **Not run** |
+
 ## The cursor in a windowed game (#56, 0.70.0)
 
 The overlay's cursor follows the Windows pointer while the game is in a window smaller than its screen and does not clip the pointer. Steps and what each should show: [docs/overlay.md, "The cursor in a windowed game: test"](overlay.md#the-cursor-in-a-windowed-game-test-0700).

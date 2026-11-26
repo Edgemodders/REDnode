@@ -523,6 +523,18 @@ export const NOTES = {
     tryThis: ['Press Write the workspots, Set the target here, walk away, then Spawn the walker and Walk to the target.', 'Press Spawn the copy, Dress the copy, then Direct the copy.'],
     preview: 'The preview\'s game has no player, AI or workspots, so the buttons log a failure here: the app is meant for the game.',
   },
+  'saves-spike': {
+    group: 'tests',
+    summary: 'List the game\'s saves and load one, or the last checkpoint, from the main menu or a loaded game: the spike for tests an assistant runs by itself (#57, for REDcode).',
+    teaches: ['api.$new', 'inkISystemRequestsHandler', 'game.on', 'game.onState', 'ui.select'],
+    how: [
+      '**Handler** reaches the game\'s system requests handler through a fresh `inkMenuScenario`, as REDnode\'s own main-menu check does, and reads `IsPreGame`, `HasLastCheckpoint` and `GetLatestSaveMetadata`.',
+      '**List saves** registers REDnode\'s `REDnodeSavesListener` script object for the game\'s `OnSavesForLoadReady` and `OnSaveMetadataReady` callbacks and calls `RequestSavesForLoad`; the listener sends them back as the `saves.list` and `saves.meta` game events.',
+      '**Load the picked save** calls `LoadSavedGame` with the save\'s place in the game\'s list; **Continue** calls `LoadLastCheckpoint`. `game.onState` times each change of state until V is in the world.',
+    ],
+    tryThis: ['At the main menu, press Handler, then List saves, pick a save and press Load the picked save.'],
+    preview: 'The preview\'s game has no saves or system requests handler, so the buttons log a failure here: the app is meant for the game. Needs REDnode 0.74.0, whose script sends the saves.',
+  },
   'nodes-test': {
     group: 'tests',
     summary: 'Find out what the camera looks at in the world: buildings, street furniture, decals and lights, each with the sector and node it comes from; outline one, hide it for the session (#24\'s spike).',
