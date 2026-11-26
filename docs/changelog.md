@@ -12,6 +12,10 @@ How to keep it:
 
 ## Unreleased
 
+### New
+
+- **Scene format 3** ([#51](https://github.com/Edgemodders/REDnode/issues/51)): `world.load` and MCP's `world_load` read EDGEbuilder's scene format 3, the scenes that remove the game's own objects. The objects load as before; the world edits are not applied yet, and the answer's `notes` say how many were left out, of which kinds.
+
 ## 0.73.1 (2026-11-25)
 
 <!-- nexus

@@ -1284,6 +1284,15 @@ Steps: [docs/world.md, "SC1 test"](world.md#sc1-test).
 | Stand-in `rednode`, 2026-11-25, 0.73.1, by Claude | **Pass**: 41 checks (scratchpad `sc1/stand/check.mjs`): every button against a stand-in that walks people toward the move command's target, the command's fields in fixed point, the hold cancelled before a walk and given back after, the marker target, the gap's order, the moves and the drag, the device at the person's feet, the game's nearest person, the cutscene copy for V's body, a man V refusing a woman nearby |
 | Game 2.5, dev PC | **Not run** |
 
+## Scene format 3 read (#51 step 1, 0.74.0)
+
+`world.load` and MCP `world_load` take EDGEbuilder's scene format 3: its objects load as format 2's, and its `worldEdits` are not applied but counted in `notes`. Steps: [docs/world.md, "Scene format 3: test"](world.md#scene-format-3-test).
+
+| Run | Result |
+|---|---|
+| Plain Node, 2026-11-25, 0.74.0, by Claude | **Pass**: 9 checks (scratchpad `w51/check.mjs`): a format 3 scene's objects read as format 2's, removals counted (one and two), mixed actions with an unknown one named, no note without edits, `kinds` and `skip` on format 3, a stray list in format 2 noted, format 4 refused, format 1 unchanged |
+| Game 2.5, dev PC | **Not run** |
+
 ## The cursor in a windowed game (#56, 0.70.0)
 
 The overlay's cursor follows the Windows pointer while the game is in a window smaller than its screen and does not clip the pointer. Steps and what each should show: [docs/overlay.md, "The cursor in a windowed game: test"](overlay.md#the-cursor-in-a-windowed-game-test-0700).

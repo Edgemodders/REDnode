@@ -2623,3 +2623,25 @@ On the dev PC, game 2.5 with Codeware. Press F10 for the mouse to press a button
 | 15 | **Set the target here**, walk 8 m away, **Walk the copy to the target** | Say whether the copy walks to the pin |
 | 16 | Set **Copy** to The cutscene copy, no impostor, and press **Spawn the copy** | Say whether it looks any different from step 12 |
 | 17 | **Remove everything** | Every spawn and the pin are gone; the game's person from step 11 goes back to their day |
+
+## Scene format 3 read (#51 step 1; 0.74.0)
+
+EDGEbuilder writes scene format 3 for a scene that changes the game's own world: format 2's objects, unchanged, plus a `worldEdits` list (its [scene format](https://edgemodders.github.io/EDGEbuilder/scene.html#format-3-draft-world-edits), a draft until EDGEbuilder pins it). REDnode's reader refused format 3 before (`scene format 3 is newer than REDnode reads (1 and 2)`). Built on 2026-11-25 in REDnode 0.74.0, step 1 of #51 as asked:
+
+| Part | What it does |
+|---|---|
+| `readScene` in `packages/rednode/src/scene.ts` | Takes formats 1 to 3; format 4 or later is refused with `(1 to 3)`. A format 3 file's objects load as format 2's, with `kinds` and `skip` as before |
+| `notes` | The world edits are not applied. One note counts them by action, such as `2 world edits not applied (removals of the game's own objects)` or `3 world edits not applied (2 removals of the game's own objects, 1 door state)`; an action REDnode does not know is named in quotes. No note when the list is empty or missing |
+| Where | `world.load`, the MCP tool `world_load`, and anything else using the shared reader (the host imports the package's `scene.js`) |
+
+Step 2 (hide each `remove` edit through the world node registry, show it again at `world.unload` and when the package stops) waits for N2, the registry in full, in the agreed order. Plain Node check: scratchpad `w51/check.mjs` (9).
+
+### Scene format 3: test
+
+With a save loaded, nothing else needed; Claude drives it through MCP. The file is `w51.scene.json` (a cardboard box and two `remove` edits naming made-up nodes), written beside V first.
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | Claude calls `world_load` with the file | One box near V; the answer's `notes` say `2 world edits not applied (removals of the game's own objects)`; no error |
+| 2 | Claude calls `world_load` with the same file edited to `"format": 4` | Refused: `scene format 4 is newer than REDnode reads (1 to 3)` |
+| 3 | Claude removes the box (`world_remove`, or the scene unloaded) | The box is gone |

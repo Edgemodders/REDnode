@@ -3,7 +3,8 @@
  * calls, so the host uses it too (the MCP server's `world_load`).
  *
  * The format is EDGEbuilder's ([scene format](https://edgemodders.github.io/EDGEbuilder/scene.html)):
- * format 1, plus format 2's draft `npc` kind.
+ * format 1, plus format 2's draft `npc` kind, and format 3's draft `worldEdits` (#51), which are
+ * read but not applied: each kind of edit left out is said in {@link SceneRead.notes}.
  *
  * @module
  */
@@ -80,7 +81,7 @@ export interface SceneFilter {
 export function readScene(scene: unknown, filter: SceneFilter = {}): SceneRead {
   const s = scene as Scene;
   if (!s || typeof s !== "object" || !Array.isArray(s.objects)) throw new Error("not a scene: it has no objects list");
-  if (typeof s.format === "number" && s.format > 2) throw new Error(`scene format ${s.format} is newer than REDnode reads (1 and 2)`);
+  if (typeof s.format === "number" && s.format > 3) throw new Error(`scene format ${s.format} is newer than REDnode reads (1 to 3)`);
   const kinds = filter.kinds == null ? null : new Set(listOf(filter.kinds, "kinds"));
   for (const k of kinds ?? []) {
     if (!(SCENE_KINDS as readonly string[]).includes(k)) throw new Error(`kinds: "${k}" is not a scene kind. It takes ${SCENE_KINDS.join(", ")}`);
@@ -148,7 +149,31 @@ export function readScene(scene: unknown, filter: SceneFilter = {}): SceneRead {
   }
   const missing = [...skip].filter((id) => !seen.has(id));
   if (missing.length) notes.push(`skip names ${missing.map((id) => `"${id}"`).join(", ")}, which the scene has no object for`);
+  const edits = worldEditsNote(s.worldEdits);
+  if (edits) notes.push(edits);
   return { name: String(s.name ?? "scene"), plans, skipped, notes };
+}
+
+const EDIT_WORDS: Record<string, [string, string]> = {
+  remove: ["removal of the game's own objects", "removals of the game's own objects"],
+  door: ["door state", "door states"],
+};
+
+/** Format 3's world edits are not applied yet (#51 step 2): say how many, of which kinds. */
+function worldEditsNote(edits: unknown): string | null {
+  if (!Array.isArray(edits) || edits.length === 0) return null;
+  const counts = new Map<string, number>();
+  for (const e of edits) {
+    const action = typeof (e as { action?: unknown })?.action === "string" ? String((e as { action: string }).action) : "unknown";
+    counts.set(action, (counts.get(action) ?? 0) + 1);
+  }
+  const parts = [...counts].map(([action, n]) => {
+    const words = EDIT_WORDS[action];
+    const what = words ? words[n === 1 ? 0 : 1] : `"${action}" edit${n === 1 ? "" : "s"}`;
+    return counts.size === 1 ? what : `${n} ${what}`;
+  });
+  const n = edits.length;
+  return `${n} world edit${n === 1 ? "" : "s"} not applied (${parts.join(", ")})`;
 }
 
 function listOf(v: unknown, what: string): string[] {
