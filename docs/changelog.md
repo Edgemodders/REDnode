@@ -12,6 +12,13 @@ How to keep it:
 
 ## Unreleased
 
+## 0.75.0 (2026-11-26)
+
+<!-- nexus
+New: Load modded saves without the mod check, a launcher switch: no Mod Verification popup (off by default)
+New: world.load reads EDGEbuilder's scene format 3; its edits to the game's own world are not applied yet
+-->
+
 ### New
 
 - **Scene format 3** ([#51](https://github.com/Edgemodders/REDnode/issues/51)): `world.load` and MCP's `world_load` read EDGEbuilder's scene format 3, the scenes that remove the game's own objects. The objects load as before; the world edits are not applied yet, and the answer's `notes` say how many were left out, of which kinds.
