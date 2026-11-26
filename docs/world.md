@@ -2645,3 +2645,5 @@ With a save loaded, nothing else needed; Claude drives it through MCP. The file 
 | 1 | Claude calls `world_load` with the file | One box near V; the answer's `notes` say `2 world edits not applied (removals of the game's own objects)`; no error |
 | 2 | Claude calls `world_load` with the same file edited to `"format": 4` | Refused: `scene format 4 is newer than REDnode reads (1 to 3)` |
 | 3 | Claude removes the box (`world_remove`, or the scene unloaded) | The box is gone |
+
+**Passed in game on 2026-11-26** on the dev PC (REDnode 0.75.0, all three steps, Claude driving MCP; docs/testing.md has the answers). Step 2 of #51 (applying the removals) waits for N2.

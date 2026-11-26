@@ -1291,7 +1291,7 @@ Steps: [docs/world.md, "SC1 test"](world.md#sc1-test).
 | Run | Result |
 |---|---|
 | Plain Node, 2026-11-25, 0.74.0, by Claude | **Pass**: 9 checks (scratchpad `w51/check.mjs`): a format 3 scene's objects read as format 2's, removals counted (one and two), mixed actions with an unknown one named, no note without edits, `kinds` and `skip` on format 3, a stray list in format 2 noted, format 4 refused, format 1 unchanged |
-| Game 2.5, dev PC | **Not run** |
+| Game 2.5, dev PC, 2026-11-26, REDnode 0.75.0, Claude driving MCP with the owner in game | **Pass**, all three steps. Step 1: `world_load` of `w51.scene.json` (written 2 m in front of V) spawned the box (id 11119618) and answered `notes: ["2 world edits not applied (removals of the game's own objects)"]`, `skipped: []`. Step 2: the same scene as format 4 refused with `scene format 4 is newer than REDnode reads (1 to 3)`. Step 3: the scene unloaded, `removed: 1`, `world_spawned` empty. Claude Code's connection to the game's MCP server came back after the owner's /mcp reconnect |
 
 ## Saves spike (#57 step 1, 0.74.0)
 
