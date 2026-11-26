@@ -1064,6 +1064,8 @@ Start with the switch off. To see the game's own check, switch **Remove Mods Men
 | 5 | Close the game, start it again, press **Continue** | Still on: no popup. Switch it off to leave the game's check as it was |
 | 6 | With Remove Mods Menu on again, start the game | The game starts, no script errors in `r6/logs/redscript_rCURRENT.log`, and loads still show no popup |
 
+**Passed in game on 2026-11-26** on the dev PC (REDnode 0.75.0, all six steps; docs/testing.md has the log lines).
+
 ### Tooltips on ui controls (#55, 0.70.0)
 
 Asked for by REDcode's Animation Tools pack on 2026-11-22 ([#55](https://github.com/Edgemodders/REDnode/issues/55)): its **Generate** button is disabled for about a minute while Uthana makes a clip, and the owner wanted it to say so. `tip` on `ui.button`, `ui.toggle`, `ui.slider`, `ui.input` and `ui.select` is a tooltip, and `set({ tip })` changes or clears it. It is the control's `title`, which the UI kit already draws in the page (Chromium's own tooltips never show in offscreen windows). A disabled `rn-button` still gets pointer moves, so its tip shows too.

@@ -1300,7 +1300,7 @@ The Saves spike (`apps/saves-spike` 0.1.0, on REDnode 0.74.0 with its `REDnodeSa
 | Run | Result |
 |---|---|
 | Stand-in `rednode`, 2026-11-25, 0.74.0, by Claude | **Pass**: 11 checks (scratchpad `s57/check.mjs`): the handler's three reads, a load before a list refused, the listener made once and registered for both callbacks (again after unregistering), the list and the details shown and the select filled, the picked index loaded, the state's changes timed, Continue with and without a checkpoint, an empty list. The script: 0 errors with redscript-cli alone and beside Codeware, and with the game's scc.exe |
-| Game 2.5, dev PC | **Not run** |
+| Game 2.5, dev PC, 2026-11-26, REDnode 0.74.0, Saves spike 0.1.0 then 0.1.1, by the owner | **Pass**, all six steps. 940 saves listed 11 ms after the call at the main menu, every name matching a folder; details for only the newest. Step 3: `LoadSavedGame(3)` loaded ManualSave-1587 from the main menu, V in the world at 3.7 s. Step 4 first failed on 0.1.0 (`List saves failed: ... that game object no longer exists`: the listener made at the main menu was dropped by the load); 0.1.1 makes a fresh listener each time, and `LoadSavedGame(1)` then loaded AutoSave-17 from a game (main menu at 1.4 s, world at 5.0 s). Step 5: `LoadLastCheckpoint(false)` at the main menu did nothing, since every save is modded and the game's Continue uses `LoadModdedSave(0)` for those. Step 6: `LoadLastCheckpoint(true)` in a game loaded the last save in 3.6 s. Results: docs/game-tests.md, "Saves spike: results" |
 
 ## The cursor in a windowed game (#56, 0.70.0)
 
@@ -1369,7 +1369,7 @@ The launcher's switch that loads saves made with mods with no Mod Verification p
 | Run | Result |
 |---|---|
 | Script compiles, 2026-11-26, 0.75.0, by Claude | **Pass**: 0 errors in REDnode's scripts with redscript-cli alone, beside Codeware, and beside Codeware and Remove Mods Menu (Remove Mods Menu replaces `LoadListItem.IsModded`, REDnode wraps it); the game's scc.exe beside both, 0 errors (scratchpad `modded/check.ps1`). The plugin builds and its unit tests pass |
-| Game 2.5, dev PC | Not run |
+| Game 2.5, dev PC, 2026-11-26, REDnode 0.75.0, by the owner | **Pass**, all six steps. The host logged the switch on at 11:20:41; after the restart (step 5) the plugin was told at once (`Saves: modded saves load without the mod check`, 11:23:06). With Remove Mods Menu back on (step 6), no errors in `redscript_rCURRENT.log` |
 
 ## Hide on a click in the game (0.69.0)
 

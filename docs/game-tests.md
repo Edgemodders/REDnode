@@ -54,12 +54,26 @@ The game on its main menu, nothing loaded yet. The Saves spike needs no permissi
 | 5 | Exit to the main menu (pause menu, Exit to main menu), press **Continue (last checkpoint)** | The last save loads, as the game's own Continue |
 | 6 | In game, switch on **Continue: only the same playthrough**, press **Continue (last checkpoint)** | The last save of this playthrough loads |
 
+### Saves spike: results (2026-11-26)
+
+On the dev PC, game 2.5, REDnode 0.74.0 with Saves spike 0.1.0, then 0.1.1. **All six steps passed** once step 5 was understood.
+
+| Question | Answer |
+|---|---|
+| Q1. The handler | Found at the main menu in 23 ms (`IsPreGame` true, a last checkpoint, the latest save's details through `GetLatestSaveMetadata`) |
+| Q2. The list without the load menu | Yes: `saves.list` with **940 saves 11 ms** after `RequestSavesForLoad`. The details do **not** come with it: one `saves.meta` (the newest save) at the main menu, none in a game. The game asks for details per save as its menu shows them, so 57b reads them from the save folders' `metadata.9.json` instead |
+| Q3. Names and order | All 940 names match a folder in Saved Games. The first 12 are newest first by folder time, the whole list is not (unverified why; the folder time is not the save's own time). The owner could not compare with the Load menu, which shows no names. Each load names the save it asked for, so a wrong order would show as a wrong save |
+| Q4. `LoadSavedGame(index)` | Loads the save at that place in the list: ManualSave-1587 (place 3) from the main menu, V in the world 3.7 s after the call; AutoSave-17 (place 1) from a loaded game, the main menu at 1.4 s and the world at 5.0 s. It loads a modded save with no Mod Verification popup |
+| Q5. `LoadLastCheckpoint` | In a game, `LoadLastCheckpoint(true)` loads the last save of the playthrough in 3.6 s (the death screen's and the pause menu's quick load call). At the main menu it does **nothing for a modded save**: the game's own Continue calls `LoadModdedSave(0)` then (`SingleplayerMenuGameController.HandleMenuItemActivate`), and `LoadLastCheckpoint(false)` only for an unmodded one |
+
+Found on the way: a listener made at the main menu is gone in the game, since REDnode drops game objects when a save loads (`List saves failed: ... that game object no longer exists`). Saves spike 0.1.1 makes a fresh one for each list. The owner's ask from step 5 became REDnode 0.75.0's **Load modded saves without the mod check** (docs/overlay.md), passed the same day.
+
 ### 57b: the build (after the spike)
 
-From what the spike finds:
+From what the spike found:
 
-- `game.saves()` in the `rednode` package: `{ index, name, location, quest, type, time, level, modded, version }[]`, newest first as the game lists them; the location as words (`loc.text` for its key).
-- `game.load({ save })` by name or index, or `game.load({ last: true })`, waiting until V is in the world (or a time limit) and answering how long it took.
+- `game.saves()` in the `rednode` package: `{ index, name, location, quest, type, time, level, modded, version }[]`, in the game's order. The names and order from `RequestSavesForLoad`, the details from each save folder's `metadata.9.json` (the game sends them only as its menu asks); the location as words (`loc.text` for its key).
+- `game.load({ save })` by name or index through `LoadSavedGame`, or `game.load({ last: true })`: at the main menu `LoadSavedGame(0)` (the game's Continue for a modded save), in a game `LoadLastCheckpoint(true)`. It waits until V is in the world (or a time limit) and answers how long it took. A list is asked again before each load by name, since a new save shifts every index.
 - MCP: `game_saves` (a read, no ask) and `game_load` (asks first), usable from the main menu.
 
 ## Step 2: a test session (proposed)
