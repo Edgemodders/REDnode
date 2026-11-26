@@ -509,6 +509,20 @@ export const NOTES = {
     tryThis: ['Press Read the body, then Make the device at V and Play on V.', 'Press Spawn the copy, Dress the copy, then Play on the copy.'],
     preview: 'The preview\'s game has no player or workspots, so the buttons log a failure here: the app is meant for the game.',
   },
+  'scene-spike': {
+    group: 'tests',
+    summary: 'The pieces of a directed scene: walk a spawned person to a mark with the game\'s AI, time the gaps between a workspot, a walk and a workspot, move a person while they act, play a workspot on someone who does not carry it, and spawn the game\'s cutscene copy of V (the scene spike, SC1, for EDGEdir).',
+    teaches: ['world.spawn', 'world.writeWorkspot', 'world.useWorkspot', 'world.stopWorkspot', 'world.jumpWorkspot', 'world.move', 'world.near', 'world.pin', 'api.$new', 'WorkspotGameSystem'],
+    how: [
+      '**Walk to the target** cancels the person\'s hold command and sends the game\'s `AIMoveToCommand` through their AI component, with the target as a place (a `WorldPosition` in fixed point) or a marker entity, then follows the command\'s state and the distance left each second.',
+      '**Stop, walk there, play there** ends the workspot, walks the person to the target and plays the workspot again there, timing each part.',
+      'Section 3 moves a person with `world.move` while they play a written workspot, and reads where they are after 0.5 s and 2 s.',
+      'Section 4 plays a workspot on someone who does not carry it: a bare device spawned at their feet carries it, and `PlayInDeviceSimple(device, person)` puts them in it.',
+      'Section 5 spawns the game\'s cutscene copy of V by its record (`Character.TPP_Player_Cutscene_Female` or `_Male`), dresses it in V\'s clothes and directs and walks it like any person.',
+    ],
+    tryThis: ['Press Write the workspots, Set the target here, walk away, then Spawn the walker and Walk to the target.', 'Press Spawn the copy, Dress the copy, then Direct the copy.'],
+    preview: 'The preview\'s game has no player, AI or workspots, so the buttons log a failure here: the app is meant for the game.',
+  },
   'nodes-test': {
     group: 'tests',
     summary: 'Find out what the camera looks at in the world: buildings, street furniture, decals and lights, each with the sector and node it comes from; outline one, hide it for the session (#24\'s spike).',

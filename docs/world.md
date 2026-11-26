@@ -2567,3 +2567,59 @@ REDnode 0.73.0. Load a save outside a fight.
 | 7 | Let a gang member die by other means if one comes up (police, another gang, a car), or run over a civilian | A line "by other" or "by none", not counted in the tally; a civilian's affiliation (unverified) |
 | 8 | Leave the fight until combat ends | "Combat: out of combat" and one "V left combat" line |
 | 9 | Load another save | No "V left combat" from the load (0.73.1); people already lying down there may give "by none" lines; a fight there gives lines again |
+
+## The scene spike (SC1)
+
+Next in the order agreed with the owner on 2026-11-23, started on 2026-11-25. It answers what EDGEdir's scenes still need before REDnode can offer them as calls:
+
+- [#50](https://github.com/Edgemodders/REDnode/issues/50) part 2: a person walks to a mark.
+- [#48](https://github.com/Edgemodders/REDnode/issues/48) part 2: directing a person who does not carry the workspot.
+- Whether `world.move` holds on a person playing a written workspot (EDGEdir's Adjust).
+- A copy of V by another route than the photo mode puppet, which crashed the game in #47's test.
+
+### SC1: build
+
+The **Scene spike** app (`packages/overlay/apps/scene-spike`, 0.1.0) uses `api` and `world`, with the `bridge` and `archives` permissions for `world.writeWorkspot`. No part of REDnode changes, so there is no version raise: it runs on REDnode 0.73.1.
+
+| Section | What it tries |
+|---|---|
+| Workspots | `world.writeWorkspot` writes `sc1_ma`: two clips on `man_base.rig`, standing and arms crossed. For a feminine V it also writes `sc1_wa`, two clips on `woman_base.rig`, for the copy |
+| 1. A walk | A paramedic spawned with `npc: { hold: true }`, carrying `sc1_ma`. **Walk to the target** cancels the hold (`CancelOrInterruptCommand("AIHoldPositionCommand")`) and sends the game's `AIMoveToCommand` through the AI component (`SendCommand`). Choices: the target as a place (a `WorldPosition`, in fixed point: metres times 2^17) or as a bare marker entity; Walk, Run or Sprint; the navmesh or a straight line (`ignoreNavigation`); `desiredDistanceFromTarget` 0.1 to 2 m; optionally, turning to face V at the end (`rotateEntityTowardsFacingTarget`). Each second it logs the command's state (`GetCommandState`), the distance left, the speed and the height. At the end it logs where the person stopped and their facing, and gives them a new hold |
+| 2. The gap | **Stop, walk there, play there** runs `world.stopWorkspot` (fast, or the game's own stop), the walk, then `world.useWorkspot` at the target, and times each part: out of the workspot, the first step, the walk, back in. **Walk while in the workspot** sends the walk with no stop first |
+| 3. Moves | Tried on the walker while it plays its workspot: `world.move` a step aside, a quarter turn, a 2 s drag at about 30 moves a second (EDGEdir's Adjust), and, to compare, the game's `TeleportationFacility.Teleport`. After each, at 0, 0.5 and 2 s: the distance from the aim, the yaw, and whether the workspot still runs |
+| 4. Directing | A bare device (`mq061_empty_entity.ent`) is spawned at the person's feet, facing their way, carrying the workspot, and `PlayInDeviceSimple(device, person)` plays it, as #47 did for V. Tried on a plain paramedic spawned with no workspot, and on the nearest of the game's own people within 20 m, who is held for 10 minutes first. A woman nearby is refused when V is a man, since only the man's workspot was written then. Jumps by entry id and a fast exit |
+| 5. The copy | The game's **cutscene copy of V**: `Character.TPP_Player_Cutscene_Female` or `_Male`, and the `No_Impostor` pair. It is an ordinary NPC record. Its template, `player_wa_tpp_cutscene.ent`, is an `NPCPuppet` with an AI component and the character customization controllers, animating on `woman_base.rig` (read with REDbridge). The copy is spawned by record with no workspot component and dressed with preview copies of V's clothes, as #47's spike did. Then it is directed through a device (section 4) and walked (section 1) |
+
+**Why the cutscene copy** (unverified until the test): the photo mode puppet is an `NPCPuppet` too, so the crash did not come from a second player. Three other things set it apart:
+
+- It carries photo mode's own component, `PhotoModePlayerEntityComponent`, which sets itself up from photo mode's state.
+- It was spawned by its template alone, with no character record.
+- A workspot component was added to it.
+
+The cutscene copy has none of the three: it has its own record, and the workspot sits on a device.
+
+**Check:** scratchpad `sc1/stand/check.mjs` (41 checks, plain Node against a stand-in `rednode` that walks people toward a move command's target). It covers each button, the command's fields, the hold cancelled and given back, the marker, the gap's order, the moves, the device at the person's feet, the game's people, the copy for V's body, and a man V refusing a woman nearby.
+
+### SC1 test
+
+On the dev PC, game 2.5 with Codeware. Press F10 for the mouse to press a button, and F10 again to play. **Save before step 12:** spawning a copy of V crashed the game in #47's test, by another route. If anything sticks, press **Remove everything**; if that does not help, load the save.
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | Load a save outdoors on a quiet sidewalk with open ground, a parked car or bench near, and people about. In the Mod Manager, switch on **Scene spike (SC1)**'s **Allowed** switches for `bridge` and `archives`, then switch the app on in the launcher. Press **Write the workspots** | The log lists one workspot (a masculine V) or two (a feminine V), each with `stand` and `crossed`, swapped in |
+| 2 | Stand where a mark should be and press **Set the target here**. Walk about 10 m away, with the car or bench between you and the pin if you can. Press **Spawn the walker**, then **Walk to the target** | A Target pin, and the paramedic walks to it. Say whether he walks (feet moving) or slides, whether he goes round the car, and where he stops. The log has his state each second and where he stopped |
+| 3 | Walk away again. Set **Pace** to Run and **Stop short by** to 0.1 m. **Spawn the walker**, **Walk to the target** | Say whether he runs and how close he stops |
+| 4 | Walk away so the car is between you and the pin. Switch on **A straight line**, **Spawn the walker**, **Walk to the target** | Say whether he walks through the car, stops at it, or goes round it anyway |
+| 5 | Switch **A straight line** off, set **Pace** to Walk and **Stop short by** to 0.5 m. Switch on **Face V at the end** and **Target a marker entity**, walk away, **Spawn the walker**, **Walk to the target** | Say whether he turns to face V at the end, and whether the marker target works as the place did |
+| 6 | Switch both off. Stand about 6 m from the pin. **Spawn the walker**, **Play the workspot here**, then **crossed** | He stands, then crosses his arms |
+| 7 | **Stop, walk there, play there** | He leaves the workspot, walks to the pin and stands there again. Say whether there is a T pose or a pause, and whether he stands at the pin or snaps back. The log has the gaps in ms |
+| 8 | **Play the workspot here**, then **Walk while in the workspot** | Say whether he leaves the workspot to walk, or stays put |
+| 9 | Walk up close. **Play the workspot here**, then in turn **A step aside**, **A quarter turn**, **A 2 s drag**, **The game's teleport** | For each, say whether he moved, kept playing (standing or arms crossed), slid back, or left the workspot |
+| 10 | **Spawn a plain person**, **Direct the plain person**, then **Directed: crossed**, **Directed: stand**, **Directed: stop** | A second paramedic, directed with no workspot of his own. Say whether he plays each clip, and what he does after the stop |
+| 11 | Walk to a street with people. **Direct the nearest of the game's people**, **Directed: crossed**, **Directed: stop** | Say who was picked, whether they play it, and what they do after |
+| 12 | **Save the game.** Back on open ground, set **Copy** to The cutscene copy and press **Spawn the copy** | A copy of V 2.5 m in front, facing V. Say whether its face, hair and body are V's, or whether the game crashed |
+| 13 | **Dress the copy** | Say whether it wears what V wears. The log lists each item |
+| 14 | **Direct the copy**, **Directed: crossed**, **Directed: stop** | Say whether the copy plays the clips |
+| 15 | **Set the target here**, walk 8 m away, **Walk the copy to the target** | Say whether the copy walks to the pin |
+| 16 | Set **Copy** to The cutscene copy, no impostor, and press **Spawn the copy** | Say whether it looks any different from step 12 |
+| 17 | **Remove everything** | Every spawn and the pin are gone; the game's person from step 11 goes back to their day |

@@ -1268,6 +1268,22 @@ The V actor spike (`apps/actor-spike` 0.2.0) and `game.player.body()`, for EDGEd
 | Stand-in `rednode`, 2026-11-22, 0.70.0, by Claude | **Pass**: 26 checks (scratchpad `v47/stand/check.mjs`): every button against a stand-in that answers as the game would, `PlayInDeviceSimple`'s arguments, the device facing V's way and the copy facing V, the dropdown and switches changing the next call, the hidden item left off the copy, the written workspots on the right rig for a `wa` V, jumps by entry id on V and by name on the copy, Give V back |
 | Game 2.5, dev PC, 2026-11-23, REDnode 0.70.0, spike 0.2.1 | **Partly run.** 0.2.0's device template is not in 2.5 (fixed in 0.2.1, copied into the game during the run). The real V played the game's player workspots in first person (the dance, over 10 s) and took jumps between entries; NPC clips put V in a T pose in third person and broke the first person camera; Third person on flips the camera with or without a workspot. **Spawn the copy crashed the game** (the photo mode puppet spawned as a plain entity; no REDnode frame on the stack), so the copy's steps were not run. Results: [docs/world.md, "#47 test: results"](world.md#47-test-results) |
 
+## The scene spike (SC1)
+
+The Scene spike (`apps/scene-spike` 0.1.0, on REDnode 0.73.1), for EDGEdir's #50 part 2, #48 part 2 and the copy of V left open by #47:
+- a spawned person walked to a target with the game's `AIMoveToCommand`;
+- the gaps between a workspot, a walk and a workspot;
+- `world.move` on a person playing a written workspot;
+- a workspot played on someone who does not carry it, through a device at their feet;
+- the game's cutscene copy of V (`Character.TPP_Player_Cutscene_*`), dressed, directed and walked.
+
+Steps: [docs/world.md, "SC1 test"](world.md#sc1-test).
+
+| Run | Result |
+|---|---|
+| Stand-in `rednode`, 2026-11-25, 0.73.1, by Claude | **Pass**: 41 checks (scratchpad `sc1/stand/check.mjs`): every button against a stand-in that walks people toward the move command's target, the command's fields in fixed point, the hold cancelled before a walk and given back after, the marker target, the gap's order, the moves and the drag, the device at the person's feet, the game's nearest person, the cutscene copy for V's body, a man V refusing a woman nearby |
+| Game 2.5, dev PC | **Not run** |
+
 ## The cursor in a windowed game (#56, 0.70.0)
 
 The overlay's cursor follows the Windows pointer while the game is in a window smaller than its screen and does not clip the pointer. Steps and what each should show: [docs/overlay.md, "The cursor in a windowed game: test"](overlay.md#the-cursor-in-a-windowed-game-test-0700).
