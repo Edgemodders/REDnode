@@ -322,6 +322,13 @@ $('clickhide').addEventListener('change', async (e) => {
   RednodeUI.notify(on ? 'A click in the game hides REDnode; F10 brings it back' : 'A click in the game leaves windows pinned to the HUD', { title: 'Hide on a click in the game' });
 });
 
+// Load modded saves without the mod check (0.75.0): off by default.
+$('plainmodded').addEventListener('change', async (e) => {
+  const on = await window.rednode.apps.plainModdedLoad(e.detail.checked);
+  $('plainmodded').checked = on;
+  RednodeUI.notify(on ? 'Saves made with mods load with no Mod Verification popup' : 'Saves made with mods go through the game\'s mod check again', { title: 'Load modded saves' });
+});
+
 // Tooltips: the UI kit's, in every window. Off for players who know REDnode.
 $('tips').addEventListener('change', async (e) => {
   const on = await window.rednode.apps.tooltips(e.detail.checked);
@@ -367,6 +374,7 @@ async function refresh() {
     $('versions').checked = await window.rednode.apps.titleVersions();
     $('pausehide').checked = await window.rednode.apps.hidePauseMenu();
     $('clickhide').checked = await window.rednode.apps.hideOnClickAway();
+    $('plainmodded').checked = await window.rednode.apps.plainModdedLoad();
     const state = await window.rednode.state();
     $('version').textContent = `Version ${state.version}`;
     // Solo mode: which package has the screen, and a way out.

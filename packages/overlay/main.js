@@ -1100,6 +1100,15 @@ function sendClickAway() {
   if (connected) sendJson({ cmd: 'overlay.clickAway', hide: settings.hideOnClickAway === true });
 }
 
+// Load modded saves without the mod check (0.75.0, the launcher's switch, settings.plainModdedLoad,
+// off by default): game 2.5 sends a save made with mods through its mod check and the "Mod
+// Verification" popup. REDnodeModdedSaves.reds makes the load menu and the title screen's Continue
+// treat it as unmodded while the plugin says the switch is on; the host tells it at each hello and
+// when the switch changes.
+function sendPlainModdedLoad() {
+  if (connected) sendJson({ cmd: 'saves.plainModded', on: settings.plainModdedLoad === true });
+}
+
 // The plugin's mode changed while the pause menu hid the overlay: the host's own hide, or the
 // player's F10 (then the pause menu's close leaves the overlay as the player put it).
 function pauseOnMode(next) {
@@ -1969,6 +1978,7 @@ function onGameMessage(m) {
         endKeyView('the game said hello');
         sendAppKeys();
         sendClickAway();
+        sendPlainModdedLoad();
       } else {
         pauseOnMode(mode);
         appKeysOnMode(mode);
@@ -5991,6 +6001,18 @@ ipcMain.handle('rednode:host:hide-on-click-away', (event, on) => {
     sendClickAway();
   }
   return settings.hideOnClickAway === true;
+});
+
+// Load modded saves without the mod check (0.75.0): off by default; the launcher's switch.
+ipcMain.handle('rednode:host:plain-modded-load', (event, on) => {
+  fromLauncher(event);
+  if (typeof on === 'boolean' && on !== (settings.plainModdedLoad === true)) {
+    settings.plainModdedLoad = on;
+    writeJson('settings.json', settings);
+    log(`Load modded saves without the mod check: ${on ? 'on' : 'off'}`);
+    sendPlainModdedLoad();
+  }
+  return settings.plainModdedLoad === true;
 });
 
 // Tooltips (the UI kit's, for title attributes): on by default; the launcher's switch

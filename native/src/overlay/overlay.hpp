@@ -159,8 +159,10 @@ void CursorFrame(bool aDrawn);        // each present: counts for the cursor dia
 bool CursorAway();                    // following the Windows pointer, which is outside the game's window (#56): not drawn
 void ResendGameWindow();              // {"event":"game-window"} again, for a host that just connected
 // Host commands for input: {"cmd":"keys.bind",...} (apps' keys), {"cmd":"overlay.mode",...} and
-// {"cmd":"overlay.clickAway","hide":true}. True when the message was one of them.
+// {"cmd":"overlay.clickAway","hide":true}, and {"cmd":"saves.plainModded","on":true}. True when the
+// message was one of them.
 bool HandleInputCommand(const std::string& aJson);
+bool PlainModdedLoad(); // the launcher's Load modded saves without the mod check, for REDnodeSaves.reds
 bool ClickAwayHides(); // a press on empty screen leaves interactive mode for hidden, not passive
 
 // gamestate.cpp: what the game is showing, for hideWith. Bits of GetUiState().

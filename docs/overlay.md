@@ -1036,6 +1036,34 @@ Asked for by the owner on 2026-11-21. In interactive mode a click on empty scree
 
 **Passed in game on 2026-11-21** on the dev PC (REDnode 0.69.0, all six steps; docs/testing.md has the log lines).
 
+### Load modded saves without the mod check (0.75.0)
+
+Asked for by the owner on 2026-11-26, during the Saves spike's test. Game 2.5 marks a save made with mods as modded, and loading one goes through `LoadModdedSave()`, the game's mod check with its **Mod Verification** popup. The owner plays with a mod that skips it (Remove Mods Menu, Nexus 35686, no licence given, so REDnode's version is written from the game's own scripts and none of its code). The launcher's Settings drawer has **Load modded saves without the mod check**, off by default (`settings.plainModdedLoad`).
+
+The game's load paths branch on two marks. The load menu (title screen and pause menu) asks each entry's `LoadListItem.IsModded()`. The title screen's Continue (`SingleplayerMenuGameController.HandleMenuItemActivate`, `QuickLoad`) asks `m_isModded`, set from the latest save's details, and calls `LoadModdedSave(0)` for a modded save, `LoadLastCheckpoint(false)` otherwise. With the switch on, both answer not modded.
+
+| Part | Where |
+|---|---|
+| Scripts | `native/scripts/REDnodeModdedSaves.reds`: `@wrapMethod` of `LoadListItem.IsModded` and of `SingleplayerMenuGameController.HandleMenuItemActivate` (clears `m_isModded` first). Wraps only: another mod may replace the same methods, and two `@replaceMethod`s of one method are a compile error that stops every script. Compiled with 0 errors alone, beside Codeware, beside Codeware and Remove Mods Menu, and with the game's scc.exe (scratchpad `modded/check.ps1`) |
+| The plugin | The global `REDnode_PlainModdedLoad() -> Bool` (main.cpp), from `{"cmd":"saves.plainModded","on":true}` (input.cpp). The scripts read it when the player loads, not when a menu opens, so a menu opened before the host connected still follows the switch |
+| The host | `sendPlainModdedLoad` in main.js at each hello and when the switch changes; IPC `rednode:host:plain-modded-load` |
+| The launcher | The **Load modded saves without the mod check** switch (`plainmodded`) |
+
+Not covered: the title screen's start-up check of outdated mod.io mods (`CheckUserOutdatedMods`, native, called from the menu's `OnInitialize`; skipping it means replacing the whole function).
+
+### Load modded saves: test
+
+Start with the switch off. To see the game's own check, switch **Remove Mods Menu** off in EDGEdeck and deploy first; with it on, steps 1 and 2 show no popup either.
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | At the title screen, press **Continue** | With Remove Mods Menu off: the game's Mod Verification popup. Cancel it |
+| 2 | F10, launcher, Settings: switch **Load modded saves without the mod check** on. F10 to close. Press **Continue** | The last save loads with no popup. The plugin log says `Saves: modded saves load without the mod check` |
+| 3 | Exit to the main menu, open **Load Game**, load an older save | It loads with no popup |
+| 4 | In the game, pause menu, **Load Game**, load another save | It loads with no popup |
+| 5 | Close the game, start it again, press **Continue** | Still on: no popup. Switch it off to leave the game's check as it was |
+| 6 | With Remove Mods Menu on again, start the game | The game starts, no script errors in `r6/logs/redscript_rCURRENT.log`, and loads still show no popup |
+
 ### Tooltips on ui controls (#55, 0.70.0)
 
 Asked for by REDcode's Animation Tools pack on 2026-11-22 ([#55](https://github.com/Edgemodders/REDnode/issues/55)): its **Generate** button is disabled for about a minute while Uthana makes a clip, and the owner wanted it to say so. `tip` on `ui.button`, `ui.toggle`, `ui.slider`, `ui.input` and `ui.select` is a tooltip, and `set({ tip })` changes or clears it. It is the control's `title`, which the UI kit already draws in the page (Chromium's own tooltips never show in offscreen windows). A disabled `rn-button` still gets pointer moves, so its tip shows too.

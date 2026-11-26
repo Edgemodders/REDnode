@@ -79,6 +79,21 @@ void REDnode_Ping(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, 
     }
 }
 
+// redscript: public static native func REDnode_PlainModdedLoad() -> Bool
+// The launcher's Load modded saves without the mod check (0.75.0), as the host last sent it.
+void REDnode_PlainModdedLoad(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4)
+{
+    RED4EXT_UNUSED_PARAMETER(aContext);
+    RED4EXT_UNUSED_PARAMETER(a4);
+
+    aFrame->code++; // skip ParamEnd
+
+    if (aOut)
+    {
+        *static_cast<bool*>(aOut) = rednode::overlay::detail::PlainModdedLoad();
+    }
+}
+
 // redscript: public static native func REDnode_Emit(name: String, value: Int32) -> Void
 // Queues an event and returns at once. The script never waits on the pump.
 void REDnode_Emit(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4)
@@ -152,6 +167,11 @@ void PostRegisterTypes()
     ping->AddParam("Int32", "value");
     ping->SetReturnType("Int32");
     rtti->RegisterFunction(ping);
+
+    auto plainModded = RED4ext::CGlobalFunction::Create("REDnode_PlainModdedLoad", "REDnode_PlainModdedLoad", &REDnode_PlainModdedLoad);
+    plainModded->flags = flags;
+    plainModded->SetReturnType("Bool");
+    rtti->RegisterFunction(plainModded);
 
     auto emit = RED4ext::CGlobalFunction::Create("REDnode_Emit", "REDnode_Emit", &REDnode_Emit);
     emit->flags = flags;

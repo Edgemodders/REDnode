@@ -110,6 +110,8 @@ contextBridge.exposeInMainWorld('rednode', {
     hidePauseMenu: (on) => ipcRenderer.invoke('rednode:host:hide-pause-menu', on),
     /** Gets Hide on a click in the game, or turns it on or off (off by default; 0.69.0). */
     hideOnClickAway: (on) => ipcRenderer.invoke('rednode:host:hide-on-click-away', on),
+    /** Gets Load modded saves without the mod check, or turns it on or off (off by default; 0.75.0). */
+    plainModdedLoad: (on) => ipcRenderer.invoke('rednode:host:plain-modded-load', on),
     /** Gets Versions in title bars, or turns it on or off for every window (on by default; 0.68.2). */
     titleVersions: (on) => ipcRenderer.invoke('rednode:host:title-versions', on),
     /** Gets REDbridge, and .NET 10 for this Windows user if missing (W3). Progress arrives with the apps list. */

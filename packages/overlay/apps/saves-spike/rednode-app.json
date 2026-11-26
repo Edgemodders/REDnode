@@ -1,7 +1,7 @@
 {
   "id": "saves-spike",
   "name": "Saves spike (#57)",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Edgemodders",
   "description": "The spike for REDcode's tests run by an assistant (#57 step 1): reaches the game's system requests handler, lists the game's saves with REDnode's saves listener, and loads one, or the last checkpoint, from the main menu or a loaded game, logging the time until V is in the world.",
   "main": "mod.mjs",

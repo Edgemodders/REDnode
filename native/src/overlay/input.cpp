@@ -48,6 +48,10 @@ bool g_appKeyChar = false;        // window thread only: the character a pressed
 // interactive mode goes to hidden mode instead of passive. {"cmd":"overlay.clickAway","hide":true}
 std::atomic_bool g_clickAwayHides{false};
 
+// Load modded saves without the mod check (0.75.0, the launcher's switch, off by default): the
+// scripts in REDnodeSaves.reds read it when a save is loaded. {"cmd":"saves.plainModded","on":true}
+std::atomic_bool g_plainModdedLoad{false};
+
 uint8_t HeldMods()
 {
     uint8_t mods = 0;
@@ -693,8 +697,20 @@ bool ClickAwayHides()
     return g_clickAwayHides.load();
 }
 
+bool PlainModdedLoad()
+{
+    return g_plainModdedLoad.load();
+}
+
 bool HandleInputCommand(const std::string& aJson)
 {
+    if (aJson.find("\"cmd\":\"saves.plainModded\"") != std::string::npos)
+    {
+        const bool on = aJson.find("\"on\":true") != std::string::npos;
+        if (g_plainModdedLoad.exchange(on) != on)
+            Log("Saves: modded saves load %s", on ? "without the mod check" : "with the game's mod check");
+        return true;
+    }
     if (aJson.find("\"cmd\":\"overlay.clickAway\"") != std::string::npos)
     {
         const bool hide = aJson.find("\"hide\":true") != std::string::npos;

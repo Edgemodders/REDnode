@@ -15,6 +15,7 @@ How to keep it:
 ### New
 
 - **Scene format 3** ([#51](https://github.com/Edgemodders/REDnode/issues/51)): `world.load` and MCP's `world_load` read EDGEbuilder's scene format 3, the scenes that remove the game's own objects. The objects load as before; the world edits are not applied yet, and the answer's `notes` say how many were left out, of which kinds.
+- **Load modded saves without the mod check**, a switch in the launcher's Settings (off by default): game 2.5 sends a save made with mods through its mod check and a Mod Verification popup; with the switch on, the title screen's Continue and the Load menu load it as they load any other save. It works beside other mods that change the same check, such as Remove Mods Menu.
 
 ## 0.73.1 (2026-11-25)
 

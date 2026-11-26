@@ -1362,6 +1362,15 @@ The overlay's cursor follows the Windows pointer while the game is in a window s
 | Dev and packaged host, stand-in plugin, 2026-11-21, 0.70.0, by Claude | **Pass**: 25 checks (scratchpad `wl/run.sh`, `MOCK_HOST_EXE` for the packaged host): the Editor request window names the tool and package in its own words, Allow lets the call through with `service.caller()` `{ editor, name: "editor:EDGEdir" }`, a second call asks nothing, another package asks again and Deny holds, Try Live asks on its own; every refusal in words; a 150 KB cue sheet; the 30 s cap; Drop a pin here with V facing +X writes `yaw: -90` |
 | Game 2.5, dev PC, 2026-11-23, REDnode 0.70.0 | **Pass**, all 8 steps, Claude driving the calls from VS Code. Steps 2 to 4: the Editor request window asked for REDnode test, Allow gave the count 1 after 8 s; `get` came back in 24 ms with no window; Deny test asked again and Deny answered 403 "The player denied Deny test calls to Counter service for this session". Step 5: `kinds: ["npc"]` spawned the two people standing still and skipped the box as `not in kinds`. Step 6: the same name with `skip: ["person-left"]` replaced the first load: the box and the right-hand person, `person-left` skipped by id, `world_spawned` listing only those two. Step 7: unload removed 2. Step 8: Drop a pin here wrote `yaw` -4.4 and 82 (86 degrees apart, a quarter turn), the first pin exactly at V's position, every pin with an `id`, the set at version 1. Claude Code's connection to the game's MCP server had failed at the session's start (the game was not running) and came back with /mcp Reconnect |
 
+## Load modded saves without the mod check (0.75.0)
+
+The launcher's switch that loads saves made with mods with no Mod Verification popup. Steps: [docs/overlay.md, "Load modded saves: test"](overlay.md#load-modded-saves-test).
+
+| Run | Result |
+|---|---|
+| Script compiles, 2026-11-26, 0.75.0, by Claude | **Pass**: 0 errors in REDnode's scripts with redscript-cli alone, beside Codeware, and beside Codeware and Remove Mods Menu (Remove Mods Menu replaces `LoadListItem.IsModded`, REDnode wraps it); the game's scc.exe beside both, 0 errors (scratchpad `modded/check.ps1`). The plugin builds and its unit tests pass |
+| Game 2.5, dev PC | Not run |
+
 ## Hide on a click in the game (0.69.0)
 
 The launcher's switch that makes a click outside REDnode's windows hide the whole overlay, not leave windows pinned to the HUD. Steps: [docs/overlay.md, "Hide on a click in the game (0.69.0)"](overlay.md#hide-on-a-click-in-the-game-0690).

@@ -108,9 +108,12 @@ game.onState((s) => {
 let listStarted = 0;
 async function listSaves() {
   const h = await handler();
-  if (!listener) listener = await api.$new('REDnodeSavesListener');
+  // A fresh listener each time: REDnode drops game objects when a save loads, so one made
+  // at the main menu is gone in the game (found in the spike's first run, step 4).
+  const old = listener;
+  listener = await api.$new('REDnodeSavesListener');
   for (const [event, fn] of [['OnSavesForLoadReady', 'OnSavesForLoadReady'], ['OnSaveMetadataReady', 'OnSaveMetadataReady']]) {
-    await h.UnregisterFromCallback(event, listener, fn).catch(() => undefined);
+    if (old) await h.UnregisterFromCallback(event, old, fn).catch(() => undefined);
     await h.RegisterToCallback(event, listener, fn);
   }
   names = [];
@@ -183,4 +186,4 @@ ui.window({
     log,
   ],
 });
-say('Saves spike 0.1.0 ready');
+say('Saves spike 0.1.1 ready');
