@@ -2637,6 +2637,17 @@ On the dev PC, game 2.5 with Codeware. Press F10 for the mouse to press a button
 
 Steps 3 to 5, 7, 8 and 15 walk a person and wait for 0.76.2; steps 10 to 14, 16 and 17 are still to run.
 
+**Third run, same day** (REDnode 0.76.2, Scene spike 0.1.2, `Character.CitizenRichMale`), steps 2 to 5:
+
+| Step | Result |
+|---|---|
+| 2 | Passed: he walked (feet moving) to the pin, 10.8 m in 8.1 s, top speed 2.0 m/s, first step 136 ms after the command, `Success`. He stopped 0.00 m from it though 0.5 m short was asked: with a place as the target, `desiredDistanceFromTarget` is not used (unverified beyond these runs) |
+| 3 | `Run` still walked: 15.6 m in 12.1 s, top 1.9 m/s, first step 574 ms; stopped 0.00 m (0.1 asked). The game's handler passes Run on (Sprint only in combat), so a relaxed person likely walks whatever is asked (unverified: how to make one run outside combat) |
+| 4 | `ignoreNavigation` did not walk a straight line: he went round the car and round people nearby, 31.3 m in 21.6 s, stopped at the pin. So it does not turn off avoidance, or is not what keeps him on the navmesh (unverified which) |
+| 5 | The marker entity target works (set through `SetEntity`, so 0.76.2's entity path is good): he stopped 0.50 m from it, as asked, so `desiredDistanceFromTarget` is used for an entity target. With **Face V** on he walked backwards to the pin: `rotateEntityTowardsFacingTarget` keeps him facing V for the whole walk, not only at the end. 15.9 m in 13.7 s, top 1.4 m/s |
+
+For EDGEdir (#50): a walk to a mark works; give the mark as an entity to stop short of it; a "face V at the end" needs a turn after the walk, not the facing target.
+
 ## Scene format 3 read (#51 step 1; 0.74.0)
 
 EDGEbuilder writes scene format 3 for a scene that changes the game's own world: format 2's objects, unchanged, plus a `worldEdits` list (its [scene format](https://edgemodders.github.io/EDGEbuilder/scene.html#format-3-draft-world-edits), a draft until EDGEbuilder pins it). REDnode's reader refused format 3 before (`scene format 3 is newer than REDnode reads (1 and 2)`). Built on 2026-11-25 in REDnode 0.74.0, step 1 of #51 as asked:
