@@ -25,8 +25,15 @@
 
 import { api, game, ui, world } from 'rednode';
 
-const WALKER = 'Character.trauma_team_paramedic'; // a man: the male clips below
-const PLAIN = 'Character.trauma_team_paramedic';
+// The walker and the plain person are men: the male clips below. In 0.1.0's first run (2026-11-27)
+// the Trauma Team paramedic left the world half a second after his hold was cancelled for a walk,
+// so 0.1.1 starts with a plain citizen and keeps the paramedic as a choice.
+const PEOPLE = [
+  ['Character.CitizenRichMale', 'A citizen (CitizenRichMale)'],
+  ['Character.trauma_team_paramedic', 'The Trauma Team paramedic'],
+];
+let WALKER = PEOPLE[0][0];
+let PLAIN = PEOPLE[0][0];
 // A bare gameObject with no components, from the game's own files (as #47's spike, 0.2.1).
 const EMPTY = 'base\\quest\\minor_quests\\mq061\\entities\\mq061_empty_entity.ent';
 const COMPONENT = 'rednode_workspot'; // the name world.spawn gives the workspot component
@@ -184,7 +191,7 @@ const spawnWalker = () =>
     const place = await inFront(3, 0);
     const { id, position } = await world.spawn({ record: WALKER, ...place, workspot: w.path, npc: { hold: true } });
     walker = { id };
-    return `${id.hash} at ${position ? fmt(position) : 'a place not read'}, holding, carrying ${w.path}`;
+    return `${WALKER}, ${id.hash} at ${position ? fmt(position) : 'a place not read'}, holding, carrying ${w.path}`;
   });
 
 // The AI component's command state, as the game names it (Executing, Success, Failure, ...).
@@ -250,7 +257,11 @@ async function walkTo(person, label, { cancelHold = true } = {}) {
     if (!walk || walk.cmd !== cmd) return { cancelled: true };
     const now = performance.now();
     const p = await placeOf(person).catch(() => null);
-    if (!p) return { lost: true };
+    if (!p) {
+      say(`  ${((now - t0) / 1000).toFixed(1)} s: the ${label} is gone from the world (last command state ${state || 'not read'})`);
+      walk = null;
+      return { lost: true };
+    }
     const s = await commandState(ai, cmd);
     const speed = flat(p, last) / ((now - lastAt) / 1000);
     peak = Math.max(peak, speed);
@@ -588,6 +599,7 @@ ui.window({
     status,
     ui.row(ui.button('Write the workspots', writeAll), ui.button('Remove everything', removeAll, { variant: 'ghost' })),
     ui.heading('1. A walk (#50)'),
+    ui.select('Walker and plain person', opt(PEOPLE), { value: WALKER, onChange: (v) => (WALKER = PLAIN = v) }),
     ui.row(
       ui.select('Pace', opt([['Walk', 'Walk'], ['Run', 'Run'], ['Sprint', 'Sprint']]), { value: movement, onChange: (v) => (movement = v) }),
       ui.select('Stop short by', opt([['0.1', '0.1 m'], ['0.5', '0.5 m'], ['1', '1 m'], ['2', '2 m']]), { value: String(stopAt), onChange: (v) => (stopAt = Number(v)) }),

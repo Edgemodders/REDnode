@@ -1,7 +1,7 @@
 {
   "id": "scene-spike",
   "name": "Scene spike (SC1)",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Edgemodders",
   "description": "The scene spike for EDGEdir (#50, #48, #47): walks a spawned person to a target with the game's AI move command and times the gaps between a workspot, a walk and a workspot; moves a person while they play a written workspot; plays a workspot on a person who does not carry it through a device at their feet, on a plain person and on one of the game's own; and spawns the game's cutscene copy of V, dresses it, directs it and walks it. Asks for the bridge and archives permissions, to write its workspots.",
   "main": "mod.mjs",
