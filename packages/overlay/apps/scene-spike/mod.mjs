@@ -258,7 +258,7 @@ async function walkTo(person, label, { cancelHold = true } = {}) {
     const now = performance.now();
     const p = await placeOf(person).catch(() => null);
     if (!p) {
-      say(`  ${((now - t0) / 1000).toFixed(1)} s: the ${label} is gone from the world (last command state ${state || 'not read'})`);
+      say(`  ${((now - t0) / 1000).toFixed(1)} s: ${label} is gone from the world (last command state ${state || 'not read'})`);
       walk = null;
       return { lost: true };
     }
@@ -421,6 +421,38 @@ const dragStep = () =>
     say(`  in the workspot before: ${was}; ${n} moves in 2 s (${(n / 2).toFixed(0)} a second), ${fails} answered false`);
     await afterMove(e, 'after', aimed);
     return 'say whether the walker slid smoothly, jumped, or left the workspot';
+  });
+
+// Added in 0.1.2 after SC1's second run, where nothing moved a person playing a workspot: stop the
+// workspot, move a step aside with a quarter turn, play it again, and see whether the move holds.
+const stopMovePlay = () =>
+  step('Stop, move, play again', async () => {
+    const e = await entityOf(walker, 'walker');
+    if (!(await inWorkspot(e))) throw new Error('the walker is not in the workspot: press Play the workspot here first');
+    const p = await walkerPlace(e);
+    const f = await e.GetWorldForward();
+    const aimed = { position: { x: p.position.x + f.Y * 1, y: p.position.y - f.X * 1, z: p.position.z }, yaw: p.yaw + 90 };
+    const t0 = performance.now();
+    await world.stopWorkspot(walker.id, { fast: fastExit });
+    while (performance.now() - t0 < 10000 && (await inWorkspot(e))) await wait(50);
+    const out = performance.now() - t0;
+    const ok = await world.move(walker.id, aimed.position, undefined, aimed.yaw);
+    const moved = performance.now() - t0;
+    const near = async () => {
+      const q = await placeOf(await world.entity(walker.id));
+      const g = await (await world.entity(walker.id)).GetWorldForward();
+      return `${flat(q, aimed.position).toFixed(2)} m from the aim, yaw ${yawOf(g).toFixed(0)} (aimed ${aimed.yaw.toFixed(0)})`;
+    };
+    await wait(300);
+    say(`  out of the workspot after ${out.toFixed(0)} ms (${fastExit ? 'fast exit' : "the game's own stop"}); world.move answered ${ok}; 0.3 s later ${await near()}`);
+    const t1 = performance.now();
+    const u = await world.useWorkspot(walker.id, { waitMs: 5000 });
+    walker.id = u.id;
+    const back = performance.now() - t1;
+    say(`  ${u.started ? `in the workspot again after ${back.toFixed(0)} ms` : `not started: ${u.why}`}; then ${await near()}`);
+    await wait(2000);
+    say(`  2 s later: ${await near()}, in workspot ${await inWorkspot(await world.entity(walker.id))}`);
+    return `stop ${out.toFixed(0)} ms, move at ${moved.toFixed(0)} ms, play ${back.toFixed(0)} ms. Say whether he ends a step aside and turned, and whether there was a T pose or a pause`;
   });
 
 // ---- 4. Directing a person through a device ----------------------------------------------
@@ -625,6 +657,7 @@ ui.window({
       ui.button('A 2 s drag', dragStep),
       ui.button("The game's teleport", teleportStep, { variant: 'ghost' }),
     ),
+    ui.row(ui.button('Stop, move, play again', stopMovePlay)),
     ui.heading('4. A person without the workspot (#48)'),
     ui.row(ui.button('Spawn a plain person', spawnPlain), ui.button('Direct the plain person', directPlain), ui.button("Direct the nearest of the game's people", directNearest)),
     ui.row(
@@ -638,4 +671,4 @@ ui.window({
     log,
   ],
 });
-say('Scene spike 0.1.0 ready');
+say('Scene spike 0.1.2 ready');
