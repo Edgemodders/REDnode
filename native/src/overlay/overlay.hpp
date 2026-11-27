@@ -392,6 +392,15 @@ bool ReadGroups(const json::Value* aGroups, std::vector<std::string>& aOut, std:
 // One cast per group, the hit nearest aFrom winning; aGroup names it.
 bool RaycastGroups(const float aFrom[3], const float aTo[3], const std::vector<std::string>& aGroups, bool& aHit,
                    float aPoint[3], std::string& aGroup);
+// bones.cpp (#62): an animated component's live pose, on the game thread. Appends one component's
+// answer fields (no braces) to aOut: "object", "lod", "parts", "count", "bones".
+struct BonesWanted
+{
+    bool local = true;
+    bool model = false;
+    std::vector<uint64_t> names; // CName hashes; empty: every bone
+};
+bool ReadBones(void* aComponent, const BonesWanted& aWanted, std::string& aOut, std::string& aError);
 // overlay.cpp
 const RED4ext::v1::Sdk* GetSdk();
 RED4ext::v1::PluginHandle GetHandle();

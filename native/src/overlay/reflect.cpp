@@ -1927,6 +1927,142 @@ std::string WorldFiles(const Value& aParams, std::string& aError)
     return out + "}";
 }
 
+// #62: the live pose of an entity's animated components (bones.cpp reads it).
+//   world.bones {"self":{"$ref":n}} or {"id":"<entity id hash>"},
+//               "components":["root","deformations"]?, "bones":["pelvis", ...]?, "space":"local"|"model"|"both"
+//     -> {"ms":t, "components":[{"name","rig":"0x...", "object","lod","parts","count","bones":[...]}
+//                               | {"name","rig","error"}]}
+Handle<IScriptable> EntityOf(const Value& aParams, std::string& aError)
+{
+    const Value* self = aParams.Get("self");
+    const Value* id = aParams.Get("id");
+    Handle<IScriptable> entity;
+    if (self)
+        return FromRef(*self, aError);
+    if (id && (id->kind == Value::Kind::String || id->kind == Value::Kind::Number))
+    {
+        Value hash;
+        hash.kind = Value::Kind::Object;
+        hash.fields.emplace_back("hash", id->kind == Value::Kind::String ? Text(id->text) : *id);
+        Value args = NullArgs(1);
+        args.items.push_back(std::move(hash));
+        Handle<IScriptable> none;
+        if (CallNative(none, "ScriptGameInstance", "FindEntityByID", args, &entity, aError) && !entity)
+            aError = "no entity with that id is in the world";
+        return entity;
+    }
+    aError = "self (an entity) or id (an entity id hash) is required";
+    return {};
+}
+
+bool NameList(const Value* aList, std::vector<uint64_t>& aOut, const char* aWhat, std::string& aError)
+{
+    if (!aList || aList->IsNull())
+        return true;
+    if (aList->kind != Value::Kind::Array)
+    {
+        aError = std::string(aWhat) + " must be an array of names";
+        return false;
+    }
+    for (const Value& v : aList->items)
+    {
+        if (v.kind != Value::Kind::String)
+        {
+            aError = std::string(aWhat) + " must be an array of names";
+            return false;
+        }
+        aOut.push_back(CName(v.text.c_str()).hash);
+    }
+    return true;
+}
+
+std::string WorldBones(const Value& aParams, std::string& aError)
+{
+    const auto started = std::chrono::steady_clock::now();
+    BonesWanted wanted;
+    const Value* space = aParams.Get("space");
+    const std::string spaceText = space && space->kind == Value::Kind::String ? space->text : "local";
+    if (spaceText != "local" && spaceText != "model" && spaceText != "both")
+    {
+        aError = "space must be \"local\", \"model\" or \"both\"";
+        return {};
+    }
+    wanted.local = spaceText != "model";
+    wanted.model = spaceText != "local";
+    std::vector<uint64_t> only;
+    if (!NameList(aParams.Get("bones"), wanted.names, "bones", aError) ||
+        !NameList(aParams.Get("components"), only, "components", aError))
+        return {};
+
+    Handle<IScriptable> entity = EntityOf(aParams, aError);
+    if (!entity)
+        return {};
+    std::unique_ptr<Slot> ret;
+    if (!RunPlain(entity, nullptr, "GetComponents", 0, ret, aError)) // Codeware
+    {
+        aError = "reading an entity's components needs Codeware: " + aError;
+        return {};
+    }
+    const auto kind = ret->type->GetType();
+    if (kind != Kind::Array && kind != Kind::NativeArray)
+    {
+        aError = "GetComponents answered " + TypeName(ret->type);
+        return {};
+    }
+    CClass* animated = CRTTISystem::Get()->GetClass("entAnimatedComponent");
+    if (!animated)
+    {
+        aError = "the game has no entAnimatedComponent class";
+        return {};
+    }
+    const auto* arr = static_cast<const CRTTIBaseArrayType*>(ret->type);
+    const auto inner = arr->GetInnerType()->GetType();
+    const uint32_t n = arr->GetLength(ret->mem);
+    std::string out = "{\"components\":[";
+    int found = 0;
+    for (uint32_t k = 0; k < n; ++k)
+    {
+        void* el = arr->GetElement(ret->mem, k);
+        Handle<IScriptable> component = inner == Kind::Handle ? *static_cast<Handle<IScriptable>*>(el)
+                                        : inner == Kind::WeakHandle ? static_cast<WeakHandle<IScriptable>*>(el)->Lock()
+                                                                    : Handle<IScriptable>{};
+        if (!component || !component->GetType()->IsA(animated))
+            continue;
+        uint64_t name = 0, rig = 0;
+        for (const CClass* c = component->GetType(); c; c = c->parent)
+        {
+            for (const CProperty* p : c->props)
+            {
+                const void* mem = reinterpret_cast<const uint8_t*>(component.GetPtr()) + p->valueOffset;
+                if (p->name == CName("name") && p->type->GetType() == Kind::Name)
+                    name = static_cast<const CName*>(mem)->hash;
+                else if (p->name == CName("rig") && p->type->GetType() == Kind::ResourceReference)
+                    rig = static_cast<const ResourcePath*>(mem)->hash;
+            }
+        }
+        if (!only.empty() && std::find(only.begin(), only.end(), name) == only.end())
+            continue;
+        const char* text = CNamePool::Get(CName(name));
+        out += found++ ? ",{" : "{";
+        out += "\"name\":" + JsonString(text && *text ? text : "") + ",\"rig\":\"" + Hex(rig) + "\",";
+        std::string fields, why;
+        if (ReadBones(component.GetPtr(), wanted, fields, why))
+            out += fields;
+        else
+            out += "\"error\":" + JsonString(why);
+        out += "}";
+    }
+    if (!found)
+    {
+        aError = only.empty() ? "the entity has no animated component" : "the entity has no animated component of those names";
+        return {};
+    }
+    const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+    char tail[48];
+    std::snprintf(tail, sizeof(tail), "],\"ms\":%.2f}", ms);
+    return out + tail;
+}
+
 std::string WorldNear(const Value& aParams, std::string& aError)
 {
     const auto started = std::chrono::steady_clock::now();
@@ -2092,7 +2228,8 @@ bool IsReflectMethod(const std::string& aMethod)
            aMethod == "rtti.set" || aMethod == "tweakdb.get" || aMethod == "tweakdb.record" ||
            aMethod == "tweakdb.records" || aMethod == "tweakdb.set" || aMethod == "tweakdb.clone" ||
            aMethod == "tweakdb.create" || aMethod == "tweakdb.update" || aMethod == "world.near" ||
-           aMethod == "world.files" || aMethod == "world.ray" || aMethod == "loc.text";
+           aMethod == "world.files" || aMethod == "world.ray" || aMethod == "world.bones" ||
+           aMethod == "loc.text";
 }
 
 // #59, #60: a line through the world's collision.
@@ -2170,6 +2307,8 @@ std::string Reflect(const std::string& aMethod, const json::Value& aParams, std:
         return WorldNear(aParams, aError);
     if (aMethod == "world.files")
         return WorldFiles(aParams, aError);
+    if (aMethod == "world.bones")
+        return WorldBones(aParams, aError);
     if (aMethod == "loc.text")
         return LocText(aParams, aError);
     return Release(aParams);

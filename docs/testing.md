@@ -1284,6 +1284,15 @@ Steps: [docs/world.md, "SC1 test"](world.md#sc1-test).
 | Stand-in `rednode`, 2026-11-25, 0.73.1, by Claude | **Pass**: 41 checks (scratchpad `sc1/stand/check.mjs`): every button against a stand-in that walks people toward the move command's target, the command's fields in fixed point, the hold cancelled before a walk and given back after, the marker target, the gap's order, the moves and the drag, the device at the person's feet, the game's nearest person, the cutscene copy for V's body, a man V refusing a woman nearby |
 | Game 2.5, dev PC | **Not run** |
 
+## Bones (#62, 0.76.0)
+
+`world.bones` and MCP `world_bones` read the live pose of an entity's animated components: the body's rig and the deformation helpers, local and model space, from a static reading of 2.5's exe. Steps: [docs/world.md, "Bones test"](world.md#bones-test).
+
+| Run | Result |
+|---|---|
+| Unit test, 2026-11-26, 0.76.0, by Claude | **Pass**: `REDnode_bones_tests` reads the layout from made-up code (and refuses a changed buffer read and a local read outside the code), finds bones in made-up pose parts from either buffer and the identity for a bone no part holds, and checks the QsTransform product; with `REDNODE_GAME_EXE` the model read's pattern matches once in 2.5's exe and every offset of the static reading comes out |
+| Game 2.5, dev PC | **Not run** |
+
 ## Scene format 3 read (#51 step 1, 0.74.0)
 
 `world.load` and MCP `world_load` take EDGEbuilder's scene format 3: its objects load as format 2's, and its `worldEdits` are not applied but counted in `notes`. Steps: [docs/world.md, "Scene format 3: test"](world.md#scene-format-3-test).

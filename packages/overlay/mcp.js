@@ -32,7 +32,7 @@ REDnode runs overlay apps (web pages drawn on top of the game) and Node mods (No
 - game_image: the game's screen as the player sees it, with or without the overlay.
 - tweakdb: TweakDB flats and records, read from the running game.
 - archives_reload: swaps changed archives into the running game (through REDswap, installed with REDnode), for seeing an asset change without a restart. Afterwards what V wears, REDnode's spawns and the game's entities within 30 m of V that use a swapped file show the new version. Archives that change the game's sound paks are swapped with the game paused and its sound index loaded again; a sound that just played may keep its old version until the game loads it again (for a weapon, equip it again).
-- world_near, world_spawned: the entities near V (with the files they use), and what REDnode spawned. world_spawn, world_remove and world_load (EDGEbuilder scene files) place things in the world, and world_animate plays a workspot on a spawned person; they ask first. world_weather reads the weather and its states; world_weather_set sets and holds one, or gives it back to the game's cycle, and asks first.
+- world_near, world_spawned: the entities near V (with the files they use), and what REDnode spawned. world_spawn, world_remove and world_load (EDGEbuilder scene files) place things in the world, and world_animate plays a workspot on a spawned person; they ask first. world_weather reads the weather and its states; world_weather_set sets and holds one, or gives it back to the game's cycle, and asks first. world_bones reads the live pose of an entity's animated components (bone names, parents, local and model-space transforms), read only.
 - world_pin, world_unpin, world_pins: glowing pins with a label, drawn by the overlay (they change nothing in the game, so they do not ask), at a place or following an entity, seen from far away and through walls.
 - api_read, api_call, api_get: live calls into the game. Game objects come back as {"$ref": n, "$type": "..."}; pass {"$ref": n} back as self. Most functions take the game instance first: pass {}. 64-bit numbers are strings. References die when a save loads.
 For a quest: game_facts and game_journal read facts and journal entries; game_facts_set, game_journal_set and game_teleport change the player's save or move V, and ask first.
@@ -550,6 +550,34 @@ function createMcp(host) {
       async ({ radius, files, uses }) => {
         try {
           return text(await host.call('world.near', { radius: radius ?? 15, files: !!files, ...(uses ? { hashes: uses } : {}) }));
+        } catch (err) {
+          return fail(err.message);
+        }
+      },
+    );
+
+    // #62: a body's live pose.
+    mcp.registerTool(
+      'world_bones',
+      {
+        title: 'Bones of an entity',
+        description:
+          'Reads the live pose of an entity\'s animated components (a person has "root" on its body\'s rig and "deformations" for the muscle and ' +
+          'twist helpers): each bone\'s name, parent, and transform as t [x,y,z], r [x,y,z,w], s [x,y,z]. space "local" (the default) is relative ' +
+          'to the parent, as the game holds it; "model" is relative to the component, from the game\'s own read that bone slots use; "both" gives ' +
+          'both. Also the rig\'s path hash and the animated object\'s level of detail. Read only. The id comes from world_spawned, world_spawn or world_near.',
+        inputSchema: {
+          id: z.string().describe('The entity id hash'),
+          components: z.array(z.string()).optional().describe('Only these animated components, by name'),
+          bones: z.array(z.string()).optional().describe('Only these bones, by name'),
+          space: z.enum(['local', 'model', 'both']).optional(),
+        },
+        annotations: READ,
+      },
+      async ({ id, components, bones, space }) => {
+        try {
+          const r = await host.call('world.bones', { id, ...(components ? { components } : {}), ...(bones ? { bones } : {}), space: space ?? 'local' });
+          return text(JSON.stringify({ ...r, at: new Date().toISOString() }));
         } catch (err) {
           return fail(err.message);
         }

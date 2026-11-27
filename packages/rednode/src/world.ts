@@ -167,6 +167,69 @@ export interface EntityFiles {
   files: string[];
 }
 
+/** A bone's transform: translation, rotation quaternion (x, y, z, w) and scale. */
+export interface BoneTransform {
+  t: [number, number, number];
+  r: [number, number, number, number];
+  s: [number, number, number];
+}
+
+/** One bone of an animated component, as {@link world.bones} reads it. */
+export interface Bone {
+  /** Its index in the component's meta rig. */
+  index: number;
+  name: string;
+  /** Its parent's name, or null for a root. */
+  parent: string | null;
+  /** Which of the component's pose parts holds it; -1 when none does, and the game reads it as the identity. */
+  part: number;
+  /** Relative to its parent, as the game holds it (with `space` "local" or "both"). */
+  local?: BoneTransform;
+  /** Relative to the component, from the game's own read that bone slots use (with `space` "model" or "both"). */
+  model?: BoneTransform;
+}
+
+/** One animated component's pose, as {@link world.bones} reads it. */
+export interface ComponentBones {
+  /** The component's name, such as "root" or "deformations". */
+  name: string;
+  /** Its rig's path hash ("0x..."). */
+  rig: string;
+  /** Why it could not be read; the other fields are then missing. */
+  error?: string;
+  /** Where its animated object came from: the component's own cache, or the game's lookup. */
+  object?: "cache" | "lookup";
+  /**
+   * The animated object's level of detail: its camera distance level, the last level and its
+   * distance from the camera. Read at the SDK's offsets for the object, unverified on 2.5.
+   */
+  lod?: { level: number; last: number; distance: number };
+  /** How many bones each pose part holds. */
+  parts?: number[];
+  /** How many bones its meta rig has. */
+  count?: number;
+  bones?: Bone[];
+}
+
+/** What {@link world.bones} answers. */
+export interface BonesRead {
+  components: ComponentBones[];
+  /** How long the read took on the game thread, in milliseconds. */
+  ms: number;
+  /** When the read was answered (Date.now()). */
+  at: number;
+}
+
+/** Options for {@link world.bones}. */
+export interface BonesOptions {
+  /** Only these animated components, by name. Default: every one the entity has. */
+  components?: string[];
+  /** Only these bones, by name. Default: every bone. */
+  bones?: string[];
+  /** "local" (the default), "model", or "both". */
+  space?: "local" | "model" | "both";
+}
+
 /**
  * A node of the world (#24): something a sector placed, a building, a piece of street
  * furniture, a decal, a light, as the world node registry recorded it when its sector loaded.
@@ -1265,6 +1328,31 @@ export const world = {
   async files(entity: GameRef | EntityId | string): Promise<EntityFiles> {
     const self = typeof entity === "object" && "$ref" in entity ? entity : null;
     return (await invoke("world.files", self ? { self } : { id: idOf(entity as EntityId | string).hash })) as EntityFiles;
+  },
+
+  /**
+   * The live pose of an entity's animated components (#62): every bone of each one, its local
+   * transform as the game holds it, and with `space: "model"` or `"both"` its transform
+   * relative to the component from the game's own read (the one bone slots use). A person has
+   * a `root` component on its body's rig and, for the muscle and twist helpers, a
+   * `deformations` component on its deformation rig. Read only, on the game thread; the pose
+   * is the last one the game's animation wrote. Needs Codeware.
+   *
+   * @example
+   * ```ts
+   * const read = await world.bones(id, { components: ["deformations"], space: "both" });
+   * for (const c of read.components) console.log(c.name, c.count, c.bones?.[0]);
+   * ```
+   */
+  async bones(entity: GameRef | EntityId | string, options: BonesOptions = {}): Promise<BonesRead> {
+    const self = typeof entity === "object" && "$ref" in entity ? entity : null;
+    const r = (await invoke("world.bones", {
+      ...(self ? { self } : { id: idOf(entity as EntityId | string).hash }),
+      ...(options.components ? { components: options.components } : {}),
+      ...(options.bones ? { bones: options.bones } : {}),
+      space: options.space ?? "local",
+    })) as Omit<BonesRead, "at">;
+    return { ...r, at: Date.now() };
   },
 
   /**

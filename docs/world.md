@@ -2647,3 +2647,50 @@ With a save loaded, nothing else needed; Claude drives it through MCP. The file 
 | 3 | Claude removes the box (`world_remove`, or the scene unloaded) | The box is gone |
 
 **Passed in game on 2026-11-26** on the dev PC (REDnode 0.75.0, all three steps, Claude driving MCP; docs/testing.md has the answers). Step 2 of #51 (applying the removals) waits for N2.
+
+## Bones (#62; 0.76.0)
+
+REDcode's [#62](https://github.com/Edgemodders/REDnode/issues/62) asks for the live skeleton of a person in the running game, deformation helpers included, to check REDcode's run of a body's deformation graph (`man_base_deformations.animgraph`) against the game's. Game 2.5 has no script call that reads bones: `entAnimatedComponent` has no functions, and `FunctionalTestsGameSystem.GetBoneWorldTransform` is a stub in the retail game that always answers false. Built on 2026-11-26 in REDnode 0.76.0 from a static reading of 2.5's exe.
+
+### Bones: the static reading
+
+A slot bound to a bone (`entSlotComponent.GetSlotTransform`, whose native is at `+0xca2200`) asks the entity's animated component for the bone's model-space transform through one function, "the model read" (`+0xbf1ec4`: `QsTransform* (component, out, {meta rig index, bone name})`). It:
+
+| Step | What the code does | 2.5's offsets |
+|---|---|---|
+| The animated object | The component's cache, else the game's lookup (`+0x286a3c`, from a registry the component names) | component +0x178, registry +0x168 |
+| The meta rig | The object's meta rig: bone names and parent indices (the SDK's `anim::MetaRig`) | object +0x08; names +0x20, parents +0x10 |
+| The model transform | Walks the bone's parents, multiplying each bone's local transform | |
+| A bone's local transform ("the local read", `+0xbf1f78`) | Walks a list of pose parts in the object; the first part whose own bone names hold the bone gives it from its pose buffer. A bone no part holds is the identity | list +0x60, part +0x40, next +0x08, part names +0xD8 |
+| The pose buffer ("the buffer read", `+0x1b462c`) | One of two buffers of QsTransforms, chosen by comparing their counts | +0x48 (count +0x5C) when they differ, +0xB8 (count +0xC4) when equal |
+
+A person's helpers are in their own animated component: `man_base_deformations.ent` has one `entAnimatedComponent` named `deformations`, on `man_base_deformations.rig` with `man_base_deformations.animgraph`. So `world.bones` reads every animated component of the entity, each on its own meta rig.
+
+### Bones: build
+
+| Part | What it does |
+|---|---|
+| `native/src/overlay/bones.hpp` | The patterns and instruction forms. The model read is found by one byte pattern, which must match once in the game's code; every offset above comes from its code and the two functions it calls, checked instruction by instruction. The local read as REDnode's own memory read, and a QsTransform product for the test. Unit test `native/tests/bones_test.cpp`: made-up code and pose parts, and with `REDNODE_GAME_EXE` set, the real exe (it finds every 2.5 offset above) |
+| `native/src/overlay/bones.cpp` | The read, on the game thread: the object, its meta rig, every pose part and array checked with VirtualQuery first (the game's crash handler takes a fault before `__try` does), each bone's local transform read and its model transform from the game's own model read. Logs `Bones: model read +0x...` with every offset once a session |
+| `world.bones` in `reflect.cpp` | The entity by reference or id, its animated components through Codeware's `GetComponents`, each one's name and rig, then the read. Options `components`, `bones` (names), `space` (`local`, `model`, `both`) |
+| `world.bones(entity, options)` in `packages/rednode/src/world.ts` | Answers `{ components: [{ name, rig, object, lod, parts, count, bones: [{ index, name, parent, part, local, model }] }], ms, at }`; a transform is `{ t: [x,y,z], r: [x,y,z,w], s: [x,y,z] }` |
+| MCP `world_bones` | The same read for assistants, by entity id, read only (no ask) |
+| **Bones test** (`packages/overlay/apps/bones-test` 0.1.0) | Spawns the Trauma Team paramedic (male average, `man_base.rig`) 2.5 m in front of V playing `generic__stand_ground_arms_crossed__stand_around__02.workspot`, then Read, Read 4 (a second apart), Read the nearest person and Remove. Each read is saved in full as `bones-<n>.json` in its data folder with the workspot and the seconds since it started, and checked: each bone's model transform against its parent's times its local one |
+
+Unverified until the test: that the deformation component's meta rig holds the 110 helpers, that its pose parts are the deformation graph's output, and the level of detail fields (the SDK's offsets for the animated object, +0x9C, +0xAC, +0xE4). The clip's time is the seconds since the workspot started, not the animation's own time, which REDnode does not read. The pose is the last one the game's animation wrote; the read runs on the game thread and may meet an animation job writing (unverified).
+
+### Bones test
+
+With a save loaded in an open place, the Bones test switched on in the launcher (it needs no permission switches), and Codeware installed.
+
+| Step | Do | Expect |
+|---|---|---|
+| 1 | Press **Spawn** | The paramedic stands 2.5 m in front of V and crosses the arms within a few seconds; the log says `workspot started` |
+| 2 | Press **Read** | A line per component: `root (man_base.rig)` and `deformations (man_base_deformations.rig)`, each with its bone count, pose parts, how many bones no part holds, its level of detail, and `model vs parent x local` a fraction of a millimetre at worst; `bones-1.json` written. The plugin log has one `Bones: model read +0xbf1ec4 ...` line |
+| 3 | Press **Read 4** | Four lines a second apart; the helper `l_chest_front_B_top_out_JNT`'s local place shows on the deformations line |
+| 4 | Walk about 40 m away, keeping the paramedic in sight, and press **Read** | It still reads; note whether the level of detail numbers change |
+| 5 | Walk up to anyone in the street and press **Read the nearest person** | Their components with rig and bone count, or an error that says why |
+| 6 | Claude calls MCP `world_bones` with the paramedic's id and `space: "both"` | The same shape as the app's reads |
+| 7 | Press **Remove** | The paramedic is gone |
+
+The files go to REDcode for its check; the plugin log, `rednode-mods.log` and the files are read after the run.
