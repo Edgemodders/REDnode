@@ -522,6 +522,106 @@ const CProperty* FindProperty(const CClass* aClass, std::string_view aName)
     return nullptr;
 }
 
+CBaseFunction* Resolve(const Value& aParams, Handle<IScriptable>& aSelf, size_t aArgs, std::string& aError);
+bool SafeExecute(void* aInstance, CBaseFunction* aFn, void* aOut, StackArgs_t* aArgs, unsigned long* aCode);
+
+// A static function of AIPositionSpec, found once.
+CBaseFunction* PositionSpecFn(const char* aName, size_t aArgs, std::string& aError)
+{
+    static std::unordered_map<std::string, CBaseFunction*> found;
+    if (auto it = found.find(aName); it != found.end())
+        return it->second;
+    Value params;
+    params.kind = Value::Kind::Object;
+    Value cls;
+    cls.kind = Value::Kind::String;
+    cls.text = "AIPositionSpec";
+    Value fn;
+    fn.kind = Value::Kind::String;
+    fn.text = aName;
+    params.fields.emplace_back("class", cls);
+    params.fields.emplace_back("fn", fn);
+    Handle<IScriptable> none;
+    CBaseFunction* f = Resolve(params, none, aArgs, aError);
+    if (f)
+        found[aName] = f;
+    return f;
+}
+
+// AIPositionSpec keeps which kind of target it holds, a place or an entity, in bytes the game's
+// reflection does not name (RED4ext.SDK's unk00). Filled by its fields alone it reads as empty
+// (IsEmpty true, IsWorldPosition false), and a move command given it sent the person to the
+// game's invalid position, so they left the world (SC1's first run, 2026-11-27). Its own setter
+// writes the kind: SetWorldPosition takes it by script_ref; SetEntity's RTTI says by value, so it
+// is called on the struct itself and then checked.
+bool MarkPositionSpec(const CClass* aCls, void* aMem, const Value& aValue, std::string& aError)
+{
+    bool entity = false;
+    bool place = false;
+    for (const auto& [key, v] : aValue.fields)
+    {
+        if (key == "entity" && !v.IsNull())
+            entity = true;
+        else if (key == "worldPosition" && !v.IsNull())
+            place = true;
+    }
+    if (!entity && !place)
+        return true;
+    const char* setter = entity ? "SetEntity" : "SetWorldPosition";
+    const CProperty* field = FindProperty(aCls, entity ? "entity" : "worldPosition");
+    CBaseFunction* set = PositionSpecFn(setter, 2, aError);
+    CBaseFunction* check = PositionSpecFn(entity ? "IsEntity" : "IsWorldPosition", 1, aError);
+    if (!field || !set || !check || set->params.size() < 2 || check->params.size() < 1)
+    {
+        aError = std::string("AIPositionSpec: the game's ") + setter + " was not found" +
+                 (aError.empty() ? "" : " (" + aError + ")");
+        return false;
+    }
+    // The setter writes the struct while it reads the value: give it a copy.
+    alignas(16) uint8_t copy[64] = {};
+    if (field->type->GetSize() > sizeof(copy))
+    {
+        aError = "AIPositionSpec: " + Str(field->name) + " is larger than expected";
+        return false;
+    }
+    field->type->Construct(copy);
+    field->type->Assign(copy, static_cast<uint8_t*>(aMem) + field->valueOffset);
+
+    ScriptRef<void> ref{};
+    StackArgs_t args;
+    rtti::IType* first = set->params[0]->type;
+    if (first->GetType() == Kind::ScriptReference)
+    {
+        ref.innerType = const_cast<CClass*>(aCls);
+        ref.ref = aMem;
+        ref.hash = aCls->GetName();
+        args.emplace_back(first, &ref);
+    }
+    else
+        args.emplace_back(first, aMem);
+    args.emplace_back(set->params[1]->type, copy);
+    unsigned long code = 0;
+    const bool ran = SafeExecute(nullptr, set, nullptr, &args, &code);
+    field->type->Destruct(copy);
+    if (!ran)
+    {
+        aError = std::string("AIPositionSpec: the game's ") + setter + " failed";
+        return false;
+    }
+
+    bool is = false;
+    StackArgs_t checkArgs;
+    checkArgs.emplace_back(check->params[0]->type, aMem);
+    if (!SafeExecute(nullptr, check, &is, &checkArgs, &code) || !is)
+    {
+        aError = entity ? "AIPositionSpec: an entity target could not be set (the game's SetEntity left it "
+                          "empty); use worldPosition"
+                        : "AIPositionSpec: the game's SetWorldPosition left it empty";
+        return false;
+    }
+    return true;
+}
+
 bool FromJson(const rtti::IType* aType, void* aMem, const Value& aValue, std::string& aError, int aDepth)
 {
     if (aDepth > 32)
@@ -707,6 +807,8 @@ bool FromJson(const rtti::IType* aType, void* aMem, const Value& aValue, std::st
                 return false;
             }
         }
+        if (name == "AIPositionSpec")
+            return MarkPositionSpec(cls, aMem, aValue, aError);
         return true;
     }
     case Kind::Array:

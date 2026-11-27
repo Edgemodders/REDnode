@@ -16,6 +16,10 @@ How to keep it:
 
 - `world.bones(entity, { components, bones, space })` reads the live pose of an entity's skeleton: each bone's name, parent and rig, its model-space transform as the game holds it, its transform relative to its parent, and with `bind: true` its rig's bind pose, the deformation helpers included (#62, for REDcode). The MCP tool `world_bones` reads it for assistants.
 
+### Fixed
+
+- An `AIPositionSpec` built by `api` (the target of the game's move commands, such as `AIMoveToCommand`'s `movementTarget`) now holds its place: REDnode sets it through the game's own `SetWorldPosition`. Filled by its fields alone it read as empty, and a person sent a move command left the world. An entity target is set through `SetEntity` and refused with a clear error if the game leaves it empty.
+
 ## 0.75.0 (2026-11-26)
 
 <!-- nexus
