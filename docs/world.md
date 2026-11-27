@@ -2711,7 +2711,7 @@ On 2026-11-26 on the dev PC, by the owner, Bones test 0.1.0. Steps 1 to 5 ran; s
 
 ### Bones test: retest (0.76.1)
 
-On 2026-11-26 on the dev PC, by the owner, Bones test 0.2.0. Steps 1 to 4 passed; step 5 could not run (neither this session nor REDcode's had `world_bones` in its tool list after the deploy, each connection read before it); step 6 by the owner.
+On 2026-11-26 on the dev PC, by the owner, Bones test 0.2.0. Every step passed: steps 1 to 4 and 6 in the app, step 5 the same night from a new Claude Code session (the two sessions running at the deploy had read their tool lists before it, so neither had `world_bones`). **#62 is done.**
 
 | Step | Result |
 |---|---|
@@ -2719,6 +2719,7 @@ On 2026-11-26 on the dev PC, by the owner, Bones test 0.2.0. Steps 1 to 4 passed
 | 2 | Four reads, 157 ms (the first) then 68 to 71 ms. `face_rig`, read first, answered the skeleton; `root` and `deformations` said `same skeleton as face_rig`. 512 bones; rigs `man_base.rig` 71, the face rig (`0xD2A7FDDB49ED3AFE`) 344, `man_base_deformations.rig` 181; none in no rig. The pose moved between reads (up to 181 mm at the head tip); LeftHand at about [0.05, 0.14, 1.33], in front of the chest: the arms crossed. The helper `l_chest_front_B_top_out_JNT`'s live local differed from its bind pose |
 | 3 | At 20 m the level of detail read 3/2, and the helper's live local was exactly its bind pose: past some distance the deformation graph does not run, and the helpers keep their bind pose. Sample close |
 | 4 | A street person (`0xBF7667454C2B918E` face rig): the same shape, 512 bones on the same three rig sizes, 69.8 ms |
-| 5 | Not run |
+| 5 | A new Claude Code session called `world_near` (radius 10) and `world_bones` with `space: "both"`, `bind: true` on the nearest person (`10542429`, `outcast__wa_homeless_02`, 3.8 m): 69.8 ms. `face_rig` answered the skeleton (lod 1/4 at 5.0 m, 512 bones with unique names and indices 0 to 511, every parent a bone in the list, only `Root` without one, rigs of 71, 344 and 181, every bone with `model`, `local` and `bind`); `root` and `deformations` said `sameAs: "face_rig"`. 186,608 characters of compact JSON (about 364 a bone). A bone's `rig` is the first rig holding its name, so the deformation rig's copies of the 71 body bones count on the body rig: 71, 335 and 106 |
+| 6 | The paramedic removed |
 
 REDcode compared reads 1 to 4 with its own run of `man_base_deformations.animgraph` on the game's 71 body bones: 116 helpers at a median 1.6 mm and 0.01°, all 16 twist helpers exact, curves, points and set-transforms within 2 mm; left for REDcode: one wrist helper (4.3 cm) and the elbow and thumb bulges (up to 3 cm). A read of about 70 ms holds the game thread: checking the rigs once a session, not at every read, would cut it (later).
