@@ -19,6 +19,7 @@ How to keep it:
 ### Fixed
 
 - An `AIPositionSpec` built by `api` (the target of the game's move commands, such as `AIMoveToCommand`'s `movementTarget`) now holds its place: REDnode sets it through the game's own `SetWorldPosition`. Filled by its fields alone it read as empty, and a person sent a move command left the world. An entity target is set through `SetEntity` and refused with a clear error if the game leaves it empty.
+- The UI kit, Perf, Game state, Layers test and Fill test samples have a ✕ close button in their title bars, as every other window has.
 
 ## 0.75.0 (2026-11-26)
 

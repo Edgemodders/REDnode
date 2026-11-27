@@ -1,7 +1,7 @@
 {
   "id": "fill-test",
   "name": "Fill test",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Edgemodders",
   "description": "Checks \"fill\": \"screen\" (#32): a see-through page over the whole game view, with a frame on its four edges, its size, and a panel kept at the right edge. Every screen shape should be covered edge to edge.",
   "entry": "index.html",
