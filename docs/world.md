@@ -2708,3 +2708,17 @@ On 2026-11-26 on the dev PC, by the owner, Bones test 0.1.0. Steps 1 to 5 ran; s
 | 4 | At 28 to 30 m the level of detail read 4/3, against 0/4 at 1.5 m: the fields follow the distance |
 | 5 | Not read from the log |
 | Found | Every read gave the same transforms to four decimals, near and far, with the elbow helpers 36 cm out from the body: the bind pose, not the live one. The static reading was corrected (above) and the live read built in 0.76.1 |
+
+### Bones test: retest (0.76.1)
+
+On 2026-11-26 on the dev PC, by the owner, Bones test 0.2.0. Steps 1 to 4 passed; step 5 could not run (neither this session nor REDcode's had `world_bones` in its tool list after the deploy, each connection read before it); step 6 by the owner.
+
+| Step | Result |
+|---|---|
+| 1 | The paramedic spawned (`11120245`) and crossed the arms |
+| 2 | Four reads, 157 ms (the first) then 68 to 71 ms. `face_rig`, read first, answered the skeleton; `root` and `deformations` said `same skeleton as face_rig`. 512 bones; rigs `man_base.rig` 71, the face rig (`0xD2A7FDDB49ED3AFE`) 344, `man_base_deformations.rig` 181; none in no rig. The pose moved between reads (up to 181 mm at the head tip); LeftHand at about [0.05, 0.14, 1.33], in front of the chest: the arms crossed. The helper `l_chest_front_B_top_out_JNT`'s live local differed from its bind pose |
+| 3 | At 20 m the level of detail read 3/2, and the helper's live local was exactly its bind pose: past some distance the deformation graph does not run, and the helpers keep their bind pose. Sample close |
+| 4 | A street person (`0xBF7667454C2B918E` face rig): the same shape, 512 bones on the same three rig sizes, 69.8 ms |
+| 5 | Not run |
+
+REDcode compared reads 1 to 4 with its own run of `man_base_deformations.animgraph` on the game's 71 body bones: 116 helpers at a median 1.6 mm and 0.01°, all 16 twist helpers exact, curves, points and set-transforms within 2 mm; left for REDcode: one wrist helper (4.3 cm) and the elbow and thumb bulges (up to 3 cm). A read of about 70 ms holds the game thread: checking the rigs once a session, not at every read, would cut it (later).
