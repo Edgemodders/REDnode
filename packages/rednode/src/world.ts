@@ -214,8 +214,11 @@ export interface ComponentBones {
    * distance from the camera. Read at the SDK's offsets for the object, unverified on 2.5.
    */
   lod?: { level: number; last: number; distance: number };
-  /** How many bones each of the animated object's rigs holds, in order (a person's body, face and deformation rigs). */
-  rigs?: number[];
+  /**
+   * The animated object's rigs, in order (a person's body, face and deformation rigs): how many
+   * bones each holds and its depot path hash ("0x...", null if REDnode could not check it is a rig).
+   */
+  rigs?: { bones: number; path: string | null }[];
   /** How many bones its meta rig has: every rig's bones together. */
   count?: number;
   bones?: Bone[];

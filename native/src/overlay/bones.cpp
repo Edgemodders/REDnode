@@ -14,7 +14,7 @@
 // before they are read, and sizes past a sane limit refuse the read.
 //
 //   ReadBones(component, wanted) -> fields of one answer (bones.cpp builds them):
-//     "object":"cache"|"lookup", "lod":{"level","last","distance"}, "rigs":[n bones, ...],
+//     "object":"cache"|"lookup", "lod":{"level","last","distance"}, "rigs":[{"bones":n,"path":"0x..."}, ...],
 //     "count":n, "bones":[{"index","name","parent","rig","model":{t,r,s},"local":{t,r,s},"bind":{t,r,s}}]
 //   "model": the live pose, relative to the entity's animated root, as the game holds it.
 //   "local": the live pose relative to the parent, computed by REDnode from the two model transforms.
@@ -48,6 +48,38 @@ constexpr uint32_t MaxBones = 4096;
 constexpr uint32_t MaxParts = 32;
 constexpr size_t ObjectBytes = 0x100; // the SDK's anim::AnimatedObject
 constexpr size_t LodLevel = 0x9C, LodLast = 0xAC, LodDistance = 0xE4;
+constexpr size_t ResourcePathAt = 0x30; // CResource::path (the SDK's), a rig's depot path hash
+
+struct RigInfo
+{
+    uint32_t bones = 0;
+    uint64_t path = 0; // 0 when the object is not an animRig
+};
+
+bool InImage(const void* aAddress)
+{
+    static const auto range = []() {
+        const auto* base = reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
+        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
+        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(base + dos->e_lfanew);
+        return std::pair<const uint8_t*, const uint8_t*>(base, base + nt->OptionalHeader.SizeOfImage);
+    }();
+    const auto* p = static_cast<const uint8_t*>(aAddress);
+    return p >= range.first && p < range.second;
+}
+
+// A rig's depot path hash, once its vtable is in the game's image and its class is animRig.
+uint64_t RigPath(const uint8_t* aRig)
+{
+    const void* vtable = *reinterpret_cast<const void* const*>(aRig);
+    if (!InImage(vtable))
+        return 0;
+    static RED4ext::CClass* rigClass = RED4ext::CRTTISystem::Get()->GetClass("animRig");
+    auto* object = reinterpret_cast<RED4ext::ISerializable*>(const_cast<uint8_t*>(aRig));
+    if (!rigClass || object->GetType() != rigClass)
+        return 0;
+    return *reinterpret_cast<const uint64_t*>(aRig + ResourcePathAt);
+}
 
 Layout g_layout;
 bool g_looked = false;
@@ -169,7 +201,7 @@ const uint8_t* ObjectOf(const Layout& aL, uint8_t* aComponent, bool& aLookedUp)
 
 // Checks the object, its meta rig, its live pose and its rigs with VirtualQuery. Fills the rigs'
 // bone counts and the live pose's array; answers the meta rig, or null with aWhy.
-const uint8_t* CheckObject(const Layout& aL, const uint8_t* aObject, std::vector<uint32_t>& aRigs, const Qs*& aPose,
+const uint8_t* CheckObject(const Layout& aL, const uint8_t* aObject, std::vector<RigInfo>& aRigs, const Qs*& aPose,
                            const char*& aWhy)
 {
     if (!Readable(aObject, ObjectBytes))
@@ -206,6 +238,7 @@ const uint8_t* CheckObject(const Layout& aL, const uint8_t* aObject, std::vector
             return aWhy = "its rigs are not readable", nullptr;
         const uint8_t* part = *reinterpret_cast<const uint8_t* const*>(node + aL.partOf);
         uint32_t count = 0;
+        uint64_t rigPath = 0;
         if (part)
         {
             if (!Readable(part, partBytes))
@@ -220,8 +253,9 @@ const uint8_t* CheckObject(const Layout& aL, const uint8_t* aObject, std::vector
                 return aWhy = "a rig's lists are not as expected", nullptr;
             if (count && (!Readable(partNames->entries, count * sizeof(uint64_t)) || !Readable(buffer, count * sizeof(Qs))))
                 return aWhy = "a rig's lists are not readable", nullptr;
+            rigPath = RigPath(part);
         }
-        aRigs.push_back(count);
+        aRigs.push_back({count, rigPath});
         node = *reinterpret_cast<const uint8_t* const*>(node + aL.next);
     }
     return rig;
@@ -291,7 +325,7 @@ bool ReadBones(void* aComponent, const BonesWanted& aWanted, const void*& aObjec
     if (std::find(aWanted.skip.begin(), aWanted.skip.end(), object) != aWanted.skip.end())
         return true; // read already, for another component: the caller says which
 
-    std::vector<uint32_t> rigs;
+    std::vector<RigInfo> rigs;
     const Qs* pose = nullptr;
     const char* why = nullptr;
     const uint8_t* rig = CheckObject(l, object, rigs, pose, why);
@@ -315,7 +349,12 @@ bool ReadBones(void* aComponent, const BonesWanted& aWanted, const void*& aObjec
     Num(aOut, *reinterpret_cast<const float*>(object + LodDistance));
     aOut += "},\"rigs\":[";
     for (size_t k = 0; k < rigs.size(); ++k)
-        aOut += (k ? "," : "") + std::to_string(rigs[k]);
+    {
+        char path[24];
+        std::snprintf(path, sizeof(path), "0x%016llX", static_cast<unsigned long long>(rigs[k].path));
+        aOut += std::string(k ? "," : "") + "{\"bones\":" + std::to_string(rigs[k].bones) + ",\"path\":" +
+                (rigs[k].path ? std::string("\"") + path + "\"" : std::string("null")) + "}";
+    }
     aOut += "],\"count\":" + std::to_string(count) + ",\"bones\":[";
     bool first = true;
     for (uint32_t i = 0; i < count; ++i)

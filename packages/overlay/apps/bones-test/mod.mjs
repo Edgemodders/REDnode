@@ -115,7 +115,7 @@ async function readOnce() {
     const hand = bone(c.bones, 'LeftHand');
     const helper = bone(c.bones, HELPER);
     parts.push(
-      `${c.name} (${rigName(c.rig)}): ${c.count} bones, rigs [${c.rigs.join(', ')}], ${none} in no rig, ` +
+      `${c.name} (${rigName(c.rig)}): ${c.count} bones, rigs [${c.rigs.map((r) => `${rigName(r.path)} ${r.bones}`).join(', ')}], ${none} in no rig, ` +
         `lod ${c.lod.level}/${c.lod.last} at ${c.lod.distance.toFixed(1)} m, object from ${c.object}; ` +
         (n > 1 ? `moved since the last read: ${(move.worst * 1000).toFixed(1)} mm at most${move.where ? ` (${move.where})` : ''}; ` : '') +
         (hand ? `LeftHand model ${fmt(hand.model.t)}; ` : '') +
@@ -144,7 +144,7 @@ const readNear = () =>
     if (!p) throw new Error('No person within 10 m');
     const r = await world.bones(p.id, { space: 'local' });
     return r.components
-      .map((c) => (c.error ? `${c.name}: ${c.error}` : c.sameAs ? `${c.name}: same skeleton as ${c.sameAs}` : `${c.name} (${rigName(c.rig)}): ${c.count} bones, rigs [${c.rigs.join(', ')}]`))
+      .map((c) => (c.error ? `${c.name}: ${c.error}` : c.sameAs ? `${c.name}: same skeleton as ${c.sameAs}` : `${c.name} (${rigName(c.rig)}): ${c.count} bones, rigs [${c.rigs.map((r) => `${rigName(r.path)} ${r.bones}`).join(', ')}]`))
       .join(' | ') + `, ${r.ms.toFixed(1)} ms`;
   });
 
