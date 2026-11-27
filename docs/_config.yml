@@ -55,6 +55,8 @@ nav:
     url: /semi-native.html
   - title: VATS
     url: /vats.html
+  - title: Maps
+    url: /maps.html
   - title: Quest API
     url: /quests.html
   - title: Quickhack functions
