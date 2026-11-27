@@ -1929,8 +1929,10 @@ std::string WorldFiles(const Value& aParams, std::string& aError)
 
 // #62: the live pose of an entity's animated components (bones.cpp reads it).
 //   world.bones {"self":{"$ref":n}} or {"id":"<entity id hash>"},
-//               "components":["root","deformations"]?, "bones":["pelvis", ...]?, "space":"local"|"model"|"both"
-//     -> {"ms":t, "components":[{"name","rig":"0x...", "object","lod","parts","count","bones":[...]}
+//               "components":["root","deformations"]?, "bones":["Hips", ...]?, "space":"local"|"model"|"both",
+//               "bind":false
+//     -> {"ms":t, "components":[{"name","rig":"0x...", "object","lod","rigs","count","bones":[...]}
+//                               | {"name","rig","sameAs":"<component that read the same animated object>"}
 //                               | {"name","rig","error"}]}
 Handle<IScriptable> EntityOf(const Value& aParams, std::string& aError)
 {
@@ -1989,6 +1991,8 @@ std::string WorldBones(const Value& aParams, std::string& aError)
     }
     wanted.local = spaceText != "model";
     wanted.model = spaceText != "local";
+    const Value* bind = aParams.Get("bind");
+    wanted.bind = bind && bind->kind == Value::Kind::Bool && bind->boolean;
     std::vector<uint64_t> only;
     if (!NameList(aParams.Get("bones"), wanted.names, "bones", aError) ||
         !NameList(aParams.Get("components"), only, "components", aError))
@@ -2020,6 +2024,7 @@ std::string WorldBones(const Value& aParams, std::string& aError)
     const uint32_t n = arr->GetLength(ret->mem);
     std::string out = "{\"components\":[";
     int found = 0;
+    std::vector<std::string> readBy; // the component that read each object in wanted.skip
     for (uint32_t k = 0; k < n; ++k)
     {
         void* el = arr->GetElement(ret->mem, k);
@@ -2046,10 +2051,20 @@ std::string WorldBones(const Value& aParams, std::string& aError)
         out += found++ ? ",{" : "{";
         out += "\"name\":" + JsonString(text && *text ? text : "") + ",\"rig\":\"" + Hex(rig) + "\",";
         std::string fields, why;
-        if (ReadBones(component.GetPtr(), wanted, fields, why))
-            out += fields;
-        else
+        const void* object = nullptr;
+        if (!ReadBones(component.GetPtr(), wanted, object, fields, why))
             out += "\"error\":" + JsonString(why);
+        else if (fields.empty())
+        {
+            const auto at = std::find(wanted.skip.begin(), wanted.skip.end(), object) - wanted.skip.begin();
+            out += "\"sameAs\":" + JsonString(readBy[static_cast<size_t>(at)]);
+        }
+        else
+        {
+            out += fields;
+            wanted.skip.push_back(object);
+            readBy.push_back(text && *text ? text : "");
+        }
         out += "}";
     }
     if (!found)

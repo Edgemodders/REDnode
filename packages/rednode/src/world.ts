@@ -181,12 +181,17 @@ export interface Bone {
   name: string;
   /** Its parent's name, or null for a root. */
   parent: string | null;
-  /** Which of the component's pose parts holds it; -1 when none does, and the game reads it as the identity. */
-  part: number;
-  /** Relative to its parent, as the game holds it (with `space` "local" or "both"). */
-  local?: BoneTransform;
-  /** Relative to the component, from the game's own read that bone slots use (with `space` "model" or "both"). */
+  /** Which of the animated object's rigs holds it (see {@link ComponentBones.rigs}); -1 when none does. */
+  rig: number;
+  /**
+   * The live pose, relative to the entity's animated root, as the game holds it (the transforms
+   * bone slots are placed by), with `space` "model" or "both".
+   */
   model?: BoneTransform;
+  /** The live pose relative to its parent, worked out from the two model transforms, with `space` "local" or "both". */
+  local?: BoneTransform;
+  /** Its own rig's bind pose relative to its parent (the rig's A-pose, else its reference pose), with `bind: true`. */
+  bind?: BoneTransform;
 }
 
 /** One animated component's pose, as {@link world.bones} reads it. */
@@ -197,6 +202,11 @@ export interface ComponentBones {
   rig: string;
   /** Why it could not be read; the other fields are then missing. */
   error?: string;
+  /**
+   * The components of one entity share one animated object (a person's root, face_rig and
+   * deformations do): the object is read once, and the others name the component that read it.
+   */
+  sameAs?: string;
   /** Where its animated object came from: the component's own cache, or the game's lookup. */
   object?: "cache" | "lookup";
   /**
@@ -204,9 +214,9 @@ export interface ComponentBones {
    * distance from the camera. Read at the SDK's offsets for the object, unverified on 2.5.
    */
   lod?: { level: number; last: number; distance: number };
-  /** How many bones each pose part holds. */
-  parts?: number[];
-  /** How many bones its meta rig has. */
+  /** How many bones each of the animated object's rigs holds, in order (a person's body, face and deformation rigs). */
+  rigs?: number[];
+  /** How many bones its meta rig has: every rig's bones together. */
   count?: number;
   bones?: Bone[];
 }
@@ -228,6 +238,8 @@ export interface BonesOptions {
   bones?: string[];
   /** "local" (the default), "model", or "both". */
   space?: "local" | "model" | "both";
+  /** Also each bone's bind pose from its own rig. */
+  bind?: boolean;
 }
 
 /**
@@ -1331,12 +1343,13 @@ export const world = {
   },
 
   /**
-   * The live pose of an entity's animated components (#62): every bone of each one, its local
-   * transform as the game holds it, and with `space: "model"` or `"both"` its transform
-   * relative to the component from the game's own read (the one bone slots use). A person has
-   * a `root` component on its body's rig and, for the muscle and twist helpers, a
-   * `deformations` component on its deformation rig. Read only, on the game thread; the pose
-   * is the last one the game's animation wrote. Needs Codeware.
+   * The live pose of an entity's skeleton (#62): every bone of its animated object, the body's,
+   * the face's and the muscle and twist helpers' (a person's root, face_rig and deformations
+   * components share the object; the first one read answers, the others say `sameAs`). With
+   * `space: "model"` or `"both"`, each bone as the game holds it, relative to the animated root;
+   * with `"local"` (the default) or `"both"`, relative to its parent. With `bind: true`, also its
+   * rig's bind pose. Read only, on the game thread; the pose is the last one the game's
+   * animation wrote. Needs Codeware.
    *
    * @example
    * ```ts
@@ -1351,6 +1364,7 @@ export const world = {
       ...(options.components ? { components: options.components } : {}),
       ...(options.bones ? { bones: options.bones } : {}),
       space: options.space ?? "local",
+      ...(options.bind ? { bind: true } : {}),
     })) as Omit<BonesRead, "at">;
     return { ...r, at: Date.now() };
   },

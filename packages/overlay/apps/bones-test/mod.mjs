@@ -1,10 +1,11 @@
 // Bones test: REDnode #62's world.bones, for REDcode's check of its body deformation graph.
 // Spawns a male average person (the Trauma Team paramedic, on man_base.rig) beside V playing a
-// gameplay workspot with the arms crossed, then reads the live pose of its animated components:
-// "root" (the body's rig) and "deformations" (the muscle and twist helpers). Each read is saved
-// in full, with the workspot and the seconds since it started, as bones-<n>.json in the
-// package's data folder, and checked: each bone's model transform against its parent's model
-// transform times its own local one, which says the locals are relative to the meta rig's parents.
+// gameplay workspot with the arms crossed, then reads the live pose of its skeleton: the body's,
+// the face's and the muscle and twist helpers' bones (its root, face_rig and deformations
+// components share one animated object, read once). Each read is saved in full (model and local
+// transforms, and each bone's rig bind pose), with the workspot and the seconds since it started,
+// as bones-<n>.json in the package's data folder. The log says how far the pose moved since the
+// last read and how far the arms are from their bind pose, which tells a live pose from a still one.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -59,40 +60,26 @@ const rigName = (hash) => {
   }
 };
 
-// parent * local, as bones.hpp's Mul does.
-function rotate(q, v) {
-  const [x, y, z, w] = q;
-  const dotUV = x * v[0] + y * v[1] + z * v[2];
-  const dotUU = x * x + y * y + z * z;
-  const cross = [y * v[2] - z * v[1], z * v[0] - x * v[2], x * v[1] - y * v[0]];
-  return [0, 1, 2].map((i) => 2 * dotUV * [x, y, z][i] + (w * w - dotUU) * v[i] + 2 * w * cross[i]);
-}
-function mul(p, l) {
-  const scaled = [p.s[0] * l.t[0], p.s[1] * l.t[1], p.s[2] * l.t[2]];
-  const r = rotate(p.r, scaled);
-  const [ax, ay, az, aw] = p.r;
-  const [bx, by, bz, bw] = l.r;
-  return {
-    t: [p.t[0] + r[0], p.t[1] + r[1], p.t[2] + r[2]],
-    r: [aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx, aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz],
-  };
-}
+let last = null; // the last read's model places, by bone name
 
-// The largest gap, in metres, between a bone's model place and its parent's model times its local.
-function chainGap(bones) {
-  const byName = new Map(bones.map((b) => [b.name, b]));
+// The largest move, in metres, of any bone's model place since the last read.
+function moved(bones) {
   let worst = 0;
   let where = '';
-  for (const b of bones) {
-    if (!b.parent || !b.model || !b.local) continue;
-    const p = byName.get(b.parent);
-    if (!p?.model) continue;
-    const m = mul(p.model, b.local);
-    const gap = Math.hypot(m.t[0] - b.model.t[0], m.t[1] - b.model.t[1], m.t[2] - b.model.t[2]);
-    if (gap > worst) (worst = gap), (where = b.name);
+  if (last) {
+    for (const b of bones) {
+      const was = last.get(b.name);
+      if (!was || !b.model) continue;
+      const d = Math.hypot(b.model.t[0] - was[0], b.model.t[1] - was[1], b.model.t[2] - was[2]);
+      if (d > worst) (worst = d), (where = b.name);
+    }
   }
+  last = new Map(bones.filter((b) => b.model).map((b) => [b.name, b.model.t]));
   return { worst, where };
 }
+
+const bone = (bones, name) => bones.find((b) => b.name === name);
+const fmt = (t) => `[${t.map((v) => v.toFixed(3)).join(', ')}]`;
 
 const spawn = () =>
   step('Spawn', async () => {
@@ -101,12 +88,13 @@ const spawn = () =>
     const { id, entity } = await world.spawn({ record: RECORD, ...(await inFront(2.5)), workspot: WORKSPOT });
     const r = await world.useWorkspot(id);
     person = { id: r.id, started: Date.now() };
+    last = null;
     return `${RECORD} ${r.id.hash}${entity ? '' : ' (not in the world yet)'}; workspot ${r.started ? 'started' : `not started: ${r.why}`}`;
   });
 
 async function readOnce() {
   if (!person) throw new Error('Press Spawn first');
-  const read = await world.bones(person.id, { space: 'both' });
+  const read = await world.bones(person.id, { space: 'both', bind: true });
   const n = ++reads;
   const seconds = (read.at - person.started) / 1000;
   const file = path.join(pkg.dataDir, `bones-${n}.json`);
@@ -118,14 +106,20 @@ async function readOnce() {
       parts.push(`${c.name}: ${c.error}`);
       continue;
     }
-    const none = c.bones.filter((b) => b.part < 0).length;
-    const gap = chainGap(c.bones);
-    const helper = c.bones.find((b) => b.name === HELPER);
+    if (c.sameAs) {
+      parts.push(`${c.name} (${rigName(c.rig)}): same skeleton as ${c.sameAs}`);
+      continue;
+    }
+    const none = c.bones.filter((b) => b.rig < 0).length;
+    const move = moved(c.bones);
+    const hand = bone(c.bones, 'LeftHand');
+    const helper = bone(c.bones, HELPER);
     parts.push(
-      `${c.name} (${rigName(c.rig)}): ${c.count} bones, parts [${c.parts.join(', ')}], ${none} in no part, ` +
+      `${c.name} (${rigName(c.rig)}): ${c.count} bones, rigs [${c.rigs.join(', ')}], ${none} in no rig, ` +
         `lod ${c.lod.level}/${c.lod.last} at ${c.lod.distance.toFixed(1)} m, object from ${c.object}; ` +
-        `model vs parent x local: ${(gap.worst * 1000).toFixed(2)} mm at worst${gap.where ? ` (${gap.where})` : ''}` +
-        (helper ? `; ${HELPER} local t [${helper.local.t.map((v) => v.toFixed(4)).join(', ')}]` : ''),
+        (n > 1 ? `moved since the last read: ${(move.worst * 1000).toFixed(1)} mm at most${move.where ? ` (${move.where})` : ''}; ` : '') +
+        (hand ? `LeftHand model ${fmt(hand.model.t)}; ` : '') +
+        (helper ? `${HELPER} model ${fmt(helper.model.t)}, local ${fmt(helper.local.t)}, bind ${fmt(helper.bind.t)}` : ''),
     );
   }
   return `${parts.join(' | ')} -> ${path.basename(file)}`;
@@ -149,7 +143,9 @@ const readNear = () =>
     const p = near.find((e) => /NPCPuppet/.test(e.type ?? ''));
     if (!p) throw new Error('No person within 10 m');
     const r = await world.bones(p.id, { space: 'local' });
-    return r.components.map((c) => (c.error ? `${c.name}: ${c.error}` : `${c.name} (${rigName(c.rig)}): ${c.count} bones, parts [${c.parts.join(', ')}]`)).join(' | ');
+    return r.components
+      .map((c) => (c.error ? `${c.name}: ${c.error}` : c.sameAs ? `${c.name}: same skeleton as ${c.sameAs}` : `${c.name} (${rigName(c.rig)}): ${c.count} bones, rigs [${c.rigs.join(', ')}]`))
+      .join(' | ') + `, ${r.ms.toFixed(1)} ms`;
   });
 
 const remove = () =>

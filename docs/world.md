@@ -2648,7 +2648,7 @@ With a save loaded, nothing else needed; Claude drives it through MCP. The file 
 
 **Passed in game on 2026-11-26** on the dev PC (REDnode 0.75.0, all three steps, Claude driving MCP; docs/testing.md has the answers). Step 2 of #51 (applying the removals) waits for N2.
 
-## Bones (#62; 0.76.0)
+## Bones (#62; 0.76.0, 0.76.1)
 
 REDcode's [#62](https://github.com/Edgemodders/REDnode/issues/62) asks for the live skeleton of a person in the running game, deformation helpers included, to check REDcode's run of a body's deformation graph (`man_base_deformations.animgraph`) against the game's. Game 2.5 has no script call that reads bones: `entAnimatedComponent` has no functions, and `FunctionalTestsGameSystem.GetBoneWorldTransform` is a stub in the retail game that always answers false. Built on 2026-11-26 in REDnode 0.76.0 from a static reading of 2.5's exe.
 
@@ -2666,18 +2666,20 @@ A slot bound to a bone (`entSlotComponent.GetSlotTransform`, whose native is at 
 
 A person's helpers are in their own animated component: `man_base_deformations.ent` has one `entAnimatedComponent` named `deformations`, on `man_base_deformations.rig` with `man_base_deformations.animgraph`. So `world.bones` reads every animated component of the entity, each on its own meta rig.
 
+**Corrected after the first run (0.76.0).** The "pose parts" above are the object's rigs, `animRig` resources: names at +0xD8 are the rig's `boneMetaNames`, +0x48 its `referencePoseLS` and +0xB8 its `aPoseLS` (the SDK's `anim::Rig`). So the model read answers the bind pose; 0.76.0 read the A-pose as if it were the live one, the same in every read. The live pose is read by another function on the slot path, `+0x32aa4c` (component, bone, out world transform), which calls "the live read" `+0x32b1e8` (animated object, bone, out): the object's current pose is at +0x18, and its first field is an array of model-space QsTransforms in meta rig order (bones outside the meta rig are in a list at +0x38, count +0x44, 64 bytes each: name, then the transform at +0x10). The world transform is that times the component's own (+0xE0 place, +0xF0 rotation). Every animated component of a person (`root`, `face_rig`, `deformations`) names the same animated object, whose meta rig holds all their bones: 512 on the paramedic, from rigs of 71 (the body), 344 and 181 (the deformation rig: the body's 71 and 110 helpers).
+
 ### Bones: build
 
 | Part | What it does |
 |---|---|
 | `native/src/overlay/bones.hpp` | The patterns and instruction forms. The model read is found by one byte pattern, which must match once in the game's code; every offset above comes from its code and the two functions it calls, checked instruction by instruction. The local read as REDnode's own memory read, and a QsTransform product for the test. Unit test `native/tests/bones_test.cpp`: made-up code and pose parts, and with `REDNODE_GAME_EXE` set, the real exe (it finds every 2.5 offset above) |
-| `native/src/overlay/bones.cpp` | The read, on the game thread: the object, its meta rig, every pose part and array checked with VirtualQuery first (the game's crash handler takes a fault before `__try` does), each bone's local transform read and its model transform from the game's own model read. Logs `Bones: model read +0x...` with every offset once a session |
-| `world.bones` in `reflect.cpp` | The entity by reference or id, its animated components through Codeware's `GetComponents`, each one's name and rig, then the read. Options `components`, `bones` (names), `space` (`local`, `model`, `both`) |
-| `world.bones(entity, options)` in `packages/rednode/src/world.ts` | Answers `{ components: [{ name, rig, object, lod, parts, count, bones: [{ index, name, parent, part, local, model }] }], ms, at }`; a transform is `{ t: [x,y,z], r: [x,y,z,w], s: [x,y,z] }` |
+| `native/src/overlay/bones.cpp` | The read, on the game thread: the object, its meta rig, its live pose and its rigs checked with VirtualQuery first (the game's crash handler takes a fault before `__try` does). 0.76.1: `model` is the live pose copied at once, `local` is worked out from it (parent⁻¹ × child), `bind` (asked for) the bone's own rig's A-pose, else its reference pose, relative to its parent. The live read is found by its own pattern, unique in 2.5's exe. Logs `Bones: live read +0x...` with every offset once a session |
+| `world.bones` in `reflect.cpp` | The entity by reference or id, its animated components through Codeware's `GetComponents`, each one's name and rig, then the read. Components that share an animated object are read once; the others answer `sameAs`. Options `components`, `bones` (names), `space` (`local`, `model`, `both`), `bind` |
+| `world.bones(entity, options)` in `packages/rednode/src/world.ts` | Answers `{ components: [{ name, rig, object, lod, rigs, count, bones: [{ index, name, parent, rig, model, local, bind }] } or { name, rig, sameAs }], ms, at }`; a transform is `{ t: [x,y,z], r: [x,y,z,w], s: [x,y,z] }` |
 | MCP `world_bones` | The same read for assistants, by entity id, read only (no ask) |
-| **Bones test** (`packages/overlay/apps/bones-test` 0.1.0) | Spawns the Trauma Team paramedic (male average, `man_base.rig`) 2.5 m in front of V playing `generic__stand_ground_arms_crossed__stand_around__02.workspot`, then Read, Read 4 (a second apart), Read the nearest person and Remove. Each read is saved in full as `bones-<n>.json` in its data folder with the workspot and the seconds since it started, and checked: each bone's model transform against its parent's times its local one |
+| **Bones test** (`packages/overlay/apps/bones-test` 0.2.0) | Spawns the Trauma Team paramedic (male average, `man_base.rig`) 2.5 m in front of V playing `generic__stand_ground_arms_crossed__stand_around__02.workspot`, then Read, Read 4 (a second apart), Read the nearest person and Remove. Each read is saved in full (model, local and bind) as `bones-<n>.json` in its data folder with the workspot and the seconds since it started. The log gives how far the pose moved since the last read, the left hand's place, and a helper's live and bind places |
 
-Unverified until the test: that the deformation component's meta rig holds the 110 helpers, that its pose parts are the deformation graph's output, and the level of detail fields (the SDK's offsets for the animated object, +0x9C, +0xAC, +0xE4). The clip's time is the seconds since the workspot started, not the animation's own time, which REDnode does not read. The pose is the last one the game's animation wrote; the read runs on the game thread and may meet an animation job writing (unverified).
+Unverified until the retest: that the live pose follows the animation (its bones move between reads and the arms are crossed in it), that the helpers' live transforms are the deformation graph's output, and whether the read stays near 300 ms on the game thread (0.76.0 read the same object three times). The clip's time is the seconds since the workspot started, not the animation's own time, which REDnode does not read. The pose is the last one the game's animation wrote; the read runs on the game thread and may meet an animation job writing (unverified).
 
 ### Bones test
 
@@ -2694,3 +2696,15 @@ With a save loaded in an open place, the Bones test switched on in the launcher 
 | 7 | Press **Remove** | The paramedic is gone |
 
 The files go to REDcode for its check; the plugin log, `rednode-mods.log` and the files are read after the run.
+
+### Bones test: first run (0.76.0)
+
+On 2026-11-26 on the dev PC, by the owner, Bones test 0.1.0. Steps 1 to 5 ran; step 6 could not, since this session's tool list was read before the deploy (`world_bones` was not in it).
+
+| Step | Result |
+|---|---|
+| 1 | The paramedic spawned (`11120272`) and the workspot started |
+| 2 to 3 | Seven reads, 300 to 360 ms each. `face_rig` (rig `0xD2A7FDDB49ED3AFE`), `root` (`man_base.rig`) and `deformations` (`man_base_deformations.rig`) each answered the same object: 512 bones, rigs of 71, 344 and 181 bones, none in no rig; `root` from the component's cache, the other two through the game's lookup |
+| 4 | At 28 to 30 m the level of detail read 4/3, against 0/4 at 1.5 m: the fields follow the distance |
+| 5 | Not read from the log |
+| Found | Every read gave the same transforms to four decimals, near and far, with the elbow helpers 36 cm out from the body: the bind pose, not the live one. The static reading was corrected (above) and the live read built in 0.76.1 |

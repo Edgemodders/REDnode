@@ -1,21 +1,28 @@
 // Bones (#62, for REDcode; docs/world.md "Bones (#62)"): the live pose of an entity's animated
-// components, each bone's local transform as the game holds it and its model-space transform from
-// the game's own model read. On the game thread, read only.
+// object, read only, on the game thread.
 //
-// bones.hpp has the static reading of 2.5's code (the model read, the local read and the buffer
-// read) and the instruction forms the offsets come from. The model read is found by one byte
-// pattern, which must match once; every other place comes from its code and the calls it makes.
+// bones.hpp has the static reading of 2.5's code and the instruction forms the offsets come from:
+// the live read (the animated object's current pose, model-space QsTransforms in meta rig order),
+// and the model read with its local read (the rigs' bind pose). Each is found by one byte pattern,
+// which must match once; every other place comes from their code and the calls the model read
+// makes. The first run (0.76.0) read the rigs' bind pose as if it were the live one: the "pose
+// parts" are the rigs (animRig: names +0xD8, reference pose +0x48, A-pose +0xB8). REDnode 0.76.1
+// reads the live pose, and the bind pose only when asked.
 //
 // The game's crash handler takes a fault before __try does (worldnodes.cpp found this), so the
-// animated object, its meta rig, each pose part and each array are checked with VirtualQuery before
-// they are read, and sizes past a sane limit refuse the read.
+// animated object, its meta rig, its pose, its rigs and each array are checked with VirtualQuery
+// before they are read, and sizes past a sane limit refuse the read.
 //
-//   ReadBones(component, wanted) -> fields of one component's answer (bones.cpp builds them):
-//     "object":"cache"|"lookup", "lod":{"level","last","distance"}, "parts":[n bones, ...],
-//     "count":n, "bones":[{"index","name","parent","part","local":{t,r,s},"model":{t,r,s}}]
-//   "part" -1: no pose part holds the bone, and the game reads it as the identity.
+//   ReadBones(component, wanted) -> fields of one answer (bones.cpp builds them):
+//     "object":"cache"|"lookup", "lod":{"level","last","distance"}, "rigs":[n bones, ...],
+//     "count":n, "bones":[{"index","name","parent","rig","model":{t,r,s},"local":{t,r,s},"bind":{t,r,s}}]
+//   "model": the live pose, relative to the entity's animated root, as the game holds it.
+//   "local": the live pose relative to the parent, computed by REDnode from the two model transforms.
+//   "bind": the bone's own rig's bind pose relative to its parent (the A-pose, else the reference pose).
+//   "rig": which of the object's rigs holds the bone (-1: none).
 //   "lod": the animated object's camera distance level, last level and distance from the camera, at
-//   the SDK's offsets for anim::AnimatedObject (0x9C, 0xAC, 0xE4), unverified on 2.5.
+//   the SDK's offsets for anim::AnimatedObject (0x9C, 0xAC, 0xE4); they changed with distance in the
+//   first run.
 
 #include "bones.hpp"
 #include "overlay.hpp"
@@ -86,27 +93,35 @@ std::vector<Code> GameCode()
     return code;
 }
 
+// The one match of a pattern in the game's code, or null with aWhy.
+const uint8_t* FindOnce(const std::vector<Code>& aCode, const char* aPattern, const char* aName, std::string& aWhy)
+{
+    const uint8_t* found = nullptr;
+    int total = 0;
+    for (const Code& c : aCode)
+    {
+        int count = 0;
+        const uint8_t* at = FindPattern(c.begin, c.end, aPattern, &count);
+        if (at && !found)
+            found = at;
+        total += count;
+    }
+    if (total == 1)
+        return found;
+    aWhy = std::string(aName) + (total ? "'s pattern matches more than once" : "'s pattern is not in the game's code");
+    return nullptr;
+}
+
 const Layout& Find()
 {
     if (g_looked)
         return g_layout;
     g_looked = true;
     const auto code = GameCode();
-    const uint8_t* found = nullptr;
-    int total = 0;
-    for (const Code& c : code)
-    {
-        int count = 0;
-        const uint8_t* at = FindPattern(c.begin, c.end, ModelReadPattern, &count);
-        if (at && !found)
-            found = at;
-        total += count;
-    }
-    if (total != 1)
-    {
-        g_layout.why = total ? "the model read's pattern matches more than once" : "the model read's pattern is not in the game's code";
-    }
-    else
+    static std::string why;
+    const uint8_t* model = FindOnce(code, ModelReadPattern, "the model read", why);
+    const uint8_t* live = model ? FindOnce(code, LiveReadPattern, "the live read", why) : nullptr;
+    if (model && live)
     {
         auto inside = [&code](const uint8_t* aAt, size_t aBytes) {
             for (const Code& c : code)
@@ -116,15 +131,19 @@ const Layout& Find()
             }
             return false;
         };
-        g_layout = ReadLayout(found, inside);
+        g_layout = ReadLayout(model, live, inside);
+    }
+    else
+    {
+        g_layout.why = why.c_str();
     }
     const auto* image = reinterpret_cast<const uint8_t*>(GetModuleHandleW(nullptr));
     if (g_layout.ok)
-        Log("Bones: model read +0x%llx, local read +0x%llx; object at component +0x%X (registry +0x%X), meta rig +0x%X "
-            "(names +0x%X, parents +0x%X), parts +0x%X (part +0x%X, next +0x%X, names +0x%X), buffers +0x%X/+0x%X "
-            "(counts +0x%X/+0x%X)",
-            static_cast<unsigned long long>(g_layout.modelRead - image),
-            static_cast<unsigned long long>(g_layout.localRead - image), g_layout.objectCache, g_layout.registry,
+        Log("Bones: live read +0x%llx (pose +0x%X), model read +0x%llx; object at component +0x%X (registry +0x%X), "
+            "meta rig +0x%X (names +0x%X, parents +0x%X), rigs +0x%X (rig +0x%X, next +0x%X, names +0x%X), "
+            "bind poses +0x%X/+0x%X (counts +0x%X/+0x%X)",
+            static_cast<unsigned long long>(g_layout.liveRead - image), g_layout.pose,
+            static_cast<unsigned long long>(g_layout.modelRead - image), g_layout.objectCache, g_layout.registry,
             g_layout.metaRig, g_layout.rigNames, g_layout.rigParents, g_layout.parts, g_layout.partOf, g_layout.next,
             g_layout.partNames, g_layout.bufferA, g_layout.bufferB, g_layout.countA, g_layout.countB);
     else
@@ -133,17 +152,6 @@ const Layout& Find()
 }
 
 using LookupFn = void*(__fastcall*)(void* aRegistry, void* aComponent);
-using ModelFn = Qs*(__fastcall*)(void* aComponent, Qs* aOut, const BoneRef* aBone);
-
-struct Raw
-{
-    Qs local;
-    Qs model;
-    uint64_t name;
-    int16_t parent;
-    int16_t part;
-    uint32_t pad[3];
-};
 
 // The animated object of a component: its cache, else the game's own lookup.
 const uint8_t* ObjectOf(const Layout& aL, uint8_t* aComponent, bool& aLookedUp)
@@ -159,9 +167,10 @@ const uint8_t* ObjectOf(const Layout& aL, uint8_t* aComponent, bool& aLookedUp)
     return static_cast<const uint8_t*>(reinterpret_cast<LookupFn>(const_cast<uint8_t*>(aL.lookup))(registry, aComponent));
 }
 
-// Checks the object, its meta rig and its pose parts with VirtualQuery. Fills the parts' bone
-// counts; answers the meta rig, or null with aWhy.
-const uint8_t* CheckObject(const Layout& aL, const uint8_t* aObject, std::vector<uint32_t>& aParts, const char*& aWhy)
+// Checks the object, its meta rig, its live pose and its rigs with VirtualQuery. Fills the rigs'
+// bone counts and the live pose's array; answers the meta rig, or null with aWhy.
+const uint8_t* CheckObject(const Layout& aL, const uint8_t* aObject, std::vector<uint32_t>& aRigs, const Qs*& aPose,
+                           const char*& aWhy)
 {
     if (!Readable(aObject, ObjectBytes))
         return aWhy = "its animated object is not readable", nullptr;
@@ -178,20 +187,29 @@ const uint8_t* CheckObject(const Layout& aL, const uint8_t* aObject, std::vector
     if (!Readable(names->entries, names->size * sizeof(uint64_t)) || !Readable(parents->entries, parents->size * sizeof(int16_t)))
         return aWhy = "its meta rig's bone lists are not readable", nullptr;
 
+    const uint8_t* pose = *reinterpret_cast<const uint8_t* const*>(aObject + aL.pose);
+    if (!pose)
+        return aWhy = "its animated object has no live pose (not animated yet)", nullptr;
+    if (!Readable(pose, 8))
+        return aWhy = "its live pose is not readable", nullptr;
+    aPose = *reinterpret_cast<const Qs* const*>(pose);
+    if (!Readable(aPose, names->size * sizeof(Qs)))
+        return aWhy = "its live pose's transforms are not readable", nullptr;
+
     const uint8_t* node = *reinterpret_cast<const uint8_t* const*>(aObject + aL.parts);
     const size_t nodeBytes = (aL.partOf > aL.next ? aL.partOf : aL.next) + 8;
     const size_t partBytes = std::max<size_t>({aL.partNames + sizeof(Array), aL.countA + 4, aL.countB + 4,
                                               aL.bufferA + 8, aL.bufferB + 8});
     while (node)
     {
-        if (aParts.size() >= MaxParts || !Readable(node, nodeBytes))
-            return aWhy = "its pose parts are not readable", nullptr;
+        if (aRigs.size() >= MaxParts || !Readable(node, nodeBytes))
+            return aWhy = "its rigs are not readable", nullptr;
         const uint8_t* part = *reinterpret_cast<const uint8_t* const*>(node + aL.partOf);
         uint32_t count = 0;
         if (part)
         {
             if (!Readable(part, partBytes))
-                return aWhy = "a pose part is not readable", nullptr;
+                return aWhy = "a rig is not readable", nullptr;
             const Array* partNames = ArrayAt(part, aL.partNames);
             const uint32_t a = *reinterpret_cast<const uint32_t*>(part + aL.countA);
             const uint32_t b = *reinterpret_cast<const uint32_t*>(part + aL.countB);
@@ -199,11 +217,11 @@ const uint8_t* CheckObject(const Layout& aL, const uint8_t* aObject, std::vector
             const uint32_t held = b == a ? b : a;
             count = partNames->size;
             if (count > MaxBones || held < count)
-                return aWhy = "a pose part's lists are not as expected", nullptr;
+                return aWhy = "a rig's lists are not as expected", nullptr;
             if (count && (!Readable(partNames->entries, count * sizeof(uint64_t)) || !Readable(buffer, count * sizeof(Qs))))
-                return aWhy = "a pose part's lists are not readable", nullptr;
+                return aWhy = "a rig's lists are not readable", nullptr;
         }
-        aParts.push_back(count);
+        aRigs.push_back(count);
         node = *reinterpret_cast<const uint8_t* const*>(node + aL.next);
     }
     return rig;
@@ -252,8 +270,9 @@ std::string Quote(const std::string& aText)
 }
 } // namespace
 
-bool ReadBones(void* aComponent, const BonesWanted& aWanted, std::string& aOut, std::string& aError)
+bool ReadBones(void* aComponent, const BonesWanted& aWanted, const void*& aObject, std::string& aOut, std::string& aError)
 {
+    aObject = nullptr;
     const Layout& l = Find();
     if (!l.ok)
     {
@@ -268,12 +287,17 @@ bool ReadBones(void* aComponent, const BonesWanted& aWanted, std::string& aOut, 
         aError = "the component has no animated object (not streamed in, or not animated)";
         return false;
     }
-    std::vector<uint32_t> parts;
+    aObject = object;
+    if (std::find(aWanted.skip.begin(), aWanted.skip.end(), object) != aWanted.skip.end())
+        return true; // read already, for another component: the caller says which
+
+    std::vector<uint32_t> rigs;
+    const Qs* pose = nullptr;
     const char* why = nullptr;
-    const uint8_t* rig = CheckObject(l, object, parts, why);
+    const uint8_t* rig = CheckObject(l, object, rigs, pose, why);
     if (!rig)
     {
-        aError = std::string("the component's pose cannot be read: ") + why;
+        aError = std::string("the pose cannot be read: ") + why;
         return false;
     }
     const Array* names = ArrayAt(rig, l.rigNames);
@@ -281,51 +305,47 @@ bool ReadBones(void* aComponent, const BonesWanted& aWanted, std::string& aOut, 
     const auto* parentList = static_cast<const int16_t*>(ArrayAt(rig, l.rigParents)->entries);
     const uint32_t count = names->size;
 
-    std::vector<Raw> raw(count);
-    for (uint32_t i = 0; i < count; ++i)
-    {
-        raw[i].name = nameList[i];
-        raw[i].parent = parentList[i];
-        int part = -1;
-        raw[i].local = LocalOf(l, object, nameList[i], part);
-        raw[i].part = static_cast<int16_t>(part);
-        if (aWanted.model)
-        {
-            BoneRef ref{static_cast<int32_t>(i), 0, nameList[i], 0};
-            reinterpret_cast<ModelFn>(const_cast<uint8_t*>(l.modelRead))(component, &raw[i].model, &ref);
-        }
-    }
+    // Copied at once, so the whole pose comes from one moment of the game thread.
+    std::vector<Qs> model(pose, pose + count);
 
     char lod[160];
     std::snprintf(lod, sizeof(lod), "{\"level\":%u,\"last\":%u,\"distance\":",
                   *reinterpret_cast<const uint32_t*>(object + LodLevel), *reinterpret_cast<const uint32_t*>(object + LodLast));
     aOut += std::string("\"object\":\"") + (lookedUp ? "lookup" : "cache") + "\",\"lod\":" + lod;
     Num(aOut, *reinterpret_cast<const float*>(object + LodDistance));
-    aOut += "},\"parts\":[";
-    for (size_t k = 0; k < parts.size(); ++k)
-        aOut += (k ? "," : "") + std::to_string(parts[k]);
+    aOut += "},\"rigs\":[";
+    for (size_t k = 0; k < rigs.size(); ++k)
+        aOut += (k ? "," : "") + std::to_string(rigs[k]);
     aOut += "],\"count\":" + std::to_string(count) + ",\"bones\":[";
     bool first = true;
     for (uint32_t i = 0; i < count; ++i)
     {
         if (!aWanted.names.empty() &&
-            std::find(aWanted.names.begin(), aWanted.names.end(), raw[i].name) == aWanted.names.end())
+            std::find(aWanted.names.begin(), aWanted.names.end(), nameList[i]) == aWanted.names.end())
             continue;
+        int rigOf = -1;
+        const Qs bind = LocalOf(l, object, nameList[i], rigOf);
+        const int p = parentList[i];
+        const bool hasParent = p >= 0 && static_cast<uint32_t>(p) < count && static_cast<uint32_t>(p) != i;
         aOut += first ? "{" : ",{";
         first = false;
-        aOut += "\"index\":" + std::to_string(i) + ",\"name\":" + Quote(NameOf(raw[i].name)) + ",\"parent\":";
-        const int p = raw[i].parent;
-        aOut += p >= 0 && static_cast<uint32_t>(p) < count ? Quote(NameOf(nameList[p])) : "null";
-        aOut += ",\"part\":" + std::to_string(raw[i].part);
-        if (aWanted.local)
-        {
-            aOut += ",\"local\":";
-            QsJson(aOut, raw[i].local);
-        }
+        aOut += "\"index\":" + std::to_string(i) + ",\"name\":" + Quote(NameOf(nameList[i])) + ",\"parent\":";
+        aOut += hasParent ? Quote(NameOf(nameList[p])) : "null";
+        aOut += ",\"rig\":" + std::to_string(rigOf);
         if (aWanted.model)
         {
             aOut += ",\"model\":";
-            QsJson(aOut, raw[i].model);
+            QsJson(aOut, model[i]);
+        }
+        if (aWanted.local)
+        {
+            aOut += ",\"local\":";
+            QsJson(aOut, hasParent ? Local(model[p], model[i]) : model[i]);
+        }
+        if (aWanted.bind)
+        {
+            aOut += ",\"bind\":";
+            QsJson(aOut, bind);
         }
         aOut += "}";
     }

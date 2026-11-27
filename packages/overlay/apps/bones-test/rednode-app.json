@@ -1,7 +1,7 @@
 {
   "id": "bones-test",
   "name": "Bones test (#62)",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Edgemodders",
   "description": "REDnode #62's world.bones, for REDcode: spawns a male average person beside V with the arms crossed, reads the live pose of its body rig and its deformation helpers (local and model space), saves each read as JSON in the data folder, and checks that each bone's model transform is its parent's times its local one.",
   "main": "mod.mjs",
@@ -10,7 +10,7 @@
   "minWidth": 480,
   "minHeight": 300,
   "requires": {
-    "rednode": ">=0.76.0",
+    "rednode": ">=0.76.1",
     "codeware": ">=1.14"
   }
 }

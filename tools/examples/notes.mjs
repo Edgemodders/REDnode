@@ -529,11 +529,11 @@ export const NOTES = {
     teaches: ['world.bones', 'world.spawn', 'world.useWorkspot', 'world.near', 'pkg.dataDir'],
     how: [
       '**Spawn** places the Trauma Team paramedic, on the male average rig, 2.5 m in front of V and starts a gameplay workspot with the arms crossed.',
-      '**Read** calls `world.bones` with `space: "both"`: for each animated component (`root` for the body, `deformations` for the helpers) its rig, its level of detail, and each bone\'s name, parent, local transform and model-space transform. The read is saved in full in the app\'s data folder with the seconds since the workspot started.',
-      'Each read is checked: a bone\'s model transform should be its parent\'s model transform times its own local one. The log gives the largest gap in millimetres.',
+      '**Read** calls `world.bones` with `space: "both"` and `bind: true`: the person\'s skeleton, which their `root`, `face_rig` and `deformations` components share, with its level of detail, and each bone\'s name, parent, rig, live model-space and local transforms and bind pose. The read is saved in full in the app\'s data folder with the seconds since the workspot started.',
+      'The log says how far the pose moved since the last read, where the left hand is, and a helper\'s live and bind places, which tells a live pose from a still one.',
     ],
     tryThis: ['Press Spawn, wait until the arms are crossed, then Read 4.', 'Walk up to anyone and press Read the nearest person.'],
-    preview: 'The preview\'s game has no people or skeletons, so the buttons log a failure here: the app is meant for the game. Needs REDnode 0.76.0.',
+    preview: 'The preview\'s game has no people or skeletons, so the buttons log a failure here: the app is meant for the game. Needs REDnode 0.76.1.',
   },
   'saves-spike': {
     group: 'tests',

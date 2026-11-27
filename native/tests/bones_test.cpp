@@ -57,6 +57,7 @@ void MadeUpCode()
     uint8_t* next = code.data() + 0x180;
     uint8_t* buffer = code.data() + 0x200;
     uint8_t* equal = code.data() + 0x240;
+    uint8_t* live = code.data() + 0x280;
 
     Put(model, ModelReadPattern);
     Put32(model + ModelCache, 0x1234);
@@ -66,6 +67,10 @@ void MadeUpCode()
     model[ModelNames] = 0x28;
     model[ModelParents] = 0x38;
     Aim(model + ModelLocalCall + 1, local);
+
+    Put(live, LiveReadPattern);
+    live[LivePose] = 0x28;
+    live[LiveMetaRig] = 0x18;
 
     Put(local, LocalReadPattern);
     local[LocalParts] = 0x70;
@@ -91,8 +96,9 @@ void MadeUpCode()
     int count = 0;
     Check(FindPattern(code.data(), code.data() + code.size(), ModelReadPattern, &count) == model && count == 1,
           "the model read's pattern is found once");
-    const Layout l = ReadLayout(model, inside);
+    const Layout l = ReadLayout(model, live, inside);
     Check(l.ok, l.ok ? "the layout reads" : l.why);
+    Check(l.liveRead == live && l.pose == 0x28, "the live read and the pose's place");
     Check(l.objectCache == 0x1234 && l.registry == 0x5678, "the component's object and registry offsets");
     Check(l.lookup == lookup && l.localRead == local, "the lookup and the local read");
     Check(l.metaRig == 0x18 && l.rigNames == 0x28 && l.rigParents == 0x38, "the meta rig and its lists");
@@ -101,11 +107,15 @@ void MadeUpCode()
 
     // A broken second buffer form is refused.
     equal[7] = 0x90;
-    Check(!ReadLayout(model, inside).ok, "a changed buffer read is refused");
+    Check(!ReadLayout(model, live, inside).ok, "a changed buffer read is refused");
     equal[7] = 0x8B;
     // A call outside the code is refused.
     auto narrow = [&](const uint8_t* aAt, size_t aBytes) { return aAt >= model && aAt + aBytes <= model + 0x100; };
-    Check(!ReadLayout(model, narrow).ok, "a local read outside the code is refused");
+    Check(!ReadLayout(model, live, narrow).ok, "a local read outside the code is refused");
+    // The live read must find the meta rig where the model read does.
+    live[LiveMetaRig] = 0x20;
+    Check(!ReadLayout(model, live, inside).ok, "a live read with another meta rig place is refused");
+    live[LiveMetaRig] = 0x18;
 }
 
 Qs Make(float tx, float ty, float tz, float rx, float ry, float rz, float rw)
@@ -176,6 +186,15 @@ void Product()
     scaled.s[0] = scaled.s[1] = scaled.s[2] = 2.f;
     const Qs ms = Mul(scaled, child);
     Check(Near(ms.t[1], 2) && Near(ms.s[0], 2), "the parent's scale scales the child's place");
+    // Local undoes Mul: the child relative to its parent, from both in model space.
+    Qs turned = Make(0.3f, -0.2f, 1.1f, 0, 0, 0, 1);
+    const float len = std::sqrt(0.1f * 0.1f + 0.7f * 0.7f + 0.2f * 0.2f + 0.5f * 0.5f);
+    turned.r[0] = 0.1f / len, turned.r[1] = 0.7f / len, turned.r[2] = -0.2f / len, turned.r[3] = 0.5f / len;
+    const Qs kid = Make(0.05f, 0.4f, -0.1f, 0, 0, h, h);
+    const Qs back = Local(turned, Mul(turned, kid));
+    Check(Near(back.t[0], kid.t[0]) && Near(back.t[1], kid.t[1]) && Near(back.t[2], kid.t[2]), "Local gives the child's place back");
+    Check(Near(std::fabs(back.r[2]), h) && Near(std::fabs(back.r[3]), h) && Near(back.r[0], 0) && Near(back.r[1], 0),
+          "Local gives the child's rotation back");
 }
 
 void RealExe()
@@ -200,18 +219,25 @@ void RealExe()
         if (section->Characteristics & IMAGE_SCN_MEM_EXECUTE)
             code.push_back({image + section->VirtualAddress, image + section->VirtualAddress + section->Misc.VirtualSize});
     }
-    const uint8_t* found = nullptr;
-    int total = 0;
-    for (const auto& c : code)
-    {
-        int count = 0;
-        const uint8_t* at = FindPattern(c.first, c.second, ModelReadPattern, &count);
-        if (at && !found)
-            found = at;
-        total += count;
-    }
+    auto once = [&](const char* aPattern, int& aTotal) {
+        const uint8_t* found = nullptr;
+        aTotal = 0;
+        for (const auto& c : code)
+        {
+            int count = 0;
+            const uint8_t* at = FindPattern(c.first, c.second, aPattern, &count);
+            if (at && !found)
+                found = at;
+            aTotal += count;
+        }
+        return found;
+    };
+    int total = 0, liveTotal = 0;
+    const uint8_t* found = once(ModelReadPattern, total);
+    const uint8_t* liveFound = once(LiveReadPattern, liveTotal);
     Check(total == 1, "the model read's pattern matches once in the game exe");
-    if (total != 1)
+    Check(liveTotal == 1, "the live read's pattern matches once in the game exe");
+    if (total != 1 || liveTotal != 1)
         return;
     auto inside = [&](const uint8_t* aAt, size_t aBytes) {
         for (const auto& c : code)
@@ -221,10 +247,11 @@ void RealExe()
         }
         return false;
     };
-    const Layout l = ReadLayout(found, inside);
+    const Layout l = ReadLayout(found, liveFound, inside);
     Check(l.ok, l.ok ? "the layout reads from the game exe" : l.why);
     if (!l.ok)
         return;
+    std::printf("      live read +0x%llx (pose +0x%X)\n", static_cast<unsigned long long>(l.liveRead - image), l.pose);
     std::printf("      model read +0x%llx, lookup +0x%llx, local read +0x%llx\n",
                 static_cast<unsigned long long>(l.modelRead - image), static_cast<unsigned long long>(l.lookup - image),
                 static_cast<unsigned long long>(l.localRead - image));

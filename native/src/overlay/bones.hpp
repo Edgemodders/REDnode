@@ -6,21 +6,30 @@
 //
 // Game 2.5 has no script call that reads bones. Its slot component does, natively: a slot bound
 // to a bone (entSlotComponent.GetSlotTransform) asks the entity's entAnimatedComponent for the
-// bone's model-space transform through one function, which this file calls "the model read":
+// bone's place through two functions, found in a static reading of 2.5's exe:
 //
-//   QsTransform* ModelRead(entAnimatedComponent*, QsTransform* out, const BoneRef* bone)
+//   "the live read" (+0x32b1e8): bool (animated object, BoneRef*, QsTransform* out). The animated
+//   object keeps its current pose at +0x18; the pose's first field is an array of model-space
+//   QsTransforms, one per bone of the object's meta rig (the SDK's anim::MetaRig: bone names and
+//   parent indices), in meta rig order. This is what the game animates.
+//   "the model read" (+0xbf1ec4): QsTransform* (component, out, BoneRef*), which walks the bone's
+//   parents through "the local read" over the object's rigs (a list of animRig resources: names at
+//   +0xD8, the reference pose at +0x48 and the A-pose at +0xB8, chosen by their counts). It answers
+//   the rig's bind pose, not the live one; REDnode reads it only for "bind" and for which rig
+//   holds a bone.
 //
-// It takes the component's animated object (cached in the component, else looked up from a
-// registry the component names), the object's meta rig (bone names and parent indices, the SDK's
-// anim::MetaRig), and walks the bone's parents, multiplying each bone's local transform, which
-// "the local read" finds in the first pose part (a list in the animated object) whose own bone
-// names hold the bone. A bone no part holds is the identity. A part's pose is one of two buffers
-// of QsTransforms, chosen by comparing their counts ("the buffer read").
+// Each animated component of an entity (a person's root, face_rig and deformations) names the
+// same animated object, cached in the component or found by the game's lookup from a registry
+// the component names.
 //
-// The plugin takes every offset from those three functions' own code, found by one byte
-// pattern for the model read (unique in 2.5's exe) and the calls it makes, rather than from
-// fixed numbers: these are the instruction forms it looks for, with 2.5's values.
+// The plugin takes every offset from those functions' own code, found by two byte patterns (each
+// unique in 2.5's exe) and the calls the model read makes, rather than from fixed numbers: these
+// are the instruction forms it looks for, with 2.5's values.
 //
+//   live read (pattern below)
+//     mov r8, [rcx + pose]              4C 8B 41 <disp8>       0x18, the current pose
+//     mov rdx, [rcx + metaRig]          48 8B 51 <disp8>       0x08
+//     add rcx, [r8]                     49 03 08               the pose's model-space array
 //   model read (pattern below)
 //     mov rdi, [rcx + cache]            48 8B B9 <disp32>      the animated object, 0x178
 //     mov rcx, [rcx + registry]         48 8B 89 <disp32>      0x168, then call lookup
@@ -69,6 +78,8 @@ struct Layout
 {
     bool ok = false;
     const char* why = nullptr;
+    const uint8_t* liveRead = nullptr;  // bool (object, BoneRef*, Qs* out)
+    uint32_t pose = 0;                  // animated object -> current pose (its first field: Qs[])
     const uint8_t* modelRead = nullptr; // Qs* (component, out, BoneRef*)
     const uint8_t* lookup = nullptr;    // void* (registry, component): the animated object
     const uint8_t* localRead = nullptr;
@@ -86,6 +97,13 @@ struct Layout
     uint32_t bufferA = 0;      // part -> buffer A (used when the counts differ)
     uint32_t bufferB = 0;      // part -> buffer B (used when they are equal)
 };
+
+// The live read's start, in 2.5.
+constexpr const char* LiveReadPattern =
+    "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 40 49 8B F8 33 DB 4C 8B 41 ?? 48 8B F2 48 8B E9 "
+    "4D 85 C0 74 ?? 83 39 FF 74 ?? 48 8B 51 ?? 48 8B 46 10 48 39 42 ?? 0F 85 ?? ?? ?? ?? 8B 06 83 F8 FF 74 ?? "
+    "48 8D 0C 40 48 C1 E1 04 49 03 08";
+constexpr size_t LivePose = 28, LiveMetaRig = 48, LiveReadLength = 81;
 
 // The model read's start, in 2.5. ?? are the offsets and calls read below.
 constexpr const char* ModelReadPattern =
@@ -194,9 +212,16 @@ inline const uint8_t* Target(const uint8_t* aRel)
 // Reads every offset from the model read's code and the two functions it reaches. aInside says
 // whether a target lies inside the code that may be read (aLimit bytes from it at least).
 template<typename Inside>
-Layout ReadLayout(const uint8_t* aModelRead, Inside aInside)
+Layout ReadLayout(const uint8_t* aModelRead, const uint8_t* aLiveRead, Inside aInside)
 {
     Layout l;
+    if (!aLiveRead || !aInside(aLiveRead, LiveReadLength) || !MatchesAt(aLiveRead, LiveReadPattern))
+    {
+        l.why = "the live read's code is not as expected";
+        return l;
+    }
+    l.liveRead = aLiveRead;
+    l.pose = aLiveRead[LivePose];
     if (!aModelRead || !aInside(aModelRead, ModelReadLength) || !MatchesAt(aModelRead, ModelReadPattern))
     {
         l.why = "the model read's code is not as expected";
@@ -209,6 +234,11 @@ Layout ReadLayout(const uint8_t* aModelRead, Inside aInside)
     l.metaRig = aModelRead[ModelMetaRig];
     l.rigNames = aModelRead[ModelNames];
     l.rigParents = aModelRead[ModelParents];
+    if (aLiveRead[LiveMetaRig] != l.metaRig)
+    {
+        l.why = "the live read and the model read find the meta rig in different places";
+        return l;
+    }
     l.localRead = Target(aModelRead + ModelLocalCall + 1);
     if (!aInside(l.lookup, 1))
     {
@@ -337,6 +367,24 @@ inline Qs Mul(const Qs& aParent, const Qs& aLocal)
         out.s[i] = aParent.s[i] * aLocal.s[i];
     }
     QuatMul(aParent.r, aLocal.r, out.r);
+    return out;
+}
+// The child relative to its parent, from both in model space: parent^-1 * child, so that
+// Mul(parent, Local(parent, child)) is the child again.
+inline Qs Local(const Qs& aParent, const Qs& aChild)
+{
+    Qs out{};
+    const float inv[4] = {-aParent.r[0], -aParent.r[1], -aParent.r[2], aParent.r[3]};
+    const float d[3] = {aChild.t[0] - aParent.t[0], aChild.t[1] - aParent.t[1], aChild.t[2] - aParent.t[2]};
+    float back[3];
+    Rotate(inv, d, back);
+    for (int i = 0; i < 3; ++i)
+    {
+        const float s = aParent.s[i] != 0.f ? aParent.s[i] : 1.f;
+        out.t[i] = back[i] / s;
+        out.s[i] = aChild.s[i] / s;
+    }
+    QuatMul(inv, aChild.r, out.r);
     return out;
 }
 } // namespace rednode::overlay::bones

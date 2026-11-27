@@ -562,21 +562,23 @@ function createMcp(host) {
       {
         title: 'Bones of an entity',
         description:
-          'Reads the live pose of an entity\'s animated components (a person has "root" on its body\'s rig and "deformations" for the muscle and ' +
-          'twist helpers): each bone\'s name, parent, and transform as t [x,y,z], r [x,y,z,w], s [x,y,z]. space "local" (the default) is relative ' +
-          'to the parent, as the game holds it; "model" is relative to the component, from the game\'s own read that bone slots use; "both" gives ' +
-          'both. Also the rig\'s path hash and the animated object\'s level of detail. Read only. The id comes from world_spawned, world_spawn or world_near.',
+          'Reads the live pose of an entity\'s skeleton: every bone of its animated object (a person\'s body, face and muscle and twist helpers; ' +
+          'its root, face_rig and deformations components share the object, read once, the others answer sameAs), each with its name, parent, ' +
+          'rig and transform as t [x,y,z], r [x,y,z,w], s [x,y,z]. space "model" is the live pose relative to the animated root, as the game holds ' +
+          'it; "local" (the default) is relative to the parent; "both" gives both. bind adds each bone\'s rig bind pose. Also the level of detail. ' +
+          'Read only. The id comes from world_spawned, world_spawn or world_near.',
         inputSchema: {
           id: z.string().describe('The entity id hash'),
           components: z.array(z.string()).optional().describe('Only these animated components, by name'),
           bones: z.array(z.string()).optional().describe('Only these bones, by name'),
           space: z.enum(['local', 'model', 'both']).optional(),
+          bind: z.boolean().optional().describe('Also each bone\'s bind pose from its rig'),
         },
         annotations: READ,
       },
-      async ({ id, components, bones, space }) => {
+      async ({ id, components, bones, space, bind }) => {
         try {
-          const r = await host.call('world.bones', { id, ...(components ? { components } : {}), ...(bones ? { bones } : {}), space: space ?? 'local' });
+          const r = await host.call('world.bones', { id, ...(components ? { components } : {}), ...(bones ? { bones } : {}), space: space ?? 'local', ...(bind ? { bind: true } : {}) });
           return text(JSON.stringify({ ...r, at: new Date().toISOString() }));
         } catch (err) {
           return fail(err.message);

@@ -14,7 +14,7 @@ How to keep it:
 
 ### New
 
-- `world.bones(entity, { components, bones, space })` reads the live pose of an entity's animated components: each bone's name, parent, local transform and model-space transform, the deformation helpers included (#62, for REDcode). The MCP tool `world_bones` reads it for assistants.
+- `world.bones(entity, { components, bones, space })` reads the live pose of an entity's skeleton: each bone's name, parent and rig, its model-space transform as the game holds it, its transform relative to its parent, and with `bind: true` its rig's bind pose, the deformation helpers included (#62, for REDcode). The MCP tool `world_bones` reads it for assistants.
 
 ## 0.75.0 (2026-11-26)
 
