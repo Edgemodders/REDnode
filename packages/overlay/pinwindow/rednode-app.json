@@ -1,7 +1,7 @@
 {
   "id": "pinwindow",
   "name": "Pins",
-  "version": "0.76.2",
+  "version": "0.77.0",
   "author": "Edgemodders",
   "description": "Every pin in the world with its distance and Go there; Drop a pin here where V stands; your own pin sets, saved as files, shown or hidden; Click a pin to go there.",
   "entry": "index.html",

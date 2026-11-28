@@ -1672,7 +1672,22 @@ function openInGame(w) {
   });
   sendJson({ cmd: 'window.drag', window: w.id, regions: w.dragRegions });
   if (w.escapeLock) sendJson({ cmd: 'keys.lock', window: w.id, escape: true });
+  takeKeysOnOpen(w);
   repaint(w.win.webContents); // send a full frame now
+}
+
+// A package the player switched on from the launcher or the Mod Manager: its first window to
+// open takes the keyboard, so the Mod Manager's search box is typed into at once. A new window
+// never took it before 0.77.0, and keys stayed with the launcher.
+const keysOnOpen = new Map(); // package id -> when it was switched on
+const KEYS_ON_OPEN_MS = 10000;
+function takeKeysOnOpen(w) {
+  const id = w.app.manifest.id.split('~')[0];
+  const at = keysOnOpen.get(id);
+  if (at === undefined || w.app.debugger || w.app.manifest.kind === 'hud') return;
+  keysOnOpen.delete(id);
+  if (Date.now() - at > KEYS_ON_OPEN_MS || windowHidden(w)) return;
+  sendJson({ cmd: 'window.front', window: w.id });
 }
 
 function connect() {
@@ -4085,6 +4100,7 @@ function setPackageOpen(id, open) {
 
 ipcMain.handle('rednode:apps:set-open', (event, id, open) => {
   fromLauncher(event);
+  if (open) keysOnOpen.set(String(id), Date.now());
   setPackageOpen(id, open);
   return appList();
 });

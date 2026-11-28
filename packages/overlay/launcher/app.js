@@ -90,7 +90,13 @@ function makeRow(item) {
   const text = el('div');
   const name = el('div', 'name link', item.name);
   let current = item;
-  name.addEventListener('click', () => act(current.name, () => showPackage(current)));
+  // The launcher closes after, out of the way of what it opened, and its filter, which found
+  // the package, is cleared for the next open (0.77.0).
+  name.addEventListener('click', () => {
+    act(current.name, () => showPackage(current));
+    $('filter').value = '';
+    showPanel(false);
+  });
   const meta = el('div', 'meta');
   text.append(name, meta);
 
@@ -722,15 +728,16 @@ function showDrawer(on) {
 $('gear').addEventListener('click', () => showDrawer(drawer.hidden));
 drawer.addEventListener('close', () => showDrawer(false)); // a drawer's close hides only it
 
-$('toggle').addEventListener('click', () => {
-  panel.hidden = !panel.hidden;
-  if (panel.hidden) showDrawer(false);
+function showPanel(on) {
+  panel.hidden = !on;
+  if (!on) showDrawer(false);
   else {
     refresh();
     // The filter takes the keyboard, so typing at once finds a mod (0.67.2).
     requestAnimationFrame(() => $('filter').focus());
   }
-});
+}
+$('toggle').addEventListener('click', () => showPanel(panel.hidden));
 
 // Keep memory and state current while the list is open.
 setInterval(() => {

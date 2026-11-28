@@ -1382,6 +1382,22 @@ The launcher's switch that loads saves made with mods with no Mod Verification p
 | Script compiles, 2026-11-26, 0.75.0, by Claude | **Pass**: 0 errors in REDnode's scripts with redscript-cli alone, beside Codeware, and beside Codeware and Remove Mods Menu (Remove Mods Menu replaces `LoadListItem.IsModded`, REDnode wraps it); the game's scc.exe beside both, 0 errors (scratchpad `modded/check.ps1`). The plugin builds and its unit tests pass |
 | Game 2.5, dev PC, 2026-11-26, REDnode 0.75.0, by the owner | **Pass**, all six steps. The host logged the switch on at 11:20:41; after the restart (step 5) the plugin was told at once (`Saves: modded saves load without the mod check`, 11:23:06). With Remove Mods Menu back on (step 6), no errors in `redscript_rCURRENT.log` |
 
+## The launcher closes, the Mod Manager's search (0.77.0)
+
+Asked for by the owner on 2026-11-28. A click on a package's name in the launcher closes the launcher and clears its filter. A package switched on from the launcher or the Mod Manager takes the keyboard when its first window opens (the host sends `window.front`, `takeKeysOnOpen` in main.js; a new window never took it before), and the Mod Manager focuses its search box when it starts.
+
+Steps (the Mod Manager switched off first, in the launcher):
+
+1. F10. Open the launcher, type part of an app's name in its filter (one switched off), and click its name: the app opens, the launcher closes.
+2. Open the launcher again: its filter is empty and the pinned list shows.
+3. Press **Open** beside the filter: the Mod Manager opens. Type at once, without clicking: the letters go into its search box and the list narrows.
+4. Click a name for an app that is already on (its window showing): the launcher closes, with a note "Already showing".
+5. Close the Mod Manager with ✕, then switch it on again with its launcher toggle: typing at once searches again.
+
+| Run | Result |
+|---|---|
+| Not run yet | |
+
 ## Hide on a click in the game (0.69.0)
 
 The launcher's switch that makes a click outside REDnode's windows hide the whole overlay, not leave windows pinned to the HUD. Steps: [docs/overlay.md, "Hide on a click in the game (0.69.0)"](overlay.md#hide-on-a-click-in-the-game-0690).

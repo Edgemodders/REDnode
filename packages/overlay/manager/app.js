@@ -768,3 +768,5 @@ window.rednode.on((m) => {
 });
 setInterval(refresh, 2000); // memory and state stay current
 refresh();
+// The search box takes the keyboard, so typing at once finds a mod (0.77.0).
+requestAnimationFrame(() => $('search').focus());
